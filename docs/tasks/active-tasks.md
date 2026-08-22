@@ -17,3 +17,4 @@
 | CC-013 | Add direct-body editing and stale preview protection in the editor | Backlog | P1 |
 | CC-014 | Port SDF evaluation to a Burst-compatible execution program | In Progress | P1 |
 | CC-015 | Spore-like body sample authoring and place-part snapping | In Progress | P1 |
+| CC-016 | Body spline manipulation solver (local curve editing) | Backlog | P1 |

@@ -106,13 +106,32 @@ exactly the segment length) then translates the downstream joints rigidly.
 This changes less — total body length is preserved and the tail is not
 respaced.
 
-Lesson: the desired Spore feel is a local bend with fixed segment lengths, not
-whole-body re-spacing. The FABRIK weaknesses recorded earlier (neighbors move
-with the dragged sample, straightening a kink lengthens the body, pushing a
-point kinks/squishes the segments) are the open problem to solve next — for
-example a FABRIK variant with stronger local control (bias the bend toward the
-dragged joint, keep upstream joints near their rest pose) rather than the
-pinned re-space or even-spacing constraint passes tried here.
+Lesson: the desired Spore feel is a local curve edit, not whole-body re-spacing
+and not a global FABRIK solve. A post-rollback review (2026-08-22) corrected
+two readings of the manipulation audit:
+
+1. FABRIK is a constraint primitive, not the editing model. Preserving every
+   segment length exactly is not the goal — neighbors should resist the drag
+   (rest/inertia), move only weakly, and segment lengths should be preserved
+   softly, not exactly. "FABRIK preserves constraints; the editor preserves
+   intent."
+2. Do not build an aggressive drag-direction classifier. The primary interior
+   interaction is drag = bend; endpoint = length; radius stays separate. The
+   "along-spine internal drag = longitudinal redistribution" idea is an
+   inference, not confirmed Spore behavior, and should only be a secondary
+   refinement after the bend interaction is stable.
+
+The implementation contract for the next slice is CC-016 (Body spline
+manipulation solver): a local 3-7 sample solver over the existing v2 schema —
+mouse-down snapshot, strong movement of the selected sample, weak
+neighbor resistance, soft segment-length preservation, a curvature/kink
+penalty (P[i-1] - 2P[i] + P[i+1]) so dragging a sample toward the neighbor
+chord straightens or slides instead of kinking, endpoint length editing, and
+one drag = one Undo. No schema/serialization change, no global re-spacing
+during a drag, no MeshCollider coupling. The audit
+(`docs/audits/sporelike-body-spline-manipulation-audit-26-08-22-15-34-00.md`)
+remains external design evidence, not an owned file; it should be committed as
+design documentation in a separate deliberate change.
 
 The **Body Spacing** slider is kept: `RespaceToTargetSpacing` re-samples the
 whole Body to a target chord spacing keeping the head and tail endpoints
