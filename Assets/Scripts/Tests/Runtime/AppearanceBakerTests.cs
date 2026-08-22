@@ -1,0 +1,204 @@
+using NUnit.Framework;
+using UnityEngine;
+using ProceduralCreature.Appearance;
+using ProceduralCreature.Common;
+using ProceduralCreature.Definition;
+using ProceduralCreature.Morphology.Extraction;
+using ProceduralCreature.Morphology.Sdf;
+
+namespace ProceduralCreature.Tests.Runtime
+{
+    [TestFixture]
+    public class MeshExtractionResultNormalsTests
+    {
+        [Test]
+        public void ComputeAngleWeightedNormals_SingleTriangle_PointsInExpectedDirection()
+        {
+            var mesh = new MeshExtractionResult();
+            mesh.Positions.Add(Vector3.zero);
+            mesh.Positions.Add(Vector3.right);
+            mesh.Positions.Add(Vector3.up);
+            mesh.Triangles.AddRange(new[] { 0, 1, 2 });
+
+            mesh.ComputeAngleWeightedNormals();
+
+            Assert.AreEqual(3, mesh.Normals.Count);
+            Vector3 expected = Vector3.Cross(Vector3.right, Vector3.up).normalized;
+            foreach (Vector3 normal in mesh.Normals)
+            {
+                Assert.AreEqual(expected, normal, "All three vertices of a single flat triangle share its face normal.");
+            }
+        }
+
+        [Test]
+        public void ComputeAngleWeightedNormals_IsIdempotent()
+        {
+            var mesh = new MeshExtractionResult();
+            mesh.Positions.Add(Vector3.zero);
+            mesh.Positions.Add(Vector3.right);
+            mesh.Positions.Add(Vector3.up);
+            mesh.Triangles.AddRange(new[] { 0, 1, 2 });
+
+            mesh.ComputeAngleWeightedNormals();
+            var first = new System.Collections.Generic.List<Vector3>(mesh.Normals);
+            mesh.ComputeAngleWeightedNormals();
+
+            CollectionAssert.AreEqual(first, mesh.Normals);
+        }
+    }
+
+    [TestFixture]
+    public class TriplanarNoiseTests
+    {
+        [Test]
+        public void Evaluate_IsDeterministic()
+        {
+            Vector3 position = new Vector3(1.5f, -0.3f, 2.1f);
+            Vector3 normal = new Vector3(0.5f, 0.7f, 0.5f).normalized;
+
+            float first = TriplanarNoise.Evaluate(position, normal, seed: 7, scale: 1.5f);
+            float second = TriplanarNoise.Evaluate(position, normal, seed: 7, scale: 1.5f);
+
+            Assert.AreEqual(first, second);
+        }
+
+        [Test]
+        public void Evaluate_DifferentSeeds_ProduceDifferentValues()
+        {
+            Vector3 position = new Vector3(1.5f, -0.3f, 2.1f);
+            Vector3 normal = Vector3.up;
+
+            float a = TriplanarNoise.Evaluate(position, normal, seed: 1, scale: 1f);
+            float b = TriplanarNoise.Evaluate(position, normal, seed: 99, scale: 1f);
+
+            Assert.AreNotEqual(a, b);
+        }
+
+        [Test]
+        public void Evaluate_ReturnsValueInUnitRange()
+        {
+            Vector3 normal = new Vector3(0.3f, 0.9f, 0.3f).normalized;
+            for (float x = -3f; x <= 3f; x += 0.7f)
+            {
+                float value = TriplanarNoise.Evaluate(new Vector3(x, x * 0.5f, -x), normal, seed: 3, scale: 2f);
+                Assert.GreaterOrEqual(value, 0f);
+                Assert.LessOrEqual(value, 1f);
+            }
+        }
+
+        [Test]
+        public void Evaluate_DegenerateZeroNormal_DoesNotThrowOrProduceNaN()
+        {
+            float value = TriplanarNoise.Evaluate(Vector3.zero, Vector3.zero, seed: 0, scale: 1f);
+            Assert.IsFalse(float.IsNaN(value));
+        }
+    }
+
+    [TestFixture]
+    public class PartAppearanceSamplerTests
+    {
+        private static CreaturePart ColoredSphere(string id, Vector3 position, Color color)
+        {
+            return new CreaturePart
+            {
+                Id = id,
+                PartType = PartType.Body,
+                Transform = new TransformData { Position = position, Rotation = Quaternion.identity, Scale = Vector3.one },
+                Shape = new ShapeDefinition { Type = ShapeType.Sphere, PrimarySize = 1f, SmoothBlendRadius = 0.1f },
+                Appearance = new AppearanceDefinition { BaseColor = color, NoiseSeed = 0, NoiseScale = 1f },
+            };
+        }
+
+        [Test]
+        public void Resolve_PicksNearestPart()
+        {
+            var definition = CreatureDefinition.CreateEmpty();
+            definition.AddPart(ColoredSphere("part_a", new Vector3(-5f, 0f, 0f), Color.red));
+            definition.AddPart(ColoredSphere("part_b", new Vector3(5f, 0f, 0f), Color.blue));
+
+            ResolvedAppearance nearA = PartAppearanceSampler.Resolve(definition, new Vector3(-5f, 0f, 0f));
+            ResolvedAppearance nearB = PartAppearanceSampler.Resolve(definition, new Vector3(5f, 0f, 0f));
+
+            Assert.AreEqual(Color.red, nearA.BaseColor);
+            Assert.AreEqual(Color.blue, nearB.BaseColor);
+        }
+
+        [Test]
+        public void Resolve_EmptyDefinition_ReturnsDefaultRatherThanThrowing()
+        {
+            CreatureDefinition definition = CreatureDefinition.CreateEmpty();
+            ResolvedAppearance resolved = PartAppearanceSampler.Resolve(definition, Vector3.zero);
+            Assert.AreEqual(AppearanceDefinition.Default.BaseColor, resolved.BaseColor);
+        }
+
+        [Test]
+        public void Resolve_NullDefinition_ThrowsDomainException()
+        {
+            Assert.Throws<DomainException>(() => PartAppearanceSampler.Resolve(null, Vector3.zero));
+        }
+    }
+
+    [TestFixture]
+    public class AppearanceBakerTests
+    {
+        [Test]
+        public void Bake_ProducesOneColorPerVertex()
+        {
+            var sphere = new SphereSdfNode(1f);
+            var bounds = new BoundsDefinition { MaxX = 1.5f, MaxY = 1.5f, MaxZ = 1.5f };
+            var settings = new GenerationSettings { VoxelsPerUnit = 4f };
+            DensityGrid grid = DensityGrid.Sample(sphere, bounds, settings);
+            MeshExtractionResult mesh = MarchingCubesExtractor.Extract(sphere, grid);
+
+            var definition = CreatureDefinition.CreateEmpty();
+            definition.AddPart(new CreaturePart
+            {
+                Id = "part_body",
+                Transform = TransformData.Identity,
+                Shape = new ShapeDefinition { Type = ShapeType.Sphere, PrimarySize = 1f, SmoothBlendRadius = 0.1f },
+                Appearance = new AppearanceDefinition { BaseColor = Color.green, NoiseSeed = 5, NoiseScale = 2f },
+            });
+
+            Color[] colors = AppearanceBaker.Bake(definition, mesh);
+
+            Assert.AreEqual(mesh.Positions.Count, colors.Length);
+        }
+
+        [Test]
+        public void Bake_ColorsStayNearBaseColorWithinBrightnessVariation()
+        {
+            var sphere = new SphereSdfNode(1f);
+            var bounds = new BoundsDefinition { MaxX = 1.5f, MaxY = 1.5f, MaxZ = 1.5f };
+            var settings = new GenerationSettings { VoxelsPerUnit = 4f };
+            DensityGrid grid = DensityGrid.Sample(sphere, bounds, settings);
+            MeshExtractionResult mesh = MarchingCubesExtractor.Extract(sphere, grid);
+
+            var definition = CreatureDefinition.CreateEmpty();
+            definition.AddPart(new CreaturePart
+            {
+                Id = "part_body",
+                Transform = TransformData.Identity,
+                Shape = new ShapeDefinition { Type = ShapeType.Sphere, PrimarySize = 1f, SmoothBlendRadius = 0.1f },
+                Appearance = new AppearanceDefinition { BaseColor = new Color(0.5f, 0.5f, 0.5f), NoiseSeed = 1, NoiseScale = 1f },
+            });
+
+            Color[] colors = AppearanceBaker.Bake(definition, mesh);
+
+            foreach (Color c in colors)
+            {
+                Assert.GreaterOrEqual(c.r, 0.5f * 0.84f);
+                Assert.LessOrEqual(c.r, 0.5f * 1.16f);
+            }
+        }
+
+        [Test]
+        public void Bake_NullArguments_ThrowDomainException()
+        {
+            var mesh = new MeshExtractionResult();
+            var definition = CreatureDefinition.CreateEmpty();
+
+            Assert.Throws<DomainException>(() => AppearanceBaker.Bake(null, mesh));
+            Assert.Throws<DomainException>(() => AppearanceBaker.Bake(definition, null));
+        }
+    }
+}

@@ -1,0 +1,131 @@
+using NUnit.Framework;
+using ProceduralCreature.Definition;
+using ProceduralCreature.Morphology.Extraction;
+using ProceduralCreature.Morphology.Sdf;
+
+namespace ProceduralCreature.Tests.Runtime
+{
+    [TestFixture]
+    public class MarchingCubesExtractorTests
+    {
+        [Test]
+        public void Extract_Sphere_ProducesWatertightMesh()
+        {
+            var sphere = new SphereSdfNode(1f);
+            var bounds = new BoundsDefinition { MaxX = 1.5f, MaxY = 1.5f, MaxZ = 1.5f };
+            var settings = new GenerationSettings { VoxelsPerUnit = 6f };
+
+            DensityGrid grid = DensityGrid.Sample(sphere, bounds, settings);
+            MeshExtractionResult mesh = MarchingCubesExtractor.Extract(sphere, grid);
+
+            Assert.Greater(mesh.TriangleCount, 0, "Sphere should produce a non-empty mesh at this resolution.");
+
+            MeshTopologyReport report = MeshTopologyValidator.Validate(mesh);
+            Assert.IsTrue(report.IsWatertight,
+                $"Expected a watertight sphere mesh; found {report.BoundaryEdgeCount} boundary edges " +
+                $"and {report.NonManifoldEdgeCount} non-manifold edges out of {report.TotalEdgeCount} total.");
+        }
+
+        [Test]
+        public void Extract_TwoOverlappingSpheres_ProducesWatertightMesh()
+        {
+            // A union of two overlapping spheres is more likely to produce
+            // saddle-shaped (ambiguous-face-prone) regions near the join than a
+            // single sphere — a more meaningful stress test for the decider.
+            var a = new SphereSdfNode(1f);
+            UnityEngine.Matrix4x4 offset = UnityEngine.Matrix4x4.TRS(
+                new UnityEngine.Vector3(1f, 0f, 0f), UnityEngine.Quaternion.identity, UnityEngine.Vector3.one);
+            var b = new TransformNode(new SphereSdfNode(1f), offset);
+            var union = new SmoothUnionNode(a, b, 0.3f);
+
+            var bounds = new BoundsDefinition { MaxX = 2.5f, MaxY = 1.5f, MaxZ = 1.5f };
+            var settings = new GenerationSettings { VoxelsPerUnit = 5f };
+
+            DensityGrid grid = DensityGrid.Sample(union, bounds, settings);
+            MeshExtractionResult mesh = MarchingCubesExtractor.Extract(union, grid);
+
+            MeshTopologyReport report = MeshTopologyValidator.Validate(mesh);
+            Assert.IsTrue(report.IsWatertight,
+                $"Expected a watertight union mesh; found {report.BoundaryEdgeCount} boundary edges " +
+                $"and {report.NonManifoldEdgeCount} non-manifold edges out of {report.TotalEdgeCount} total.");
+        }
+
+        [Test]
+        public void Extract_EmptyRegion_ProducesEmptyMesh()
+        {
+            var farAwaySphere = new SphereSdfNode(0.1f);
+            var bounds = new BoundsDefinition { MaxX = 0.5f, MaxY = 0.5f, MaxZ = 0.5f };
+            var settings = new GenerationSettings { VoxelsPerUnit = 4f };
+
+            // Sphere radius 0.1 centered at origin, sampled well within bounds --
+            // should still produce geometry; verify the inverse (an EmptySdfNode
+            // produces zero triangles) as the true "nothing here" case.
+            DensityGrid grid = DensityGrid.Sample(new EmptySdfNode(), bounds, settings);
+            MeshExtractionResult mesh = MarchingCubesExtractor.Extract(new EmptySdfNode(), grid);
+
+            Assert.AreEqual(0, mesh.TriangleCount);
+        }
+
+        [Test]
+        public void Extract_VertexCountIsWeldedNotPerCubeDuplicated()
+        {
+            var sphere = new SphereSdfNode(1f);
+            var bounds = new BoundsDefinition { MaxX = 1.5f, MaxY = 1.5f, MaxZ = 1.5f };
+            var settings = new GenerationSettings { VoxelsPerUnit = 6f };
+
+            DensityGrid grid = DensityGrid.Sample(sphere, bounds, settings);
+            MeshExtractionResult mesh = MarchingCubesExtractor.Extract(sphere, grid);
+
+            // A welded 2-manifold closed mesh satisfies Euler's formula
+            // V - E + F = 2 (genus 0). Cross-check vertex count against triangle
+            // count via the edge count the validator already computed, as a
+            // structural sanity check that welding actually happened (an
+            // unwelded, per-cube-duplicated mesh would badly fail this).
+            MeshTopologyReport report = MeshTopologyValidator.Validate(mesh);
+            int eulerCharacteristic = mesh.Positions.Count - report.TotalEdgeCount + mesh.TriangleCount;
+
+            Assert.AreEqual(2, eulerCharacteristic,
+                "Welded closed genus-0 mesh should satisfy V - E + F = 2.");
+        }
+    }
+
+    [TestFixture]
+    public class MeshTopologyValidatorTests
+    {
+        [Test]
+        public void Validate_SingleTriangle_HasThreeBoundaryEdges()
+        {
+            var mesh = new MeshExtractionResult();
+            mesh.Positions.Add(UnityEngine.Vector3.zero);
+            mesh.Positions.Add(UnityEngine.Vector3.right);
+            mesh.Positions.Add(UnityEngine.Vector3.up);
+            mesh.Triangles.AddRange(new[] { 0, 1, 2 });
+
+            MeshTopologyReport report = MeshTopologyValidator.Validate(mesh);
+
+            Assert.AreEqual(3, report.BoundaryEdgeCount);
+            Assert.AreEqual(0, report.NonManifoldEdgeCount);
+            Assert.IsFalse(report.IsWatertight);
+        }
+
+        [Test]
+        public void Validate_Tetrahedron_IsWatertight()
+        {
+            var mesh = new MeshExtractionResult();
+            mesh.Positions.Add(UnityEngine.Vector3.zero);
+            mesh.Positions.Add(UnityEngine.Vector3.right);
+            mesh.Positions.Add(UnityEngine.Vector3.up);
+            mesh.Positions.Add(UnityEngine.Vector3.forward);
+
+            mesh.Triangles.AddRange(new[] { 0, 1, 2 });
+            mesh.Triangles.AddRange(new[] { 0, 2, 3 });
+            mesh.Triangles.AddRange(new[] { 0, 3, 1 });
+            mesh.Triangles.AddRange(new[] { 1, 3, 2 });
+
+            MeshTopologyReport report = MeshTopologyValidator.Validate(mesh);
+
+            Assert.IsTrue(report.IsWatertight);
+            Assert.AreEqual(6, report.TotalEdgeCount);
+        }
+    }
+}
