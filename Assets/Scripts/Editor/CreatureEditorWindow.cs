@@ -275,6 +275,12 @@ namespace ProceduralCreature.Editor
                 ScheduleAutoRegeneration();
             }
 
+            long estimatedVoxels = new GenerationSettings { VoxelsPerUnit = _previewVoxelsPerUnit }
+                .EstimateVoxelCount(_definition.Bounds);
+            EditorGUILayout.LabelField(
+                "Estimated Voxel Count",
+                $"{estimatedVoxels:N0} / {GenerationTolerances.MaxVoxelBudget:N0}");
+
             float newDelay = Mathf.Max(
                 MinimumAutoRegenerationDelaySeconds,
                 EditorGUILayout.FloatField("Auto Regen Rate (seconds)", _autoRegenerationDelaySeconds));
@@ -874,8 +880,12 @@ namespace ProceduralCreature.Editor
             }
             catch (DomainException ex)
             {
+                string validationDetails = string.Join(
+                    "\n", _validation.Issues.Select(issue => issue.Message));
                 EditorUtility.DisplayDialog(
-                    "Generation Failed", $"Stage: {diagnostics.FailedStage}\n{ex.Message}", "OK");
+                    "Generation Failed",
+                    $"Stage: {diagnostics.FailedStage}\n{ex.Message}\n\n{validationDetails}",
+                    "OK");
             }
         }
 
