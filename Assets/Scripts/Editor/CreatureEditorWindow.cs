@@ -66,12 +66,22 @@ namespace ProceduralCreature.Editor
     /// HelpBox surfaces this in the UI whenever Place Part Mode is active,
     /// rather than leaving it as an implementation detail the user has no way
     /// to know about.
+    ///
+    /// (3) BODY SAMPLE HANDLES AND PLACE-PART SNAPPING are the Spore-like
+    /// authoring surface (CC-015). With the Body selected (and Place Part Mode
+    /// off), each Body sample draws a clickable sphere cap; the active sample
+    /// gets a position handle, and dragging bends the spine as an equal-length
+    /// rigid chain so even spacing is preserved (see BodySplineAuthoring). In
+    /// Place Part Mode, clicking the preview mesh with a part selected snaps
+    /// that part to the hit point; with nothing selected a new part is created.
+    /// Body sample edits target DNA positions directly — never the preview mesh.
     /// </summary>
     public sealed class CreatureEditorWindow : EditorWindow
     {
         private CreatureDefinition _definition;
         private ValidationResult _validation = ValidationResult.Valid();
         private string _selectedPartId;
+        private int _activeBodySampleIndex = -1;
         private Vector2 _partListScroll;
         private Vector2 _validationScroll;
         private bool _showValidationPanel = true;
@@ -223,7 +233,8 @@ namespace ProceduralCreature.Editor
             if (_placementModeActive)
             {
                 EditorGUILayout.HelpBox(
-                    "Place Part Mode: click the preview mesh in the Scene view to add a new part there. " +
+                    "Place Part Mode: click the preview mesh in the Scene view. With a part selected, the " +
+                    "part snaps to the clicked position. With no part selected, a new part is created there. " +
                     "This raycasts against the mesh from the last 'Regenerate Preview' click, which may be " +
                     "stale if you've edited the creature since then — regenerate first if placement looks off.",
                     MessageType.Info);
@@ -513,7 +524,11 @@ namespace ProceduralCreature.Editor
         {
             bool isSelected = _selectedPartId == CreatureDefinition.BodyId;
             bool nowSelected = GUILayout.Toggle(isSelected, "Body", EditorStyles.toolbarButton);
-            if (nowSelected && !isSelected) _selectedPartId = CreatureDefinition.BodyId;
+            if (nowSelected && !isSelected)
+            {
+                _selectedPartId = CreatureDefinition.BodyId;
+                _activeBodySampleIndex = -1; // start with no sample grabbed
+            }
         }
 
         private void DrawPartNode(CreaturePart part, int depth, HashSet<string> visited)
@@ -524,7 +539,11 @@ namespace ProceduralCreature.Editor
             bool isSelected = part.Id == _selectedPartId;
             string label = $"{indent}{part.PartType}  {GetPartLabel(part)}";
             bool nowSelected = GUILayout.Toggle(isSelected, label, EditorStyles.toolbarButton);
-            if (nowSelected && !isSelected) _selectedPartId = part.Id;
+            if (nowSelected && !isSelected)
+            {
+                _selectedPartId = part.Id;
+                _activeBodySampleIndex = -1;
+            }
 
             foreach (CreaturePart child in ChildrenOf(part.Id)
                 .OrderBy(p => p.Id, System.StringComparer.Ordinal))
@@ -558,6 +577,7 @@ namespace ProceduralCreature.Editor
             }));
 
             _selectedPartId = newId;
+            _activeBodySampleIndex = -1;
         }
 
         private void RemoveSelectedPart()
@@ -689,25 +709,29 @@ namespace ProceduralCreature.Editor
                     definition => definition.Body.Samples.RemoveAll(s => s.Id == idToRemove));
             }
 
+            EditorGUILayout.BeginHorizontal();
             if (GUILayout.Button("Add Body Sample"))
             {
                 MutateDefinition("Add Body Sample", definition =>
                 {
-                    uint nextId = definition.Body.Samples.Count == 0
-                        ? 1u
-                        : definition.Body.Samples.Max(s => s.Id) + 1u;
-                    Vector3 position = definition.Body.Samples.Count == 0
-                        ? Vector3.zero
-                        : definition.Body.Samples[definition.Body.Samples.Count - 1].Position
-                            + definition.Forward.normalized * 0.5f;
-                    definition.Body.Samples.Add(new BodySample
-                    {
-                        Id = nextId,
-                        Position = position,
-                        Radius = 0.75f,
-                    });
+                    BodySplineAuthoring.AppendSample(definition.Body, definition.Forward);
                 });
+                // Select the freshly added sample so it can be dragged immediately.
+                _activeBodySampleIndex = _definition.Body.Samples.Count - 1;
+                Repaint();
             }
+            if (GUILayout.Button("Space Evenly"))
+            {
+                MutateDefinition("Space Body Evenly",
+                    definition => BodySplineAuthoring.SpaceEvenly(definition.Body));
+            }
+            EditorGUILayout.EndHorizontal();
+
+            EditorGUILayout.HelpBox(
+                "Adding a sample extends the Body along its tail at the current spacing, so samples stay " +
+                "even. Drag the sample spheres in the Scene view to bend the Body (select Body in the part " +
+                "list first); spacing stays even while you drag. Space Evenly re-snaps spacing after manual edits.",
+                MessageType.None);
         }
 
         private static BodySample FindBodySample(CreatureDefinition definition, uint id)
@@ -877,6 +901,14 @@ namespace ProceduralCreature.Editor
 
         private void OnSceneGUI(SceneView sceneView)
         {
+            // Body sample handles are the Body's scene editing surface (CC-015).
+            // They are suppressed in Place Part Mode so mesh clicks keep placing parts.
+            if (_selectedPartId == CreatureDefinition.BodyId && !_placementModeActive)
+            {
+                DrawBodySampleHandles();
+                return;
+            }
+
             DrawSelectedPartHandle();
             HandlePlacementClick();
         }
@@ -908,6 +940,47 @@ namespace ProceduralCreature.Editor
             if (EditorGUI.EndChangeCheck())
             {
                 ApplyViewportMove(selected, newWorldPosition);
+            }
+        }
+
+        /// <summary>
+        /// Spore-like Body sample editing (CC-015): each sample draws a clickable
+        /// sphere cap; the active sample gets a position handle. Dragging bends
+        /// the spine as an equal-length rigid chain through BodySplineAuthoring,
+        /// so even spacing is preserved and the result stays valid. Positions are
+        /// DNA (the Body owns the creature frame), never preview mesh data.
+        /// </summary>
+        private void DrawBodySampleHandles()
+        {
+            BodySpline spline = _definition.Body;
+            if (spline == null || spline.Samples == null || spline.Samples.Count == 0) return;
+
+            for (int i = 0; i < spline.Samples.Count; i++)
+            {
+                if (i == _activeBodySampleIndex) continue; // the position handle draws there instead
+                BodySample sample = spline.Samples[i];
+                if (sample == null) continue;
+
+                float handleSize = HandleUtility.GetHandleSize(sample.Position) * 0.12f;
+                if (Handles.Button(sample.Position, Quaternion.identity, handleSize, handleSize, Handles.SphereHandleCap))
+                {
+                    _activeBodySampleIndex = i;
+                    Repaint();
+                }
+            }
+
+            if (_activeBodySampleIndex < 0 || _activeBodySampleIndex >= spline.Samples.Count) return;
+            BodySample active = spline.Samples[_activeBodySampleIndex];
+            if (active == null) return;
+
+            EditorGUI.BeginChangeCheck();
+            Vector3 newPosition = Handles.PositionHandle(active.Position, Quaternion.identity);
+            if (EditorGUI.EndChangeCheck())
+            {
+                int index = _activeBodySampleIndex;
+                MutateDefinition("Move Body Sample (Viewport)",
+                    definition => BodySplineAuthoring.DragSampleEvenly(definition.Body, index, newPosition));
+                Repaint();
             }
         }
 
@@ -944,7 +1017,20 @@ namespace ProceduralCreature.Editor
             Ray ray = HandleUtility.GUIPointToWorldRay(e.mousePosition);
             if (!collider.Raycast(ray, out RaycastHit hit, 1000f)) return;
 
-            PlaceNewPartAtWorldPosition(hit.point);
+            // Place Part Mode snaps the selected part to the hit point (CC-015).
+            // With no part selected it falls back to creating a new part there.
+            CreaturePart selected = _selectedPartId != null && _selectedPartId != CreatureDefinition.BodyId
+                ? _definition.FindPart(_selectedPartId)
+                : null;
+            if (selected != null)
+            {
+                ApplyViewportMove(selected, hit.point);
+            }
+            else
+            {
+                PlaceNewPartAtWorldPosition(hit.point);
+            }
+
             e.Use(); // consume the click so it doesn't also (de)select scene objects
         }
 
@@ -973,6 +1059,7 @@ namespace ProceduralCreature.Editor
             }));
 
             _selectedPartId = newId;
+            _activeBodySampleIndex = -1;
             Repaint();
         }
 
