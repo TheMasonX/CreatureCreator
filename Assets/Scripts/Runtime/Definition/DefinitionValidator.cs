@@ -1,5 +1,6 @@
 using System;
 using System.Collections.Generic;
+using UnityEngine;
 using ProceduralCreature.Common;
 
 namespace ProceduralCreature.Definition
@@ -22,6 +23,7 @@ namespace ProceduralCreature.Definition
             var issues = new List<ValidationIssue>();
 
             ValidateSchemaVersion(definition, issues);
+            ValidateBody(definition, issues);
             ValidateBounds(definition, issues);
             ValidateGenerationBudget(definition, issues);
             ValidateDuplicateIds(definition, issues);
@@ -30,6 +32,100 @@ namespace ProceduralCreature.Definition
             ValidateTransformsAndShapesAndAppearance(definition, issues);
 
             return new ValidationResult(issues);
+        }
+
+        private static void ValidateBody(CreatureDefinition definition, List<ValidationIssue> issues)
+        {
+            if (definition.Body == null || definition.Body.Samples == null || definition.Body.Samples.Count == 0)
+            {
+                issues.Add(new ValidationIssue(
+                    ValidationSeverity.Error, ValidationCode.MissingBody,
+                    "CreatureDefinition requires one non-empty Body spline."));
+                return;
+            }
+
+            if (definition.Body.Samples.Count > GenerationTolerances.MaxBodySampleCount)
+            {
+                issues.Add(new ValidationIssue(
+                    ValidationSeverity.Error, ValidationCode.InvalidBodySampleCount,
+                    $"Body spline has more than {GenerationTolerances.MaxBodySampleCount} samples."));
+            }
+
+            var sampleIds = new HashSet<uint>();
+            float expectedSpacing = 0f;
+            int spacingCount = 0;
+            for (int i = 0; i < definition.Body.Samples.Count; i++)
+            {
+                BodySample sample = definition.Body.Samples[i];
+                if (sample == null)
+                {
+                    issues.Add(new ValidationIssue(
+                        ValidationSeverity.Error, ValidationCode.InvalidBodySample,
+                        $"Body sample at index {i} is null."));
+                    continue;
+                }
+
+                if (!sampleIds.Add(sample.Id))
+                {
+                    issues.Add(new ValidationIssue(
+                        ValidationSeverity.Error, ValidationCode.DuplicateBodySampleId,
+                        $"Duplicate Body sample Id '{sample.Id}'."));
+                }
+                if (i > 0 && definition.Body.Samples[i - 1] != null &&
+                    sample.Id <= definition.Body.Samples[i - 1].Id)
+                {
+                    issues.Add(new ValidationIssue(
+                        ValidationSeverity.Error, ValidationCode.DuplicateBodySampleId,
+                        "Body sample IDs must increase with spline order."));
+                }
+
+                if (!IsFinite(sample.Position.x) || !IsFinite(sample.Position.y) ||
+                    !IsFinite(sample.Position.z) || !IsFinite(sample.Radius) || sample.Radius <= 0f)
+                {
+                    issues.Add(new ValidationIssue(
+                        ValidationSeverity.Error, ValidationCode.InvalidBodySample,
+                        $"Body sample '{sample.Id}' must have finite position and positive radius."));
+                }
+                if (i > 0 && definition.Body.Samples[i - 1] != null)
+                {
+                    float spacing = Vector3.Distance(sample.Position, definition.Body.Samples[i - 1].Position);
+                    expectedSpacing += spacing;
+                    spacingCount++;
+                }
+            }
+
+            if (spacingCount > 0)
+            {
+                expectedSpacing /= spacingCount;
+                for (int i = 1; i < definition.Body.Samples.Count; i++)
+                {
+                    BodySample previous = definition.Body.Samples[i - 1];
+                    BodySample current = definition.Body.Samples[i];
+                    if (previous != null && current != null &&
+                        Mathf.Abs(Vector3.Distance(previous.Position, current.Position) - expectedSpacing) >
+                        GenerationTolerances.BodySpacingTolerance)
+                    {
+                        issues.Add(new ValidationIssue(
+                            ValidationSeverity.Error, ValidationCode.UnevenBodySpacing,
+                            "Body samples must have even arc-length spacing."));
+                        break;
+                    }
+                }
+            }
+
+            if (!IsFinite(definition.Forward.x) || !IsFinite(definition.Forward.y) ||
+                !IsFinite(definition.Forward.z) || definition.Forward.sqrMagnitude <=
+                GenerationTolerances.ScalarComparisonEpsilon * GenerationTolerances.ScalarComparisonEpsilon)
+            {
+                issues.Add(new ValidationIssue(
+                    ValidationSeverity.Error, ValidationCode.InvalidForward,
+                    "CreatureDefinition.Forward must be finite and nonzero."));
+            }
+        }
+
+        private static bool IsFinite(float value)
+        {
+            return !float.IsNaN(value) && !float.IsInfinity(value);
         }
 
         private static void ValidateSchemaVersion(CreatureDefinition definition, List<ValidationIssue> issues)
@@ -83,6 +179,7 @@ namespace ProceduralCreature.Definition
             var seen = new HashSet<string>(StringComparer.Ordinal);
             foreach (CreaturePart part in definition.Parts)
             {
+                if (part == null) continue;
                 if (string.IsNullOrWhiteSpace(part.Id))
                 {
                     issues.Add(new ValidationIssue(
@@ -109,7 +206,14 @@ namespace ProceduralCreature.Definition
 
             foreach (CreaturePart part in definition.Parts)
             {
-                if (part.ParentId != null && !idsById.Contains(part.ParentId))
+                if (part == null) continue;
+                if (part.ParentId == null)
+                {
+                    issues.Add(new ValidationIssue(
+                        ValidationSeverity.Error, ValidationCode.InvalidBodyParent,
+                        $"Part '{part.Id}' must be a descendant of the Body.", part.Id));
+                }
+                else if (part.ParentId != CreatureDefinition.BodyId && !idsById.Contains(part.ParentId))
                 {
                     issues.Add(new ValidationIssue(
                         ValidationSeverity.Error,
@@ -136,6 +240,7 @@ namespace ProceduralCreature.Definition
         {
             foreach (CreaturePart part in definition.Parts)
             {
+                if (part == null) continue;
                 if (!Enum.IsDefined(typeof(PartType), part.PartType))
                 {
                     issues.Add(new ValidationIssue(
@@ -143,6 +248,19 @@ namespace ProceduralCreature.Definition
                         ValidationCode.UnsupportedPartType,
                         $"Part '{part.Id}' has an unsupported PartType value.",
                         part.Id));
+                }
+                else if (part.PartType == PartType.Body || part.PartType == PartType.Root)
+                {
+                    issues.Add(new ValidationIssue(
+                        ValidationSeverity.Error, ValidationCode.UnsupportedPartType,
+                        $"Part '{part.Id}' cannot use reserved PartType {part.PartType} in schema v2.",
+                        part.Id));
+                }
+                if (part.ParentId == CreatureDefinition.BodyId && part.PartType == PartType.Tail)
+                {
+                    issues.Add(new ValidationIssue(
+                        ValidationSeverity.Error, ValidationCode.InvalidBodyParent,
+                        $"Part '{part.Id}' cannot be an independent root Tail.", part.Id));
                 }
             }
         }
@@ -152,6 +270,7 @@ namespace ProceduralCreature.Definition
         {
             foreach (CreaturePart part in definition.Parts)
             {
+                if (part == null) continue;
                 if (!part.Transform.IsFinite())
                 {
                     issues.Add(new ValidationIssue(
@@ -202,6 +321,18 @@ namespace ProceduralCreature.Definition
                         ValidationCode.NonFiniteAppearance,
                         $"Part '{part.Id}' has a non-finite appearance parameter.",
                         part.Id));
+                }
+
+                if (part.ParentAttachment != null &&
+                    (!IsFinite(part.ParentAttachment.SegmentT) ||
+                     !IsFinite(part.ParentAttachment.RadialAngle) ||
+                     !IsFinite(part.ParentAttachment.SurfaceOffset) ||
+                     !IsFinite(part.ParentAttachment.Roll) ||
+                     part.ParentAttachment.SegmentT < 0f || part.ParentAttachment.SegmentT > 1f))
+                {
+                    issues.Add(new ValidationIssue(
+                        ValidationSeverity.Error, ValidationCode.InvalidAttachmentAnchor,
+                        $"Part '{part.Id}' has an invalid semantic attachment anchor.", part.Id));
                 }
             }
         }

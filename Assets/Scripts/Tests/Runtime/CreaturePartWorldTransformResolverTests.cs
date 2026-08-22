@@ -61,6 +61,27 @@ namespace ProceduralCreature.Tests.Runtime
         }
 
         [Test]
+        public void BodyChild_ResolvesAgainstTheBodyRootFrame()
+        {
+            var definition = CreatureDefinition.CreateEmpty();
+            var child = new CreaturePart
+            {
+                Id = "part_leg",
+                ParentId = CreatureDefinition.BodyId,
+                Transform = new TransformData { Position = new Vector3(1f, -1f, 0f), Rotation = Quaternion.identity, Scale = Vector3.one },
+                Shape = ShapeDefinition.DefaultSphere,
+                Appearance = AppearanceDefinition.Default,
+            };
+            definition.AddPart(child);
+
+            Matrix4x4 world = CreaturePartWorldTransformResolver.ResolveLocalToCreatureSpace(definition, child);
+            Vector3 worldPosition = world.GetColumn(3);
+
+            Assert.AreEqual(new Vector3(1f, -1f, 0f), worldPosition,
+                "A Body child's local transform IS creature-space: the Body spline owns the creature frame.");
+        }
+
+        [Test]
         public void ThreeLevelChain_ComposesCorrectly()
         {
             var definition = CreatureDefinition.CreateEmpty();

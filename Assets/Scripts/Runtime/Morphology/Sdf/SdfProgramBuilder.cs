@@ -29,6 +29,16 @@ namespace ProceduralCreature.Morphology.Sdf
     /// </summary>
     public static class SdfProgramBuilder
     {
+        /// <summary>
+        /// Blend radius used when smooth-uniting adjacent Body spline samples. The
+        /// Body spline does not carry per-sample blend radii; this deterministic
+        /// fraction of the smaller adjacent radius keeps the primary field
+        /// continuous without introducing a new schema field. A Spore-like
+        /// fourth-order metaball falloff is a later decision that needs scalar
+        /// parity tests before replacing this smooth-union path.
+        /// </summary>
+        private const float BodySampleBlendFactor = 0.5f;
+
         public static SdfProgram CompilePortable(CreatureDefinition definition)
         {
             if (definition == null) throw new DomainException("Cannot compile a null CreatureDefinition.");
@@ -38,13 +48,59 @@ namespace ProceduralCreature.Morphology.Sdf
                 .OrderBy(p => p.Id, System.StringComparer.Ordinal)
                 .ToList();
 
-            if (orderedParts.Count == 0)
+            // The Body spline is the primary field, composed before any child
+            // attachment. Body samples are ordered by their authoritative spline
+            // order (list index), not by ID — sample order IS the spline.
+            bool hasBodySamples = definition.Body != null
+                && definition.Body.Samples != null
+                && definition.Body.Samples.Count > 0;
+
+            if (orderedParts.Count == 0 && !hasBodySamples)
             {
                 operations.Add(SdfOperation.Primitive(SdfOperationType.Empty, float3.zero));
                 return new SdfProgram(new NativeArray<SdfOperation>(operations.ToArray(), Allocator.Persistent), 0);
             }
 
             int root = -1;
+            if (hasBodySamples)
+            {
+                for (int i = 0; i < definition.Body.Samples.Count; i++)
+                {
+                    BodySample sample = definition.Body.Samples[i];
+                    int primitive = operations.Count;
+                    operations.Add(SdfOperation.Primitive(SdfOperationType.Sphere, new float3(sample.Radius, 0f, 0f)));
+
+                    Matrix4x4 localToCreature = Matrix4x4.TRS(sample.Position, Quaternion.identity, Vector3.one);
+                    Matrix4x4 worldToLocal = localToCreature.inverse;
+                    operations.Add(new SdfOperation
+                    {
+                        Type = SdfOperationType.Transform,
+                        A = primitive,
+                        Matrix = ToFloat4x4(worldToLocal),
+                        DistanceScale = 1f,
+                    });
+                    int bodyNode = operations.Count - 1;
+
+                    if (root >= 0)
+                    {
+                        BodySample previous = definition.Body.Samples[i - 1];
+                        float blend = Mathf.Min(previous.Radius, sample.Radius) * BodySampleBlendFactor;
+                        operations.Add(new SdfOperation
+                        {
+                            Type = SdfOperationType.SmoothUnion,
+                            A = root,
+                            B = bodyNode,
+                            Parameters = new float3(blend, 0f, 0f),
+                        });
+                        root = operations.Count - 1;
+                    }
+                    else
+                    {
+                        root = bodyNode;
+                    }
+                }
+            }
+
             foreach (CreaturePart part in orderedParts)
             {
                 int previousRoot = root;
@@ -123,18 +179,57 @@ namespace ProceduralCreature.Morphology.Sdf
                 throw new DomainException("Cannot compile a null CreatureDefinition.");
             }
 
-            if (definition.Parts.Count == 0)
+            bool hasBodySamples = definition.Body != null
+                && definition.Body.Samples != null
+                && definition.Body.Samples.Count > 0;
+
+            List<(CreaturePart Part, ISdfNode Node)> compiled = CompileIndividualParts(definition);
+            if (compiled.Count == 0 && !hasBodySamples)
             {
                 return new EmptySdfNode();
             }
 
-            List<(CreaturePart Part, ISdfNode Node)> compiled = CompileIndividualParts(definition);
-
-            ISdfNode accumulated = compiled[0].Node;
-            for (int i = 1; i < compiled.Count; i++)
+            ISdfNode accumulated = CompileBodyField(definition);
+            for (int i = 0; i < compiled.Count; i++)
             {
                 float blendRadius = compiled[i].Part.Shape.SmoothBlendRadius;
-                accumulated = new SmoothUnionNode(accumulated, compiled[i].Node, blendRadius);
+                accumulated = accumulated == null
+                    ? compiled[i].Node
+                    : new SmoothUnionNode(accumulated, compiled[i].Node, blendRadius);
+            }
+
+            return accumulated;
+        }
+
+        /// <summary>
+        /// Compiles the Body spline into the primary implicit surface: one sphere
+        /// per sample at its authoritative position/radius, smooth-united in spline
+        /// order. Returns null when the definition has no Body samples.
+        /// </summary>
+        private static ISdfNode CompileBodyField(CreatureDefinition definition)
+        {
+            if (definition.Body == null || definition.Body.Samples == null || definition.Body.Samples.Count == 0)
+            {
+                return null;
+            }
+
+            ISdfNode accumulated = null;
+            for (int i = 0; i < definition.Body.Samples.Count; i++)
+            {
+                BodySample sample = definition.Body.Samples[i];
+                ISdfNode sphere = new TransformNode(
+                    new SphereSdfNode(sample.Radius),
+                    Matrix4x4.TRS(sample.Position, Quaternion.identity, Vector3.one));
+
+                if (accumulated == null)
+                {
+                    accumulated = sphere;
+                    continue;
+                }
+
+                BodySample previous = definition.Body.Samples[i - 1];
+                float blend = Mathf.Min(previous.Radius, sample.Radius) * BodySampleBlendFactor;
+                accumulated = new SmoothUnionNode(accumulated, sphere, blend);
             }
 
             return accumulated;

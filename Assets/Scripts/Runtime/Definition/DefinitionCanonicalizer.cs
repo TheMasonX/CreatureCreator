@@ -1,4 +1,6 @@
+using System.Collections.Generic;
 using System.Linq;
+using UnityEngine;
 using ProceduralCreature.Common;
 
 namespace ProceduralCreature.Definition
@@ -33,6 +35,34 @@ namespace ProceduralCreature.Definition
 
             CreatureDefinition result = definition.Clone();
 
+            if (result.Body == null || result.Body.Samples == null)
+            {
+                throw new DomainException("Cannot canonicalize a definition without a Body spline.");
+            }
+
+            foreach (BodySample sample in result.Body.Samples)
+            {
+                if (sample == null || !IsFinite(sample.Position) || !IsFinite(sample.Radius))
+                {
+                    throw new DomainException("Cannot canonicalize a Body spline with non-finite samples.");
+                }
+                sample.Position = new Vector3(
+                    GenerationTolerances.Quantize(sample.Position.x),
+                    GenerationTolerances.Quantize(sample.Position.y),
+                    GenerationTolerances.Quantize(sample.Position.z));
+                sample.Radius = GenerationTolerances.Quantize(sample.Radius);
+            }
+
+            if (!IsFinite(result.Forward) || result.Forward.sqrMagnitude <= 0f)
+            {
+                throw new DomainException("Cannot canonicalize a definition with an invalid Forward vector.");
+            }
+            Vector3 forward = result.Forward.normalized;
+            result.Forward = new Vector3(
+                GenerationTolerances.Quantize(forward.x),
+                GenerationTolerances.Quantize(forward.y),
+                GenerationTolerances.Quantize(forward.z));
+
             foreach (CreaturePart part in result.Parts)
             {
                 if (!part.Transform.IsFinite())
@@ -47,11 +77,44 @@ namespace ProceduralCreature.Definition
             // Stable ordering independent of authoring/insertion order — this is what
             // makes "definition order independence where semantics are unchanged"
             // (§13.4 determinism tests) hold for serialization output.
-            result.Parts = result.Parts
-                .OrderBy(p => p.Id, System.StringComparer.Ordinal)
-                .ToList();
+            var childrenByParent = result.Parts
+                .Where(p => p != null)
+                .GroupBy(p => p.ParentId ?? string.Empty)
+                .ToDictionary(group => group.Key,
+                    group => group.OrderBy(p => p.Id, System.StringComparer.Ordinal).ToList());
+            var orderedParts = new List<CreaturePart>();
+            AppendChildren(CreatureDefinition.BodyId, childrenByParent, orderedParts);
+            foreach (CreaturePart part in result.Parts
+                .Where(p => p != null && !orderedParts.Contains(p))
+                .OrderBy(p => p.Id, System.StringComparer.Ordinal))
+            {
+                orderedParts.Add(part);
+            }
+            result.Parts = orderedParts;
 
             return result;
+        }
+
+        private static void AppendChildren(string parentId,
+            Dictionary<string, List<CreaturePart>> childrenByParent,
+            List<CreaturePart> orderedParts)
+        {
+            if (!childrenByParent.TryGetValue(parentId, out List<CreaturePart> children)) return;
+            foreach (CreaturePart child in children)
+            {
+                orderedParts.Add(child);
+                AppendChildren(child.Id, childrenByParent, orderedParts);
+            }
+        }
+
+        private static bool IsFinite(Vector3 value)
+        {
+            return IsFinite(value.x) && IsFinite(value.y) && IsFinite(value.z);
+        }
+
+        private static bool IsFinite(float value)
+        {
+            return !float.IsNaN(value) && !float.IsInfinity(value);
         }
     }
 }

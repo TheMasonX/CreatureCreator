@@ -1,3 +1,4 @@
+using System;
 using System.Collections.Generic;
 using System.Globalization;
 using ProceduralCreature.Definition;
@@ -26,16 +27,49 @@ namespace ProceduralCreature.Serialization
                 throw new DnaDeserializationException("Root JSON value must be an object.");
             }
 
+            int schemaVersion = (int)RequireNumber(obj, "schemaVersion");
+            if (schemaVersion == 1)
+            {
+                throw new DnaDeserializationException(
+                    "Schema version 1 is unsupported; flat v1 DNA cannot be migrated without changing author intent.");
+            }
+            if (schemaVersion != CreatureDefinition.CurrentSchemaVersion)
+            {
+                throw new DnaDeserializationException(
+                    $"Schema version {schemaVersion} is unsupported (expected {CreatureDefinition.CurrentSchemaVersion}).");
+            }
+
             var definition = new CreatureDefinition
             {
-                SchemaVersion = (int)RequireNumber(obj, "schemaVersion"),
+                SchemaVersion = schemaVersion,
                 SymmetryMode = RequireEnum<SymmetryMode>(obj, "symmetryMode"),
                 Bounds = ReadBounds(RequireObject(obj, "bounds")),
                 Generation = ReadGeneration(RequireObject(obj, "generation")),
+                Forward = ReadVec3(RequireObject(obj, "forward")),
+                Body = ReadBody(RequireObject(obj, "body")),
                 Parts = ReadParts(RequireArray(obj, "parts")),
             };
 
             return definition;
+        }
+
+        private static BodySpline ReadBody(Dictionary<string, object> obj)
+        {
+            var body = new BodySpline();
+            foreach (object entry in RequireArray(obj, "samples"))
+            {
+                if (entry is not Dictionary<string, object> sampleObj)
+                {
+                    throw new DnaDeserializationException("Each entry in 'samples' must be an object.");
+                }
+                body.Samples.Add(new BodySample
+                {
+                    Id = RequireUInt(sampleObj, "id"),
+                    Position = ReadVec3(RequireObject(sampleObj, "position")),
+                    Radius = (float)RequireNumber(sampleObj, "radius"),
+                });
+            }
+            return body;
         }
 
         private static BoundsDefinition ReadBounds(Dictionary<string, object> obj)
@@ -82,6 +116,24 @@ namespace ProceduralCreature.Serialization
                 Shape = ReadShape(RequireObject(obj, "shape")),
                 Appearance = ReadAppearance(RequireObject(obj, "appearance")),
                 MirrorAcrossSymmetryPlane = RequireBool(obj, "mirrorAcrossSymmetryPlane"),
+                ParentAttachment = ReadNullableAnchor(obj, "parentAttachment"),
+            };
+        }
+
+        private static BodySurfaceAnchor ReadNullableAnchor(Dictionary<string, object> obj, string key)
+        {
+            if (!obj.TryGetValue(key, out object value) || value == null) return null;
+            if (value is not Dictionary<string, object> anchorObj)
+            {
+                throw new DnaDeserializationException($"Field '{key}' must be an object or null.");
+            }
+            return new BodySurfaceAnchor
+            {
+                SegmentStartSampleId = RequireUInt(anchorObj, "segmentStartSampleId"),
+                SegmentT = (float)RequireNumber(anchorObj, "segmentT"),
+                RadialAngle = (float)RequireNumber(anchorObj, "radialAngle"),
+                SurfaceOffset = (float)RequireNumber(anchorObj, "surfaceOffset"),
+                Roll = (float)RequireNumber(anchorObj, "roll"),
             };
         }
 
@@ -160,6 +212,16 @@ namespace ProceduralCreature.Serialization
             object value = RequireField(obj, key);
             if (value is bool b) return b;
             throw new DnaDeserializationException($"Field '{key}' must be a boolean.");
+        }
+
+        private static uint RequireUInt(Dictionary<string, object> obj, string key)
+        {
+            double value = RequireNumber(obj, key);
+            if (value < 0 || value > uint.MaxValue || value != Math.Floor(value))
+            {
+                throw new DnaDeserializationException($"Field '{key}' must be an unsigned integer.");
+            }
+            return (uint)value;
         }
 
         private static string RequireString(Dictionary<string, object> obj, string key)

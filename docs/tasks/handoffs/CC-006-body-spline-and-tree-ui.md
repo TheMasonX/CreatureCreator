@@ -1,7 +1,7 @@
 # Handoff: Body Spline and Attachment Tree
 
 **Task:** CC-006
-**Status:** Ready for implementation
+**Status:** Schema decision recorded, ready for implementation
 **Owner:** Next implementation agent
 **Date:** 2026-08-22
 
@@ -45,18 +45,31 @@ Do not assume that the current flat part schema can represent the new contract w
 
 ## Schema decisions to make first
 
+The audit in `docs/audits/sporelike-creature-model-and-editor-audit-26-08-22-15-34-00.md` was reviewed on 2026-08-22. The following decisions are adopted for implementation:
+
+- Store Body as a dedicated `BodySpline` record on `CreatureDefinition`.
+- Give samples stable IDs, authoritative list order, positions, and positive radii. Validate even arc-length spacing. Do not repair spacing during validation.
+- Use spherical Body samples for the first implementation. Keep the existing smooth-union compatibility path until a separate metaball falloff change has scalar parity tests.
+- Resolve bent Body frames with deterministic parallel transport seeded by `Forward`.
+- Store Body and nested attachment locations as semantic anchors. Mesh raycasts may provide projection input, but mesh indices, world positions, and collider references are never authoritative DNA.
+- Make schema version `2` explicit. Reject or separately migrate schema `1`; do not silently reinterpret the flat v1 part list.
+- Disallow `Body`, `Root`, and independent root `Tail` parts in valid v2 authoring. A tail is a Body continuation or a named descendant.
+- Treat the editor tree as a deterministic semantic outliner derived from DNA. Keep viewport manipulation as the primary authoring workflow and retain the existing mutation, validation, Undo, and session boundaries.
+
+These decisions are design evidence from the audit, not implementation or Unity validation evidence. The audit's migration, frame, anchor, SDF, and editor recommendations remain acceptance criteria for the implementation slices below.
+
 Resolve these questions before changing serialized fields:
 
-- Should Body samples be a new `BodySpline` record on `CreatureDefinition`, or a specialized ordered set of `CreaturePart` records?
-- Does a Body sample have a stable ID, or does the spline use stable sample IDs separate from part IDs?
-- What is the exact longitudinal representation? Prefer a normalized interval or explicit sample index with deterministic spacing.
-- What does a sample size mean? Define radius, diameter, or another unit and use one term everywhere.
-- How are rotations and radial frames defined when the spline bends or has coincident direction vectors?
+- ~~Should Body samples be a new `BodySpline` record on `CreatureDefinition`, or a specialized ordered set of `CreaturePart` records?~~ Resolved above: dedicated `BodySpline`.
+- ~~Does a Body sample have a stable ID, or does the spline use stable sample IDs separate from part IDs?~~ Resolved above: stable sample IDs separate from part IDs.
+- ~~What is the exact longitudinal representation? Prefer a normalized interval or explicit sample index with deterministic spacing.~~ Resolved above: ordered positions with even arc-length spacing. No redundant longitudinal parameter.
+- ~~What does a sample size mean? Define radius, diameter, or another unit and use one term everywhere.~~ Resolved above: radius.
+- ~~How are rotations and radial frames defined when the spline bends or has coincident direction vectors?~~ Resolved above: deterministic parallel transport with validation of degenerate cases.
 - Which semantic parts are permitted directly below Body?
 - Which parts can own children?
-- Is `Tail` removed, rejected for schema version `2`, or migrated into Body samples or a named descendant?
-- How are existing flat-part definitions migrated? Require an explicit migration step if the result cannot be inferred without changing author intent.
-- Does the Body field use the existing smooth-min function, a Spore-like spherical metaball falloff, or a selectable compatibility mode?
+- ~~Is `Tail` removed, rejected for schema version `2`, or migrated into Body samples or a named descendant?~~ Resolved above: no independent root Tail. Use Body continuation or named descendant.
+- ~~How are existing flat-part definitions migrated? Require an explicit migration step if the result cannot be inferred without changing author intent.~~ Resolved above: reject or separately migrate v1. Do not silently reinterpret it.
+- ~~Does the Body field use the existing smooth-min function, a Spore-like spherical metaball falloff, or a selectable compatibility mode?~~ Resolved for the first slice: spherical samples with the existing compatibility path. Any new falloff requires separate scalar parity tests.
 
 Record the final schema decision in CC-006 before implementation. Bump `CurrentSchemaVersion` only with canonical JSON and migration tests.
 

@@ -33,6 +33,12 @@ namespace ProceduralCreature.Common
         /// </summary>
         public const float MinScaleComponent = 1e-3f;
 
+        /// <summary>Maximum absolute error allowed between adjacent Body arc lengths.</summary>
+        public const float BodySpacingTolerance = 1e-3f;
+
+        /// <summary>Maximum number of authored samples in a Body spline.</summary>
+        public const int MaxBodySampleCount = 1024;
+
         /// <summary>
         /// Hard ceiling on estimated total voxel count for a single generation
         /// (Sprint 3.1 "safety budget"). A definition whose bounds/resolution combo

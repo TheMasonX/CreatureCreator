@@ -20,11 +20,14 @@ namespace ProceduralCreature.Tests.Runtime
         {
             var definition = CreatureDefinition.CreateEmpty();
             definition.SymmetryMode = SymmetryMode.MirrorAcrossXAxis;
+            definition.Forward = Vector3.forward;
+            definition.Body.Samples.Add(new BodySample { Id = 1, Position = new Vector3(0f, 0f, -1f), Radius = 0.75f });
+            definition.Body.Samples.Add(new BodySample { Id = 2, Position = new Vector3(0f, 0f, 1f), Radius = 0.9f });
             definition.AddPart(new CreaturePart
             {
-                Id = "part_body",
-                ParentId = null,
-                PartType = PartType.Body,
+                Id = "part_leg",
+                ParentId = CreatureDefinition.BodyId,
+                PartType = PartType.Leg,
                 Transform = new TransformData
                 {
                     Position = Vector3.zero,
@@ -36,12 +39,12 @@ namespace ProceduralCreature.Tests.Runtime
             });
             definition.AddPart(new CreaturePart
             {
-                Id = "part_leg",
-                ParentId = "part_body",
-                PartType = PartType.Leg,
+                Id = "part_foot",
+                ParentId = "part_leg",
+                PartType = PartType.Foot,
                 Transform = new TransformData
                 {
-                    Position = new Vector3(0.5f, -1f, 0f),
+                    Position = new Vector3(0f, -0.5f, 0f),
                     Rotation = Quaternion.identity,
                     Scale = new Vector3(0.3f, 0.3f, 0.3f),
                 },
@@ -92,6 +95,8 @@ namespace ProceduralCreature.Tests.Runtime
 
             CreatureDefinition definitionB = CreatureDefinition.CreateEmpty();
             definitionB.SymmetryMode = definitionA.SymmetryMode;
+            definitionB.Forward = definitionA.Forward;
+            definitionB.Body = definitionA.Body.Clone();
             definitionB.AddPart(definitionA.Parts[1].Clone()); // leg first
             definitionB.AddPart(definitionA.Parts[0].Clone()); // body second
 
@@ -124,19 +129,32 @@ namespace ProceduralCreature.Tests.Runtime
         [Test]
         public void Deserialize_ThrowsOnMissingRequiredField()
         {
-            const string json = "{\"schemaVersion\":1,\"symmetryMode\":\"None\"}"; // missing bounds/generation/parts
+            const string json = "{\"schemaVersion\":2,\"symmetryMode\":\"None\"}"; // missing bounds/generation/body/parts
             Assert.Throws<DnaDeserializationException>(() => _serializer.Deserialize(json));
         }
 
         [Test]
-        public void Deserialize_PreservesNullParentId()
+        public void Deserialize_RejectsV1Explicitly()
+        {
+            const string json = "{\"schemaVersion\":1}";
+            DnaDeserializationException exception = Assert.Throws<DnaDeserializationException>(
+                () => _serializer.Deserialize(json));
+            StringAssert.Contains("Schema version 1 is unsupported", exception.Message);
+        }
+
+        [Test]
+        public void Deserialize_PreservesBodySplineAndForward()
         {
             CreatureDefinition original = MakeTwoPartDefinition();
             string json = _serializer.Serialize(original);
 
             CreatureDefinition reconstructed = _serializer.Deserialize(json);
 
-            Assert.IsNull(reconstructed.FindPart("part_body").ParentId);
+            Assert.AreEqual(2, reconstructed.Body.Samples.Count);
+            Assert.AreEqual(1u, reconstructed.Body.Samples[0].Id);
+            Assert.AreEqual(0.75f, reconstructed.Body.Samples[0].Radius, 1e-4f);
+            Assert.AreEqual(2u, reconstructed.Body.Samples[1].Id);
+            Assert.AreEqual(Vector3.forward, reconstructed.Forward);
         }
     }
 }

@@ -1,4 +1,5 @@
 using NUnit.Framework;
+using UnityEngine;
 using ProceduralCreature.Definition;
 using ProceduralCreature.Editor;
 
@@ -25,10 +26,12 @@ namespace ProceduralCreature.Tests.Editor
         {
             var definition = CreatureDefinition.CreateEmpty();
             definition.SymmetryMode = SymmetryMode.MirrorAcrossXAxis;
+            definition.Body.Samples.Add(new BodySample { Id = 1, Position = Vector3.zero, Radius = 1f });
             definition.AddPart(new CreaturePart
             {
                 Id = "part_a",
-                PartType = PartType.Body,
+                ParentId = CreatureDefinition.BodyId,
+                PartType = PartType.Limb,
                 Transform = TransformData.Identity,
                 Shape = ShapeDefinition.DefaultSphere,
                 Appearance = AppearanceDefinition.Default,
@@ -39,6 +42,7 @@ namespace ProceduralCreature.Tests.Editor
 
             Assert.IsNotNull(loaded);
             Assert.AreEqual(SymmetryMode.MirrorAcrossXAxis, loaded.SymmetryMode);
+            Assert.AreEqual(1, loaded.Body.Samples.Count);
             Assert.AreEqual(1, loaded.Parts.Count);
             Assert.AreEqual("part_a", loaded.Parts[0].Id);
         }

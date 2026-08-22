@@ -12,8 +12,8 @@ namespace ProceduralCreature.Tests.Runtime
             return new CreaturePart
             {
                 Id = id,
-                ParentId = parentId,
-                PartType = PartType.Body,
+                ParentId = parentId ?? CreatureDefinition.BodyId,
+                PartType = PartType.Limb,
                 Transform = TransformData.Identity,
                 Shape = ShapeDefinition.DefaultSphere,
                 Appearance = AppearanceDefinition.Default,
@@ -21,11 +21,12 @@ namespace ProceduralCreature.Tests.Runtime
         }
 
         [Test]
-        public void Validate_EmptyDefinitionIsValid()
+        public void Validate_EmptyDefinitionReportsMissingBody()
         {
             CreatureDefinition definition = CreatureDefinition.CreateEmpty();
             ValidationResult result = DefinitionValidator.Validate(definition);
-            Assert.IsTrue(result.IsValid);
+            Assert.IsFalse(result.IsValid);
+            Assert.IsTrue(HasCode(result, ValidationCode.MissingBody));
         }
 
         [Test]
@@ -39,6 +40,152 @@ namespace ProceduralCreature.Tests.Runtime
 
             Assert.IsFalse(result.IsValid);
             Assert.IsTrue(HasCode(result, ValidationCode.DuplicatePartId));
+        }
+
+        // ---- v2 Body spline rules ------------------------------------------------------
+
+        private static CreatureDefinition ValidDefinitionWithBody()
+        {
+            var definition = CreatureDefinition.CreateEmpty();
+            definition.Forward = Vector3.forward;
+            definition.Body.Samples.Add(new BodySample { Id = 1, Position = new Vector3(0f, 0f, -1f), Radius = 0.75f });
+            definition.Body.Samples.Add(new BodySample { Id = 2, Position = new Vector3(0f, 0f, 1f), Radius = 0.9f });
+            definition.AddPart(ValidPart("part_leg"));
+            return definition;
+        }
+
+        [Test]
+        public void Validate_ValidBodySplineAndPart_Passes()
+        {
+            ValidationResult result = DefinitionValidator.Validate(ValidDefinitionWithBody());
+            Assert.IsTrue(result.IsValid, "A definition with one Body spline, a valid Forward, and a Body descendant should validate.");
+        }
+
+        [Test]
+        public void Validate_DetectsDuplicateBodySampleIds()
+        {
+            CreatureDefinition definition = ValidDefinitionWithBody();
+            definition.Body.Samples.Add(new BodySample { Id = 1, Position = new Vector3(0f, 0f, 2f), Radius = 0.5f });
+
+            ValidationResult result = DefinitionValidator.Validate(definition);
+
+            Assert.IsTrue(HasCode(result, ValidationCode.DuplicateBodySampleId));
+        }
+
+        [Test]
+        public void Validate_DetectsNonIncreasingBodySampleIds()
+        {
+            CreatureDefinition definition = ValidDefinitionWithBody();
+            definition.Body.Samples[1].Id = 1; // must increase with spline order
+
+            ValidationResult result = DefinitionValidator.Validate(definition);
+
+            Assert.IsTrue(HasCode(result, ValidationCode.DuplicateBodySampleId));
+        }
+
+        [Test]
+        public void Validate_DetectsInvalidBodySamplePosition()
+        {
+            CreatureDefinition definition = ValidDefinitionWithBody();
+            definition.Body.Samples[0].Position = new Vector3(float.NaN, 0f, 0f);
+
+            ValidationResult result = DefinitionValidator.Validate(definition);
+
+            Assert.IsTrue(HasCode(result, ValidationCode.InvalidBodySample));
+        }
+
+        [Test]
+        public void Validate_DetectsNonPositiveBodySampleRadius()
+        {
+            CreatureDefinition definition = ValidDefinitionWithBody();
+            definition.Body.Samples[0].Radius = 0f;
+
+            ValidationResult result = DefinitionValidator.Validate(definition);
+
+            Assert.IsTrue(HasCode(result, ValidationCode.InvalidBodySample));
+        }
+
+        [Test]
+        public void Validate_DetectsUnevenBodySpacing()
+        {
+            CreatureDefinition definition = ValidDefinitionWithBody();
+            definition.Body.Samples.Add(new BodySample { Id = 3, Position = new Vector3(0f, 0f, 5f), Radius = 0.6f });
+            definition.Body.Samples.Add(new BodySample { Id = 4, Position = new Vector3(0f, 0f, 5.4f), Radius = 0.6f });
+
+            ValidationResult result = DefinitionValidator.Validate(definition);
+
+            Assert.IsTrue(HasCode(result, ValidationCode.UnevenBodySpacing));
+        }
+
+        [Test]
+        public void Validate_DetectsZeroForward()
+        {
+            CreatureDefinition definition = ValidDefinitionWithBody();
+            definition.Forward = Vector3.zero;
+
+            ValidationResult result = DefinitionValidator.Validate(definition);
+
+            Assert.IsTrue(HasCode(result, ValidationCode.InvalidForward));
+        }
+
+        [Test]
+        public void Validate_RejectsPartWithNoParent()
+        {
+            CreatureDefinition definition = ValidDefinitionWithBody();
+            definition.AddPart(ValidPart("part_root", parentId: null));
+
+            ValidationResult result = DefinitionValidator.Validate(definition);
+
+            Assert.IsTrue(HasCode(result, ValidationCode.InvalidBodyParent),
+                "Every non-Body part must descend from the Body in v2.");
+        }
+
+        [Test]
+        public void Validate_RejectsReservedBodyPartType()
+        {
+            CreatureDefinition definition = ValidDefinitionWithBody();
+            CreaturePart part = ValidPart("part_bad");
+            part.PartType = PartType.Body;
+            definition.AddPart(part);
+
+            ValidationResult result = DefinitionValidator.Validate(definition);
+
+            Assert.IsTrue(HasCode(result, ValidationCode.UnsupportedPartType),
+                "PartType.Body is reserved for the dedicated BodySpline in v2.");
+        }
+
+        [Test]
+        public void Validate_RejectsIndependentRootTail()
+        {
+            CreatureDefinition definition = ValidDefinitionWithBody();
+            CreaturePart part = ValidPart("part_tail");
+            part.PartType = PartType.Tail;
+            definition.AddPart(part);
+
+            ValidationResult result = DefinitionValidator.Validate(definition);
+
+            Assert.IsTrue(HasCode(result, ValidationCode.InvalidBodyParent),
+                "An independent Tail directly on the Body is not allowed in v2.");
+        }
+
+        [Test]
+        public void Validate_DetectsInvalidAttachmentAnchor()
+        {
+            CreatureDefinition definition = ValidDefinitionWithBody();
+            CreaturePart part = ValidPart("part_leg");
+            part.ParentAttachment = new BodySurfaceAnchor
+            {
+                SegmentStartSampleId = 1,
+                SegmentT = 1.5f, // outside [0,1]
+                RadialAngle = 0f,
+                SurfaceOffset = 0.1f,
+                Roll = 0f,
+            };
+            definition.AddPart(part);
+
+            ValidationResult result = DefinitionValidator.Validate(definition);
+
+            Assert.IsTrue(HasCode(result, ValidationCode.InvalidAttachmentAnchor));
         }
 
         [Test]

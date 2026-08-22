@@ -19,15 +19,22 @@ namespace ProceduralCreature.Serialization
     /// class exists to fix in place):
     /// <code>
     /// {
-    ///   "schemaVersion": 1,
+    ///   "schemaVersion": 2,
     ///   "symmetryMode": "None",
     ///   "bounds": { "maxX": 4.0000, "maxY": 4.0000, "maxZ": 4.0000 },
     ///   "generation": { "voxelsPerUnit": 16.0000 },
+    ///   "forward": { "x": 0.0000, "y": 0.0000, "z": 1.0000 },
+    ///   "body": {
+    ///     "samples": [
+    ///       { "id": 1, "position": { "x": 0.0000, "y": 0.0000, "z": -1.0000 }, "radius": 0.7500 },
+    ///       { "id": 2, "position": { "x": 0.0000, "y": 0.0000, "z": 1.0000 }, "radius": 0.9000 }
+    ///     ]
+    ///   },
     ///   "parts": [
     ///     {
     ///       "id": "part_4f9a1c02",
-    ///       "parentId": null,
-    ///       "partType": "Body",
+    ///       "parentId": "body",
+    ///       "partType": "Limb",
     ///       "transform": {
     ///         "position": { "x": 0.0000, "y": 0.0000, "z": 0.0000 },
     ///         "rotation": { "x": 0.0000, "y": 0.0000, "z": 0.0000, "w": 1.0000 },
@@ -39,7 +46,8 @@ namespace ProceduralCreature.Serialization
     ///         "noiseSeed": 0,
     ///         "noiseScale": 1.0000
     ///       },
-    ///       "mirrorAcrossSymmetryPlane": false
+    ///       "mirrorAcrossSymmetryPlane": false,
+    ///       "parentAttachment": null
     ///     }
     ///   ]
     /// }
@@ -55,6 +63,8 @@ namespace ProceduralCreature.Serialization
             WriteField(sb, "symmetryMode", definition.SymmetryMode.ToString());
             WriteRawField(sb, "bounds", WriteBounds(definition.Bounds));
             WriteRawField(sb, "generation", WriteGeneration(definition.Generation));
+            WriteRawField(sb, "forward", WriteVec3(definition.Forward));
+            WriteRawField(sb, "body", WriteBody(definition.Body));
             WriteRawField(sb, "parts", WriteParts(definition.Parts));
             sb.Append('}');
             return sb.ToString();
@@ -93,6 +103,22 @@ namespace ProceduralCreature.Serialization
             return sb.ToString();
         }
 
+        private static string WriteBody(BodySpline body)
+        {
+            var sb = new StringBuilder();
+            sb.Append("{\"samples\":[");
+            for (int i = 0; i < body.Samples.Count; i++)
+            {
+                if (i > 0) sb.Append(',');
+                BodySample sample = body.Samples[i];
+                sb.Append("{\"id\":").Append(sample.Id.ToString(CultureInfo.InvariantCulture));
+                sb.Append(",\"position\":").Append(WriteVec3(sample.Position));
+                sb.Append(",\"radius\":").Append(Num(sample.Radius)).Append('}');
+            }
+            sb.Append("]}");
+            return sb.ToString();
+        }
+
         private static string WritePart(CreaturePart part)
         {
             var sb = new StringBuilder();
@@ -105,8 +131,20 @@ namespace ProceduralCreature.Serialization
             WriteRawField(sb, "shape", WriteShape(part.Shape));
             WriteRawField(sb, "appearance", WriteAppearance(part.Appearance));
             WriteField(sb, "mirrorAcrossSymmetryPlane", part.MirrorAcrossSymmetryPlane);
+            WriteRawField(sb, "parentAttachment", WriteNullableAnchor(part.ParentAttachment));
             sb.Append('}');
             return sb.ToString();
+        }
+
+        private static string WriteNullableAnchor(BodySurfaceAnchor anchor)
+        {
+            if (anchor == null) return "null";
+            return "{\"segmentStartSampleId\":" +
+                anchor.SegmentStartSampleId.ToString(CultureInfo.InvariantCulture) +
+                ",\"segmentT\":" + Num(anchor.SegmentT) +
+                ",\"radialAngle\":" + Num(anchor.RadialAngle) +
+                ",\"surfaceOffset\":" + Num(anchor.SurfaceOffset) +
+                ",\"roll\":" + Num(anchor.Roll) + "}";
         }
 
         private static string WriteTransform(TransformData t)

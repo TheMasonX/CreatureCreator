@@ -38,6 +38,9 @@ namespace ProceduralCreature.Definition
         /// </summary>
         public bool MirrorAcrossSymmetryPlane;
 
+        /// <summary>Semantic attachment coordinates in the direct parent's frame.</summary>
+        public BodySurfaceAnchor ParentAttachment;
+
         public CreaturePart Clone()
         {
             return new CreaturePart
@@ -50,6 +53,7 @@ namespace ProceduralCreature.Definition
                 Shape = Shape,
                 Appearance = Appearance,
                 MirrorAcrossSymmetryPlane = MirrorAcrossSymmetryPlane,
+                ParentAttachment = ParentAttachment == null ? null : ParentAttachment.Clone(),
             };
         }
 

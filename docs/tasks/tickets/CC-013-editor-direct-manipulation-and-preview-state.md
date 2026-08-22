@@ -14,6 +14,7 @@ links:
   - Assets/Scripts/Runtime/Generation/CreatureMeshGenerator.cs
   - Assets/Scripts/Runtime/Definition/CreatureDefinition.cs
   - Assets/Scripts/Runtime/Definition/DefinitionValidator.cs
+  - docs/audits/sporelike-creature-model-and-editor-audit-26-08-22-15-34-00.md
 ---
 
 ## Summary
@@ -36,10 +37,10 @@ Add viewport handle support for body segment movement, radius adjustment, extens
 - Smoke test confirming no stale geometry is used after a definition change and preview regeneration.
 
 ## Findings
-The audit treats direct manipulation as the primary authoring surface and flags stale preview geometry as a design risk. The repository already has saved definitions and preview generation, but the authoring UI still needs to prevent hidden geometry drift.
+The audit treats direct manipulation as the primary authoring surface and flags stale preview geometry as a design risk. The repository already has saved definitions and preview generation, but the authoring UI still needs to prevent hidden geometry drift. The tree is a semantic outliner for selection, inspection, naming, and reparenting. It must project the authoritative definition and must not become a second mutable hierarchy.
 
 ## Blockers
 This depends on the body/limb schema being stable and on the editor preview pipeline being able to track definition changes explicitly.
 
 ## Next Step
-Implement the explicit preview state and body handles that use semantic attachment coordinates rather than preview mesh IDs or raycast targets.
+Implement the explicit preview state and body handles that use semantic attachment coordinates rather than preview mesh IDs or raycast targets. Keep modifier-key reparenting and richer palette drag interactions as later UX milestones after the schema and anchor projection are validated.

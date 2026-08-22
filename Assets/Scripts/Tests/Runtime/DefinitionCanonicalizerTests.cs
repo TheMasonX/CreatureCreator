@@ -11,13 +11,20 @@ namespace ProceduralCreature.Tests.Runtime
         private static CreatureDefinition MakeSinglePartDefinition(TransformData transform)
         {
             var definition = CreatureDefinition.CreateEmpty();
+            definition.Body.Samples.Add(new BodySample
+            {
+                Id = 1,
+                Position = Vector3.zero,
+                Radius = 1f,
+            });
             definition.AddPart(new CreaturePart
             {
                 Id = "part_a",
+                ParentId = CreatureDefinition.BodyId,
                 Transform = transform,
                 Shape = ShapeDefinition.DefaultSphere,
                 Appearance = AppearanceDefinition.Default,
-                PartType = PartType.Body,
+                PartType = PartType.Limb,
             });
             return definition;
         }
@@ -92,14 +99,15 @@ namespace ProceduralCreature.Tests.Runtime
         public void Canonicalize_SortsPartsByIdRegardlessOfInputOrder()
         {
             var definition = CreatureDefinition.CreateEmpty();
+            definition.Body.Samples.Add(new BodySample { Id = 1, Position = Vector3.zero, Radius = 1f });
             definition.AddPart(new CreaturePart
             {
-                Id = "part_z", Transform = TransformData.Identity,
+                Id = "part_z", ParentId = CreatureDefinition.BodyId, Transform = TransformData.Identity,
                 Shape = ShapeDefinition.DefaultSphere, Appearance = AppearanceDefinition.Default,
             });
             definition.AddPart(new CreaturePart
             {
-                Id = "part_a", Transform = TransformData.Identity,
+                Id = "part_a", ParentId = CreatureDefinition.BodyId, Transform = TransformData.Identity,
                 Shape = ShapeDefinition.DefaultSphere, Appearance = AppearanceDefinition.Default,
             });
 

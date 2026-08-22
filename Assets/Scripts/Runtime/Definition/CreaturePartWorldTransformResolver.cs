@@ -41,7 +41,9 @@ namespace ProceduralCreature.Definition
 
                 chain.Add(current);
 
-                if (current.ParentId == null) break;
+                // The Body owns the creature frame; a Body-child's transform is
+                // already creature-space (the Body spline defines the origin).
+                if (current.ParentId == null || current.ParentId == CreatureDefinition.BodyId) break;
 
                 CreaturePart parent = definition.FindPart(current.ParentId);
                 if (parent == null)

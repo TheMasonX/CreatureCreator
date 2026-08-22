@@ -1,6 +1,7 @@
 using System;
 using System.Collections.Generic;
 using System.Linq;
+using UnityEngine;
 
 namespace ProceduralCreature.Definition
 {
@@ -17,12 +18,15 @@ namespace ProceduralCreature.Definition
     [Serializable]
     public sealed class CreatureDefinition
     {
-        public const int CurrentSchemaVersion = 1;
+        public const int CurrentSchemaVersion = 2;
+        public const string BodyId = "body";
 
         public int SchemaVersion = CurrentSchemaVersion;
         public SymmetryMode SymmetryMode = SymmetryMode.None;
         public BoundsDefinition Bounds = BoundsDefinition.Default;
         public GenerationSettings Generation = GenerationSettings.Default;
+        public BodySpline Body = new BodySpline();
+        public Vector3 Forward = Vector3.forward;
         public List<CreaturePart> Parts = new List<CreaturePart>();
 
         public static CreatureDefinition CreateEmpty()
@@ -43,6 +47,8 @@ namespace ProceduralCreature.Definition
                 SymmetryMode = SymmetryMode,
                 Bounds = Bounds,
                 Generation = Generation,
+                Body = Body == null ? null : Body.Clone(),
+                Forward = Forward,
                 Parts = Parts.Select(p => p.Clone()).ToList(),
             };
         }

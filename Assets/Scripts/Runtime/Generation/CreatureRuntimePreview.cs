@@ -84,20 +84,32 @@ namespace ProceduralCreature.Generation
         {
             var definition = CreatureDefinition.CreateEmpty();
             definition.Generation = new GenerationSettings { VoxelsPerUnit = 12f };
-            definition.AddPart(new CreaturePart
+            definition.Forward = Vector3.forward;
+            definition.Body.Samples.Add(new BodySample
             {
-                Id = "runtime_body",
-                PartType = PartType.Body,
-                Transform = TransformData.Identity,
-                Shape = new ShapeDefinition { Type = ShapeType.Sphere, PrimarySize = 1.6f, SmoothBlendRadius = 0.25f },
-                Appearance = new AppearanceDefinition { BaseColor = new Color(0.22f, 0.58f, 0.78f, 1f), NoiseSeed = 7, NoiseScale = 1.5f },
+                Id = 1,
+                Position = new Vector3(0f, 0f, -1f),
+                Radius = 1.1f,
+            });
+            definition.Body.Samples.Add(new BodySample
+            {
+                Id = 2,
+                Position = new Vector3(0f, 0f, 0f),
+                Radius = 1.3f,
+            });
+            definition.Body.Samples.Add(new BodySample
+            {
+                Id = 3,
+                Position = new Vector3(0f, 0f, 1f),
+                Radius = 1.0f,
             });
             definition.AddPart(new CreaturePart
             {
                 Id = "runtime_head",
-                ParentId = "runtime_body",
-                PartType = PartType.Body,
-                Transform = new TransformData { Position = new Vector3(0f, 1.45f, 0f), Rotation = Quaternion.identity, Scale = Vector3.one },
+                ParentId = CreatureDefinition.BodyId,
+                PartType = PartType.Limb,
+                DisplayName = "Head",
+                Transform = new TransformData { Position = new Vector3(0f, 1.45f, 1.4f), Rotation = Quaternion.identity, Scale = Vector3.one },
                 Shape = new ShapeDefinition { Type = ShapeType.Sphere, PrimarySize = 0.85f, SmoothBlendRadius = 0.2f },
                 Appearance = new AppearanceDefinition { BaseColor = new Color(0.3f, 0.72f, 0.86f, 1f), NoiseSeed = 11, NoiseScale = 1.5f },
             });

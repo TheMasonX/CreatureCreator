@@ -47,6 +47,46 @@ namespace ProceduralCreature.Tests.Runtime
         }
 
         [Test]
+        public void Compile_BodySpline_IsThePrimaryField()
+        {
+            var definition = CreatureDefinition.CreateEmpty();
+            definition.Body.Samples.Add(new BodySample { Id = 1, Position = new Vector3(0f, 0f, -1f), Radius = 0.75f });
+            definition.Body.Samples.Add(new BodySample { Id = 2, Position = new Vector3(0f, 0f, 1f), Radius = 0.9f });
+
+            ISdfNode compiled = SdfProgramBuilder.Compile(definition);
+
+            // A point at a Body sample center must be well inside the field even
+            // though the definition has no parts at all.
+            Assert.Less(compiled.Evaluate(new Vector3(0f, 0f, -1f)), 0f,
+                "The Body spline alone must produce a primary implicit surface.");
+            Assert.Less(compiled.Evaluate(new Vector3(0f, 0f, 1f)), 0f);
+            Assert.Greater(compiled.Evaluate(new Vector3(0f, 0f, 4f)), 0f,
+                "A point far outside the spline must be outside the field.");
+        }
+
+        [Test]
+        public void CompilePortable_BodySpline_MatchesManagedGraph()
+        {
+            var definition = CreatureDefinition.CreateEmpty();
+            definition.Body.Samples.Add(new BodySample { Id = 1, Position = new Vector3(0f, 0f, -1f), Radius = 0.75f });
+            definition.Body.Samples.Add(new BodySample { Id = 2, Position = new Vector3(0f, 0f, 1f), Radius = 0.9f });
+            definition.AddPart(Sphere("part_leg", new Vector3(1f, -1f, 0f)));
+
+            ISdfNode managed = SdfProgramBuilder.Compile(definition);
+            using (SdfProgram portable = SdfProgramBuilder.CompilePortable(definition))
+            {
+                for (float x = -2f; x <= 2f; x += 0.31f)
+                for (float y = -2f; y <= 2f; y += 0.37f)
+                {
+                    Vector3 point = new Vector3(x, y, 0.21f);
+                    Assert.AreEqual(managed.Evaluate(point),
+                        SdfProgramEvaluator.Evaluate(portable, new float3(point.x, point.y, point.z)),
+                        1e-4f, $"Mismatch at {point}.");
+                }
+            }
+        }
+
+        [Test]
         public void Compile_IsDeterministicRegardlessOfPartsInsertionOrder()
         {
             var definitionA = CreatureDefinition.CreateEmpty();

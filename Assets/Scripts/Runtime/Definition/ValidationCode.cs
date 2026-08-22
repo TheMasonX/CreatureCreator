@@ -19,5 +19,13 @@ namespace ProceduralCreature.Definition
         GenerationBudgetExceeded,
         UnsupportedSchemaVersion,
         InvalidBounds,
+        MissingBody,
+        InvalidBodySampleCount,
+        DuplicateBodySampleId,
+        InvalidBodySample,
+        UnevenBodySpacing,
+        InvalidForward,
+        InvalidBodyParent,
+        InvalidAttachmentAnchor,
     }
 }

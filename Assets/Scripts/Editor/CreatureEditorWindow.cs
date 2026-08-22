@@ -1,3 +1,4 @@
+using System.Collections.Generic;
 using System.IO;
 using System.Linq;
 using UnityEditor;
@@ -95,6 +96,47 @@ namespace ProceduralCreature.Editor
         private const string UsePortableSamplingKey = "ProceduralCreature.UsePortableSampling";
         private const string CurrentFilePathKey = "ProceduralCreature.CurrentFilePath";
 
+        /// <summary>
+        /// Part types that are valid to author in schema v2. Body, Root, and
+        /// independent Tail are reserved by the validator and must not be offered.
+        /// </summary>
+        private static readonly PartType[] ValidV2PartTypes =
+        {
+            PartType.Limb,
+            PartType.Leg,
+            PartType.Arm,
+            PartType.Foot,
+        };
+
+        /// <summary>
+        /// A valid v2 starter creature: one Body spline along the Forward axis and
+        /// no parts. Kept in sync with the schema's "exactly one Body root" rule.
+        /// </summary>
+        private static CreatureDefinition CreateDefaultCreature()
+        {
+            var definition = CreatureDefinition.CreateEmpty();
+            definition.Forward = Vector3.forward;
+            definition.Body.Samples.Add(new BodySample
+            {
+                Id = 1,
+                Position = new Vector3(0f, 0f, -1f),
+                Radius = 0.9f,
+            });
+            definition.Body.Samples.Add(new BodySample
+            {
+                Id = 2,
+                Position = new Vector3(0f, 0f, 0f),
+                Radius = 1.0f,
+            });
+            definition.Body.Samples.Add(new BodySample
+            {
+                Id = 3,
+                Position = new Vector3(0f, 0f, 1f),
+                Radius = 0.9f,
+            });
+            return definition;
+        }
+
         [MenuItem("Window/Procedural Creature/Creature Editor")]
         public static void ShowWindow()
         {
@@ -104,7 +146,7 @@ namespace ProceduralCreature.Editor
 
         private void OnEnable()
         {
-            _definition = CreatureEditorSession.TryLoad() ?? CreatureDefinition.CreateEmpty();
+            _definition = CreatureEditorSession.TryLoad() ?? CreateDefaultCreature();
             Revalidate();
 
             _undoState = ScriptableObject.CreateInstance<CreatureUndoState>();
@@ -162,7 +204,9 @@ namespace ProceduralCreature.Editor
                 return;
             }
 
-            if (_selectedPartId != null && _definition.FindPart(_selectedPartId) == null)
+            if (_selectedPartId != null
+                && _selectedPartId != CreatureDefinition.BodyId
+                && _definition.FindPart(_selectedPartId) == null)
             {
                 _selectedPartId = null;
             }
@@ -324,7 +368,7 @@ namespace ProceduralCreature.Editor
             if (!proceed) return;
 
             _selectedPartId = null;
-            ReplaceDefinition("New Creature", CreatureDefinition.CreateEmpty());
+            ReplaceDefinition("New Creature", CreateDefaultCreature());
         }
 
         private void SaveCurrent()
@@ -426,28 +470,80 @@ namespace ProceduralCreature.Editor
             EditorGUILayout.LabelField("Parts", EditorStyles.boldLabel);
 
             _partListScroll = EditorGUILayout.BeginScrollView(_partListScroll);
-            foreach (CreaturePart part in _definition.Parts.OrderBy(p => p.Id, System.StringComparer.Ordinal))
+
+            DrawBodyNode();
+            var visited = new HashSet<string> { CreatureDefinition.BodyId };
+            foreach (CreaturePart child in ChildrenOf(CreatureDefinition.BodyId)
+                .OrderBy(p => p.Id, System.StringComparer.Ordinal))
             {
-                bool isSelected = part.Id == _selectedPartId;
-                string label = $"{part.PartType}  {GetPartLabel(part)}";
-                bool nowSelected = GUILayout.Toggle(isSelected, label, EditorStyles.toolbarButton);
-                if (nowSelected && !isSelected) _selectedPartId = part.Id;
+                DrawPartNode(child, depth: 1, visited);
             }
+
+            // Parts whose ParentId points at a missing part (or at a cycle) are
+            // not reachable from the Body root; show them explicitly so the user
+            // can reparent or remove them instead of the part silently vanishing
+            // from the tree. The validator reports the underlying error.
+            var reachable = new HashSet<string>(visited);
+            IEnumerable<CreaturePart> orphans = _definition.Parts
+                .Where(p => p != null && !reachable.Contains(p.Id))
+                .OrderBy(p => p.Id, System.StringComparer.Ordinal);
+            bool firstOrphan = true;
+            foreach (CreaturePart orphan in orphans)
+            {
+                if (firstOrphan)
+                {
+                    EditorGUILayout.LabelField("Unparented", EditorStyles.boldLabel);
+                    firstOrphan = false;
+                }
+                DrawPartNode(orphan, depth: 1, visited);
+            }
+
             EditorGUILayout.EndScrollView();
 
             if (GUILayout.Button("Add Part")) AddNewPart();
 
-            GUI.enabled = _selectedPartId != null;
+            GUI.enabled = _selectedPartId != null && _selectedPartId != CreatureDefinition.BodyId;
             if (GUILayout.Button("Remove Selected")) RemoveSelectedPart();
             GUI.enabled = true;
 
             EditorGUILayout.EndVertical();
         }
 
+        private void DrawBodyNode()
+        {
+            bool isSelected = _selectedPartId == CreatureDefinition.BodyId;
+            bool nowSelected = GUILayout.Toggle(isSelected, "Body", EditorStyles.toolbarButton);
+            if (nowSelected && !isSelected) _selectedPartId = CreatureDefinition.BodyId;
+        }
+
+        private void DrawPartNode(CreaturePart part, int depth, HashSet<string> visited)
+        {
+            if (!visited.Add(part.Id)) return; // parent cycle: stop descending, the validator flags it
+
+            string indent = new string(' ', depth * 2);
+            bool isSelected = part.Id == _selectedPartId;
+            string label = $"{indent}{part.PartType}  {GetPartLabel(part)}";
+            bool nowSelected = GUILayout.Toggle(isSelected, label, EditorStyles.toolbarButton);
+            if (nowSelected && !isSelected) _selectedPartId = part.Id;
+
+            foreach (CreaturePart child in ChildrenOf(part.Id)
+                .OrderBy(p => p.Id, System.StringComparer.Ordinal))
+            {
+                DrawPartNode(child, depth + 1, visited);
+            }
+        }
+
+        private IEnumerable<CreaturePart> ChildrenOf(string parentId)
+        {
+            return _definition.Parts.Where(p => p.ParentId == parentId);
+        }
+
         private void AddNewPart()
         {
             string newId = PartIdGenerator.CreateNew();
-            string parentId = _selectedPartId; // convenience: new part parents to whatever's selected
+            string parentId = _selectedPartId != null && _selectedPartId != CreatureDefinition.BodyId
+                ? _selectedPartId
+                : CreatureDefinition.BodyId; // default: attach directly to the Body
 
             MutateDefinition("Add Part", definition => definition.AddPart(new CreaturePart
             {
@@ -490,6 +586,13 @@ namespace ProceduralCreature.Editor
         {
             EditorGUILayout.BeginVertical();
 
+            if (_selectedPartId == CreatureDefinition.BodyId)
+            {
+                DrawBodyInspector();
+                EditorGUILayout.EndVertical();
+                return;
+            }
+
             CreaturePart selected = _selectedPartId != null ? _definition.FindPart(_selectedPartId) : null;
             if (selected == null)
             {
@@ -527,11 +630,89 @@ namespace ProceduralCreature.Editor
 
         private void DrawPartTypeField(CreaturePart selected)
         {
-            PartType newType = (PartType)EditorGUILayout.EnumPopup("Part Type", selected.PartType);
-            if (newType == selected.PartType) return;
+            string[] typeNames = ValidV2PartTypes.Select(t => t.ToString()).ToArray();
+            int currentIndex = System.Array.IndexOf(ValidV2PartTypes, selected.PartType);
+            if (currentIndex < 0) currentIndex = 0; // legacy/unknown value maps to the first valid type for display
 
+            int newIndex = EditorGUILayout.Popup("Part Type", currentIndex, typeNames);
+            if (newIndex == currentIndex) return;
+
+            PartType newType = ValidV2PartTypes[newIndex];
             string partId = selected.Id;
             MutateDefinition("Change Part Type", definition => definition.FindPart(partId).PartType = newType);
+        }
+
+        private void DrawBodyInspector()
+        {
+            EditorGUILayout.LabelField("Editing: Body", EditorStyles.boldLabel);
+
+            Vector3 newForward = EditorGUILayout.Vector3Field("Forward", _definition.Forward);
+            if (newForward != _definition.Forward)
+            {
+                MutateDefinition("Edit Body Forward", definition => definition.Forward = newForward);
+            }
+
+            EditorGUILayout.Space();
+            EditorGUILayout.LabelField("Body Spline", EditorStyles.boldLabel);
+            EditorGUILayout.LabelField($"Samples: {_definition.Body.Samples.Count}");
+
+            BodySample sampleToRemove = null;
+            for (int i = 0; i < _definition.Body.Samples.Count; i++)
+            {
+                BodySample sample = _definition.Body.Samples[i];
+                EditorGUILayout.BeginHorizontal();
+                EditorGUILayout.LabelField($"#{sample.Id}", GUILayout.Width(40));
+                Vector3 newPosition = EditorGUILayout.Vector3Field("", sample.Position);
+                if (newPosition != sample.Position)
+                {
+                    uint sampleId = sample.Id;
+                    MutateDefinition("Move Body Sample",
+                        definition => FindBodySample(definition, sampleId).Position = newPosition);
+                    sample = _definition.Body.Samples[i];
+                }
+                float newRadius = EditorGUILayout.FloatField(sample.Radius, GUILayout.Width(60));
+                if (!Mathf.Approximately(newRadius, sample.Radius))
+                {
+                    uint sampleId = sample.Id;
+                    MutateDefinition("Resize Body Sample",
+                        definition => FindBodySample(definition, sampleId).Radius = newRadius);
+                    sample = _definition.Body.Samples[i];
+                }
+                if (GUILayout.Button("Remove", GUILayout.Width(60))) sampleToRemove = sample;
+                EditorGUILayout.EndHorizontal();
+            }
+
+            if (sampleToRemove != null)
+            {
+                uint idToRemove = sampleToRemove.Id;
+                MutateDefinition("Remove Body Sample",
+                    definition => definition.Body.Samples.RemoveAll(s => s.Id == idToRemove));
+            }
+
+            if (GUILayout.Button("Add Body Sample"))
+            {
+                MutateDefinition("Add Body Sample", definition =>
+                {
+                    uint nextId = definition.Body.Samples.Count == 0
+                        ? 1u
+                        : definition.Body.Samples.Max(s => s.Id) + 1u;
+                    Vector3 position = definition.Body.Samples.Count == 0
+                        ? Vector3.zero
+                        : definition.Body.Samples[definition.Body.Samples.Count - 1].Position
+                            + definition.Forward.normalized * 0.5f;
+                    definition.Body.Samples.Add(new BodySample
+                    {
+                        Id = nextId,
+                        Position = position,
+                        Radius = 0.75f,
+                    });
+                });
+            }
+        }
+
+        private static BodySample FindBodySample(CreatureDefinition definition, uint id)
+        {
+            return definition.Body.Samples.First(s => s.Id == id);
         }
 
         private void DrawParentPicker(CreaturePart selected)
@@ -542,14 +723,14 @@ namespace ProceduralCreature.Editor
                 .ToList();
             var candidateIds = candidateParts.Select(p => p.Id).ToList();
             var candidateLabels = candidateParts.Select(GetPartLabel).ToList();
-            candidateIds.Insert(0, null);
-            candidateLabels.Insert(0, "(none - root)");
+            candidateIds.Insert(0, CreatureDefinition.BodyId);
+            candidateLabels.Insert(0, "Body (root)");
 
             int currentIndex = selected.ParentId == null ? 0 : candidateIds.IndexOf(selected.ParentId);
             if (currentIndex < 0) currentIndex = 0;
 
             int newIndex = EditorGUILayout.Popup("Parent", currentIndex, candidateLabels.ToArray());
-            string newParentId = newIndex == 0 ? null : candidateIds[newIndex];
+            string newParentId = candidateIds[newIndex];
             if (newParentId == selected.ParentId) return;
 
             string partId = selected.Id;
@@ -769,9 +950,11 @@ namespace ProceduralCreature.Editor
 
         private void PlaceNewPartAtWorldPosition(Vector3 worldPosition)
         {
-            string parentId = _selectedPartId;
+            string parentId = _selectedPartId != null && _selectedPartId != CreatureDefinition.BodyId
+                ? _selectedPartId
+                : CreatureDefinition.BodyId;
             Vector3 localPosition = WorldToLocalPosition(worldPosition, parentId, out bool parentResolvedSuccessfully);
-            if (!parentResolvedSuccessfully) parentId = null; // fall back to a root part rather than dropping the click
+            if (!parentResolvedSuccessfully) parentId = CreatureDefinition.BodyId; // fall back to the Body root rather than dropping the click
 
             Vector3 clampedPosition = ClampToBounds(localPosition, _definition.Bounds);
             string newId = PartIdGenerator.CreateNew();
@@ -809,7 +992,9 @@ namespace ProceduralCreature.Editor
         {
             succeeded = true;
 
-            if (parentId == null) return worldPosition;
+            // The Body owns the creature frame; a Body-child's local position is
+            // already creature-space (the Body spline itself defines the origin).
+            if (parentId == null || parentId == CreatureDefinition.BodyId) return worldPosition;
 
             CreaturePart parentPart = _definition.FindPart(parentId);
             if (parentPart == null)

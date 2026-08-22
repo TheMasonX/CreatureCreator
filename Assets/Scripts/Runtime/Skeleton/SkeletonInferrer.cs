@@ -87,9 +87,12 @@ namespace ProceduralCreature.Skeleton
 
         private static string ResolveParentBoneId(CreatureDefinition definition, CreaturePart part, bool mirrored)
         {
-            if (part.ParentId == null)
+            // The Body is the sole root; a part attached to the Body spline has no
+            // parent bone (the Body's own frame/bones are a later BodyFrameResolver
+            // slice).
+            if (part.ParentId == null || part.ParentId == CreatureDefinition.BodyId)
             {
-                return null; // root bone, mirrored or not
+                return null;
             }
 
             if (!mirrored)
