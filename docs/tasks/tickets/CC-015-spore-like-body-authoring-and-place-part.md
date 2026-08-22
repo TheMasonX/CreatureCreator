@@ -92,6 +92,39 @@ defect, an `AdvanceChord` bug that re-pointed the chord origin at each segment
 vertex instead of keeping the last placed sample fixed, was also caught by the
 tests.
 
+### Drag rollback note (2026-08-22)
+
+The pinned re-space drag and the even-spacing constraint pass (`WalkExtending`)
+changed the body too much during a drag: re-spacing the whole spline to even
+chords moved the tail and neighbors significantly, and extreme drags extended
+the body in ways that fought the author's intent. `DragSampleEvenly` is rolled
+back to the FABRIK initial implementation (commit 77ba8b3): segment length is
+the current average spacing, dragging the head translates the whole spine
+rigidly, and dragging any other sample solves the upstream sub-chain with
+FABRIK (joint 0 anchored, the dragged joint reaching the target, every link
+exactly the segment length) then translates the downstream joints rigidly.
+This changes less — total body length is preserved and the tail is not
+respaced.
+
+Lesson: the desired Spore feel is a local bend with fixed segment lengths, not
+whole-body re-spacing. The FABRIK weaknesses recorded earlier (neighbors move
+with the dragged sample, straightening a kink lengthens the body, pushing a
+point kinks/squishes the segments) are the open problem to solve next — for
+example a FABRIK variant with stronger local control (bias the bend toward the
+dragged joint, keep upstream joints near their rest pose) rather than the
+pinned re-space or even-spacing constraint passes tried here.
+
+The **Body Spacing** slider is kept: `RespaceToTargetSpacing` re-samples the
+whole Body to a target chord spacing keeping the head and tail endpoints
+(denser adds samples, sparser removes them, radii interpolated along the
+body). The drag and the slider are independent — the slider is the explicit
+density control and the drag is back to the FABRIK baseline.
+
+Validation for the rollback: clean Unity compile; FABRIK drag tests restored to
+the 77ba8b3 set (`TailDrag`, `HeadDrag`, `MiddleDrag_BendsUpstream`,
+`TailUnreachable_StretchesStraight`); slider tests retained
+(`RespaceToTargetSpacing_Denser/Sparser/InterpolatesRadii/InvalidInput`).
+
 ## Manual checks still to run
 
 The scene-view interaction (clicking a Body sample sphere cap and dragging its

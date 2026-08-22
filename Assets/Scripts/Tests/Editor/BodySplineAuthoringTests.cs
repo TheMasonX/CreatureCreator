@@ -207,5 +207,89 @@ namespace ProceduralCreature.Tests.Editor
             Assert.AreEqual(new Vector3(1f, 0f, -1f), spline.Samples[1].Position);
             Assert.AreEqual(new Vector3(2f, 0f, -1f), spline.Samples[2].Position);
         }
+
+        [Test]
+        public void RespaceToTargetSpacing_Denser_AddsSamplesAndKeepsEndpoints()
+        {
+            var spline = new BodySpline();
+            for (int i = 0; i < 5; i++)
+            {
+                spline.Samples.Add(new BodySample { Id = (uint)(i + 1), Position = new Vector3(i, 0f, 0f), Radius = 1f });
+            }
+
+            // 4.0 total length / 0.5 spacing = 8 segments -> 9 samples.
+            BodySplineAuthoring.RespaceToTargetSpacing(spline, 0.5f);
+
+            Assert.AreEqual(9, spline.Samples.Count);
+            AssertEvenSpacing(spline);
+            Assert.AreEqual(new Vector3(0f, 0f, 0f), spline.Samples[0].Position); // head kept
+            Assert.AreEqual(new Vector3(4f, 0f, 0f), spline.Samples[8].Position); // tail kept
+            Assert.That(Vector3.Distance(spline.Samples[1].Position, spline.Samples[0].Position),
+                Is.EqualTo(0.5f).Within(1e-3f));
+
+            var definition = CreatureDefinition.CreateEmpty();
+            definition.Body = spline;
+            Assert.IsTrue(DefinitionValidator.Validate(definition).IsValid);
+        }
+
+        [Test]
+        public void RespaceToTargetSpacing_Sparser_RemovesSamples()
+        {
+            var spline = new BodySpline();
+            for (int i = 0; i < 5; i++)
+            {
+                spline.Samples.Add(new BodySample { Id = (uint)(i + 1), Position = new Vector3(i, 0f, 0f), Radius = 1f });
+            }
+
+            // 4.0 total length / 2 spacing = 2 segments -> 3 samples.
+            BodySplineAuthoring.RespaceToTargetSpacing(spline, 2f);
+
+            Assert.AreEqual(3, spline.Samples.Count);
+            AssertEvenSpacing(spline);
+            Assert.AreEqual(new Vector3(0f, 0f, 0f), spline.Samples[0].Position);
+            Assert.AreEqual(new Vector3(4f, 0f, 0f), spline.Samples[2].Position);
+
+            var definition = CreatureDefinition.CreateEmpty();
+            definition.Body = spline;
+            Assert.IsTrue(DefinitionValidator.Validate(definition).IsValid);
+        }
+
+        [Test]
+        public void RespaceToTargetSpacing_InterpolatesRadiiAlongTheBody()
+        {
+            var spline = new BodySpline();
+            float[] radii = { 1f, 0.8f, 0.6f, 0.4f, 0.2f };
+            for (int i = 0; i < 5; i++)
+            {
+                spline.Samples.Add(new BodySample { Id = (uint)(i + 1), Position = new Vector3(i, 0f, 0f), Radius = radii[i] });
+            }
+
+            BodySplineAuthoring.RespaceToTargetSpacing(spline, 0.5f); // denser -> 9 samples
+
+            Assert.AreEqual(9, spline.Samples.Count);
+            Assert.AreEqual(1f, spline.Samples[0].Radius, 1e-3f); // head radius preserved
+            Assert.AreEqual(0.2f, spline.Samples[8].Radius, 1e-3f); // tail radius preserved
+            // Radii taper monotonically from head to tail.
+            for (int i = 1; i < spline.Samples.Count; i++)
+            {
+                Assert.That(spline.Samples[i].Radius, Is.LessThanOrEqualTo(spline.Samples[i - 1].Radius + 1e-4f));
+                Assert.That(spline.Samples[i].Radius, Is.GreaterThan(0f));
+            }
+        }
+
+        [Test]
+        public void RespaceToTargetSpacing_InvalidInput_LeavesUnchanged()
+        {
+            var spline = new BodySpline();
+            spline.Samples.Add(new BodySample { Id = 1, Position = Vector3.zero, Radius = 1f });
+            spline.Samples.Add(new BodySample { Id = 2, Position = new Vector3(1f, 0f, 0f), Radius = 1f });
+
+            BodySplineAuthoring.RespaceToTargetSpacing(spline, 0f);
+            BodySplineAuthoring.RespaceToTargetSpacing(spline, -1f);
+
+            Assert.AreEqual(2, spline.Samples.Count);
+            Assert.AreEqual(Vector3.zero, spline.Samples[0].Position);
+            Assert.AreEqual(new Vector3(1f, 0f, 0f), spline.Samples[1].Position);
+        }
     }
 }

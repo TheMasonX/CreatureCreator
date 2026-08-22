@@ -727,16 +727,48 @@ namespace ProceduralCreature.Editor
             }
             EditorGUILayout.EndHorizontal();
 
+            // Body Spacing density control (CC-015): re-samples the whole Body
+            // to the target chord spacing, keeping the head and tail in place
+            // (denser spacing adds samples, sparser removes them).
+            float currentSpacing = CurrentBodySpacing(_definition.Body);
+            float minSpacing = Mathf.Max(0.05f, currentSpacing * 0.2f);
+            float maxSpacing = currentSpacing * 5f;
+            float newSpacing = EditorGUILayout.Slider("Body Spacing", currentSpacing, minSpacing, maxSpacing);
+            if (!Mathf.Approximately(newSpacing, currentSpacing))
+            {
+                float target = newSpacing;
+                MutateDefinition("Set Body Spacing",
+                    definition => BodySplineAuthoring.RespaceToTargetSpacing(definition.Body, target));
+                _activeBodySampleIndex = -1; // sample count may have changed
+                Repaint();
+            }
+
             EditorGUILayout.HelpBox(
                 "Adding a sample extends the Body along its tail at the current spacing, so samples stay " +
                 "even. Drag the sample spheres in the Scene view to bend the Body (select Body in the part " +
-                "list first); spacing stays even while you drag. Space Evenly re-snaps spacing after manual edits.",
+                "list first); spacing stays even while you drag. The Body Spacing slider re-samples the " +
+                "whole Body to a denser or sparser target spacing (head and tail stay put). Space Evenly " +
+                "re-snaps spacing after manual edits.",
                 MessageType.None);
         }
 
         private static BodySample FindBodySample(CreatureDefinition definition, uint id)
         {
             return definition.Body.Samples.First(s => s.Id == id);
+        }
+
+        private static float CurrentBodySpacing(BodySpline spline)
+        {
+            if (spline == null || spline.Samples == null || spline.Samples.Count < 2) return 1f;
+            float total = 0f;
+            int pairs = 0;
+            for (int i = 1; i < spline.Samples.Count; i++)
+            {
+                if (spline.Samples[i] == null || spline.Samples[i - 1] == null) continue;
+                total += Vector3.Distance(spline.Samples[i].Position, spline.Samples[i - 1].Position);
+                pairs++;
+            }
+            return pairs > 0 ? total / pairs : 1f;
         }
 
         private void DrawParentPicker(CreaturePart selected)
