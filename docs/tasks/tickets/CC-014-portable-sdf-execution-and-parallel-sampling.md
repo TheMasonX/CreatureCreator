@@ -94,18 +94,22 @@ The first implementation slice adds the blittable operation representation and
 scalar evaluator. The managed node graph remains the reference path. Jobs and
 Burst sampling are still pending Unity compilation and parity evidence.
 
+Burst sampling is now the default for the public mesh-generation overload and
+for new editor sessions. The managed sampler remains available through the
+editor setting as an explicit fallback.
+
 ## Blockers
 
-Performance at one preview quality is validated, but a second preview quality
-and a default-path switch are still unvalidated. Preserve the managed evaluator
-as the default until broader profiling justifies a switch.
+Performance at one preview quality is validated. A second preview quality and
+long-run regression coverage remain outstanding. Preserve the managed evaluator
+as an explicit fallback while broader profiling continues.
 Unity test discovery also needs follow-up because the focused runner returned zero
 tests.
 
 ## Next Step
 
-Capture FieldSampling timings at more than one preview quality, then decide
-whether to expose the portable sampler through the generation settings.
+Capture FieldSampling timings at more than one preview quality and repair Unity
+test discovery so the parity fixtures run in the normal test pipeline.
 
 ## Handoff
 

@@ -11,7 +11,7 @@ namespace ProceduralCreature.Generation
     {
         public static Mesh Generate(CreatureDefinition definition, out MeshTopologyReport topologyReport, GenerationDiagnostics diagnostics = null)
         {
-            return Generate(definition, out topologyReport, diagnostics, usePortableSampling: false);
+            return Generate(definition, out topologyReport, diagnostics, usePortableSampling: true);
         }
 
         public static Mesh Generate(

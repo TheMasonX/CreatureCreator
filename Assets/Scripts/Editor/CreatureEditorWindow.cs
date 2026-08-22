@@ -115,7 +115,7 @@ namespace ProceduralCreature.Editor
                 EditorPrefs.GetFloat(AutoRegenerationDelayKey, MinimumAutoRegenerationDelaySeconds));
             _previewVoxelsPerUnit = Mathf.Max(1f, EditorPrefs.GetFloat(PreviewVoxelsPerUnitKey, 16f));
             _logGenerationDiagnostics = EditorPrefs.GetBool(LogGenerationDiagnosticsKey, true);
-            _usePortableSampling = EditorPrefs.GetBool(UsePortableSamplingKey, false);
+            _usePortableSampling = EditorPrefs.GetBool(UsePortableSamplingKey, true);
             _currentFilePath = SessionState.GetString(CurrentFilePathKey, string.Empty);
 
             Undo.undoRedoPerformed += OnUndoRedoPerformed;
