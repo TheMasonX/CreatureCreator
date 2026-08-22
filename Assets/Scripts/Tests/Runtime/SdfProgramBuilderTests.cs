@@ -1,4 +1,5 @@
 using NUnit.Framework;
+using Unity.Mathematics;
 using UnityEngine;
 using ProceduralCreature.Common;
 using ProceduralCreature.Definition;
@@ -118,6 +119,46 @@ namespace ProceduralCreature.Tests.Runtime
         public void Compile_NullDefinition_ThrowsDomainException()
         {
             Assert.Throws<DomainException>(() => SdfProgramBuilder.Compile(null));
+        }
+
+        [Test]
+        public void CompilePortable_MatchesManagedGraphAcrossPrimitiveAndCompositionSamples()
+        {
+            var definition = CreatureDefinition.CreateEmpty();
+            definition.SymmetryMode = SymmetryMode.MirrorAcrossXAxis;
+            CreaturePart body = Sphere("body", new Vector3(1f, 0.25f, -0.5f));
+            body.Shape.Type = ShapeType.Box;
+            body.Shape.PrimarySize = 0.8f;
+            body.Shape.SmoothBlendRadius = 0.2f;
+            definition.AddPart(body);
+            CreaturePart limb = Sphere("limb", new Vector3(-1.2f, 0.4f, 0f));
+            limb.Shape.Type = ShapeType.Capsule;
+            limb.Shape.PrimarySize = 0.35f;
+            limb.Shape.SmoothBlendRadius = 0.1f;
+            limb.MirrorAcrossSymmetryPlane = true;
+            definition.AddPart(limb);
+
+            ISdfNode managed = SdfProgramBuilder.Compile(definition);
+            using (SdfProgram portable = SdfProgramBuilder.CompilePortable(definition))
+            {
+                for (float x = -3f; x <= 3f; x += 0.37f)
+                for (float y = -2f; y <= 2f; y += 0.41f)
+                {
+                    Vector3 point = new Vector3(x, y, 0.23f);
+                    Assert.AreEqual(managed.Evaluate(point),
+                        SdfProgramEvaluator.Evaluate(portable, new float3(point.x, point.y, point.z)),
+                        1e-4f, $"Mismatch at {point}.");
+                }
+            }
+        }
+
+        [Test]
+        public void CompilePortable_EmptyDefinitionMatchesManagedGraph()
+        {
+            using (SdfProgram portable = SdfProgramBuilder.CompilePortable(CreatureDefinition.CreateEmpty()))
+            {
+                Assert.IsTrue(float.IsPositiveInfinity(SdfProgramEvaluator.Evaluate(portable, float3.zero)));
+            }
         }
     }
 }

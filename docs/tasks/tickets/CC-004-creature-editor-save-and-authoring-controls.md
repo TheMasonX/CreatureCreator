@@ -2,7 +2,7 @@
 id: creature-task-004
 key: CC-004
 title: Complete creature editor save and authoring controls
-status: Backlog
+status: In Progress
 type: Task
 priority: P1
 tags: [editor, authoring, serialization, usability]
@@ -14,6 +14,7 @@ links:
   - Assets/Scripts/Runtime/Definition/CreatureDefinition.cs
   - Assets/Scripts/Runtime/Definition/CreaturePart.cs
   - Assets/Scripts/Runtime/Definition/DefinitionCanonicalizer.cs
+  - Assets/Scripts/Tests/Runtime/JsonDnaSerializerTests.cs
 ---
 
 ## Summary
@@ -34,7 +35,8 @@ Add Save beside Save As, support Ctrl+S when the current definition has a destin
 - Existing validation, canonicalization, undo, and session boundaries remain the only mutation path.
 
 ## Validation
-- Unity EditMode tests for Save, Save As, Ctrl+S command routing, display-name persistence, parent labels, and default symmetry.
+- Unity EditMode editor-session suite: 5/5 passed after fixing malformed appearance JSON.
+- Serializer display-name assertion added, but the runtime test fixture could not run after the Unity MCP bridge disconnected.
 - Manual Unity editor check for the save commands, Place Part button, and parent dropdown.
 - Canonical JSON round-trip check confirms names and slugs remain stable.
 
@@ -42,7 +44,7 @@ Add Save beside Save As, support Ctrl+S when the current definition has a destin
 The current editor window already owns save/load, part editing, validation, and preview commands. The requested controls should extend that workflow rather than create a second authoring path.
 
 ## Blockers
-The exact Unity shortcut registration API and the final Body/Limb schema must be confirmed during implementation.
+The manual editor check and runtime serializer fixture remain pending because the Unity MCP bridge disconnected during validation.
 
 ## Next Step
-Inspect the current editor command and part-field implementations, then add focused EditMode coverage before changing the UI.
+Reconnect Unity, run the serializer fixture, and manually verify Save, Ctrl+S, Place Part, renamed labels, and default mirroring.

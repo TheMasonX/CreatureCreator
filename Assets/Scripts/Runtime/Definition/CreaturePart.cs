@@ -15,6 +15,9 @@ namespace ProceduralCreature.Definition
         /// <summary>Stable identifier. Never derived from list position (§2.2).</summary>
         public string Id;
 
+        /// <summary>Author-facing label. Id remains the stable serialized slug.</summary>
+        public string DisplayName;
+
         /// <summary>Null for the implicit/explicit root part.</summary>
         public string ParentId;
 
@@ -40,6 +43,7 @@ namespace ProceduralCreature.Definition
             return new CreaturePart
             {
                 Id = Id,
+                DisplayName = DisplayName,
                 ParentId = ParentId,
                 PartType = PartType,
                 Transform = Transform,

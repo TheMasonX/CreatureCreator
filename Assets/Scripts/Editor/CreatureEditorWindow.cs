@@ -77,9 +77,23 @@ namespace ProceduralCreature.Editor
         private GameObject _previewGameObject;
         private CreatureUndoState _undoState;
         private bool _placementModeActive;
+        private bool _autoRegenerate;
+        private bool _showEditorSettings;
+        private float _autoRegenerationDelaySeconds = 1f;
+        private float _previewVoxelsPerUnit = 16f;
+        private bool _logGenerationDiagnostics = true;
+        private bool _usePortableSampling;
+        private double _autoRegenerateAt = -1d;
+        private string _currentFilePath;
 
         private static readonly IDnaSerializer Serializer = new JsonDnaSerializer();
         private const string PreviewObjectName = "CreatureCreator Preview";
+        private const float MinimumAutoRegenerationDelaySeconds = 1f;
+        private const string AutoRegenerationDelayKey = "ProceduralCreature.AutoRegenerationDelay";
+        private const string PreviewVoxelsPerUnitKey = "ProceduralCreature.PreviewVoxelsPerUnit";
+        private const string LogGenerationDiagnosticsKey = "ProceduralCreature.LogGenerationDiagnostics";
+        private const string UsePortableSamplingKey = "ProceduralCreature.UsePortableSampling";
+        private const string CurrentFilePathKey = "ProceduralCreature.CurrentFilePath";
 
         [MenuItem("Window/Procedural Creature/Creature Editor")]
         public static void ShowWindow()
@@ -96,9 +110,17 @@ namespace ProceduralCreature.Editor
             _undoState = ScriptableObject.CreateInstance<CreatureUndoState>();
             _undoState.hideFlags = HideFlags.HideAndDontSave;
             _undoState.Json = Serializer.Serialize(_definition);
+            _autoRegenerationDelaySeconds = Mathf.Max(
+                MinimumAutoRegenerationDelaySeconds,
+                EditorPrefs.GetFloat(AutoRegenerationDelayKey, MinimumAutoRegenerationDelaySeconds));
+            _previewVoxelsPerUnit = Mathf.Max(1f, EditorPrefs.GetFloat(PreviewVoxelsPerUnitKey, 16f));
+            _logGenerationDiagnostics = EditorPrefs.GetBool(LogGenerationDiagnosticsKey, true);
+            _usePortableSampling = EditorPrefs.GetBool(UsePortableSamplingKey, false);
+            _currentFilePath = SessionState.GetString(CurrentFilePathKey, string.Empty);
 
             Undo.undoRedoPerformed += OnUndoRedoPerformed;
             SceneView.duringSceneGui += OnSceneGUI;
+            EditorApplication.update += ProcessAutoRegeneration;
 
             _previewGameObject = GameObject.Find(PreviewObjectName);
         }
@@ -112,6 +134,7 @@ namespace ProceduralCreature.Editor
 
             Undo.undoRedoPerformed -= OnUndoRedoPerformed;
             SceneView.duringSceneGui -= OnSceneGUI;
+            EditorApplication.update -= ProcessAutoRegeneration;
 
             if (_undoState != null)
             {
@@ -196,6 +219,7 @@ namespace ProceduralCreature.Editor
 
             Revalidate();
             CreatureEditorSession.Save(_definition);
+            ScheduleAutoRegeneration();
         }
 
         private void Revalidate()
@@ -210,7 +234,8 @@ namespace ProceduralCreature.Editor
             EditorGUILayout.BeginHorizontal(EditorStyles.toolbar);
 
             if (GUILayout.Button("New", EditorStyles.toolbarButton)) CreateNew();
-            if (GUILayout.Button("Save As...", EditorStyles.toolbarButton)) SaveToDisk();
+            if (GUILayout.Button("Save", EditorStyles.toolbarButton)) SaveCurrent();
+            if (GUILayout.Button("Save As...", EditorStyles.toolbarButton)) SaveAs();
             if (GUILayout.Button("Load...", EditorStyles.toolbarButton)) LoadFromDisk();
 
             GUILayout.FlexibleSpace();
@@ -225,8 +250,63 @@ namespace ProceduralCreature.Editor
             GUI.enabled = true;
 
             if (GUILayout.Button("Regenerate Preview", EditorStyles.toolbarButton)) RegeneratePreview();
+            bool newAutoRegenerate = GUILayout.Toggle(_autoRegenerate, "Auto", EditorStyles.toolbarButton, GUILayout.Width(48));
+            if (newAutoRegenerate != _autoRegenerate)
+            {
+                _autoRegenerate = newAutoRegenerate;
+                if (_autoRegenerate) ScheduleAutoRegeneration();
+                else _autoRegenerateAt = -1d;
+            }
 
             EditorGUILayout.EndHorizontal();
+            DrawEditorSettings();
+        }
+
+        private void DrawEditorSettings()
+        {
+            _showEditorSettings = EditorGUILayout.Foldout(_showEditorSettings, "Editor Settings");
+            if (!_showEditorSettings) return;
+
+            float newQuality = Mathf.Max(1f, EditorGUILayout.FloatField("Preview Mesh Quality", _previewVoxelsPerUnit));
+            if (!Mathf.Approximately(newQuality, _previewVoxelsPerUnit))
+            {
+                _previewVoxelsPerUnit = newQuality;
+                EditorPrefs.SetFloat(PreviewVoxelsPerUnitKey, _previewVoxelsPerUnit);
+                ScheduleAutoRegeneration();
+            }
+
+            float newDelay = Mathf.Max(
+                MinimumAutoRegenerationDelaySeconds,
+                EditorGUILayout.FloatField("Auto Regen Rate (seconds)", _autoRegenerationDelaySeconds));
+            if (!Mathf.Approximately(newDelay, _autoRegenerationDelaySeconds))
+            {
+                _autoRegenerationDelaySeconds = newDelay;
+                EditorPrefs.SetFloat(AutoRegenerationDelayKey, _autoRegenerationDelaySeconds);
+                ScheduleAutoRegeneration();
+            }
+
+            bool newLogGenerationDiagnostics = EditorGUILayout.Toggle(
+                "Log Generation Diagnostics", _logGenerationDiagnostics);
+            if (newLogGenerationDiagnostics != _logGenerationDiagnostics)
+            {
+                _logGenerationDiagnostics = newLogGenerationDiagnostics;
+                EditorPrefs.SetBool(LogGenerationDiagnosticsKey, _logGenerationDiagnostics);
+            }
+
+            bool newUsePortableSampling = EditorGUILayout.Toggle(
+                "Use Burst SDF Sampling", _usePortableSampling);
+            if (newUsePortableSampling != _usePortableSampling)
+            {
+                _usePortableSampling = newUsePortableSampling;
+                EditorPrefs.SetBool(UsePortableSamplingKey, _usePortableSampling);
+                ScheduleAutoRegeneration();
+            }
+        }
+
+        [MenuItem("Window/Procedural Creature/Save Creature %s")]
+        private static void SaveCurrentFromMenu()
+        {
+            GetWindow<CreatureEditorWindow>().SaveCurrent();
         }
 
         private void CreateNew()
@@ -241,11 +321,29 @@ namespace ProceduralCreature.Editor
             ReplaceDefinition("New Creature", CreatureDefinition.CreateEmpty());
         }
 
-        private void SaveToDisk()
+        private void SaveCurrent()
+        {
+            if (string.IsNullOrEmpty(_currentFilePath))
+            {
+                SaveAs();
+                return;
+            }
+
+            WriteToDisk(_currentFilePath);
+        }
+
+        private void SaveAs()
         {
             string path = EditorUtility.SaveFilePanel("Save Creature", "", "creature", "json");
             if (string.IsNullOrEmpty(path)) return;
 
+            _currentFilePath = path;
+            SessionState.SetString(CurrentFilePathKey, _currentFilePath);
+            WriteToDisk(_currentFilePath);
+        }
+
+        private void WriteToDisk(string path)
+        {
             if (!_validation.IsValid)
             {
                 bool proceed = EditorUtility.DisplayDialog(
@@ -270,6 +368,9 @@ namespace ProceduralCreature.Editor
         {
             string path = EditorUtility.OpenFilePanel("Load Creature", "", "json");
             if (string.IsNullOrEmpty(path)) return;
+
+            _currentFilePath = path;
+            SessionState.SetString(CurrentFilePathKey, _currentFilePath);
 
             string json;
             try
@@ -322,7 +423,7 @@ namespace ProceduralCreature.Editor
             foreach (CreaturePart part in _definition.Parts.OrderBy(p => p.Id, System.StringComparer.Ordinal))
             {
                 bool isSelected = part.Id == _selectedPartId;
-                string label = $"{part.PartType}  ({part.Id})";
+                string label = $"{part.PartType}  {GetPartLabel(part)}";
                 bool nowSelected = GUILayout.Toggle(isSelected, label, EditorStyles.toolbarButton);
                 if (nowSelected && !isSelected) _selectedPartId = part.Id;
             }
@@ -347,9 +448,11 @@ namespace ProceduralCreature.Editor
                 Id = newId,
                 ParentId = parentId,
                 PartType = PartType.Limb,
+                DisplayName = "Limb",
                 Transform = TransformData.Identity,
                 Shape = ShapeDefinition.DefaultSphere,
                 Appearance = AppearanceDefinition.Default,
+                MirrorAcrossSymmetryPlane = true,
             }));
 
             _selectedPartId = newId;
@@ -389,7 +492,18 @@ namespace ProceduralCreature.Editor
                 return;
             }
 
-            EditorGUILayout.LabelField($"Editing: {selected.Id}", EditorStyles.boldLabel);
+            EditorGUILayout.LabelField($"Editing: {GetPartLabel(selected)}", EditorStyles.boldLabel);
+
+            string currentDisplayName = selected.DisplayName ?? selected.Id;
+            string newDisplayName = EditorGUILayout.TextField("Name", currentDisplayName);
+            if (newDisplayName != currentDisplayName)
+            {
+                string partId = selected.Id;
+                MutateDefinition("Rename Part", definition => definition.FindPart(partId).DisplayName = newDisplayName);
+                selected = _definition.FindPart(partId);
+            }
+
+            EditorGUILayout.LabelField("Unique Part Slug", selected.Id);
 
             DrawPartTypeField(selected);
             DrawParentPicker(selected);
@@ -416,17 +530,19 @@ namespace ProceduralCreature.Editor
 
         private void DrawParentPicker(CreaturePart selected)
         {
-            var candidateIds = _definition.Parts
+            var candidateParts = _definition.Parts
                 .Where(p => p.Id != selected.Id)
-                .Select(p => p.Id)
-                .OrderBy(id => id, System.StringComparer.Ordinal)
+                .OrderBy(p => p.Id, System.StringComparer.Ordinal)
                 .ToList();
-            candidateIds.Insert(0, "(none - root)");
+            var candidateIds = candidateParts.Select(p => p.Id).ToList();
+            var candidateLabels = candidateParts.Select(GetPartLabel).ToList();
+            candidateIds.Insert(0, null);
+            candidateLabels.Insert(0, "(none - root)");
 
             int currentIndex = selected.ParentId == null ? 0 : candidateIds.IndexOf(selected.ParentId);
             if (currentIndex < 0) currentIndex = 0;
 
-            int newIndex = EditorGUILayout.Popup("Parent", currentIndex, candidateIds.ToArray());
+            int newIndex = EditorGUILayout.Popup("Parent", currentIndex, candidateLabels.ToArray());
             string newParentId = newIndex == 0 ? null : candidateIds[newIndex];
             if (newParentId == selected.ParentId) return;
 
@@ -660,9 +776,11 @@ namespace ProceduralCreature.Editor
                 Id = newId,
                 ParentId = finalParentId,
                 PartType = PartType.Limb,
+                DisplayName = "Limb",
                 Transform = new TransformData { Position = clampedPosition, Rotation = Quaternion.identity, Scale = Vector3.one },
                 Shape = ShapeDefinition.DefaultSphere,
                 Appearance = AppearanceDefinition.Default,
+                MirrorAcrossSymmetryPlane = true,
             }));
 
             _selectedPartId = newId;
@@ -717,12 +835,16 @@ namespace ProceduralCreature.Editor
                 return;
             }
 
-            var diagnostics = new GenerationDiagnostics();
+            var diagnostics = new GenerationDiagnostics(_logGenerationDiagnostics);
             try
             {
+                CreatureDefinition generationDefinition = _definition.Clone();
+                generationDefinition.Generation.VoxelsPerUnit = _previewVoxelsPerUnit;
                 MeshTopologyReport topologyReport = null;
-                Mesh unityMesh = CreatureMeshGenerator.Generate(_definition, out topologyReport, diagnostics);
+                Mesh unityMesh = CreatureMeshGenerator.Generate(
+                    generationDefinition, out topologyReport, diagnostics, _usePortableSampling);
                 ApplyPreviewMesh(unityMesh);
+                _autoRegenerateAt = -1d;
 
                 if (!topologyReport.IsWatertight)
                 {
@@ -733,15 +855,38 @@ namespace ProceduralCreature.Editor
                         $"{topologyReport.TotalEdgeCount} total. See MeshTopologyValidator.");
                 }
 
-                string timingReport = string.Join("\n",
-                    diagnostics.Timings.Select(t => $"  {t.Stage}: {t.Elapsed.TotalMilliseconds:F1}ms"));
-                Debug.Log($"[CreatureCreator] Preview regenerated — {unityMesh.triangles.Length / 3} triangles.\n{timingReport}");
+                if (_logGenerationDiagnostics)
+                {
+                    string timingReport = string.Join("\n",
+                        diagnostics.Timings.Select(FormatDiagnosticTiming));
+                    Debug.Log(
+                        $"[CreatureCreator] Preview regenerated — " +
+                        $"{unityMesh.triangles.Length / 3} triangles, " +
+                        $"{unityMesh.vertexCount} vertices, " +
+                        $"SDF Sampling: {(_usePortableSampling ? "Burst" : "Managed")}, " +
+                        $"grid {diagnostics.GridCellsX}x{diagnostics.GridCellsY}x{diagnostics.GridCellsZ} " +
+                        $"({diagnostics.GridSampleCount:N0} samples), " +
+                        $"{diagnostics.MixedCellCount:N0} mixed cells, " +
+                        $"{diagnostics.GradientEvaluationCount:N0} gradient evaluations.\n" +
+                        $"  TotalGeneration: {diagnostics.TotalTime.TotalMilliseconds:F1}ms\n" +
+                        timingReport);
+                }
             }
             catch (DomainException ex)
             {
                 EditorUtility.DisplayDialog(
                     "Generation Failed", $"Stage: {diagnostics.FailedStage}\n{ex.Message}", "OK");
             }
+        }
+
+        private static string FormatDiagnosticTiming(StageTiming timing)
+        {
+            bool isMeshSubtiming = timing.Stage == GenerationStage.MeshCornerClassification
+                                    || timing.Stage == GenerationStage.MeshContourResolution
+                                    || timing.Stage == GenerationStage.MeshVertexWelding
+                                    || timing.Stage == GenerationStage.MeshTriangleEmission;
+            string indentation = isMeshSubtiming ? "    " : "  ";
+            return $"{indentation}{timing.Stage}: {timing.Elapsed.TotalMilliseconds:F1}ms";
         }
 
         private void ApplyPreviewMesh(Mesh mesh)
@@ -768,6 +913,13 @@ namespace ProceduralCreature.Editor
             }
 
             _previewGameObject.GetComponent<MeshFilter>().sharedMesh = mesh;
+            MeshRenderer previewRenderer = _previewGameObject.GetComponent<MeshRenderer>();
+            if (previewRenderer == null) previewRenderer = _previewGameObject.AddComponent<MeshRenderer>();
+            if (previewRenderer.sharedMaterial == null)
+            {
+                Material material = CreateDefaultPreviewMaterial();
+                if (material != null) previewRenderer.sharedMaterial = material;
+            }
 
             // MeshCollider needs sharedMesh reassigned (not just relying on the
             // same Mesh object being mutated) to pick up topology changes —
@@ -789,6 +941,27 @@ namespace ProceduralCreature.Editor
                 return null;
             }
             return new Material(shader);
+        }
+
+        private static string GetPartLabel(CreaturePart part)
+        {
+            string displayName = string.IsNullOrWhiteSpace(part.DisplayName) ? part.Id : part.DisplayName;
+            return $"{displayName} ({part.Id})";
+        }
+
+        private void ScheduleAutoRegeneration()
+        {
+            if (!_autoRegenerate) return;
+            _autoRegenerateAt = EditorApplication.timeSinceStartup + _autoRegenerationDelaySeconds;
+        }
+
+        private void ProcessAutoRegeneration()
+        {
+            if (!_autoRegenerate || _autoRegenerateAt < 0d) return;
+            if (EditorApplication.timeSinceStartup < _autoRegenerateAt) return;
+
+            _autoRegenerateAt = -1d;
+            RegeneratePreview();
         }
     }
 }

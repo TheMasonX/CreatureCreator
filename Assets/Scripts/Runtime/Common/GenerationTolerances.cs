@@ -19,11 +19,13 @@ namespace ProceduralCreature.Common
         public const int QuantizationDecimalPlaces = 4;
 
         /// <summary>
-        /// General-purpose epsilon for comparing scalar/geometry values (e.g. determinism
-        /// tests comparing regenerated scalar fields or mesh measurements). Deliberately
-        /// distinct from solver convergence epsilons, which are a Phase 7 concern.
+        /// General-purpose epsilon for comparing scalar/geometry values and classifying
+        /// sampled SDF values that lie on the surface. It is deliberately small relative
+        /// to the default grid cell size, while preventing tiny contour caps at near-zero
+        /// surface samples. It remains distinct from solver convergence epsilons, which
+        /// are a Phase 7 concern.
         /// </summary>
-        public const float ScalarComparisonEpsilon = 1e-4f;
+        public const float ScalarComparisonEpsilon = 1e-3f;
 
         /// <summary>
         /// Minimum allowed value for any scale component. Values at or below this are

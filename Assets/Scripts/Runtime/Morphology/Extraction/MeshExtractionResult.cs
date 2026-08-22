@@ -1,3 +1,4 @@
+using System;
 using System.Collections.Generic;
 using UnityEngine;
 
@@ -13,6 +14,12 @@ namespace ProceduralCreature.Morphology.Extraction
     {
         public List<Vector3> Positions { get; } = new List<Vector3>();
         public List<int> Triangles { get; } = new List<int>();
+        public int MixedCellCount { get; internal set; }
+        public int GradientEvaluationCount { get; internal set; }
+        public TimeSpan CornerClassificationTime { get; internal set; }
+        public TimeSpan ContourResolutionTime { get; internal set; }
+        public TimeSpan VertexWeldingTime { get; internal set; }
+        public TimeSpan TriangleEmissionTime { get; internal set; }
 
         /// <summary>
         /// Populated by ComputeAngleWeightedNormals(); empty until then. Kept as

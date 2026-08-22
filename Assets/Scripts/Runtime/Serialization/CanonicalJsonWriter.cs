@@ -98,6 +98,7 @@ namespace ProceduralCreature.Serialization
             var sb = new StringBuilder();
             sb.Append('{');
             WriteField(sb, "id", part.Id, first: true);
+            WriteField(sb, "displayName", string.IsNullOrWhiteSpace(part.DisplayName) ? part.Id : part.DisplayName);
             WriteNullableField(sb, "parentId", part.ParentId);
             WriteField(sb, "partType", part.PartType.ToString());
             WriteRawField(sb, "transform", WriteTransform(part.Transform));
@@ -144,7 +145,7 @@ namespace ProceduralCreature.Serialization
         {
             var sb = new StringBuilder();
             sb.Append('{');
-            sb.Append("\"baseColor\":").Append(WriteColor(appearance.BaseColor)).Append(',');
+            sb.Append("\"baseColor\":").Append(WriteColor(appearance.BaseColor));
             WriteField(sb, "noiseSeed", appearance.NoiseSeed);
             WriteField(sb, "noiseScale", appearance.NoiseScale);
             sb.Append('}');

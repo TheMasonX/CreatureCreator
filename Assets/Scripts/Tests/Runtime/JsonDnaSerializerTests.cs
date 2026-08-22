@@ -66,6 +66,7 @@ namespace ProceduralCreature.Tests.Runtime
             CreaturePart originalLeg = original.FindPart("part_leg");
             CreaturePart reconstructedLeg = reconstructed.FindPart("part_leg");
             Assert.IsNotNull(reconstructedLeg);
+            Assert.AreEqual(originalLeg.DisplayName, reconstructedLeg.DisplayName);
             Assert.AreEqual(originalLeg.ParentId, reconstructedLeg.ParentId);
             Assert.AreEqual(originalLeg.MirrorAcrossSymmetryPlane, reconstructedLeg.MirrorAcrossSymmetryPlane);
             Assert.AreEqual(originalLeg.Transform.Position.x, reconstructedLeg.Transform.Position.x, 1e-4f);

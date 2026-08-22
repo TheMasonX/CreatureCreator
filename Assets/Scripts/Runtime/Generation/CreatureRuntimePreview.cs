@@ -24,7 +24,7 @@ namespace ProceduralCreature.Generation
         public void Generate()
         {
             CreatureDefinition definition = LoadDefinition();
-            var diagnostics = new GenerationDiagnostics();
+            var diagnostics = new GenerationDiagnostics(collectTimings: false);
             MeshTopologyReport topology;
             Mesh mesh = CreatureMeshGenerator.Generate(definition, out topology, diagnostics);
 

@@ -2,7 +2,7 @@
 id: creature-task-005
 key: CC-005
 title: Add preview material and automatic regeneration settings
-status: Backlog
+status: In Progress
 type: Task
 priority: P1
 tags: [editor, preview, materials, settings, performance]
@@ -34,7 +34,8 @@ Assign a material to the generated preview renderer and use it for every regener
 - Manual Regenerate remains available when Auto is disabled.
 
 ## Validation
-- Unity EditMode tests for material assignment, settings persistence, interval clamping, and request coalescing.
+- Static diagnostics report no errors for the changed editor and runtime files.
+- Unity compilation completed without script errors before the bridge disconnected.
 - Manual editor check confirms the material is visible on the generated mesh and Auto updates do not run more often than the configured interval.
 - Play Mode smoke test confirms the shared runtime preview still renders with its assigned material.
 
@@ -42,7 +43,7 @@ Assign a material to the generated preview renderer and use it for every regener
 The shared runtime generator and editor preview path already exist. The material assignment must be explicit at the preview renderer boundary, while quality and regeneration timing belong to editor or generation settings, not creature DNA.
 
 ## Blockers
-The project must select the preview material asset and define whether mesh quality is shared with or separate from `GenerationSettings`.
+The Unity manual check and Play Mode smoke test remain pending because the Unity MCP bridge disconnected. The preview currently uses a generated built-in shader material when no material is assigned.
 
 ## Next Step
-Trace preview GameObject creation and current generation settings ownership, then add the material assignment and one focused throttling test.
+Reconnect Unity and manually verify material assignment, Auto throttling, preview quality, and Play Mode rendering.

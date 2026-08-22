@@ -75,6 +75,7 @@ namespace ProceduralCreature.Serialization
             return new CreaturePart
             {
                 Id = RequireString(obj, "id"),
+                DisplayName = ReadOptionalString(obj, "displayName"),
                 ParentId = ReadNullableString(obj, "parentId"),
                 PartType = RequireEnum<PartType>(obj, "partType"),
                 Transform = ReadTransform(RequireObject(obj, "transform")),
@@ -174,6 +175,13 @@ namespace ProceduralCreature.Serialization
             if (value == null) return null;
             if (value is string s) return s;
             throw new DnaDeserializationException($"Field '{key}' must be a string or null.");
+        }
+
+        private static string ReadOptionalString(Dictionary<string, object> obj, string key)
+        {
+            if (!obj.TryGetValue(key, out object value) || value == null) return null;
+            if (value is string s) return s;
+            throw new DnaDeserializationException($"Field '{key}' must be a string.");
         }
 
         private static Dictionary<string, object> RequireObject(Dictionary<string, object> obj, string key)

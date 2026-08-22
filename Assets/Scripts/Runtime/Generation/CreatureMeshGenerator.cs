@@ -11,6 +11,15 @@ namespace ProceduralCreature.Generation
     {
         public static Mesh Generate(CreatureDefinition definition, out MeshTopologyReport topologyReport, GenerationDiagnostics diagnostics = null)
         {
+            return Generate(definition, out topologyReport, diagnostics, usePortableSampling: false);
+        }
+
+        public static Mesh Generate(
+            CreatureDefinition definition,
+            out MeshTopologyReport topologyReport,
+            GenerationDiagnostics diagnostics,
+            bool usePortableSampling)
+        {
             if (definition == null) throw new DomainException("definition must not be null.");
 
             ValidationResult validation = DefinitionValidator.Validate(definition);
@@ -22,15 +31,41 @@ namespace ProceduralCreature.Generation
             }
 
             ISdfNode sdf = null;
-            Time(diagnostics, GenerationStage.SdfCompile, () => sdf = SdfProgramBuilder.Compile(definition));
+            SdfProgram portableProgram = null;
+            Time(diagnostics, GenerationStage.SdfCompile, () =>
+            {
+                sdf = SdfProgramBuilder.Compile(definition);
+                if (usePortableSampling) portableProgram = SdfProgramBuilder.CompilePortable(definition);
+            });
 
             DensityGrid grid = null;
             Time(diagnostics, GenerationStage.FieldSampling,
-                () => grid = DensityGrid.Sample(sdf, definition.Bounds, definition.Generation));
+                () =>
+                {
+                    if (usePortableSampling)
+                    {
+                        grid = DensityGrid.SamplePortable(portableProgram, definition.Bounds, definition.Generation);
+                        portableProgram.Dispose();
+                        portableProgram = null;
+                    }
+                    else
+                    {
+                        grid = DensityGrid.Sample(sdf, definition.Bounds, definition.Generation);
+                    }
+                });
+            diagnostics?.RecordGridDimensions(grid.CellsX, grid.CellsY, grid.CellsZ, grid.SampleCount);
 
             MeshExtractionResult meshResult = null;
             Time(diagnostics, GenerationStage.MeshExtraction,
-                () => meshResult = MarchingCubesExtractor.Extract(sdf, grid));
+                () => meshResult = MarchingCubesExtractor.Extract(
+                    sdf, grid, diagnostics?.CollectTimings == true));
+            diagnostics?.RecordExtractionStatistics(
+                meshResult.MixedCellCount, meshResult.GradientEvaluationCount);
+            diagnostics?.RecordExtractionTiming(
+                meshResult.CornerClassificationTime,
+                meshResult.ContourResolutionTime,
+                meshResult.VertexWeldingTime,
+                meshResult.TriangleEmissionTime);
 
             MeshTopologyReport generatedTopologyReport = null;
             Time(diagnostics, GenerationStage.MeshValidation,

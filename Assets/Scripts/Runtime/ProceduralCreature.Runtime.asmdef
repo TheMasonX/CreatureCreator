@@ -1,7 +1,9 @@
 {
     "name": "ProceduralCreature.Runtime",
     "rootNamespace": "ProceduralCreature",
-    "references": [],
+    "references": [
+        "Unity.Burst"
+    ],
     "includePlatforms": [],
     "excludePlatforms": [],
     "allowUnsafeCode": false,

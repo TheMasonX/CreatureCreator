@@ -44,6 +44,21 @@ namespace ProceduralCreature.Tests.Runtime
         }
 
         [Test]
+        public void EstimateGradient_SpherePointsOutward()
+        {
+            var bounds = new BoundsDefinition { MaxX = 2f, MaxY = 2f, MaxZ = 2f };
+            var settings = new GenerationSettings { VoxelsPerUnit = 16f };
+            var sphere = new SphereSdfNode(1f);
+
+            DensityGrid grid = DensityGrid.Sample(sphere, bounds, settings);
+            Vector3 gradient = grid.EstimateGradient(new Vector3(1f, 0f, 0f));
+
+            Assert.Greater(gradient.x, 0f);
+            Assert.AreEqual(0f, gradient.y, 1e-4f);
+            Assert.AreEqual(0f, gradient.z, 1e-4f);
+        }
+
+        [Test]
         public void Sample_RejectsInvalidBounds()
         {
             var badBounds = new BoundsDefinition { MaxX = -1f, MaxY = 1f, MaxZ = 1f };
@@ -58,6 +73,36 @@ namespace ProceduralCreature.Tests.Runtime
         {
             Assert.Throws<DomainException>(() =>
                 DensityGrid.Sample(null, BoundsDefinition.Default, GenerationSettings.Default));
+        }
+
+        [Test]
+        public void SamplePortable_MatchesManagedSamples()
+        {
+            var definition = CreatureDefinition.CreateEmpty();
+            definition.Bounds = new BoundsDefinition { MaxX = 1f, MaxY = 1f, MaxZ = 1f };
+            definition.Generation = new GenerationSettings { VoxelsPerUnit = 4f };
+            definition.AddPart(new CreaturePart
+            {
+                Id = "sphere",
+                PartType = PartType.Body,
+                Transform = TransformData.Identity,
+                Shape = new ShapeDefinition { Type = ShapeType.Sphere, PrimarySize = 0.75f, SmoothBlendRadius = 0f },
+                Appearance = AppearanceDefinition.Default,
+            });
+
+            ISdfNode managedNode = SdfProgramBuilder.Compile(definition);
+            DensityGrid managed = DensityGrid.Sample(managedNode, definition.Bounds, definition.Generation);
+            using (SdfProgram portableProgram = SdfProgramBuilder.CompilePortable(definition))
+            {
+                DensityGrid portable = DensityGrid.SamplePortable(
+                    portableProgram, definition.Bounds, definition.Generation);
+                for (int z = 0; z <= managed.CellsZ; z++)
+                for (int y = 0; y <= managed.CellsY; y++)
+                for (int x = 0; x <= managed.CellsX; x++)
+                {
+                    Assert.AreEqual(managed.GetSample(x, y, z), portable.GetSample(x, y, z), 1e-4f);
+                }
+            }
         }
     }
 }
