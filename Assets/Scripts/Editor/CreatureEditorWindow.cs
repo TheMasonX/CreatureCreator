@@ -1163,7 +1163,7 @@ namespace ProceduralCreature.Editor
 
         private static string FormatDiagnosticTiming(StageTiming timing)
         {
-            bool isMeshSubtiming = timing.Stage == GenerationStage.MeshCornerClassification
+            bool isMeshSubtiming = timing.Stage == GenerationStage.MeshActiveCellConstruction
                                     || timing.Stage == GenerationStage.MeshContourResolution
                                     || timing.Stage == GenerationStage.MeshVertexWelding
                                     || timing.Stage == GenerationStage.MeshTriangleEmission;

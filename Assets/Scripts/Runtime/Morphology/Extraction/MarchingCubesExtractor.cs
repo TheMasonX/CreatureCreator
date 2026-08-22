@@ -31,7 +31,7 @@ namespace ProceduralCreature.Morphology.Extraction
     /// per-triangle fix that doesn't depend on getting a global traversal-order
     /// argument right, and it avoids re-evaluating the full SDF during extraction.
     /// </summary>
-    public static class MarchingCubesExtractor
+    public static partial class MarchingCubesExtractor
     {
         public static MeshExtractionResult Extract(ISdfNode node, DensityGrid grid)
         {
@@ -49,56 +49,50 @@ namespace ProceduralCreature.Morphology.Extraction
             var cornerDensities = new float[8];
             var cornerPositions = new Vector3[8];
             long contourResolutionTicks = 0;
-            long cornerClassificationTicks = 0;
             long vertexWeldingTicks = 0;
             long triangleEmissionTicks = 0;
-            Stopwatch classificationStopwatch = collectTimings ? Stopwatch.StartNew() : null;
-            float surfaceEpsilon = GenerationTolerances.ScalarComparisonEpsilon;
 
-            for (int cz = 0; cz < grid.CellsZ; cz++)
-            for (int cy = 0; cy < grid.CellsY; cy++)
-            for (int cx = 0; cx < grid.CellsX; cx++)
+            // One dense scan classifies every cell and retains only the mixed-sign
+            // cells as an ordered active-cell list. The extractor then iterates
+            // that list instead of re-classifying the whole volume, so empty
+            // volume is never re-traversed during contour resolution. Dense
+            // sampling itself is unchanged; this is purely the classification pass.
+            Stopwatch activeCellStopwatch = collectTimings ? Stopwatch.StartNew() : null;
+            ActiveCellEntry[] activeCells = ActiveCellBuilder.Build(grid);
+            if (collectTimings)
             {
-                bool anyInside = false;
-                bool anyOutside = false;
+                activeCellStopwatch.Stop();
+                result.ActiveCellConstructionTime =
+                    StopwatchTicksToTimeSpan(activeCellStopwatch.ElapsedTicks);
+            }
 
+            for (int i = 0; i < activeCells.Length; i++)
+            {
+                ActiveCellEntry cell = activeCells[i];
+                ActiveCellBuilder.DecodeCellIndex(
+                    cell.CellIndex, grid.CellsX, grid.CellsY, out int cx, out int cy, out int cz);
+
+                // Active cells are mixed-sign by construction, so a sign
+                // classification here is redundant; only the surface-epsilon
+                // normalization that feeds contour resolution is reapplied.
                 grid.CopyCellCornerSamples(cx, cy, cz, cornerDensities);
-                for (int c = 0; c < cornerDensities.Length; c++)
+                for (int c = 0; c < 8; c++)
                 {
-                    float density = cornerDensities[c];
-                    if (density >= -surfaceEpsilon && density <= surfaceEpsilon)
-                    {
-                        density = 0f;
-                    }
-                    cornerDensities[c] = density;
-
-                    if (density >= 0f) anyOutside = true;
-                    else anyInside = true;
+                    cornerDensities[c] = GenerationTolerances.NormalizeSurfaceDensity(cornerDensities[c]);
                 }
 
-                if (!anyInside || !anyOutside)
-                {
-                    continue; // cube entirely inside or entirely outside — no surface here
-                }
-
-                if (collectTimings)
-                {
-                    classificationStopwatch.Stop();
-                }
-
-                // Positions are consumed only by mixed cells. Avoid constructing
-                // eight Vector3 values for every empty cell in a large preview grid.
+                // Positions are consumed only by mixed cells. Avoiding eight
+                // Vector3 constructions per cell is what kept the old dense loop
+                // cheap for empty volume; active cells are few, but the rule still
+                // keeps this tight.
                 for (int c = 0; c < 8; c++)
                 {
                     Vector3Int offset = CubeTopology.CornerGridOffsets[c];
                     cornerPositions[c] = grid.CornerPosition(cx + offset.x, cy + offset.y, cz + offset.z);
                 }
-                if (collectTimings)
-                {
-                    cornerClassificationTicks += classificationStopwatch.ElapsedTicks;
-                }
 
                 result.MixedCellCount++;
+                result.ContourResolutionCallCount++;
 
                 List<List<CubeContourResolver.LoopVertex>> loops;
                 if (collectTimings)
@@ -118,20 +112,8 @@ namespace ProceduralCreature.Morphology.Extraction
                         grid, loop, cx, cy, cz, vertexCache, result,
                         collectTimings, ref vertexWeldingTicks, ref triangleEmissionTicks);
                 }
-
-                if (collectTimings)
-                {
-                    classificationStopwatch.Restart();
-                }
             }
 
-            if (collectTimings)
-            {
-                classificationStopwatch.Stop();
-                cornerClassificationTicks += classificationStopwatch.ElapsedTicks;
-            }
-
-            result.CornerClassificationTime = StopwatchTicksToTimeSpan(cornerClassificationTicks);
             result.ContourResolutionTime = StopwatchTicksToTimeSpan(contourResolutionTicks);
             result.VertexWeldingTime = StopwatchTicksToTimeSpan(vertexWeldingTicks);
             result.TriangleEmissionTime = StopwatchTicksToTimeSpan(triangleEmissionTicks);
@@ -214,13 +196,13 @@ namespace ProceduralCreature.Morphology.Extraction
             // rather than comparing interpolated positions, because near-zero
             // values can produce slightly different floating-point positions on
             // edges incident to the same grid corner.
-            if (NormalizeSurfaceDensity(grid.GetSample(gridA.x, gridA.y, gridA.z)) == 0f)
+            if (GenerationTolerances.NormalizeSurfaceDensity(grid.GetSample(gridA.x, gridA.y, gridA.z)) == 0f)
             {
                 return ResolveCachedVertex(
                     (gridA.x, gridA.y, gridA.z, -1), positionA, vertexCache, result);
             }
 
-            if (NormalizeSurfaceDensity(grid.GetSample(gridB.x, gridB.y, gridB.z)) == 0f)
+            if (GenerationTolerances.NormalizeSurfaceDensity(grid.GetSample(gridB.x, gridB.y, gridB.z)) == 0f)
             {
                 return ResolveCachedVertex(
                     (gridB.x, gridB.y, gridB.z, -1), positionB, vertexCache, result);
@@ -236,11 +218,6 @@ namespace ProceduralCreature.Morphology.Extraction
 
             var key = (lower.x, lower.y, lower.z, axis);
             return ResolveCachedVertex(key, vertex.Position, vertexCache, result);
-        }
-
-        private static float NormalizeSurfaceDensity(float density)
-        {
-            return Mathf.Abs(density) <= GenerationTolerances.ScalarComparisonEpsilon ? 0f : density;
         }
 
         private static int ResolveCachedVertex(
@@ -274,6 +251,7 @@ namespace ProceduralCreature.Morphology.Extraction
 
             Vector3 centroid = (p0 + p1 + p2) / 3f;
             Vector3 gradient = grid.EstimateGradient(centroid);
+            result.GradientEvaluationCount++;
 
             bool correctlyWound = Vector3.Dot(faceNormal, gradient) >= 0f;
 

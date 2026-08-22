@@ -18,6 +18,7 @@ links:
   - Assets/Scripts/Tests/Runtime/DensityGridTests.cs
   - Assets/Scripts/Runtime/Appearance/PartAppearanceSampler.cs
   - Assets/Scripts/Runtime/Definition/GenerationSettings.cs
+  - docs/tasks/handoffs/CC-008-mesh-generation-fixes-handoff.md
 ---
 
 ## Summary
@@ -31,7 +32,7 @@ Make detailed editor generation logging toggleable and include the grid dimensio
 - The setting persists across editor-window reloads.
 - Disabled diagnostics do not suppress topology warnings or generation errors.
 - Enabled diagnostics report grid dimensions, sampled corners, mixed cells, SDF gradient evaluations, mesh counts, and stage timings.
-- Enabled diagnostics report MeshCornerClassification, MeshContourResolution, MeshVertexWelding, and MeshTriangleEmission timings beneath the top-level MeshExtraction stage.
+- Enabled diagnostics report MeshActiveCellConstruction, MeshContourResolution, MeshVertexWelding, and MeshTriangleEmission timings beneath the top-level MeshExtraction stage.
 - Enabled diagnostics report `TotalGeneration`, calculated from top-level stages only so mesh subtimings are not double-counted.
 - Disabled diagnostics avoid per-operation extraction timestamp collection.
 - Mesh extraction classification uses a direct contiguous eight-corner grid read instead of repeated coordinate/index calculations.
@@ -58,8 +59,14 @@ The corrected profile measured 484.2 ms extraction, including 463.0 ms classific
 The subsequent inline epsilon classification reduced the same profiled asset probe to 142.3 ms extraction and 122.0 ms classification. Contour resolution remained 12.0 ms, welding 4.0 ms, and emission 1.0 ms. The result remained watertight with 2,264 triangles, 1,134 vertices, and zero boundary/non-manifold edges.
 The diagnostic report now includes a non-double-counted total. `Parallel.For` is not used for SDF sampling yet: the current evaluator is an interface-backed object graph that calls UnityEngine math APIs, and the project has no explicit Burst/Jobs dependency. A future parallel sampling pass should first move the compiled SDF into blittable data and a Burst-compatible evaluator, then compare worker-thread or Job System results against the deterministic scalar baseline.
 
+Slice 1 of the mesh-generation handoff is implemented and validated in the real editor. `ActiveCellBuilder` classifies the dense grid once after sampling and retains only mixed-sign cells (`ActiveCellEntry{CellIndex, CaseIndex}`) in stable increasing global index order. `MarchingCubesExtractor.Extract` now iterates active cells instead of re-classifying the whole volume; the pre-change dense loop is preserved as `ExtractLegacy` (internal reference oracle for parity, visible to tests via `AssemblyInfo.cs`). `MeshExtractionResult` gained `ActiveCellConstructionTime` and `ContourResolutionCallCount`; `GradientEvaluationCount` is now incremented per cached-grid gradient (one per non-degenerate triangle) so the diagnostic is honest.
+
+Parity evidence in the editor (27 runtime tests, executed directly): the active-cell path is byte-for-byte identical to the reference path for the centered sphere (1,208 triangles / 606 vertices, matching the previously recorded reference values), overlapping spheres, empty field, and a v2 BodySpline-with-limb fixture; watertight with zero boundary and non-manifold edges; deterministic across repeated runs; `ContourResolutionCallCount == MixedCellCount` on every fixture (homogeneous cells never reach the resolver). The MCP test runner still discovers zero runtime tests (CC-014 blocker), so tests were invoked through the editor's in-memory compiler.
+
+Current benchmark on the v2 BodySpline-with-limb definition (Body-rooted leg, 2.5 bounds): at `VoxelsPerUnit=16` (80^3, 531,441 samples) total 185.5 ms, FieldSampling 29.6 ms, MeshExtraction 106.8 ms (ActiveCellConstruction 50.0 ms, ContourResolution 41.0 ms, Welding 7.0 ms, Emission 4.0 ms), Validation 3.7 ms, AppearanceBake 45.4 ms; 7,728 mixed cells, 7,674 vertices, 15,336 triangles. At `VoxelsPerUnit=32` (160^3, 4,173,281 samples) total 1,341.2 ms, FieldSampling 253.3 ms, MeshExtraction 867.0 ms (ActiveCellConstruction 442.0 ms, ContourResolution 328.0 ms, Welding 44.0 ms, Emission 28.0 ms), Validation 21.4 ms, AppearanceBake 199.3 ms; 31,056 mixed cells, 29,586 vertices, 59,160 triangles. Active-cell construction and contour resolution dominate; welding is about 5% of extraction, confirming the audit correction that classification/traversal outrank dictionary welding. The dense scan is still the full-volume cost by design; Slice 3 (sparse candidate regions) is what removes empty volume from that scan.
+
 ## Blockers
 The Unity Test Framework job previously stalled at zero progress. Direct Unity probes now cover the centered sphere, overlapping spheres, and `first_creature.json`, but deterministic parity and the post-optimization timed benchmark remain pending.
 
 ## Next Step
-Recover or clear the stalled Unity test job, then run the focused extractor tests. Re-run the full asset benchmark and record deterministic output and stage timings before marking this task Done.
+Slice 1 is implemented and validated (byte-identical parity, determinism, and a two-quality benchmark recorded above). Proceed to Slice 2 of the handoff: direct integer edge ownership replacing the tuple dictionary in `MarchingCubesExtractor`, then delete the `ExtractLegacy` reference path and its parity tests once the new path is the baseline. Keep `CubeContourResolver`, winding, and active-cell iteration unchanged. Re-run the focused extraction tests and the benchmark after the change.

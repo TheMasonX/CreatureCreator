@@ -11,7 +11,7 @@ namespace ProceduralCreature.Generation
         SdfCompile,
         FieldSampling,
         MeshExtraction,
-        MeshCornerClassification,
+        MeshActiveCellConstruction,
         MeshContourResolution,
         MeshVertexWelding,
         MeshTriangleEmission,
@@ -84,12 +84,12 @@ namespace ProceduralCreature.Generation
         }
 
         public void RecordExtractionTiming(
-            TimeSpan cornerClassification,
+            TimeSpan activeCellConstruction,
             TimeSpan contourResolution,
             TimeSpan vertexWelding,
             TimeSpan triangleEmission)
         {
-            RecordTiming(GenerationStage.MeshCornerClassification, cornerClassification);
+            RecordTiming(GenerationStage.MeshActiveCellConstruction, activeCellConstruction);
             RecordTiming(GenerationStage.MeshContourResolution, contourResolution);
             RecordTiming(GenerationStage.MeshVertexWelding, vertexWelding);
             RecordTiming(GenerationStage.MeshTriangleEmission, triangleEmission);
@@ -107,7 +107,7 @@ namespace ProceduralCreature.Generation
 
         private static bool IsMeshSubtiming(GenerationStage stage)
         {
-            return stage == GenerationStage.MeshCornerClassification
+            return stage == GenerationStage.MeshActiveCellConstruction
                    || stage == GenerationStage.MeshContourResolution
                    || stage == GenerationStage.MeshVertexWelding
                    || stage == GenerationStage.MeshTriangleEmission;

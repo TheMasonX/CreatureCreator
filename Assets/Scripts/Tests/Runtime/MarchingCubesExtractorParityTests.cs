@@ -1,0 +1,207 @@
+using NUnit.Framework;
+using UnityEngine;
+using ProceduralCreature.Definition;
+using ProceduralCreature.Morphology.Extraction;
+using ProceduralCreature.Morphology.Sdf;
+
+namespace ProceduralCreature.Tests.Runtime
+{
+    /// <summary>
+    /// Slice 1 (CC-008) parity coverage: the active-cell extractor must produce
+    /// byte-for-byte identical output to the pre-change dense reference path on
+    /// the same sampled grid, plus determinism and contour-call accounting.
+    /// </summary>
+    [TestFixture]
+    public class MarchingCubesExtractorParityTests
+    {
+        [Test]
+        public void Extract_MatchesReference_Sphere()
+        {
+            AssertExtractMatchesReference(SphereGrid(), "sphere");
+        }
+
+        [Test]
+        public void Extract_MatchesReference_TwoOverlappingSpheres()
+        {
+            AssertExtractMatchesReference(OverlappingSpheresGrid(), "overlapping spheres");
+        }
+
+        [Test]
+        public void Extract_MatchesReference_EmptyField()
+        {
+            AssertExtractMatchesReference(EmptyGrid(), "empty field");
+        }
+
+        [Test]
+        public void Extract_MatchesReference_BodySplineWithLimb()
+        {
+            AssertExtractMatchesReference(BodySplineGrid(), "BodySpline with limb");
+        }
+
+        [Test]
+        public void Extract_IsDeterministic_Sphere()
+        {
+            DensityGrid grid = SphereGrid();
+
+            MeshExtractionResult first = MarchingCubesExtractor.Extract(new SphereSdfNode(1f), grid);
+            MeshExtractionResult second = MarchingCubesExtractor.Extract(new SphereSdfNode(1f), grid);
+
+            AssertSameGeometry(first, second, "determinism");
+        }
+
+        [Test]
+        public void Extract_IsDeterministic_BodySplineWithLimb()
+        {
+            DensityGrid grid = BodySplineGrid();
+
+            // The node argument is only null-checked by the extractor; all
+            // geometry derives from the sampled grid. Any non-null node works.
+            MeshExtractionResult first = MarchingCubesExtractor.Extract(new EmptySdfNode(), grid);
+            MeshExtractionResult second = MarchingCubesExtractor.Extract(new EmptySdfNode(), grid);
+
+            AssertSameGeometry(first, second, "determinism");
+        }
+
+        [Test]
+        public void Extract_ResolvesExactlyOneContourPerMixedCell()
+        {
+            DensityGrid grid = SphereGrid();
+            MeshExtractionResult mesh = MarchingCubesExtractor.Extract(new SphereSdfNode(1f), grid);
+
+            Assert.Greater(mesh.MixedCellCount, 0);
+            Assert.AreEqual(mesh.MixedCellCount, mesh.ContourResolutionCallCount,
+                "Homogeneous cells must never reach the contour resolver.");
+        }
+
+        [Test]
+        public void Extract_EmptyField_NeverCallsContourResolver()
+        {
+            DensityGrid grid = EmptyGrid();
+            MeshExtractionResult mesh = MarchingCubesExtractor.Extract(new EmptySdfNode(), grid);
+
+            Assert.AreEqual(0, mesh.MixedCellCount);
+            Assert.AreEqual(0, mesh.ContourResolutionCallCount);
+        }
+
+        [Test]
+        public void Extract_CenteredSphere_HasNoBoundaryOrNonManifoldEdges()
+        {
+            DensityGrid grid = SphereGrid();
+            MeshExtractionResult mesh = MarchingCubesExtractor.Extract(new SphereSdfNode(1f), grid);
+
+            MeshTopologyReport report = MeshTopologyValidator.Validate(mesh);
+            Assert.AreEqual(0, report.BoundaryEdgeCount);
+            Assert.AreEqual(0, report.NonManifoldEdgeCount);
+        }
+
+        [Test]
+        public void Extract_OverlappingSpheres_HasNoBoundaryOrNonManifoldEdges()
+        {
+            DensityGrid grid = OverlappingSpheresGrid();
+            MeshExtractionResult mesh = MarchingCubesExtractor.Extract(new SmoothUnionNode(
+                new SphereSdfNode(1f),
+                new TransformNode(new SphereSdfNode(1f),
+                    UnityEngine.Matrix4x4.TRS(new Vector3(1f, 0f, 0f), Quaternion.identity, Vector3.one)),
+                0.3f), grid);
+
+            MeshTopologyReport report = MeshTopologyValidator.Validate(mesh);
+            Assert.AreEqual(0, report.BoundaryEdgeCount);
+            Assert.AreEqual(0, report.NonManifoldEdgeCount);
+        }
+
+        private static void AssertExtractMatchesReference(DensityGrid grid, string label)
+        {
+            // The node argument is only null-checked by the extractor; all
+            // geometry derives from the sampled grid, so any non-null node works.
+            MeshExtractionResult actual = MarchingCubesExtractor.Extract(new EmptySdfNode(), grid);
+            MeshExtractionResult reference = MarchingCubesExtractor.ExtractLegacy(grid);
+
+            Assert.AreEqual(reference.MixedCellCount, actual.MixedCellCount, $"{label}: mixed cell count");
+            Assert.AreEqual(reference.TriangleCount, actual.TriangleCount, $"{label}: triangle count");
+            Assert.AreEqual(reference.Positions.Count, actual.Positions.Count, $"{label}: vertex count");
+
+            (Vector3 refMin, Vector3 refMax) = BoundsOf(reference);
+            (Vector3 actMin, Vector3 actMax) = BoundsOf(actual);
+            Assert.AreEqual(refMin, actMin, $"{label}: bounds min");
+            Assert.AreEqual(refMax, actMax, $"{label}: bounds max");
+
+            AssertSameGeometry(actual, reference, label);
+
+            MeshTopologyReport refReport = MeshTopologyValidator.Validate(reference);
+            MeshTopologyReport actReport = MeshTopologyValidator.Validate(actual);
+            Assert.AreEqual(refReport.IsWatertight, actReport.IsWatertight, $"{label}: watertight");
+            Assert.AreEqual(refReport.BoundaryEdgeCount, actReport.BoundaryEdgeCount, $"{label}: boundary edges");
+            Assert.AreEqual(refReport.NonManifoldEdgeCount, actReport.NonManifoldEdgeCount, $"{label}: non-manifold edges");
+            Assert.AreEqual(refReport.TotalEdgeCount, actReport.TotalEdgeCount, $"{label}: total edges");
+        }
+
+        private static void AssertSameGeometry(MeshExtractionResult a, MeshExtractionResult b, string label)
+        {
+            Assert.AreEqual(a.Positions.Count, b.Positions.Count, $"{label}: vertex count");
+            for (int i = 0; i < a.Positions.Count; i++)
+            {
+                Assert.AreEqual(a.Positions[i], b.Positions[i], $"{label}: position {i}");
+            }
+            CollectionAssert.AreEqual(a.Triangles, b.Triangles, $"{label}: triangle indices");
+        }
+
+        private static (Vector3 Min, Vector3 Max) BoundsOf(MeshExtractionResult mesh)
+        {
+            var min = new Vector3(float.PositiveInfinity, float.PositiveInfinity, float.PositiveInfinity);
+            var max = new Vector3(float.NegativeInfinity, float.NegativeInfinity, float.NegativeInfinity);
+            foreach (Vector3 p in mesh.Positions)
+            {
+                min = Vector3.Min(min, p);
+                max = Vector3.Max(max, p);
+            }
+            return (min, max);
+        }
+
+        private static DensityGrid SphereGrid()
+        {
+            var sphere = new SphereSdfNode(1f);
+            var bounds = new BoundsDefinition { MaxX = 1.5f, MaxY = 1.5f, MaxZ = 1.5f };
+            var settings = new GenerationSettings { VoxelsPerUnit = 6f };
+            return DensityGrid.Sample(sphere, bounds, settings);
+        }
+
+        private static DensityGrid OverlappingSpheresGrid()
+        {
+            var a = new SphereSdfNode(1f);
+            var offset = UnityEngine.Matrix4x4.TRS(new Vector3(1f, 0f, 0f), Quaternion.identity, Vector3.one);
+            var b = new TransformNode(new SphereSdfNode(1f), offset);
+            var union = new SmoothUnionNode(a, b, 0.3f);
+            var bounds = new BoundsDefinition { MaxX = 2.5f, MaxY = 1.5f, MaxZ = 1.5f };
+            var settings = new GenerationSettings { VoxelsPerUnit = 5f };
+            return DensityGrid.Sample(union, bounds, settings);
+        }
+
+        private static DensityGrid EmptyGrid()
+        {
+            var bounds = new BoundsDefinition { MaxX = 0.5f, MaxY = 0.5f, MaxZ = 0.5f };
+            var settings = new GenerationSettings { VoxelsPerUnit = 4f };
+            return DensityGrid.Sample(new EmptySdfNode(), bounds, settings);
+        }
+
+        private static DensityGrid BodySplineGrid()
+        {
+            var definition = CreatureDefinition.CreateEmpty();
+            definition.Body.Samples.Add(new BodySample { Id = 1, Position = new Vector3(0f, 0f, -1f), Radius = 0.75f });
+            definition.Body.Samples.Add(new BodySample { Id = 2, Position = new Vector3(0f, 0f, 1f), Radius = 0.9f });
+            definition.AddPart(new CreaturePart
+            {
+                Id = "leg",
+                PartType = PartType.Leg,
+                ParentId = CreatureDefinition.BodyId,
+                Transform = new TransformData { Position = new Vector3(1f, -1f, 0f), Rotation = Quaternion.identity, Scale = Vector3.one },
+                Shape = new ShapeDefinition { Type = ShapeType.Sphere, PrimarySize = 0.5f, SmoothBlendRadius = 0.25f },
+                Appearance = AppearanceDefinition.Default,
+            });
+
+            ISdfNode node = SdfProgramBuilder.Compile(definition);
+            var bounds = new BoundsDefinition { MaxX = 2.5f, MaxY = 2.5f, MaxZ = 2.5f };
+            var settings = new GenerationSettings { VoxelsPerUnit = 8f };
+            return DensityGrid.Sample(node, bounds, settings);
+        }
+    }
+}

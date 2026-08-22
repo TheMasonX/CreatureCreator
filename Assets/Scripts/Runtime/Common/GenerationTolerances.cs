@@ -50,6 +50,19 @@ namespace ProceduralCreature.Common
         public const long MaxVoxelBudget = 16_777_216L;
 
         /// <summary>
+        /// Canonicalizes a sampled surface density for sign classification and
+        /// contour resolution. A value within <see cref="ScalarComparisonEpsilon"/>
+        /// of the surface is treated as exactly on the surface (0), which removes
+        /// tiny contour caps at near-zero samples while leaving real geometry
+        /// unchanged. Shared by the active-cell classifier and the extractor's
+        /// welding boundary so both classify near-zero corners identically.
+        /// </summary>
+        public static float NormalizeSurfaceDensity(float density)
+        {
+            return Math.Abs(density) <= ScalarComparisonEpsilon ? 0f : density;
+        }
+
+        /// <summary>
         /// Rounds a value to <see cref="QuantizationDecimalPlaces"/> using away-from-zero
         /// midpoint rounding, matching typical user expectations for authored values.
         /// </summary>

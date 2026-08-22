@@ -16,7 +16,21 @@ namespace ProceduralCreature.Morphology.Extraction
         public List<int> Triangles { get; } = new List<int>();
         public int MixedCellCount { get; internal set; }
         public int GradientEvaluationCount { get; internal set; }
-        public TimeSpan CornerClassificationTime { get; internal set; }
+
+        /// <summary>
+        /// Number of times the extractor called <see cref="CubeContourResolver"/>.
+        /// One call per active (mixed-sign) cell, so equality with
+        /// <see cref="MixedCellCount"/> proves homogeneous cells never reach the
+        /// contour resolver.
+        /// </summary>
+        public int ContourResolutionCallCount { get; internal set; }
+
+        /// <summary>
+        /// Time spent building the active-cell metadata: the single dense scan
+        /// that classifies every cell and retains only mixed-sign cells. This
+        /// replaced the extractor's old full-volume classification pass.
+        /// </summary>
+        public TimeSpan ActiveCellConstructionTime { get; internal set; }
         public TimeSpan ContourResolutionTime { get; internal set; }
         public TimeSpan VertexWeldingTime { get; internal set; }
         public TimeSpan TriangleEmissionTime { get; internal set; }

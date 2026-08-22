@@ -62,7 +62,7 @@ namespace ProceduralCreature.Generation
             diagnostics?.RecordExtractionStatistics(
                 meshResult.MixedCellCount, meshResult.GradientEvaluationCount);
             diagnostics?.RecordExtractionTiming(
-                meshResult.CornerClassificationTime,
+                meshResult.ActiveCellConstructionTime,
                 meshResult.ContourResolutionTime,
                 meshResult.VertexWeldingTime,
                 meshResult.TriangleEmissionTime);
