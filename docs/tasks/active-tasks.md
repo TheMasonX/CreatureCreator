@@ -19,7 +19,7 @@
 | CC-015 | Spore-like body sample authoring and place-part snapping | In Progress | P1 |
 | CC-016 | Body spline manipulation solver (local curve editing) | In Progress | P1 |
 | CC-017 | In-viewport Body sample scale (radius) editing | In Progress | P1 |
-| CC-018 | Limb parts as joint chains with between-joint metaballs | Backlog | P1 |
+| CC-018 | Limb parts as joint chains with between-joint metaballs | In Progress | P1 |
 | CC-019 | Bidirectional Body length editing (head-end add/remove on drag) | Backlog | P1 |
 | CC-020 | Collapsible parts tree and Body inspector sections | Done | P2 |
 | CC-021 | Show editable control points for a selected part | Backlog | P2 |
@@ -37,3 +37,4 @@
 | CC-033 | Register FastNoise2Bindings as a real git submodule | Done | P2 |
 | CC-034 | Body appearance vertical blend remap as an AnimationCurve | Done | P2 |
 | CC-035 | Parts list column layout (resizable splitter + height-constrained scroll) | Backlog | P2 |
+| CC-036 | Fix obsolete Keyframe.tangentMode warnings and DrawPartList GetLastRect error | Done | P2 |

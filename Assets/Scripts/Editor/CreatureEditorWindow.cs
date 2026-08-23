@@ -575,7 +575,6 @@ namespace ProceduralCreature.Editor
             EditorGUILayout.LabelField("Parts", EditorStyles.boldLabel);
 
             _partListScroll = EditorGUILayout.BeginScrollView(_partListScroll);
-            _partListScrollViewRect = GUILayoutUtility.GetLastRect(); // viewport used by scroll-into-view
 
             DrawBodyNode();
             var visited = new HashSet<string> { CreatureDefinition.BodyId };
@@ -608,6 +607,13 @@ namespace ProceduralCreature.Editor
             }
 
             EditorGUILayout.EndScrollView();
+
+            // CC-036: capture the scroll view's viewport rect AFTER the scroll
+            // group ends. GUILayoutUtility.GetLastRect immediately after
+            // BeginScrollView is invalid ("You cannot call GetLast immediately
+            // after beginning a group"), so it is read here, at a legal layout
+            // boundary, and consumed by RevealScrollIfTarget on a later frame.
+            _partListScrollViewRect = GUILayoutUtility.GetLastRect();
 
             if (GUILayout.Button("Add Part")) AddNewPart();
 

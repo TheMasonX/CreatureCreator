@@ -62,17 +62,15 @@ namespace ProceduralCreature.Definition
         }
 
         /// <summary>
-        /// Builds a curve from explicit keys with free (non-auto) tangents, so
-        /// <see cref="UnityEngine.AnimationCurve.Evaluate"/> uses exactly the
-        /// numeric in/out tangents given here regardless of any editor tangent
-        /// mode baked into the keyframes.
+        /// Builds a curve from explicit keys. Newly constructed keys default to
+        /// free tangents, so <see cref="UnityEngine.AnimationCurve.Evaluate"/>
+        /// uses exactly the numeric in/out tangents given here.
         /// </summary>
         private static AnimationCurve Build(params Keyframe[] keys)
         {
-            for (int i = 0; i < keys.Length; i++)
-            {
-                keys[i].tangentMode = 0; // Free: evaluate the numeric tangents.
-            }
+            // New Keyframes default to tangentMode 0 (Free); the previous
+            // explicit tangentMode = 0 write was removed because the property
+            // is obsolete in Unity 6 and the assignment was redundant.
             return new AnimationCurve(keys);
         }
 
@@ -178,10 +176,7 @@ namespace ProceduralCreature.Definition
                     GenerationTolerances.Quantize(key.time),
                     GenerationTolerances.Quantize(key.value),
                     GenerationTolerances.Quantize(key.inTangent),
-                    GenerationTolerances.Quantize(key.outTangent))
-                {
-                    tangentMode = 0,
-                })
+                    GenerationTolerances.Quantize(key.outTangent)))
                 .OrderBy(key => key.time)
                 .ToArray();
         }

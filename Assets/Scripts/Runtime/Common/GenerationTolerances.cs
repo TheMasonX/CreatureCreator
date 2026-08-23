@@ -39,6 +39,27 @@ namespace ProceduralCreature.Common
         /// <summary>Maximum number of authored samples in a Body spline.</summary>
         public const int MaxBodySampleCount = 1024;
 
+        /// <summary>Minimum number of joints a limb chain must have (root + at least one more).</summary>
+        public const int MinLimbJointCount = 2;
+
+        /// <summary>Maximum number of joints in a limb chain.</summary>
+        public const int MaxLimbJointCount = 64;
+
+        /// <summary>
+        /// Minimum distance between adjacent limb joints. A shorter segment is a
+        /// degenerate zero-length segment and fails validation. Matches the scale
+        /// component floor.
+        /// </summary>
+        public const float MinLimbSegmentLength = 1e-3f;
+
+        /// <summary>
+        /// Allowed deviation of a limb chain's root joint from the local origin
+        /// (<c>Joints[0] ≈ Vector3.zero</c>, ADR-001 §3). This keeps
+        /// <c>Transform.position</c> and <c>Joints[0].Position</c> from becoming
+        /// two competing placement authorities.
+        /// </summary>
+        public const float LimbRootAtOriginTolerance = 1e-3f;
+
         /// <summary>
         /// Hard ceiling on estimated total voxel count for a single generation
         /// (Sprint 3.1 "safety budget"). A definition whose bounds/resolution combo

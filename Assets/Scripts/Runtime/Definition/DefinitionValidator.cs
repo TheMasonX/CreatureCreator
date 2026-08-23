@@ -31,6 +31,7 @@ namespace ProceduralCreature.Definition
             ValidateParentsAndCycles(definition, issues);
             ValidatePartTypes(definition, issues);
             ValidateTransformsAndShapesAndAppearance(definition, issues);
+            ValidateLimbChains(definition, issues);
 
             return new ValidationResult(issues);
         }
@@ -378,7 +379,10 @@ namespace ProceduralCreature.Definition
                     }
                 }
 
-                if (!part.Shape.HasValidParameters())
+                // A limb part's geometry derives from its LimbChain; Shape is inert
+                // (ADR-001 §2). Skip the shape-parameter check for limb parts so a
+                // limb is not forced to carry a meaningful Shape.
+                if (part.Limb == null && !part.Shape.HasValidParameters())
                 {
                     issues.Add(new ValidationIssue(
                         ValidationSeverity.Error,
@@ -407,6 +411,132 @@ namespace ProceduralCreature.Definition
                     issues.Add(new ValidationIssue(
                         ValidationSeverity.Error, ValidationCode.InvalidAttachmentAnchor,
                         $"Part '{part.Id}' has an invalid semantic attachment anchor.", part.Id));
+                }
+            }
+        }
+
+        /// <summary>
+        /// Validates every part's limb chain (CC-018, ADR-001). Reports only; never
+        /// repairs. Covers the structural, numerical, bounds, root-at-origin, and
+        /// thickness checks from the ticket's Phase 2. No anatomical constraints
+        /// are imposed — only numerical/pathological states are rejected.
+        /// </summary>
+        private static void ValidateLimbChains(CreatureDefinition definition, List<ValidationIssue> issues)
+        {
+            foreach (CreaturePart part in definition.Parts)
+            {
+                if (part == null || part.Limb == null) continue;
+
+                LimbChain limb = part.Limb;
+
+                if (limb.Joints == null || limb.Joints.Count == 0)
+                {
+                    issues.Add(new ValidationIssue(
+                        ValidationSeverity.Error, ValidationCode.InvalidLimbChain,
+                        $"Part '{part.Id}' has a limb chain with no joints.", part.Id));
+                    continue;
+                }
+
+                if (limb.Joints.Count < GenerationTolerances.MinLimbJointCount ||
+                    limb.Joints.Count > GenerationTolerances.MaxLimbJointCount)
+                {
+                    issues.Add(new ValidationIssue(
+                        ValidationSeverity.Error, ValidationCode.LimbJointCountOutOfRange,
+                        $"Part '{part.Id}' limb chain must have between " +
+                        $"{GenerationTolerances.MinLimbJointCount} and " +
+                        $"{GenerationTolerances.MaxLimbJointCount} joints " +
+                        $"(found {limb.Joints.Count}).", part.Id));
+                }
+
+                var jointIds = new HashSet<uint>();
+                for (int i = 0; i < limb.Joints.Count; i++)
+                {
+                    LimbJoint joint = limb.Joints[i];
+                    if (joint == null)
+                    {
+                        issues.Add(new ValidationIssue(
+                            ValidationSeverity.Error, ValidationCode.InvalidLimbChain,
+                            $"Part '{part.Id}' has a null limb joint at index {i}.", part.Id));
+                        continue;
+                    }
+
+                    if (!jointIds.Add(joint.Id))
+                    {
+                        issues.Add(new ValidationIssue(
+                            ValidationSeverity.Error, ValidationCode.DuplicateLimbJointId,
+                            $"Part '{part.Id}' limb has duplicate joint Id '{joint.Id}'.", part.Id));
+                    }
+                    if (i > 0 && limb.Joints[i - 1] != null &&
+                        joint.Id <= limb.Joints[i - 1].Id)
+                    {
+                        issues.Add(new ValidationIssue(
+                            ValidationSeverity.Error, ValidationCode.LimbJointOrderNotDeterministic,
+                            "Limb joint IDs must increase with chain order.", part.Id));
+                    }
+
+                    if (!IsFinite(joint.Position.x) || !IsFinite(joint.Position.y) ||
+                        !IsFinite(joint.Position.z))
+                    {
+                        issues.Add(new ValidationIssue(
+                            ValidationSeverity.Error, ValidationCode.NonFiniteLimbJoint,
+                            $"Part '{part.Id}' limb joint '{joint.Id}' has a non-finite position.", part.Id));
+                    }
+
+                    // Bounds are checked in the part's local frame — the same
+                    // approximation the existing OutOfBoundsTransform check makes
+                    // for part positions.
+                    if (!definition.Bounds.Contains(joint.Position))
+                    {
+                        issues.Add(new ValidationIssue(
+                            ValidationSeverity.Error, ValidationCode.LimbJointOutOfBounds,
+                            $"Part '{part.Id}' limb joint '{joint.Id}' lies outside the creature bounds.", part.Id));
+                    }
+
+                    if (i > 0 && limb.Joints[i - 1] != null)
+                    {
+                        float segmentLength = Vector3.Distance(joint.Position, limb.Joints[i - 1].Position);
+                        if (segmentLength < GenerationTolerances.MinLimbSegmentLength)
+                        {
+                            issues.Add(new ValidationIssue(
+                                ValidationSeverity.Error, ValidationCode.LimbSegmentTooShort,
+                                $"Part '{part.Id}' limb segment {i - 1}->{i} is shorter than the " +
+                                $"minimum ({GenerationTolerances.MinLimbSegmentLength:F4}).", part.Id));
+                        }
+                    }
+                }
+
+                if (limb.Joints[0] != null &&
+                    limb.Joints[0].Position.sqrMagnitude >
+                    GenerationTolerances.LimbRootAtOriginTolerance * GenerationTolerances.LimbRootAtOriginTolerance)
+                {
+                    issues.Add(new ValidationIssue(
+                        ValidationSeverity.Error, ValidationCode.LimbRootNotAtOrigin,
+                        $"Part '{part.Id}' limb root joint must sit at the local origin " +
+                        "(Joints[0] ≈ Vector3.zero); the part's Transform is the placement frame.", part.Id));
+                }
+
+                if (limb.Thickness == null)
+                {
+                    issues.Add(new ValidationIssue(
+                        ValidationSeverity.Error, ValidationCode.InvalidThicknessProfile,
+                        $"Part '{part.Id}' limb thickness profile must not be null.", part.Id));
+                }
+                else
+                {
+                    if (!limb.Thickness.IsFinite())
+                    {
+                        issues.Add(new ValidationIssue(
+                            ValidationSeverity.Error, ValidationCode.NonFiniteThickness,
+                            $"Part '{part.Id}' limb thickness profile has a non-finite key.", part.Id));
+                    }
+
+                    if (!limb.Thickness.HasValidKeys())
+                    {
+                        issues.Add(new ValidationIssue(
+                            ValidationSeverity.Error, ValidationCode.InvalidThicknessProfile,
+                            $"Part '{part.Id}' limb thickness profile must have at least two keys " +
+                            "with unique T in [0, 1] and positive values.", part.Id));
+                    }
                 }
             }
         }

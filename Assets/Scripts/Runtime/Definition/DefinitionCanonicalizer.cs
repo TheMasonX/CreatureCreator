@@ -74,6 +74,11 @@ namespace ProceduralCreature.Definition
                 }
 
                 part.Transform = part.Transform.Quantized();
+
+                if (part.Limb != null)
+                {
+                    CanonicalizeLimbChain(part.Limb);
+                }
             }
 
             // Stable ordering independent of authoring/insertion order — this is what
@@ -140,6 +145,43 @@ namespace ProceduralCreature.Definition
                 throw new DomainException($"Cannot canonicalize an invalid Body {name} gradient.");
             }
             GradientAdapter.Quantize(gradient);
+        }
+
+        /// <summary>
+        /// Canonicalizes a limb chain (CC-018): quantizes every joint position and
+        /// the thickness profile's keys, and orders the thickness keys by strictly
+        /// increasing T for deterministic serialization. Joint order is preserved
+        /// — list order IS the chain order. Throws on non-finite joints or an
+        /// invalid thickness profile; canonicalization is not a repair pass,
+        /// matching the transform and body-appearance rules above.
+        /// </summary>
+        private static void CanonicalizeLimbChain(LimbChain limb)
+        {
+            if (limb.Joints == null || limb.Joints.Count == 0)
+            {
+                throw new DomainException("Cannot canonicalize a limb chain with no joints.");
+            }
+            foreach (LimbJoint joint in limb.Joints)
+            {
+                if (joint == null || !IsFinite(joint.Position))
+                {
+                    throw new DomainException("Cannot canonicalize a limb chain with a null or non-finite joint.");
+                }
+                joint.Position = new Vector3(
+                    GenerationTolerances.Quantize(joint.Position.x),
+                    GenerationTolerances.Quantize(joint.Position.y),
+                    GenerationTolerances.Quantize(joint.Position.z));
+            }
+
+            if (limb.Thickness == null)
+            {
+                throw new DomainException("Cannot canonicalize a limb chain without a thickness profile.");
+            }
+            if (!limb.Thickness.IsFinite() || !limb.Thickness.HasValidKeys())
+            {
+                throw new DomainException("Cannot canonicalize an invalid limb thickness profile.");
+            }
+            limb.Thickness.Quantize();
         }
 
         private static void AppendChildren(string parentId,

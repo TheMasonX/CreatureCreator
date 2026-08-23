@@ -70,13 +70,12 @@ namespace ProceduralCreature.Tests.Runtime
         /// </summary>
         private static UnityEngine.AnimationCurve CurveFrom(params (float Time, float Value, float In, float Out)[] keys)
         {
+            // New Keyframes default to tangentMode 0 (Free), matching
+            // CurveAdapter, so evaluation uses exactly the given tangents.
             var keyframes = new UnityEngine.Keyframe[keys.Length];
             for (int i = 0; i < keys.Length; i++)
             {
-                keyframes[i] = new UnityEngine.Keyframe(keys[i].Time, keys[i].Value, keys[i].In, keys[i].Out)
-                {
-                    tangentMode = 0, // Free
-                };
+                keyframes[i] = new UnityEngine.Keyframe(keys[i].Time, keys[i].Value, keys[i].In, keys[i].Out);
             }
             return new UnityEngine.AnimationCurve(keyframes);
         }

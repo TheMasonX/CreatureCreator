@@ -2,7 +2,7 @@
 id: creature-task-018
 key: CC-018
 title: Limb parts as joint chains with between-joint metaballs
-status: Backlog
+status: In Progress
 type: Task
 priority: P1
 tags: [definition, morphology, limbs, schema]
@@ -126,6 +126,46 @@ serialization round-trip.
   Shape + Appearance` shape. See handoff
   `CC-018-CC-020-CC-027-CC-028-review-and-backlog-handoff.md`.
 
+### Implementation status (2026-08-23)
+
+Phases 0-5 are IMPLEMENTED and validated in the working tree (see
+`docs/adr/ADR-001-limbchain-schema-and-creaturepart-as-semantic-container.md`):
+
+- Phase 0: ADR-001 recorded (LimbChain schema + CreaturePart as semantic
+  container + root-at-origin invariant + 1D thickness + derived-never-serialized
+  + skeleton-from-joints).
+- Phase 1: `LimbJoint`, `ThicknessProfile`, `LimbChain` domain types;
+  `CreaturePart.Limb` nullable field (deep-copied in `Clone`).
+- Phase 2: new `ValidationCode`s + `GenerationTolerances` limb constants;
+  `DefinitionValidator.ValidateLimbChains` (count range, unique + ordered IDs,
+  finite positions, min segment length, bounds, root-at-origin, thickness).
+  Shape checks are skipped for limb parts.
+- Phase 3: canonical JSON `limbChain` (joints + thicknessProfile keys, always
+  emitted, `null` for non-limbs — byte-stable, additive, no version bump);
+  optional on read (legacy files load null); canonicalizer quantizes joints and
+  thickness keys.
+- Phase 4: `LimbMetaballSampler` (pure, deterministic; per-segment
+  `ceil(segLen / 0.1)`; radius from `Thickness.Evaluate(t)`).
+- Phase 5: `SdfProgramBuilder` compiles limb chains in both managed and portable
+  paths (metaball spheres smooth-united; part transform baked per ball in
+  portable; mirrored limbs emit a mirrored chain + hard union).
+
+**Key finding — portable Symmetry limitation:** the portable evaluator's
+`Symmetry` op (`SdfProgramEvaluator`) only mirrors a primitive/transform
+subtree correctly; over a composite (smooth-union) it reads `values` computed
+for the unmirrored point and silently no-ops. CC-018 works around this in the
+compiler (bake mirrored chain + hard union); CC-014 should fix the evaluator
+op so any future composite under Symmetry is correct. See
+`SdfProgramBuilder.CompileLimbChainPortable` doc comment.
+
+**Validation evidence (2026-08-23):** clean compile; 39/39 new limb runtime
+fixtures pass via `execute_code` (DefinitionValidatorLimbTests 18,
+JsonDnaSerializerLimbTests 9, LimbMetaballSamplerTests 8,
+SdfProgramBuilderLimbTests 4). Affected existing runtime fixtures: 68/75 pass;
+all 7 failures are the documented pre-existing broken fixtures (validator
+dup-id ×3 + rejects-no-parent, serializer display-name, skeleton mirror,
+transform resolver) — none in touched code paths.
+
 ## Blockers
 
 None for the design; implementation should not start until Phase 0 (schema
@@ -133,5 +173,9 @@ decision) is recorded as an ADR.
 
 ## Next Step
 
-Record the Phase 0 schema decision as an ADR, then implement Phase 1 (domain
-types) and Phase 2 (validation) as the smallest owning slice.
+Phase 0 is recorded as ADR-001; Phases 1-5 are implemented. Next: Phase 6
+(skeleton integration in `SkeletonInferrer` — N joints → N-1 bones, terminal
+bone as child-attachment target, mirrored chains) and Phase 7 (editor
+viewport joint handles + auto-seed default chain for Limb/Leg/Arm). See the
+handoff `docs/tasks/handoffs/CC-018-phases-0-5-handoff.md` for the full
+remaining design.

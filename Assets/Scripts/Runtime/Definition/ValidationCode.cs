@@ -29,5 +29,15 @@ namespace ProceduralCreature.Definition
         InvalidAttachmentAnchor,
         InvalidBodyAppearance,
         NonFiniteBodyAppearance,
+        InvalidLimbChain,
+        LimbJointCountOutOfRange,
+        DuplicateLimbJointId,
+        LimbJointOrderNotDeterministic,
+        NonFiniteLimbJoint,
+        LimbSegmentTooShort,
+        LimbJointOutOfBounds,
+        LimbRootNotAtOrigin,
+        InvalidThicknessProfile,
+        NonFiniteThickness,
     }
 }

@@ -31,6 +31,17 @@ namespace ProceduralCreature.Definition
         public AppearanceDefinition Appearance;
 
         /// <summary>
+        /// The authored limb chain (CC-018, ADR-001). When non-null, the part is a
+        /// limb: geometry derives from the joint chain and <see cref="Shape"/> is
+        /// inert for generation; skeleton derives from the joints. When null, the
+        /// part is a plain primitive shaped by <see cref="Shape"/>. Null for every
+        /// pre-CC-018 part, so existing creatures are unaffected. See ADR-001
+        /// ("CreaturePart as a semantic container") for the guardrail this
+        /// establishes ahead of CC-031's composable geometry model.
+        /// </summary>
+        public LimbChain Limb;
+
+        /// <summary>
         /// Whether the SDF compiler and skeleton inferer should generate a mirrored
         /// counterpart for this part when the owning CreatureDefinition's
         /// SymmetryMode is not None. See SymmetryMode.cs for the storage-model
@@ -52,6 +63,7 @@ namespace ProceduralCreature.Definition
                 Transform = Transform,
                 Shape = Shape,
                 Appearance = Appearance,
+                Limb = Limb == null ? null : Limb.Clone(),
                 MirrorAcrossSymmetryPlane = MirrorAcrossSymmetryPlane,
                 ParentAttachment = ParentAttachment == null ? null : ParentAttachment.Clone(),
             };

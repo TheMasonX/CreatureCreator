@@ -120,7 +120,7 @@ namespace ProceduralCreature.Serialization
 
         /// <summary>
         /// Reads the vertical-blend curve (CC-034) from its canonical key list.
-        /// Keys are rebuilt with free tangents so
+        /// Newly constructed keys default to free tangents, so
         /// <see cref="UnityEngine.AnimationCurve.Evaluate"/> uses exactly the
         /// numeric in/out tangents from the file.
         /// </summary>
@@ -142,10 +142,7 @@ namespace ProceduralCreature.Serialization
                     (float)RequireNumber(keyObj, "time"),
                     (float)RequireNumber(keyObj, "value"),
                     (float)RequireNumber(keyObj, "inTangent"),
-                    (float)RequireNumber(keyObj, "outTangent"))
-                {
-                    tangentMode = 0, // Free: evaluate the numeric tangents.
-                };
+                    (float)RequireNumber(keyObj, "outTangent"));
                 keys.Add(keyframe);
             }
             if (keys.Count == 0)
@@ -292,7 +289,71 @@ namespace ProceduralCreature.Serialization
                 Appearance = ReadAppearance(RequireObject(obj, "appearance")),
                 MirrorAcrossSymmetryPlane = RequireBool(obj, "mirrorAcrossSymmetryPlane"),
                 ParentAttachment = ReadNullableAnchor(obj, "parentAttachment"),
+                Limb = ReadNullableLimbChain(obj, "limbChain"),
             };
+        }
+
+        /// <summary>
+        /// Reads an optional limb chain (CC-018). A missing or null field yields a
+        /// null chain (the part is a plain primitive); pre-CC-018 v2 files load
+        /// unchanged, so this additive field needs no schema version bump. Joints
+        /// keep their authored order; the thickness profile is optional and
+        /// defaults to the standard tapering profile when absent. Tangents are not
+        /// read in v1 — the profile is linear — but a future additive tangent
+        /// field would be read here without breaking existing files.
+        /// </summary>
+        private static LimbChain ReadNullableLimbChain(Dictionary<string, object> obj, string key)
+        {
+            if (!obj.TryGetValue(key, out object value) || value == null) return null;
+            if (value is not Dictionary<string, object> limbObj)
+            {
+                throw new DnaDeserializationException($"Field '{key}' must be an object or null.");
+            }
+
+            var chain = new LimbChain
+            {
+                Thickness = ReadOptionalThicknessProfile(limbObj, "thicknessProfile"),
+            };
+            foreach (object entry in RequireArray(limbObj, "joints"))
+            {
+                if (entry is not Dictionary<string, object> jointObj)
+                {
+                    throw new DnaDeserializationException("Each limb joint must be an object.");
+                }
+                chain.Joints.Add(new LimbJoint
+                {
+                    Id = RequireUInt(jointObj, "id"),
+                    Position = ReadVec3(RequireObject(jointObj, "position")),
+                });
+            }
+            return chain;
+        }
+
+        private static ThicknessProfile ReadOptionalThicknessProfile(Dictionary<string, object> obj, string key)
+        {
+            if (!obj.TryGetValue(key, out object value) || value == null)
+            {
+                return ThicknessProfile.CreateDefault();
+            }
+            if (value is not Dictionary<string, object> profileObj)
+            {
+                throw new DnaDeserializationException($"Field '{key}' must be an object or null.");
+            }
+
+            var profile = new ThicknessProfile();
+            foreach (object entry in RequireArray(profileObj, "keys"))
+            {
+                if (entry is not Dictionary<string, object> keyObj)
+                {
+                    throw new DnaDeserializationException("Each thickness key must be an object.");
+                }
+                profile.Keys.Add(new ThicknessKey
+                {
+                    T = (float)RequireNumber(keyObj, "t"),
+                    Value = (float)RequireNumber(keyObj, "value"),
+                });
+            }
+            return profile;
         }
 
         private static BodySurfaceAnchor ReadNullableAnchor(Dictionary<string, object> obj, string key)

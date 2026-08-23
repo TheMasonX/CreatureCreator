@@ -39,6 +39,14 @@ namespace ProceduralCreature.Morphology.Sdf
         /// </summary>
         private const float BodySampleBlendFactor = 0.5f;
 
+        /// <summary>
+        /// Blend radius used when smooth-uniting adjacent derived limb metaballs
+        /// (CC-018). Same deterministic fraction-of-smaller-radius rule as the
+        /// Body spline, so the limb reads as one continuous chain rather than a
+        /// string of beads.
+        /// </summary>
+        private const float LimbSampleBlendFactor = 0.5f;
+
         public static SdfProgram CompilePortable(CreatureDefinition definition)
         {
             if (definition == null) throw new DomainException("Cannot compile a null CreatureDefinition.");
@@ -104,48 +112,68 @@ namespace ProceduralCreature.Morphology.Sdf
             foreach (CreaturePart part in orderedParts)
             {
                 int previousRoot = root;
-                int primitive = operations.Count;
-                SdfOperationType primitiveType;
-                switch (part.Shape.Type)
-                {
-                    case ShapeType.Sphere:
-                    case ShapeType.Ellipsoid:
-                        primitiveType = SdfOperationType.Sphere;
-                        break;
-                    case ShapeType.Box:
-                        primitiveType = SdfOperationType.Box;
-                        break;
-                    case ShapeType.Capsule:
-                        primitiveType = SdfOperationType.Capsule;
-                        break;
-                    default:
-                        throw new DomainException($"No portable SDF primitive mapping exists for ShapeType.{part.Shape.Type}.");
-                }
-
-                float size = part.Shape.PrimarySize;
-                float3 parameters = primitiveType == SdfOperationType.Box
-                    ? new float3(size)
-                    : new float3(size, 0f, 0f);
-                operations.Add(SdfOperation.Primitive(primitiveType, parameters));
-
                 Matrix4x4 localToCreature = CreaturePartWorldTransformResolver.ResolveLocalToCreatureSpace(definition, part);
-                Matrix4x4 worldToLocal = localToCreature.inverse;
                 Vector3 scale = localToCreature.lossyScale;
                 float distanceScale = Mathf.Min(Mathf.Abs(scale.x), Mathf.Min(Mathf.Abs(scale.y), Mathf.Abs(scale.z)));
-                operations.Add(new SdfOperation
-                {
-                    Type = SdfOperationType.Transform,
-                    A = primitive,
-                    Matrix = ToFloat4x4(worldToLocal),
-                    DistanceScale = distanceScale,
-                });
-                root = operations.Count - 1;
+                bool shouldMirror = part.MirrorAcrossSymmetryPlane && definition.SymmetryMode != SymmetryMode.None;
 
-                if (part.MirrorAcrossSymmetryPlane && definition.SymmetryMode != SymmetryMode.None)
+                int primitive;
+                if (part.Limb != null)
                 {
-                    operations.Add(new SdfOperation { Type = SdfOperationType.Symmetry, A = root });
-                    root = operations.Count - 1;
+                    // A limb compiles to a chain of derived metaball spheres with
+                    // the part's creature-space transform BAKED into each ball's
+                    // local transform (CC-018 Phase 5). The portable Transform op
+                    // can only wrap a primitive, and the portable Symmetry op can
+                    // only wrap a primitive/transform subtree (its recursion reads
+                    // values computed for the unmirrored point), so a mirrored
+                    // limb bakes a mirrored copy of the chain in instead of using
+                    // a Symmetry op — the hard union of the two sides equals
+                    // SymmetryNode(chain) = min(chain(x), chain(-x)) exactly.
+                    primitive = CompileLimbChainPortable(operations, part.Limb, localToCreature, distanceScale, shouldMirror);
                 }
+                else
+                {
+                    SdfOperationType primitiveType;
+                    switch (part.Shape.Type)
+                    {
+                        case ShapeType.Sphere:
+                        case ShapeType.Ellipsoid:
+                            primitiveType = SdfOperationType.Sphere;
+                            break;
+                        case ShapeType.Box:
+                            primitiveType = SdfOperationType.Box;
+                            break;
+                        case ShapeType.Capsule:
+                            primitiveType = SdfOperationType.Capsule;
+                            break;
+                        default:
+                            throw new DomainException($"No portable SDF primitive mapping exists for ShapeType.{part.Shape.Type}.");
+                    }
+
+                    float size = part.Shape.PrimarySize;
+                    float3 parameters = primitiveType == SdfOperationType.Box
+                        ? new float3(size)
+                        : new float3(size, 0f, 0f);
+                    primitive = operations.Count;
+                    operations.Add(SdfOperation.Primitive(primitiveType, parameters));
+
+                    Matrix4x4 worldToLocal = localToCreature.inverse;
+                    operations.Add(new SdfOperation
+                    {
+                        Type = SdfOperationType.Transform,
+                        A = primitive,
+                        Matrix = ToFloat4x4(worldToLocal),
+                        DistanceScale = distanceScale,
+                    });
+                    primitive = operations.Count - 1;
+
+                    if (shouldMirror)
+                    {
+                        operations.Add(new SdfOperation { Type = SdfOperationType.Symmetry, A = primitive });
+                        primitive = operations.Count - 1;
+                    }
+                }
+                root = primitive;
 
                 if (previousRoot >= 0)
                 {
@@ -270,7 +298,7 @@ namespace ProceduralCreature.Morphology.Sdf
 
         private static ISdfNode CompilePart(CreatureDefinition definition, CreaturePart part)
         {
-            ISdfNode primitive = CompilePrimitive(part.Shape);
+            ISdfNode primitive = CompilePartGeometry(part);
 
             Matrix4x4 localToCreatureSpace =
                 CreaturePartWorldTransformResolver.ResolveLocalToCreatureSpace(definition, part);
@@ -280,6 +308,130 @@ namespace ProceduralCreature.Morphology.Sdf
                                  && definition.SymmetryMode != SymmetryMode.None;
 
             return shouldMirror ? new SymmetryNode(transformed) : transformed;
+        }
+
+        /// <summary>
+        /// The geometry source for a part in its local frame. A limb part compiles
+        /// to its derived metaball chain (CC-018); any other part compiles to its
+        /// single Shape primitive. <see cref="Shape"/> is inert for limb parts
+        /// (ADR-001 §2).
+        /// </summary>
+        private static ISdfNode CompilePartGeometry(CreaturePart part)
+        {
+            return part.Limb != null ? CompileLimbChain(part.Limb) : CompilePrimitive(part.Shape);
+        }
+
+        /// <summary>
+        /// Compiles a limb chain (CC-018 Phase 5) into a smooth-union of sphere
+        /// nodes, one per derived metaball, in the limb's local frame. Metaball
+        /// positions and radii come from <see cref="LimbMetaballSampler"/> —
+        /// derived geometry that is never serialized.
+        /// </summary>
+        private static ISdfNode CompileLimbChain(LimbChain limb)
+        {
+            List<LimbMetaball> metaballs = LimbMetaballSampler.Sample(limb);
+            if (metaballs.Count == 1)
+            {
+                return new TransformNode(
+                    new SphereSdfNode(metaballs[0].Radius),
+                    Matrix4x4.TRS(metaballs[0].Position, Quaternion.identity, Vector3.one));
+            }
+
+            ISdfNode accumulated = null;
+            for (int i = 0; i < metaballs.Count; i++)
+            {
+                ISdfNode ball = new TransformNode(
+                    new SphereSdfNode(metaballs[i].Radius),
+                    Matrix4x4.TRS(metaballs[i].Position, Quaternion.identity, Vector3.one));
+
+                if (accumulated == null)
+                {
+                    accumulated = ball;
+                    continue;
+                }
+
+                LimbMetaball previous = metaballs[i - 1];
+                float blend = Mathf.Min(previous.Radius, metaballs[i].Radius) * LimbSampleBlendFactor;
+                accumulated = new SmoothUnionNode(accumulated, ball, blend);
+            }
+
+            return accumulated;
+        }
+
+        /// <summary>
+        /// Appends the portable operations for a limb chain: one sphere primitive
+        /// plus a baked local-space transform per derived metaball, smooth-united
+        /// in chain order. When <paramref name="includeMirror"/> is true, a second
+        /// copy of the chain with x-negated ball positions is emitted and the two
+        /// sides are hard-unioned (blend 0). This reproduces
+        /// <c>SymmetryNode(chain) = min(chain(x), chain(-x))</c> exactly without a
+        /// portable Symmetry op, which cannot wrap a composite subtree. The part's
+        /// creature-space transform and distance scale are baked into each ball's
+        /// transform, so the returned root is ready for the outer creature union.
+        /// </summary>
+        private static int CompileLimbChainPortable(List<SdfOperation> operations, LimbChain limb,
+            Matrix4x4 localToCreature, float distanceScale, bool includeMirror)
+        {
+            List<LimbMetaball> metaballs = LimbMetaballSampler.Sample(limb);
+            int originalRoot = -1;
+            int mirroredRoot = -1;
+
+            for (int i = 0; i < metaballs.Count; i++)
+            {
+                int original = AppendLimbBall(operations, localToCreature, distanceScale, metaballs[i].Position, metaballs[i].Radius);
+                originalRoot = UnionLimbBall(operations, originalRoot, original, metaballs, i);
+
+                if (includeMirror)
+                {
+                    Vector3 mirroredPosition = new Vector3(
+                        -metaballs[i].Position.x, metaballs[i].Position.y, metaballs[i].Position.z);
+                    int mirrored = AppendLimbBall(operations, localToCreature, distanceScale, mirroredPosition, metaballs[i].Radius);
+                    mirroredRoot = UnionLimbBall(operations, mirroredRoot, mirrored, metaballs, i);
+                }
+            }
+
+            if (!includeMirror) return originalRoot;
+
+            operations.Add(new SdfOperation
+            {
+                Type = SdfOperationType.SmoothUnion,
+                A = originalRoot,
+                B = mirroredRoot,
+                Parameters = new float3(0f, 0f, 0f), // blend 0 = hard min
+            });
+            return operations.Count - 1;
+        }
+
+        private static int AppendLimbBall(List<SdfOperation> operations, Matrix4x4 localToCreature,
+            float distanceScale, Vector3 localPosition, float radius)
+        {
+            int primitive = operations.Count;
+            operations.Add(SdfOperation.Primitive(SdfOperationType.Sphere, new float3(radius, 0f, 0f)));
+
+            Matrix4x4 localToCreatureForBall = localToCreature * Matrix4x4.TRS(localPosition, Quaternion.identity, Vector3.one);
+            operations.Add(new SdfOperation
+            {
+                Type = SdfOperationType.Transform,
+                A = primitive,
+                Matrix = ToFloat4x4(localToCreatureForBall.inverse),
+                DistanceScale = distanceScale,
+            });
+            return operations.Count - 1;
+        }
+
+        private static int UnionLimbBall(List<SdfOperation> operations, int root, int ball,
+            List<LimbMetaball> metaballs, int i)
+        {
+            if (root < 0) return ball;
+            float blend = Mathf.Min(metaballs[i - 1].Radius, metaballs[i].Radius) * LimbSampleBlendFactor;
+            operations.Add(new SdfOperation
+            {
+                Type = SdfOperationType.SmoothUnion,
+                A = root,
+                B = ball,
+                Parameters = new float3(blend, 0f, 0f),
+            });
+            return operations.Count - 1;
         }
 
         private static ISdfNode CompilePrimitive(ShapeDefinition shape)

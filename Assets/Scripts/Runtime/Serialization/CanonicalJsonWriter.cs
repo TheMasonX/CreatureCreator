@@ -77,7 +77,8 @@ namespace ProceduralCreature.Serialization
     ///         "noiseScale": 1.0000
     ///       },
     ///       "mirrorAcrossSymmetryPlane": false,
-    ///       "parentAttachment": null
+    ///       "parentAttachment": null,
+    ///       "limbChain": null
     ///     }
     ///   ]
     /// }
@@ -235,7 +236,62 @@ namespace ProceduralCreature.Serialization
             WriteRawField(sb, "appearance", WriteAppearance(part.Appearance));
             WriteField(sb, "mirrorAcrossSymmetryPlane", part.MirrorAcrossSymmetryPlane);
             WriteRawField(sb, "parentAttachment", WriteNullableAnchor(part.ParentAttachment));
+            WriteRawField(sb, "limbChain", WriteNullableLimbChain(part.Limb));
             sb.Append('}');
+            return sb.ToString();
+        }
+
+        /// <summary>
+        /// Writes a limb chain (CC-018). Always emitted — null for non-limb parts —
+        /// so save/load/save stays byte-stable. Joints keep their authored chain
+        /// order (list order IS the chain, like Body samples); the thickness
+        /// profile writes its keys. The v1 key record is <c>{ t, value }</c>;
+        /// tangent fields are planned additive fields that do not break this
+        /// format (ADR-001 §4).
+        /// </summary>
+        private static string WriteNullableLimbChain(LimbChain limb)
+        {
+            if (limb == null) return "null";
+            var sb = new StringBuilder();
+            sb.Append("{\"joints\":[");
+            if (limb.Joints != null)
+            {
+                for (int i = 0; i < limb.Joints.Count; i++)
+                {
+                    LimbJoint joint = limb.Joints[i];
+                    if (i > 0) sb.Append(',');
+                    sb.Append("{\"id\":");
+                    sb.Append(joint == null ? "null" : joint.Id.ToString(CultureInfo.InvariantCulture));
+                    sb.Append(",\"position\":");
+                    sb.Append(joint == null ? "null" : WriteVec3(joint.Position));
+                    sb.Append('}');
+                }
+            }
+            sb.Append("],\"thicknessProfile\":");
+            sb.Append(WriteThicknessProfile(limb.Thickness));
+            sb.Append('}');
+            return sb.ToString();
+        }
+
+        private static string WriteThicknessProfile(ThicknessProfile profile)
+        {
+            if (profile == null) return "null";
+            var sb = new StringBuilder();
+            sb.Append("{\"keys\":[");
+            if (profile.Keys != null)
+            {
+                for (int i = 0; i < profile.Keys.Count; i++)
+                {
+                    ThicknessKey key = profile.Keys[i];
+                    if (i > 0) sb.Append(',');
+                    sb.Append("{\"t\":");
+                    sb.Append(key == null ? "null" : Num(key.T));
+                    sb.Append(",\"value\":");
+                    sb.Append(key == null ? "null" : Num(key.Value));
+                    sb.Append('}');
+                }
+            }
+            sb.Append("]}");
             return sb.ToString();
         }
 
