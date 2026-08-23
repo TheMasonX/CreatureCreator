@@ -166,6 +166,119 @@ all 7 failures are the documented pre-existing broken fixtures (validator
 dup-id ×3 + rejects-no-parent, serializer display-name, skeleton mirror,
 transform resolver) — none in touched code paths.
 
+**Phase 5 defect found + fixed in review (2026-08-23):** the portable mirrored
+limb originally negated each ball's LOCAL x and reused the UNMIRRORED part
+matrix. For a limb placed away from the creature X plane (the normal authored
+case, e.g. a leg at x = 0.5), the creature-space mirror silently no-oped and
+rendered the "mirror" on the SAME side. Verified live (managed -0.2116 vs
+portable +0.2910 at the mirrored side). Fix: `CompileLimbChainPortable`
+left-multiplies the part matrix by the X reflection (`S · localToCreature`)
+and feeds ORIGINAL joint positions — equals `SymmetryNode(chain)` for any
+placement. Regression test
+`CompilePortable_MirroredLimbAtXOffset_AgreesWithManagedOnBothSides`.
+
+### Implementation status — Phases 6-7 (2026-08-23)
+
+Phase 6 — `SkeletonInferrer` limb support:
+- A limb part emits N-1 bones (one per consecutive joint pair), NOT one per
+  part: ids `part.Id + "_j" + i` (`LimbJointBoneSeparator` const), mirrored
+  chains get `_mirror` ids. Positions come from the same
+  `CreaturePartWorldTransformResolver`; mirrored joints use the creature-space
+  X reflection LEFT-multiplied (`S · world · joint`), matching the SDF
+  compiler's mirrored metaball chain exactly.
+- Rotations look along each segment with the part's (reflected) world up;
+  the vertical-segment case (the default chain is vertical) gets a
+  deterministic fallback up so `LookRotation` never degenerates.
+- `ResolveParentBoneId` is limb-aware: a child of a limb attaches to the
+  parent's TERMINAL bone (`parent.Id + "_j" + (N-2)`), mirrored variant when
+  both parent and child are mirrored. `LimbUnderLimb` also attaches to the
+  parent's terminal bone.
+- Tests: `SkeletonInferrerLimbTests` (11, Runtime via execute_code) — all pass;
+  existing `SkeletonInferrerTests` 4/4 pass (the 5th,
+  `Infer_MirroredChain_MirroredChildAttachesToMirroredParent`, is a documented
+  PRE-EXISTING failure: it asserts 6 bones but the model correctly emits 5 —
+  body + (leg,foot)×(original,mirrored); untouched by this change).
+
+Phase 7 — Editor (`CreatureEditorWindow.cs`, `LimbAuthoring.cs`,
+`ThicknessCurveAdapter.cs`):
+- `PartType.Hand = 9` added (a hand type was missing — only Foot existed);
+  JSON serializes by NAME so the value is stable; registered in
+  `ValidV2PartTypes`. Hand is an attachment part (like Foot), NOT a
+  standalone chain; its skeleton parent resolves to the arm's terminal bone.
+- `LimbAuthoring` (Editor, pure, EditMode-testable): `IsLimbChainType`
+  (Limb/Leg/Arm), `DefaultLimbChainForType`, `NextLimbJointId`,
+  `ResizeLimbChain` (root never removed, ids strictly increasing, clamp to
+  [Min,Max], appends extend downward), `ClampJointToBounds` (root → origin),
+  `WorldJointPosition`/`LocalJointPosition`.
+- Auto-seed: switching a part's type to Limb/Leg/Arm with `Limb == null`
+  seeds `LimbChain.CreateDefault()` (Shape becomes inert). `ClonePartAsChild`
+  already copies `Limb` via `CreaturePart.Clone`, so CC-029 duplication of
+  limbs works for free.
+- Inspector `DrawLimbFields`: "Add Default Limb Chain" button for
+  limb-chain-typed parts with `Limb == null` (the path for pre-CC-018 Arms
+  authored as shape parts — this is why the user saw no arm metaballs); joint
+  count slider + per-joint position list (bounded scroll, root locked to
+  origin) + thickness `CurveField` through `ThicknessCurveAdapter` (profile ↔
+  linear AnimationCurve). Every edit funnels through `MutateDefinition`.
+- Viewport `DrawLimbJointHandles` (CC-016 gesture: snapshot → transient
+  preview → ONE `MutateDefinition` on release → Esc cancels; root cap drawn
+  but NOT draggable, interior/terminal draggable, terminal = larger
+  child-attachment cap; no FABRIK). The SceneView drag itself is a manual
+  residual check (the MCP bridge cannot simulate SceneView interaction).
+- Tests: `CreatureEditorWindowLimbAuthoringTests` (15, EditMode, MCP runner)
+  — all pass; full EditMode suite 78/78.
+
+**End-to-end evidence (2026-08-23):** a mirrored Arm with a 3-joint chain at
+x = 0.5 through the portable/Burst path generates a watertight mesh
+(1458 verts, 2912 tris at VoxelsPerUnit=8) with geometry on BOTH sides
+(X extent [-0.84, 0.84]) — the exact scenario the user reported as "no arm
+metaballs". Runtime limb suites green: SdfProgramBuilderLimbTests 5/5,
+SdfProgramBuilderTests 11/11 (no regression), DefinitionValidatorLimbTests
+18/18, LimbMetaballSamplerTests 8/8, JsonDnaSerializerLimbTests 9/9,
+SkeletonInferrerLimbTests 11/11. `PartType.Hand` round-trips byte-stable.
+
+**NOTE (2026-08-23):** `Assets/Creatures/dino_creature.json` was re-saved by
+the open editor with the new canonical `"limbChain":null` field (additive, no
+version bump) — expected migration, semantically identical; commit when ready.
+
+### Phase 7 rework (2026-08-23, live-editor feedback)
+
+Two interaction fixes + follow-up backlog tasks, from the user exercising the
+editor. See handoff `docs/tasks/handoffs/CC-018-phase-7-rework-handoff.md`:
+
+1. **Joint drag fixed** — the Button+PositionHandle combo consumed the
+   mouse-down on selection and committed a no-op on release, so joints could
+   not be dragged. Non-root joints are now one-gesture `Handles.FreeMoveHandle`
+   (like the Body radius/endpoint handles); the drag index is set only inside
+   `BeginChangeCheck`, so commit-on-release fires only after a real move.
+2. **Child-at-tip frame (reworked after peer review)** — the first attempt made
+   new children *default* to the tip by overriding the child's local position at
+   creation (`LimbAuthoring.DefaultChildLocalPosition` wired into `AddNewPart` /
+   `PlaceNewPartAtWorldPosition` / `NewGenericPart`). The user reported a Hand
+   still wasn't at the end of the arm: the override only set the child's local
+   position while children were still authored in the limb's ROOT-relative
+   frame, so pre-existing saved children (the dino Hand at local (0,0,0)) stayed
+   at the shoulder with no migration. The corrected design makes the limb's
+   TERMINAL joint the ORIGIN of any child's local space:
+   `CreaturePartWorldTransformResolver` now inserts each ancestor limb's
+   terminal-joint translation when composing a child's world transform (the
+   limb's own frame stays root-at-origin), and the new
+   `ResolveChildFrameToCreatureSpace` exposes the child frame for the editor's
+   world→local conversions. A child authored at (0,0,0) sits at the tip with no
+   explicit placement; the obsolete `DefaultChildLocalPosition` /
+   `ApplyDefaultChildPlacement` overrides were removed. Existing DNA is fixed
+   implicitly: the dino Hand at (0,0,0) now resolves to the arm tip (verified:
+   hand bone == arm tip world position, parented to the arm terminal bone `_j1`).
+3. **CC-037 created** — limb color gradient base→tip (Backlog). See ticket.
+4. **CC-040 implemented (found in the working tree)** —
+   `LimbAuthoring.ApplyLimbStateForTypeChange` clears `Limb` when switching a
+   part away from a limb-chain type (wired into `DrawPartTypeField`), and the
+   validator now reports `InvalidLimbChain` for a non-limb type carrying a stale
+   chain (report-only). See the CC-040 ticket.
+
+The viewport drag remains a manual residual check (SceneView not simulatable
+via the MCP bridge).
+
 ## Blockers
 
 None for the design; implementation should not start until Phase 0 (schema
@@ -173,9 +286,13 @@ decision) is recorded as an ADR.
 
 ## Next Step
 
-Phase 0 is recorded as ADR-001; Phases 1-5 are implemented. Next: Phase 6
-(skeleton integration in `SkeletonInferrer` — N joints → N-1 bones, terminal
-bone as child-attachment target, mirrored chains) and Phase 7 (editor
-viewport joint handles + auto-seed default chain for Limb/Leg/Arm). See the
-handoff `docs/tasks/handoffs/CC-018-phases-0-5-handoff.md` for the full
-remaining design.
+Phases 0-7 are implemented and validated, including the child-at-tip frame
+(children of a limb are authored in the limb's terminal-joint local space).
+Phase 8 (remaining regression tests) is largely covered by the fixtures added
+in Phases 5-7; the remaining manual item is the viewport joint-drag feel
+(SceneView interaction is not simulatable via the MCP bridge — record as
+residual risk). CC-036 (anatomical parent validation) and CC-037/038/039
+remain backlog; CC-040 (clear limb on type-change away + defensive validator
+report) is implemented. Next: manual viewport check of limb joint handles and
+the hand-at-tip placement, then close CC-018 and update the README
+skeleton/editor sections.

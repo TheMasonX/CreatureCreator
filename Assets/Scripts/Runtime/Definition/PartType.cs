@@ -20,5 +20,11 @@ namespace ProceduralCreature.Definition
         Part = 7,
         /// <summary>An eye, typically authored on a head or the Body.</summary>
         Eye = 8,
+        /// <summary>
+        /// The terminal grip at the end of an arm (CC-018/CC-036). Authored like a
+        /// Foot — an attachment part whose skeleton parent resolves to the arm's
+        /// terminal limb bone. Serialized by NAME, so the numeric value is stable.
+        /// </summary>
+        Hand = 9,
     }
 }

@@ -233,6 +233,19 @@ namespace ProceduralCreature.Tests.Runtime
                 "A non-limb part must still have a valid Shape.");
         }
 
+        [Test]
+        public void Validate_NonLimbPartWithStaleLimbChain_ReportsInvalidLimbChain()
+        {
+            CreatureDefinition definition = DefinitionWith(StraightChain());
+            CreaturePart primitive = definition.FindPart("part_leg");
+            primitive.PartType = PartType.Part;
+            primitive.Limb = StraightChain();
+
+            ValidationResult result = DefinitionValidator.Validate(definition);
+            Assert.IsTrue(HasCode(result, ValidationCode.InvalidLimbChain),
+                "A non-limb part with stale limb data must be reported for repair or cleanup.");
+        }
+
         private static bool HasCode(ValidationResult result, ValidationCode code)
         {
             foreach (ValidationIssue issue in result.Issues)

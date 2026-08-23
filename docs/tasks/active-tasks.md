@@ -37,4 +37,9 @@
 | CC-033 | Register FastNoise2Bindings as a real git submodule | Done | P2 |
 | CC-034 | Body appearance vertical blend remap as an AnimationCurve | Done | P2 |
 | CC-035 | Parts list column layout (resizable splitter + height-constrained scroll) | Backlog | P2 |
+| CC-036 | Anatomical limb parent validation (Hand under Arm, Foot under Leg) | Backlog | P2 |
+| CC-037 | Limb color gradient along the chain (base to tip) | Backlog | P2 |
+| CC-038 | Limb and Body edit modes offer both a screenspace drag and a translation gizmo | Backlog | P2 |
+| CC-039 | Limb metaball smooth blend radius as an authored value | Backlog | P2 |
+| CC-040 | Clear the limb chain when switching a part away from a limb type | Done | P2 |
 | CC-036 | Fix obsolete Keyframe.tangentMode warnings and DrawPartList GetLastRect error | Done | P2 |

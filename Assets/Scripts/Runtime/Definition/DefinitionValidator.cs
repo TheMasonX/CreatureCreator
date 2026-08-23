@@ -425,7 +425,23 @@ namespace ProceduralCreature.Definition
         {
             foreach (CreaturePart part in definition.Parts)
             {
-                if (part == null || part.Limb == null) continue;
+                if (part == null) continue;
+
+                bool isLimbChainType = part.PartType == PartType.Limb ||
+                    part.PartType == PartType.Leg ||
+                    part.PartType == PartType.Arm;
+
+                if (part.Limb != null && !isLimbChainType)
+                {
+                    issues.Add(new ValidationIssue(
+                        ValidationSeverity.Error,
+                        ValidationCode.InvalidLimbChain,
+                        $"Part '{part.Id}' has a limb chain even though its PartType is {part.PartType}; clear the stale limb data before serialization or generation.",
+                        part.Id));
+                    continue;
+                }
+
+                if (part.Limb == null) continue;
 
                 LimbChain limb = part.Limb;
 

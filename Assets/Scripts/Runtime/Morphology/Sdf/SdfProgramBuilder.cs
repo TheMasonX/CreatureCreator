@@ -47,6 +47,15 @@ namespace ProceduralCreature.Morphology.Sdf
         /// </summary>
         private const float LimbSampleBlendFactor = 0.5f;
 
+        /// <summary>
+        /// The creature-space reflection across the X = 0 plane, matching the
+        /// convention SymmetryNode uses at the SDF layer. Used to mirror a limb
+        /// chain in the portable path by LEFT-multiplying the part's creature-space
+        /// matrix (the mirror of a composed transform), so the mirrored side lands
+        /// across the creature's X plane regardless of where the part is placed.
+        /// </summary>
+        private static readonly Matrix4x4 CreatureMirrorAcrossX = Matrix4x4.Scale(new Vector3(-1f, 1f, 1f));
+
         public static SdfProgram CompilePortable(CreatureDefinition definition)
         {
             if (definition == null) throw new DomainException("Cannot compile a null CreatureDefinition.");
@@ -362,12 +371,22 @@ namespace ProceduralCreature.Morphology.Sdf
         /// Appends the portable operations for a limb chain: one sphere primitive
         /// plus a baked local-space transform per derived metaball, smooth-united
         /// in chain order. When <paramref name="includeMirror"/> is true, a second
-        /// copy of the chain with x-negated ball positions is emitted and the two
-        /// sides are hard-unioned (blend 0). This reproduces
+        /// copy of the chain is emitted under the creature-space X mirror and the
+        /// two sides are hard-unioned (blend 0). This reproduces
         /// <c>SymmetryNode(chain) = min(chain(x), chain(-x))</c> exactly without a
-        /// portable Symmetry op, which cannot wrap a composite subtree. The part's
-        /// creature-space transform and distance scale are baked into each ball's
-        /// transform, so the returned root is ready for the outer creature union.
+        /// portable Symmetry op, which cannot wrap a composite subtree.
+        ///
+        /// The mirror is a CREATURE-SPACE reflection of the composed transform,
+        /// not a per-ball local-X negation: the mirrored ball position must be
+        /// <c>S · (localToCreature · localPos)</c>, i.e. the part matrix
+        /// LEFT-multiplied by <see cref="CreatureMirrorAcrossX"/> applied to the
+        /// ORIGINAL joint position. Negating the joint's local X and reusing the
+        /// unmirrored part matrix is wrong whenever the part is placed away from
+        /// the creature X plane (the normal limb case — a leg authored at
+        /// x = 0.5 would then render its "mirror" back on the same side). The
+        /// part's creature-space transform and distance scale are baked into each
+        /// ball's transform, so the returned root is ready for the outer creature
+        /// union.
         /// </summary>
         private static int CompileLimbChainPortable(List<SdfOperation> operations, LimbChain limb,
             Matrix4x4 localToCreature, float distanceScale, bool includeMirror)
@@ -376,6 +395,12 @@ namespace ProceduralCreature.Morphology.Sdf
             int originalRoot = -1;
             int mirroredRoot = -1;
 
+            // The creature-space mirror of the part's transform: S · localToCreature.
+            // Each mirrored ball keeps its ORIGINAL local position and is placed by
+            // this mirrored matrix, so its world position equals S · (original world
+            // position) — the same result SymmetryNode produces for the managed path.
+            Matrix4x4 mirroredPartMatrix = CreatureMirrorAcrossX * localToCreature;
+
             for (int i = 0; i < metaballs.Count; i++)
             {
                 int original = AppendLimbBall(operations, localToCreature, distanceScale, metaballs[i].Position, metaballs[i].Radius);
@@ -383,9 +408,7 @@ namespace ProceduralCreature.Morphology.Sdf
 
                 if (includeMirror)
                 {
-                    Vector3 mirroredPosition = new Vector3(
-                        -metaballs[i].Position.x, metaballs[i].Position.y, metaballs[i].Position.z);
-                    int mirrored = AppendLimbBall(operations, localToCreature, distanceScale, mirroredPosition, metaballs[i].Radius);
+                    int mirrored = AppendLimbBall(operations, mirroredPartMatrix, distanceScale, metaballs[i].Position, metaballs[i].Radius);
                     mirroredRoot = UnionLimbBall(operations, mirroredRoot, mirrored, metaballs, i);
                 }
             }

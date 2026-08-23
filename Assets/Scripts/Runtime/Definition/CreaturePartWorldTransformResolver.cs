@@ -13,6 +13,14 @@ namespace ProceduralCreature.Definition
     /// happens (matching the "don't cache/re-derive relationships in multiple
     /// places" rule from Sprint 1.1).
     ///
+    /// CHILD-AT-TIP FRAME (CC-018): a limb's TERMINAL joint is the origin of any
+    /// child's local space, so a child authored at local (0,0,0) under a limb sits
+    /// at the limb's tip, not its placement root.
+    /// ResolveLocalToCreatureSpace inserts each ancestor limb's terminal-joint
+    /// translation while composing a child's world transform;
+    /// ResolveChildFrameToCreatureSpace returns the frame a direct child is
+    /// authored in.
+    ///
     /// Assumes the definition has already passed DefinitionValidator (no cycles, no
     /// missing parents). Given valid input this never fails; given invalid input it
     /// throws DomainException rather than looping or silently truncating the chain,
@@ -59,14 +67,48 @@ namespace ProceduralCreature.Definition
             chain.Reverse(); // now root-most first, target part last
 
             Matrix4x4 world = Matrix4x4.identity;
-            foreach (CreaturePart p in chain)
+            for (int i = 0; i < chain.Count; i++)
             {
+                CreaturePart p = chain[i];
                 Quaternion normalizedRotation = p.Transform.Rotation.normalized;
                 Matrix4x4 local = Matrix4x4.TRS(p.Transform.Position, normalizedRotation, p.Transform.Scale);
                 world *= local;
+
+                // CC-018 (child-at-tip frame): a limb's TERMINAL joint is the
+                // origin of any child's local space — a child authored at local
+                // (0,0,0) sits at the limb's tip, not at its placement root.
+                // Applied only when this part is an ANCESTOR of the resolved part:
+                // the resolved part itself keeps its own frame (a limb's joints
+                // stay authored root-at-origin per the Joints[0] ≈ zero invariant).
+                if (i < chain.Count - 1
+                    && p.Limb != null
+                    && p.Limb.Joints != null
+                    && p.Limb.Joints.Count > 0)
+                {
+                    world *= Matrix4x4.Translate(p.Limb.Joints[p.Limb.Joints.Count - 1].Position);
+                }
             }
 
             return world;
+        }
+
+        /// <summary>
+        /// The creature-space matrix of the frame a CHILD of <paramref name="part"/>
+        /// is authored in. For a limb parent this is the part matrix extended to
+        /// its TERMINAL joint — children are authored relative to the tip, so local
+        /// (0,0,0) sits at the limb's end. For any other parent it equals
+        /// <see cref="ResolveLocalToCreatureSpace"/>. The editor's world→local
+        /// conversions use this so dragging/placing a child under a limb produces
+        /// tip-relative local coordinates, matching what generation reads back.
+        /// </summary>
+        public static Matrix4x4 ResolveChildFrameToCreatureSpace(CreatureDefinition definition, CreaturePart part)
+        {
+            Matrix4x4 m = ResolveLocalToCreatureSpace(definition, part);
+            if (part.Limb != null && part.Limb.Joints != null && part.Limb.Joints.Count > 0)
+            {
+                m *= Matrix4x4.Translate(part.Limb.Joints[part.Limb.Joints.Count - 1].Position);
+            }
+            return m;
         }
     }
 }

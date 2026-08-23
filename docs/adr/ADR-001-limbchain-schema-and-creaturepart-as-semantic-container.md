@@ -85,6 +85,19 @@ This is a documented invariant, enforced by the validator. It prevents
 `Transform.position` and `Joints[0].Position` from becoming two competing
 placement authorities.
 
+**Child-at-tip frame (CC-018):** a CHILD of a limb is authored in the limb's
+TERMINAL joint frame — its local origin is the limb's tip, not the limb's
+placement root. Generation (via
+`CreaturePartWorldTransformResolver.ResolveLocalToCreatureSpace`) inserts each
+ancestor limb's terminal-joint translation when composing a child's world
+transform, so a child authored at local (0,0,0) sits at the limb's end; the
+limb's own frame stays root-at-origin. The editor converts world→local through
+`ResolveChildFrameToCreatureSpace` so dragging/placing a child under a limb
+produces tip-relative coordinates. This makes "place a Hand/Foot at the end of
+an Arm/Leg" the identity transform — no per-child placement bookkeeping, and
+existing DNA written in the old root-relative frame is reinterpreted
+consistently at the tip.
+
 ### 4. Thickness is a 1D profile over normalized chain arc length
 
 Only thickness is authored per limb. There is no per-joint radius field.

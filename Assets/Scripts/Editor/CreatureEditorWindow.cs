@@ -105,6 +105,18 @@ namespace ProceduralCreature.Editor
 
         private Vector2 _partListScroll;
         private Vector2 _bodySampleScroll;
+        // CC-018 Phase 7: scroll state for the limb joint list in the inspector
+        // (presentation state, never DNA), plus the viewport joint-drag gesture.
+        // The gesture follows the CC-016 body-drag discipline: snapshot on
+        // mouse-down, transient preview during the drag (definition untouched),
+        // exactly ONE MutateDefinition on release (one drag = one Undo), Esc
+        // cancels with no mutation. Joints are free points — no FABRIK, no
+        // constraint solver; the commit clamps to the creature bounds and lets
+        // DefinitionValidator flag min-separation.
+        private Vector2 _limbJointScroll;
+        private int _limbDragJointIndex = -1;
+        private Vector3 _limbDragSnapshotLocal;
+        private Vector3 _limbDragFinalTargetLocal;
         // CC-020: parts-tree expansion + Body inspector foldout state. This is
         // editor presentation state, never creature DNA. ExpandedPartIds is
         // persisted via SessionState so it survives selection, regeneration,
@@ -167,6 +179,7 @@ namespace ProceduralCreature.Editor
             PartType.Leg,
             PartType.Arm,
             PartType.Foot,
+            PartType.Hand,
             PartType.Eye,
         };
 
@@ -871,6 +884,10 @@ namespace ProceduralCreature.Editor
                 ? _definition.ClonePartAsChild(_selectedPartId, parentId)
                 : NewGenericPart(parentId);
 
+            // CC-018 (child-at-tip frame): a new child's identity local transform
+            // already means "at the limb tip" when the parent is a limb — the
+            // resolver gives children of a limb a local space whose origin is the
+            // limb's terminal joint — so no explicit placement is needed.
             MutateDefinition("Add Part", definition => definition.AddPart(created));
             SelectPart(created.Id); // auto-reveals the new child under its (possibly collapsed) parent
         }
@@ -951,6 +968,8 @@ namespace ProceduralCreature.Editor
             EditorGUILayout.Space();
             DrawShapeFields(selected);
             EditorGUILayout.Space();
+            DrawLimbFields(selected);
+            EditorGUILayout.Space();
             DrawAppearanceFields(selected);
             EditorGUILayout.Space();
             DrawSymmetryFields(selected);
@@ -975,6 +994,11 @@ namespace ProceduralCreature.Editor
                 CreaturePart part = definition.FindPart(partId);
                 part.PartType = newType;
                 part.DisplayName = nextDisplayName;
+
+                // CC-018 Phase 7 + CC-040: when the type changes, reconcile the
+                // authored limb state with the new semantic category so stale limb
+                // data is removed immediately when leaving a limb-chain type.
+                LimbAuthoring.ApplyLimbStateForTypeChange(part, newType);
             });
         }
 
@@ -1298,6 +1322,137 @@ namespace ProceduralCreature.Editor
             MutateDefinition("Edit Shape", definition => definition.FindPart(partId).Shape = newShape);
         }
 
+        /// <summary>
+        /// The limb authoring surface (CC-018 Phase 7): joint count, per-joint
+        /// positions (bounded scroll like the Body spline), and the thickness
+        /// profile edited as a linear AnimationCurve. Every edit funnels through
+        /// <see cref="MutateDefinition"/>. A limb-chain-typed part with no chain
+        /// yet (e.g. an Arm authored before CC-018) gets an explicit "add default
+        /// chain" button — the viewport joint handles are the primary surface, and
+        /// Shape is inert once a chain exists (ADR-001).
+        /// </summary>
+        private void DrawLimbFields(CreaturePart selected)
+        {
+            EditorGUILayout.LabelField("Limb", EditorStyles.boldLabel);
+
+            if (selected.Limb == null)
+            {
+                if (LimbAuthoring.IsLimbChainType(selected.PartType))
+                {
+                    EditorGUILayout.HelpBox(
+                        "This limb has no joint chain yet — its geometry is still its Shape. " +
+                        "Add a default chain to author it as a metaball limb (the Shape then becomes inert).",
+                        MessageType.Info);
+                    if (GUILayout.Button("Add Default Limb Chain"))
+                    {
+                        string partId = selected.Id;
+                        PartType type = selected.PartType;
+                        MutateDefinition("Add Limb Chain",
+                            definition => definition.FindPart(partId).Limb = LimbAuthoring.DefaultLimbChainForType(type));
+                    }
+                }
+                else
+                {
+                    EditorGUILayout.HelpBox(
+                        "This part is not a limb-chain type; it renders from its Shape. " +
+                        "Change its Part Type to Limb/Leg/Arm to author a joint chain.",
+                        MessageType.Info);
+                }
+                return;
+            }
+
+            int minCount = GenerationTolerances.MinLimbJointCount;
+            int maxCount = GenerationTolerances.MaxLimbJointCount;
+            int newCount = EditorGUILayout.IntSlider("Joint Count", selected.Limb.Joints.Count, minCount, maxCount);
+            if (newCount != selected.Limb.Joints.Count)
+            {
+                string partId = selected.Id;
+                MutateDefinition("Resize Limb Joints",
+                    definition => LimbAuthoring.ResizeLimbChain(definition.FindPart(partId).Limb, newCount));
+                selected = _definition.FindPart(partId);
+            }
+
+            _limbJointScroll = EditorGUILayout.BeginScrollView(
+                _limbJointScroll, GUILayout.MaxHeight(BodySampleScrollMaxHeight));
+
+            for (int i = 0; i < selected.Limb.Joints.Count; i++)
+            {
+                LimbJoint joint = selected.Limb.Joints[i];
+                bool isRoot = i == 0;
+                bool isTerminal = i == selected.Limb.Joints.Count - 1;
+                string label = isRoot ? "Root" : (isTerminal ? "Tip" : $"#{i}");
+
+                EditorGUILayout.BeginHorizontal();
+                EditorGUILayout.LabelField(label, GUILayout.Width(44));
+
+                if (isRoot)
+                {
+                    // The root joint is locked to the local origin (the part's
+                    // placement frame); it moves via the part placement handle.
+                    EditorGUILayout.LabelField("origin (locked)", GUILayout.Width(210));
+                }
+                else
+                {
+                    Vector3 newPosition = EditorGUILayout.Vector3Field("", joint.Position);
+                    if (newPosition != joint.Position)
+                    {
+                        int jointIndex = i;
+                        string partId = selected.Id;
+                        Vector3 clamped = LimbAuthoring.ClampJointToBounds(newPosition, jointIndex, _definition.Bounds);
+                        MutateDefinition("Move Limb Joint",
+                            definition => definition.FindPart(partId).Limb.Joints[jointIndex].Position = clamped);
+                        selected = _definition.FindPart(partId);
+                    }
+                }
+
+                if (!isRoot && GUILayout.Button("Remove", GUILayout.Width(60)))
+                {
+                    int jointIndex = i;
+                    string partId = selected.Id;
+                    MutateDefinition("Remove Limb Joint", definition =>
+                    {
+                        LimbChain chain = definition.FindPart(partId).Limb;
+                        if (chain.Joints.Count > minCount)
+                        {
+                            chain.Joints.RemoveAt(jointIndex);
+                        }
+                    });
+                    selected = _definition.FindPart(partId);
+                    EditorGUILayout.EndHorizontal();
+                    break; // the joint list changed; stop iterating this frame
+                }
+
+                EditorGUILayout.EndHorizontal();
+            }
+            EditorGUILayout.EndScrollView();
+
+            if (GUILayout.Button("Add Joint"))
+            {
+                string partId = selected.Id;
+                MutateDefinition("Add Limb Joint", definition =>
+                {
+                    LimbChain chain = definition.FindPart(partId).Limb;
+                    if (chain.Joints.Count < maxCount)
+                    {
+                        LimbAuthoring.ResizeLimbChain(chain, chain.Joints.Count + 1);
+                    }
+                });
+                selected = _definition.FindPart(partId);
+            }
+
+            UnityEngine.AnimationCurve currentThickness = ThicknessCurveAdapter.ToCurve(selected.Limb.Thickness);
+            UnityEngine.AnimationCurve editedThickness =
+                EditorGUILayout.CurveField("Thickness", ThicknessCurveAdapter.Clone(currentThickness));
+            if (!ThicknessCurveAdapter.ContentEquals(currentThickness, editedThickness))
+            {
+                string partId = selected.Id;
+                MutateDefinition("Edit Limb Thickness", definition =>
+                {
+                    definition.FindPart(partId).Limb.Thickness = ThicknessCurveAdapter.ToProfile(editedThickness);
+                });
+            }
+        }
+
         private void DrawAppearanceFields(CreaturePart selected)
         {
             EditorGUILayout.LabelField("Appearance", EditorStyles.boldLabel);
@@ -1384,7 +1539,19 @@ namespace ProceduralCreature.Editor
 
             if (_bodyDragIndex >= 0) CancelBodyDrag(); // left Body selection mid-gesture
 
-            DrawSelectedPartHandle();
+            // CC-018 Phase 7: a selected limb part edits its joint chain in the
+            // viewport (root locked, interior + terminal draggable), suppressed in
+            // Place Part Mode so mesh clicks keep placing parts.
+            CreaturePart selected = _selectedPartId != null ? _definition.FindPart(_selectedPartId) : null;
+            if (selected != null && selected.Limb != null && !_placementModeActive)
+            {
+                DrawLimbJointHandles(selected);
+            }
+            else
+            {
+                DrawSelectedPartHandle();
+            }
+
             HandlePlacementClick();
         }
 
@@ -1416,6 +1583,168 @@ namespace ProceduralCreature.Editor
             {
                 ApplyViewportMove(selected, newWorldPosition);
             }
+        }
+
+        /// <summary>
+        /// Viewport joint editing for a selected limb part (CC-018 Phase 7). The
+        /// chain's joints draw in creature space through the part's resolved
+        /// matrix (the same transform the SDF and skeleton use). The ROOT joint
+        /// is drawn but not independently draggable — it moves only via the part
+        /// placement handle, because Joints[0] ≈ zero is the placement invariant.
+        /// Interior joints drag directly; the TERMINAL joint drags with a larger
+        /// cap as the child-attachment target (matching the Body endpoint
+        /// pattern).
+        ///
+        /// The gesture follows CC-016: snapshot on mouse-down, transient preview
+        /// during the drag (definition untouched), exactly ONE MutateDefinition on
+        /// release (one drag = one Undo), Esc cancels with no mutation. Joints are
+        /// FREE points — no FABRIK, no constraint solver; the commit clamps to the
+        /// creature bounds and DefinitionValidator flags min-separation.
+        /// </summary>
+        private void DrawLimbJointHandles(CreaturePart part)
+        {
+            LimbChain limb = part.Limb;
+            if (limb == null || limb.Joints == null || limb.Joints.Count == 0) return;
+
+            Matrix4x4 worldMatrix;
+            try
+            {
+                worldMatrix = CreaturePartWorldTransformResolver.ResolveLocalToCreatureSpace(_definition, part);
+            }
+            catch (DomainException)
+            {
+                // Invalid parent chain (already surfaced in the validation panel).
+                return;
+            }
+
+            // An in-flight drag first checks for release (commit) and Esc (cancel)
+            // so the very last drag target is captured. _limbDragJointIndex is set
+            // ONLY once a handle actually moves (in the BeginChangeCheck below), so
+            // a release here reliably means a real drag finished — a plain click
+            // never reaches this commit.
+            if (_limbDragJointIndex >= 0)
+            {
+                if (Event.current.type == EventType.KeyDown && Event.current.keyCode == KeyCode.Escape)
+                {
+                    CancelLimbJointDrag();
+                    return;
+                }
+                if ((Event.current.type == EventType.MouseUp && Event.current.button == 0)
+                    || GUIUtility.hotControl == 0)
+                {
+                    CommitLimbJointDrag(part);
+                }
+            }
+
+            Vector3[] worldPositions = new Vector3[limb.Joints.Count];
+            for (int i = 0; i < limb.Joints.Count; i++)
+            {
+                LimbJoint joint = limb.Joints[i];
+                if (joint != null)
+                {
+                    worldPositions[i] = LimbAuthoring.WorldJointPosition(worldMatrix, joint.Position);
+                }
+            }
+
+            // Chain preview line.
+            Handles.color = new Color(0.6f, 0.65f, 0.95f, 0.85f);
+            for (int i = 1; i < worldPositions.Length; i++)
+            {
+                Handles.DrawLine(worldPositions[i - 1], worldPositions[i]);
+            }
+            Handles.color = Color.white;
+
+            for (int i = 0; i < limb.Joints.Count; i++)
+            {
+                LimbJoint joint = limb.Joints[i];
+                if (joint == null) continue;
+
+                bool isRoot = i == 0;
+                bool isTerminal = i == limb.Joints.Count - 1;
+
+                Vector3 drawPosition = _limbDragJointIndex == i
+                    ? LimbAuthoring.WorldJointPosition(worldMatrix,
+                        LimbAuthoring.ClampJointToBounds(_limbDragFinalTargetLocal, i, _definition.Bounds))
+                    : worldPositions[i];
+
+                float handleSize = HandleUtility.GetHandleSize(drawPosition) * (isTerminal ? 0.16f : 0.12f);
+
+                if (isRoot)
+                {
+                    // Root cap: distinct color, not independently draggable.
+                    Handles.color = new Color(0.45f, 0.45f, 0.45f, 0.9f);
+                    Handles.SphereHandleCap(0, drawPosition, Quaternion.identity, handleSize, EventType.Repaint);
+                    Handles.color = Color.white;
+                    continue;
+                }
+
+                // Every non-root joint is a ONE-GESTURE FreeMoveHandle: click-drag
+                // to reposition directly. (The previous Button + PositionHandle
+                // combo was broken: the selection click consumed the mouse-down and
+                // the immediate release committed without moving, so points could
+                // not be dragged.) The definition is NOT mutated during the drag —
+                // the commit on release writes the clamped target exactly once
+                // (one drag = one Undo).
+                EditorGUI.BeginChangeCheck();
+                Vector3 newWorld = Handles.FreeMoveHandle(drawPosition, handleSize, Vector3.zero, Handles.SphereHandleCap);
+                if (EditorGUI.EndChangeCheck())
+                {
+                    // First change of a drag captures the snapshot; only then is
+                    // the gesture considered in-flight.
+                    if (_limbDragJointIndex != i)
+                    {
+                        _limbDragJointIndex = i;
+                        _limbDragSnapshotLocal = joint.Position;
+                    }
+                    _limbDragFinalTargetLocal = LimbAuthoring.LocalJointPosition(worldMatrix, newWorld);
+                }
+            }
+        }
+
+        /// <summary>
+        /// One whole limb-joint drag commits exactly one mutation (one Undo). The
+        /// definition was never mutated during the drag, so this is the single
+        /// canonical write of the edited joint, flowed through the normal
+        /// validation / Undo / session / auto-regen path. The root joint (index 0)
+        /// is never written here — it is not draggable in the viewport.
+        /// </summary>
+        private void CommitLimbJointDrag(CreaturePart part)
+        {
+            if (_limbDragJointIndex < 0) return; // no active gesture (idempotent)
+
+            int index = _limbDragJointIndex;
+            Vector3 targetLocal = _limbDragFinalTargetLocal;
+            string partId = part.Id;
+
+            // Clear gesture state BEFORE mutating so re-entrant GUI cannot
+            // double-commit.
+            _limbDragJointIndex = -1;
+            _limbDragSnapshotLocal = Vector3.zero;
+            _limbDragFinalTargetLocal = Vector3.zero;
+
+            Vector3 clamped = LimbAuthoring.ClampJointToBounds(targetLocal, index, _definition.Bounds);
+            MutateDefinition("Drag Limb Joint (Viewport)", definition =>
+            {
+                LimbChain chain = definition.FindPart(partId)?.Limb;
+                if (chain != null && index > 0 && index < chain.Joints.Count)
+                {
+                    chain.Joints[index].Position = clamped;
+                }
+            });
+
+            SceneView.RepaintAll();
+        }
+
+        /// <summary>
+        /// Esc during a limb-joint drag: the definition was never mutated, so
+        /// cancelling is just dropping the gesture state — no Undo entry.
+        /// </summary>
+        private void CancelLimbJointDrag()
+        {
+            _limbDragJointIndex = -1;
+            _limbDragSnapshotLocal = Vector3.zero;
+            _limbDragFinalTargetLocal = Vector3.zero;
+            SceneView.RepaintAll();
         }
 
         /// <summary>
@@ -1928,6 +2257,10 @@ namespace ProceduralCreature.Editor
             Vector3 localPosition = WorldToLocalPosition(worldPosition, parentId, out bool parentResolvedSuccessfully);
             if (!parentResolvedSuccessfully) parentId = CreatureDefinition.BodyId; // fall back to the Body root rather than dropping the click
 
+            // CC-018 (child-at-tip frame): a limb parent's terminal joint is the
+            // origin of a child's local space, and WorldToLocalPosition already
+            // converts the clicked point into that tip-relative frame — a drop at
+            // identity lands on the tip and any click offsets from the tip.
             Vector3 clampedPosition = ClampToBounds(localPosition, _definition.Bounds);
             string newId = PartIdGenerator.CreateNew();
             string finalParentId = parentId;
@@ -1977,7 +2310,11 @@ namespace ProceduralCreature.Editor
 
             try
             {
-                Matrix4x4 parentWorld = CreaturePartWorldTransformResolver.ResolveLocalToCreatureSpace(_definition, parentPart);
+                // CC-018 (child-at-tip frame): a child of a limb is authored in the
+                // limb's TERMINAL joint frame (the tip), so the conversion inverts
+                // the child frame, not the parent's placement frame.
+                Matrix4x4 parentWorld =
+                    CreaturePartWorldTransformResolver.ResolveChildFrameToCreatureSpace(_definition, parentPart);
                 return parentWorld.inverse.MultiplyPoint3x4(worldPosition);
             }
             catch (DomainException)

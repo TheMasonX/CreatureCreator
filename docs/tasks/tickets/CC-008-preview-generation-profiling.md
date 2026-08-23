@@ -65,6 +65,17 @@ Parity evidence in the editor (27 runtime tests, executed directly): the active-
 
 Current benchmark on the v2 BodySpline-with-limb definition (Body-rooted leg, 2.5 bounds): at `VoxelsPerUnit=16` (80^3, 531,441 samples) total 185.5 ms, FieldSampling 29.6 ms, MeshExtraction 106.8 ms (ActiveCellConstruction 50.0 ms, ContourResolution 41.0 ms, Welding 7.0 ms, Emission 4.0 ms), Validation 3.7 ms, AppearanceBake 45.4 ms; 7,728 mixed cells, 7,674 vertices, 15,336 triangles. At `VoxelsPerUnit=32` (160^3, 4,173,281 samples) total 1,341.2 ms, FieldSampling 253.3 ms, MeshExtraction 867.0 ms (ActiveCellConstruction 442.0 ms, ContourResolution 328.0 ms, Welding 44.0 ms, Emission 28.0 ms), Validation 21.4 ms, AppearanceBake 199.3 ms; 31,056 mixed cells, 29,586 vertices, 59,160 triangles. Active-cell construction and contour resolution dominate; welding is about 5% of extraction, confirming the audit correction that classification/traversal outrank dictionary welding. The dense scan is still the full-volume cost by design; Slice 3 (sparse candidate regions) is what removes empty volume from that scan.
 
+## Preparation Plan (2026-08-23)
+No implementation is planned in this review step. The current evidence supports a narrow optimization sequence:
+
+1. Lock a preview-quality budget for the standard 96^3 creature path and keep triangle-count variance within the measured healthy band.
+2. Treat `FieldSampling` as the first optimization target because it remains the largest single stage in the debug logs and the existing project notes call out the SDF evaluator as the next major hotspot.
+3. Review `AppearanceBake` as the second target because it is consistently the next-largest stage and is already documented as nearest-part + triplanar-noise driven.
+4. Keep mesh extraction on the quality guardrail: the current extraction path is already stable, deterministic, and topology-safe; optimization work should not broaden the geometry algorithm unless a benchmark shows a real bottleneck.
+5. Use the existing project review files in [Assets/Scripts/README.md](Assets/Scripts/README.md) and [docs/tasks/active-tasks.md](docs/tasks/active-tasks.md) as the source-of-truth constraints while the work is being prepared.
+
+This turns the timings into a disciplined optimization order: target the field sampler first, then appearance, and only then revisit broader generation changes if the quality budget still fails.
+
 ## Blockers
 The Unity Test Framework job previously stalled at zero progress. Direct Unity probes now cover the centered sphere, overlapping spheres, and `first_creature.json`, but deterministic parity and the post-optimization timed benchmark remain pending.
 

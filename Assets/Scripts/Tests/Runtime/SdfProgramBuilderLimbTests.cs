@@ -109,5 +109,67 @@ namespace ProceduralCreature.Tests.Runtime
                 }
             }
         }
+
+        /// <summary>
+        /// REGRESSION (2026-08-23): the portable mirrored-limb path originally
+        /// negated each ball's LOCAL x and reused the UNMIRRORED part matrix. For
+        /// a limb placed away from the creature X plane (the normal authored case,
+        /// e.g. a leg at x = 0.5), that put the "mirror" back on the SAME side —
+        /// the creature-space mirror silently no-oped. The fix left-multiplies the
+        /// part matrix by the X reflection, so the mirrored side must land across
+        /// the creature X plane and agree with the managed SymmetryNode path.
+        /// </summary>
+        [Test]
+        public void CompilePortable_MirroredLimbAtXOffset_AgreesWithManagedOnBothSides()
+        {
+            var chain = new LimbChain();
+            chain.Joints.Add(new LimbJoint { Id = 1, Position = Vector3.zero });
+            chain.Joints.Add(new LimbJoint { Id = 2, Position = new Vector3(0f, -1f, 0f) });
+
+            var definition = CreatureDefinition.CreateEmpty();
+            definition.SymmetryMode = SymmetryMode.MirrorAcrossXAxis;
+            definition.Forward = Vector3.forward;
+            definition.Body.Samples.Add(new BodySample { Id = 1, Position = new Vector3(0f, 0f, -1f), Radius = 0.75f });
+            definition.Body.Samples.Add(new BodySample { Id = 2, Position = new Vector3(0f, 0f, 1f), Radius = 0.9f });
+            definition.AddPart(new CreaturePart
+            {
+                Id = "part_arm",
+                ParentId = CreatureDefinition.BodyId,
+                PartType = PartType.Arm,
+                // The limb is placed away from the X = 0 plane, as a real arm/leg is.
+                Transform = new TransformData
+                {
+                    Position = new Vector3(0.5f, 0f, 0f),
+                    Rotation = Quaternion.identity,
+                    Scale = Vector3.one,
+                },
+                Shape = ShapeDefinition.DefaultSphere,
+                Appearance = AppearanceDefinition.Default,
+                MirrorAcrossSymmetryPlane = true,
+                Limb = chain,
+            });
+
+            ISdfNode managed = SdfProgramBuilder.Compile(definition);
+            using (SdfProgram portable = SdfProgramBuilder.CompilePortable(definition))
+            {
+                // The mirrored side must be inside BOTH paths (the original bug
+                // left the portable mirrored side outside).
+                Assert.Less(managed.Evaluate(new Vector3(-0.5f, -0.5f, 0f)), 0f, "Managed mirror must exist on the -X side.");
+                Assert.Less(
+                    SdfProgramEvaluator.Evaluate(portable, new float3(-0.5f, -0.5f, 0f)), 0f,
+                    "Portable mirror must exist on the -X side (regression: it used to no-op for an x-offset part).");
+
+                for (float x = -2.5f; x <= 2.5f; x += 0.25f)
+                for (float y = -1.8f; y <= 0.5f; y += 0.25f)
+                {
+                    Vector3 point = new Vector3(x, y, 0f);
+                    Assert.AreEqual(
+                        managed.Evaluate(point),
+                        SdfProgramEvaluator.Evaluate(portable, new float3(point.x, point.y, point.z)),
+                        1e-4f,
+                        $"Managed and portable mirrored fields must agree at {point}.");
+                }
+            }
+        }
     }
 }
