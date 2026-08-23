@@ -18,7 +18,7 @@
 | CC-014 | Port SDF evaluation to a Burst-compatible execution program | In Progress | P1 |
 | CC-015 | Spore-like body sample authoring and place-part snapping | In Progress | P1 |
 | CC-016 | Body spline manipulation solver (local curve editing) | In Progress | P1 |
-| CC-017 | In-viewport Body sample scale (radius) editing | Backlog | P1 |
+| CC-017 | In-viewport Body sample scale (radius) editing | In Progress | P1 |
 | CC-018 | Limb parts as joint chains with between-joint metaballs | Backlog | P1 |
 | CC-019 | Bidirectional Body length editing (head-end add/remove on drag) | Backlog | P1 |
 | CC-020 | Collapsible, less-centered parts tree | Backlog | P2 |

@@ -32,6 +32,28 @@ namespace ProceduralCreature.Tests.Editor
             return points;
         }
 
+        [Test]
+        public void RadiusHandle_ClampAtMinimumSize()
+        {
+            Vector3 samplePosition = new Vector3(0f, 0f, 0f);
+            Vector3 handlePosition = samplePosition + new Vector3(0.02f, 0f, 0f);
+
+            float radius = BodySampleRadiusHandle.ComputeRadius(samplePosition, handlePosition, 0.05f);
+
+            Assert.That(radius, Is.EqualTo(0.05f));
+        }
+
+        [Test]
+        public void RadiusHandle_UsesActualHandleDistanceWhenAboveMinimum()
+        {
+            Vector3 samplePosition = new Vector3(0f, 0f, 0f);
+            Vector3 handlePosition = samplePosition + new Vector3(0.7f, 0f, 0f);
+
+            float radius = BodySampleRadiusHandle.ComputeRadius(samplePosition, handlePosition, 0.05f);
+
+            Assert.That(radius, Is.EqualTo(0.7f).Within(1e-4f));
+        }
+
         /// <summary>
         /// The review's "straighten a kink" shape:
         ///

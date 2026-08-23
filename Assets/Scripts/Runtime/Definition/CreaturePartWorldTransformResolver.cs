@@ -61,7 +61,8 @@ namespace ProceduralCreature.Definition
             Matrix4x4 world = Matrix4x4.identity;
             foreach (CreaturePart p in chain)
             {
-                Matrix4x4 local = Matrix4x4.TRS(p.Transform.Position, p.Transform.Rotation, p.Transform.Scale);
+                Quaternion normalizedRotation = p.Transform.Rotation.normalized;
+                Matrix4x4 local = Matrix4x4.TRS(p.Transform.Position, normalizedRotation, p.Transform.Scale);
                 world *= local;
             }
 

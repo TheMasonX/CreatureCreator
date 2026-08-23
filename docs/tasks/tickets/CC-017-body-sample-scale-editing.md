@@ -2,7 +2,7 @@
 id: creature-task-017
 key: CC-017
 title: In-viewport Body sample scale (radius) editing
-status: Backlog
+status: In Progress
 type: Task
 priority: P1
 tags: [editor, viewport, body-spline, radius, ux]
@@ -48,9 +48,26 @@ radius never makes a handle vanish or become unselectable.
 
 ## Findings
 
-(empty)
+The first implementation pass adds a dedicated radial radius handle to each
+Body sample and clamps the effective radius at a minimal size so tiny samples do
+not vanish. The gesture reuses the same single-commit pattern as the body drag:
+mouse-down captures the radius state, live preview updates during the drag, and a
+single Undo step commits on release or cancels on Esc.
+
+The latest fix also addresses the repeated invalid-quaternion log spam: the
+rotation chain was composing a non-normalized quaternion from quantized data,
+which Unity rejects when building a TRS matrix. The fix normalizes the composed
+rotation in the world-transform resolver and re-normalizes quantized rotation
+before serialization/canonicalization. The radius gizmo now uses the local spine
+axis to compute a perpendicular offset instead of a world-right fallback, so it
+stays visually offset from the body path rather than overlapping the X-axis.
+
+The regression test covers the clamp math and the re-normalization case. Static
+editor diagnostics are clean for the touched files.
 
 ## Next Step
 
-Design the affordance (radial handle vs modifier+drag vs a separate radius
-gizmo), then implement it by reusing `BodyEditSolver`'s gesture pattern.
+Validate the SceneView radius gesture and the warning-free generation path in an
+actual Unity editor run. The environment here does not currently expose a Unity
+editor binary in the standard install paths, so that runtime proof remains the
+next blocking step.

@@ -42,8 +42,10 @@ Assign a material to the generated preview renderer and use it for every regener
 ## Findings
 The shared runtime generator and editor preview path already exist. The material assignment must be explicit at the preview renderer boundary, while quality and regeneration timing belong to editor or generation settings, not creature DNA.
 
+A regression was identified in the editor loop: undo and redo restored the creature definition but did not re-arm the pending auto-regeneration timer, so the editor could sit idle even while Auto remained enabled. The fix is localized to the native undo callback and is covered by a focused EditMode regression test for the undo path.
+
 ## Blockers
 The Unity manual check and Play Mode smoke test remain pending because the Unity MCP bridge disconnected. The preview currently uses a generated built-in shader material when no material is assigned.
 
 ## Next Step
-Reconnect Unity and manually verify material assignment, Auto throttling, preview quality, and Play Mode rendering.
+Reconnect Unity and manually verify material assignment, Auto throttling, preview quality, and Play Mode rendering. After Unity validation, this ticket should be marked complete once the actual editor check confirms the timer refires on undo/redo.

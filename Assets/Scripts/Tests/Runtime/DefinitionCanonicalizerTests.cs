@@ -67,6 +67,26 @@ namespace ProceduralCreature.Tests.Runtime
         }
 
         [Test]
+        public void Canonicalize_ReNormalizesQuantizedRotation()
+        {
+            var transform = new TransformData
+            {
+                Position = Vector3.zero,
+                Rotation = new Quaternion(0f, 0.1305f, 0f, 0.9914f),
+                Scale = Vector3.one,
+            };
+            var definition = MakeSinglePartDefinition(transform);
+
+            CreatureDefinition result = DefinitionCanonicalizer.Canonicalize(definition);
+            Quaternion rotation = result.Parts[0].Transform.Rotation;
+            float magnitude = Mathf.Sqrt(rotation.x * rotation.x + rotation.y * rotation.y
+                                          + rotation.z * rotation.z + rotation.w * rotation.w);
+
+            Assert.That(magnitude, Is.EqualTo(1f).Within(1e-4f),
+                "Quantized rotations must be renormalized to avoid invalid Unity TRS warnings.");
+        }
+
+        [Test]
         public void Canonicalize_ThrowsOnNaNPosition()
         {
             var transform = new TransformData

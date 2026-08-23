@@ -99,6 +99,9 @@ namespace ProceduralCreature.Editor
         private Vector3[] _bodyDragSnapshot;
         private Vector3 _bodyDragFinalTarget;
         private Vector3[] _bodyDragPreview;
+        private int _bodyRadiusDragIndex = -1;
+        private float _bodyRadiusDragStartRadius = 1f;
+        private float _bodyRadiusDragTargetRadius = 1f;
 
         private Vector2 _partListScroll;
         private Vector2 _validationScroll;
@@ -248,6 +251,10 @@ namespace ProceduralCreature.Editor
 
             Revalidate();
             CreatureEditorSession.Save(_definition);
+            if (_autoRegenerate)
+            {
+                ScheduleAutoRegeneration();
+            }
             Repaint();
         }
 
@@ -279,6 +286,10 @@ namespace ProceduralCreature.Editor
         {
             CreatureDefinition working = _definition.Clone();
             mutation(working);
+            if (working.Body != null && working.Body.Samples != null)
+            {
+                BodySplineAuthoring.RenumberSamplesInOrder(working.Body);
+            }
             ApplyDefinitionChange(undoDescription, working);
         }
 
@@ -731,7 +742,11 @@ namespace ProceduralCreature.Editor
             {
                 uint idToRemove = sampleToRemove.Id;
                 MutateDefinition("Remove Body Sample",
-                    definition => definition.Body.Samples.RemoveAll(s => s.Id == idToRemove));
+                    definition =>
+                    {
+                        definition.Body.Samples.RemoveAll(s => s.Id == idToRemove);
+                        BodySplineAuthoring.RenumberSamplesInOrder(definition.Body);
+                    });
             }
 
             EditorGUILayout.BeginHorizontal();
@@ -1053,27 +1068,52 @@ namespace ProceduralCreature.Editor
                 }
             }
 
+            if (_bodyRadiusDragIndex >= 0)
+            {
+                if (Event.current.type == EventType.KeyDown && Event.current.keyCode == KeyCode.Escape)
+                {
+                    CancelBodyRadiusDrag();
+                    return;
+                }
+                if ((Event.current.type == EventType.MouseUp && Event.current.button == 0)
+                    || GUIUtility.hotControl == 0)
+                {
+                    CommitBodyRadiusDrag();
+                }
+            }
+
+            Vector3[] displayPositions = GetBodyDisplayPositions(spline);
+            DrawBodySplineConnections(spline, displayPositions);
+
             for (int i = 0; i < spline.Samples.Count; i++)
             {
-                if (i == _activeBodySampleIndex) continue; // the position handle draws there instead
                 BodySample sample = spline.Samples[i];
                 if (sample == null) continue;
 
-                // During an active drag the neighbors are drawn at the solved
-                // preview positions so the whole neighborhood follows the edit.
-                Vector3 drawPosition = sample.Position;
-                if (_bodyDragPreview != null && i < _bodyDragPreview.Length)
-                {
-                    drawPosition = _bodyDragPreview[i];
-                }
-
+                Vector3 drawPosition = displayPositions[i];
                 bool isEndpoint = i == 0 || i == spline.Samples.Count - 1;
                 float handleSize = HandleUtility.GetHandleSize(drawPosition) * (isEndpoint ? 0.16f : 0.12f);
-                if (Handles.Button(drawPosition, Quaternion.identity, handleSize, handleSize, Handles.SphereHandleCap))
+                float radiusScale = Mathf.Clamp(sample.Radius * 0.18f, 0.08f, 0.28f);
+                handleSize = Mathf.Max(handleSize, HandleUtility.GetHandleSize(drawPosition) * radiusScale);
+                if (i != _activeBodySampleIndex && Handles.Button(drawPosition, Quaternion.identity, handleSize, handleSize, Handles.SphereHandleCap))
                 {
                     if (_bodyDragIndex >= 0 && _bodyDragIndex != i) CancelBodyDrag();
                     _activeBodySampleIndex = i;
                     Repaint();
+                }
+            }
+
+            if (_activeBodySampleIndex >= 0 && _activeBodySampleIndex < spline.Samples.Count)
+            {
+                BodySample activeSelected = spline.Samples[_activeBodySampleIndex];
+                if (activeSelected != null)
+                {
+                    Vector3 activeDrawPosition = displayPositions[_activeBodySampleIndex];
+                    float activeSize = HandleUtility.GetHandleSize(activeDrawPosition) * 0.12f;
+                    float activeRadiusScale = Mathf.Clamp(activeSelected.Radius * 0.18f, 0.08f, 0.28f);
+                    activeSize = Mathf.Max(activeSize, HandleUtility.GetHandleSize(activeDrawPosition) * activeRadiusScale);
+                    Handles.color = Color.white;
+                    Handles.SphereHandleCap(0, activeDrawPosition, Quaternion.identity, activeSize, EventType.Repaint);
                 }
             }
 
@@ -1083,24 +1123,13 @@ namespace ProceduralCreature.Editor
 
             bool activeIsEndpoint = _activeBodySampleIndex == 0 || _activeBodySampleIndex == spline.Samples.Count - 1;
 
-            // The active handle rides the solved preview position during a drag so
-            // the grabbed sample visibly follows the cursor.
-            Vector3 handlePosition = active.Position;
-            if (_bodyDragIndex == _activeBodySampleIndex && _bodyDragPreview != null)
-            {
-                handlePosition = _bodyDragPreview[_activeBodySampleIndex];
-            }
-
+            Vector3 handlePosition = displayPositions[_activeBodySampleIndex];
             EditorGUI.BeginChangeCheck();
             Vector3 newPosition = Handles.PositionHandle(handlePosition, Quaternion.identity);
             if (EditorGUI.EndChangeCheck())
             {
-                // Do not start a gesture on the release frame (the handle reports
-                // a final change on MouseUp; a real drag starts on MouseDrag).
                 if (_bodyDragIndex != _activeBodySampleIndex && Event.current.type != EventType.MouseUp)
                 {
-                    // Drag just started: freeze the mouse-down spline. Endpoints
-                    // are length edits; interior samples are bends.
                     _bodyDragIndex = _activeBodySampleIndex;
                     _bodyDragKind = activeIsEndpoint ? BodyEditKind.EndpointLength : BodyEditKind.InteriorBend;
                     _bodyDragSnapshot = CopyBodyPositions(spline);
@@ -1111,10 +1140,169 @@ namespace ProceduralCreature.Editor
                 SceneView.RepaintAll();
             }
 
-            // Draw the transient solved-spline preview (repaint only).
+            float radiusHandleSize = HandleUtility.GetHandleSize(handlePosition) * 0.12f;
+            float radiusValue = Mathf.Max(active.Radius, 0.05f);
+            if (_bodyRadiusDragIndex == _activeBodySampleIndex)
+            {
+                radiusValue = Mathf.Max(_bodyRadiusDragTargetRadius, 0.05f);
+            }
+
+            Vector3 viewDirection = SceneView.lastActiveSceneView != null
+                ? SceneView.lastActiveSceneView.camera.transform.forward
+                : Vector3.forward;
+
+            Vector3 tangent = Vector3.zero;
+            if (_activeBodySampleIndex > 0 && _activeBodySampleIndex < spline.Samples.Count - 1)
+            {
+                tangent = displayPositions[_activeBodySampleIndex + 1] - displayPositions[_activeBodySampleIndex - 1];
+            }
+            else if (_activeBodySampleIndex == 0 && spline.Samples.Count > 1)
+            {
+                tangent = displayPositions[1] - displayPositions[0];
+            }
+            else if (spline.Samples.Count > 1)
+            {
+                tangent = displayPositions[spline.Samples.Count - 1] - displayPositions[spline.Samples.Count - 2];
+            }
+
+            if (tangent.sqrMagnitude < 1e-6f)
+            {
+                tangent = Vector3.right;
+            }
+            tangent = tangent.normalized;
+
+            Vector3 radiusAxis = Vector3.Cross(tangent, viewDirection);
+            if (radiusAxis.sqrMagnitude < 0.0001f)
+            {
+                radiusAxis = Vector3.Cross(tangent, Vector3.up);
+            }
+            if (radiusAxis.sqrMagnitude < 0.0001f)
+            {
+                radiusAxis = Vector3.Cross(tangent, Vector3.forward);
+            }
+            radiusAxis.Normalize();
+
+            Vector3 radiusHandlePosition = BodySampleRadiusHandle.GetHandlePosition(handlePosition, radiusValue, radiusAxis);
+            Handles.color = new Color(1f, 1f, 1f, 0.9f);
+            Handles.DrawLine(handlePosition, radiusHandlePosition);
+            Handles.color = new Color(0.9f, 0.6f, 0.2f, 1f);
+            Handles.SphereHandleCap(0, radiusHandlePosition, Quaternion.identity, radiusHandleSize, EventType.Repaint);
+            Handles.color = Color.white;
+
+            EditorGUI.BeginChangeCheck();
+            var fmh_1143_92_639230328724397202 = Quaternion.identity; Vector3 newRadiusHandlePosition = Handles.FreeMoveHandle(radiusHandlePosition, radiusHandleSize, Vector3.zero, Handles.SphereHandleCap);
+            if (EditorGUI.EndChangeCheck())
+            {
+                if (_bodyRadiusDragIndex != _activeBodySampleIndex && Event.current.type != EventType.MouseUp)
+                {
+                    _bodyRadiusDragIndex = _activeBodySampleIndex;
+                    _bodyRadiusDragStartRadius = active.Radius;
+                    _bodyRadiusDragTargetRadius = active.Radius;
+                }
+                _bodyRadiusDragTargetRadius = BodySampleRadiusHandle.ComputeRadius(handlePosition, newRadiusHandlePosition, 0.05f);
+            }
+
+            DrawBodyEndpointExpansionHandles(spline, displayPositions);
+
             if (Event.current.type == EventType.Repaint && _bodyDragPreview != null)
             {
                 DrawBodyEditPreview(_bodyDragPreview);
+            }
+        }
+
+        private Vector3[] GetBodyDisplayPositions(BodySpline spline)
+        {
+            var positions = new Vector3[spline.Samples.Count];
+            for (int i = 0; i < spline.Samples.Count; i++)
+            {
+                positions[i] = spline.Samples[i] == null ? Vector3.zero : spline.Samples[i].Position;
+                if (_bodyDragPreview != null && i < _bodyDragPreview.Length)
+                {
+                    positions[i] = _bodyDragPreview[i];
+                }
+            }
+            return positions;
+        }
+
+        private void DrawBodySplineConnections(BodySpline spline, Vector3[] displayPositions)
+        {
+            if (displayPositions == null || displayPositions.Length < 2) return;
+
+            Handles.color = new Color(1f, 1f, 1f, 0.65f);
+            for (int i = 1; i < displayPositions.Length; i++)
+            {
+                Handles.DrawLine(displayPositions[i - 1], displayPositions[i]);
+            }
+            Handles.color = Color.white;
+        }
+
+        private void DrawBodyEndpointExpansionHandles(BodySpline spline, Vector3[] displayPositions)
+        {
+            if (spline == null || spline.Samples == null || spline.Samples.Count < 2) return;
+
+            for (int endIndex = 0; endIndex < 2; endIndex++)
+            {
+                bool isHead = endIndex == 0;
+                int sampleIndex = isHead ? 0 : spline.Samples.Count - 1;
+                if (sampleIndex < 0 || sampleIndex >= displayPositions.Length) continue;
+
+                Vector3 samplePosition = displayPositions[sampleIndex];
+                Vector3 tangent = isHead
+                    ? (displayPositions[1] - displayPositions[0])
+                    : (displayPositions[displayPositions.Length - 1] - displayPositions[displayPositions.Length - 2]);
+                if (tangent.sqrMagnitude < 1e-5f)
+                {
+                    tangent = Vector3.right;
+                }
+                tangent = tangent.normalized;
+
+                Vector3 awayAxis = isHead ? -tangent : tangent;
+                float length = Mathf.Max(HandleUtility.GetHandleSize(samplePosition) * 0.45f, 0.6f);
+                Vector3 handlePosition = samplePosition + awayAxis * length;
+                Handles.color = new Color(0.9f, 0.5f, 0.2f, 1f);
+                Handles.ArrowHandleCap(0, handlePosition, Quaternion.LookRotation(awayAxis), HandleUtility.GetHandleSize(handlePosition) * 0.35f, EventType.Repaint);
+                Handles.color = Color.white;
+
+                EditorGUI.BeginChangeCheck();
+                var fmh_1216_84_639230328724413263 = Quaternion.identity; Vector3 newHandlePosition = Handles.FreeMoveHandle(handlePosition, HandleUtility.GetHandleSize(handlePosition) * 0.12f, Vector3.zero, Handles.CubeHandleCap);
+                if (EditorGUI.EndChangeCheck())
+                {
+                    float deadZone = HandleUtility.GetHandleSize(samplePosition) * 0.22f;
+                    float dragDelta = Vector3.Dot(newHandlePosition - handlePosition, awayAxis);
+
+                    if (dragDelta > deadZone)
+                    {
+                        MutateDefinition(isHead ? "Add Head Body Sample (Viewport)" : "Add Tail Body Sample (Viewport)", definition =>
+                        {
+                            BodySpline target = definition.Body;
+                            if (isHead) BodySplineAuthoring.PrependSample(target, definition.Forward);
+                            else BodySplineAuthoring.AppendSample(target, definition.Forward);
+
+                            _activeBodySampleIndex = isHead ? 0 : target.Samples.Count - 1;
+                            _bodyDragIndex = -1;
+                            _bodyDragPreview = null;
+                            _bodyRadiusDragIndex = -1;
+                        });
+                        return;
+                    }
+
+                    if (dragDelta < -deadZone)
+                    {
+                        bool canRemove = BodySplineAuthoring.TryRemoveEndpointSample(spline, isHead, BodySplineAuthoring.DefaultMinSampleCount);
+                        if (canRemove)
+                        {
+                            MutateDefinition(isHead ? "Remove Head Body Sample (Viewport)" : "Remove Tail Body Sample (Viewport)", definition =>
+                            {
+                                BodySplineAuthoring.TryRemoveEndpointSample(definition.Body, isHead, BodySplineAuthoring.DefaultMinSampleCount);
+                                _activeBodySampleIndex = isHead ? 0 : definition.Body.Samples.Count - 1;
+                                _bodyDragIndex = -1;
+                                _bodyDragPreview = null;
+                                _bodyRadiusDragIndex = -1;
+                            });
+                            return;
+                        }
+                    }
+                }
             }
         }
 
@@ -1232,6 +1420,39 @@ namespace ProceduralCreature.Editor
             _bodyDragKind = BodyEditKind.InteriorBend;
             _bodyDragSnapshot = null;
             _bodyDragPreview = null;
+            SceneView.RepaintAll();
+        }
+
+        private void CommitBodyRadiusDrag()
+        {
+            if (_bodyRadiusDragIndex < 0) return;
+
+            int index = _bodyRadiusDragIndex;
+            float startRadius = _bodyRadiusDragStartRadius;
+            float targetRadius = Mathf.Max(_bodyRadiusDragTargetRadius, 0.05f);
+
+            _bodyRadiusDragIndex = -1;
+            _bodyRadiusDragStartRadius = 1f;
+            _bodyRadiusDragTargetRadius = 1f;
+
+            if (Mathf.Approximately(startRadius, targetRadius)) return;
+
+            BodySpline spline = _definition.Body;
+            if (spline == null || index < 0 || index >= spline.Samples.Count) return;
+
+            uint sampleId = spline.Samples[index].Id;
+            MutateDefinition("Resize Body Sample (Viewport)", definition =>
+            {
+                BodySample sample = FindBodySample(definition, sampleId);
+                sample.Radius = Mathf.Max(targetRadius, 0.05f);
+            });
+        }
+
+        private void CancelBodyRadiusDrag()
+        {
+            _bodyRadiusDragIndex = -1;
+            _bodyRadiusDragStartRadius = 1f;
+            _bodyRadiusDragTargetRadius = 1f;
             SceneView.RepaintAll();
         }
 

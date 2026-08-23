@@ -38,6 +38,8 @@ namespace ProceduralCreature.Editor
     /// </summary>
     public static class BodySplineAuthoring
     {
+        public const int DefaultMinSampleCount = 5;
+
         private const float MinSpacingSqr = 1e-10f;
         private const int DragMaxFabrikIterations = 32;
         private const float DragFabrikTolerance = 1e-4f;
@@ -99,7 +101,86 @@ namespace ProceduralCreature.Editor
 
             var sample = new BodySample { Id = nextId, Position = position, Radius = radius };
             spline.Samples.Add(sample);
+            RenumberSamplesInOrder(spline);
             return sample;
+        }
+
+        public static BodySample PrependSample(BodySpline spline, Vector3 fallbackDirection)
+        {
+            if (spline == null) throw new DomainException("spline must not be null.");
+
+            uint nextId = spline.Samples == null || spline.Samples.Count == 0
+                ? 1u
+                : spline.Samples.Max(s => s.Id) + 1u;
+
+            Vector3 position;
+            float radius = 0.75f;
+            if (spline.Samples == null || spline.Samples.Count == 0)
+            {
+                position = Vector3.zero;
+            }
+            else if (spline.Samples.Count == 1)
+            {
+                Vector3 direction = NormalizedOrFallback(fallbackDirection, Vector3.forward);
+                BodySample only = spline.Samples[0];
+                position = only.Position - direction;
+                radius = only.Radius;
+            }
+            else
+            {
+                BodySample head = spline.Samples[0];
+                BodySample next = spline.Samples[1];
+                Vector3 headDelta = next.Position - head.Position;
+                float spacing = headDelta.magnitude;
+
+                Vector3 direction;
+                if (spacing <= MinSpacingSqr)
+                {
+                    direction = NormalizedOrFallback(fallbackDirection, Vector3.forward);
+                    spacing = 1f;
+                }
+                else
+                {
+                    direction = headDelta / spacing;
+                }
+
+                position = head.Position - direction * spacing;
+                radius = head.Radius;
+            }
+
+            var sample = new BodySample { Id = nextId, Position = position, Radius = radius };
+            spline.Samples.Insert(0, sample);
+            RenumberSamplesInOrder(spline);
+            return sample;
+        }
+
+        public static bool TryRemoveEndpointSample(BodySpline spline, bool removeHead, int minSampleCount = DefaultMinSampleCount)
+        {
+            if (spline == null || spline.Samples == null) return false;
+            if (spline.Samples.Count <= minSampleCount) return false;
+
+            if (removeHead) spline.Samples.RemoveAt(0);
+            else spline.Samples.RemoveAt(spline.Samples.Count - 1);
+            RenumberSamplesInOrder(spline);
+            return true;
+        }
+
+        public static void RemoveEndpointSample(BodySpline spline, bool removeHead)
+        {
+            TryRemoveEndpointSample(spline, removeHead, DefaultMinSampleCount);
+        }
+
+        public static void RenumberSamplesInOrder(BodySpline spline)
+        {
+            if (spline == null || spline.Samples == null) return;
+
+            for (int i = 0; i < spline.Samples.Count; i++)
+            {
+                if (spline.Samples[i] != null)
+                {
+                    spline.Samples[i].Id = (uint)i + 1u;
+                }
+            }
         }
 
         /// <summary>

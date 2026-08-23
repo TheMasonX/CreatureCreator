@@ -1,5 +1,6 @@
 using NUnit.Framework;
 using UnityEngine;
+using System.Linq;
 using ProceduralCreature.Common;
 using ProceduralCreature.Definition;
 using ProceduralCreature.Editor;
@@ -92,6 +93,39 @@ namespace ProceduralCreature.Tests.Editor
             Assert.AreEqual(Vector3.zero, added.Position);
         }
 
+        [Test]
+        public void PrependSample_ReordersIdsSequentially()
+        {
+            var spline = new BodySpline();
+            spline.Samples.Add(new BodySample { Id = 1, Position = new Vector3(0f, 0f, -1f), Radius = 1f });
+            spline.Samples.Add(new BodySample { Id = 2, Position = new Vector3(0f, 0f, 0f), Radius = 1f });
+            spline.Samples.Add(new BodySample { Id = 3, Position = new Vector3(0f, 0f, 1f), Radius = 1f });
+
+            BodySample added = BodySplineAuthoring.PrependSample(spline, Vector3.forward);
+
+            Assert.AreEqual(4, spline.Samples.Count);
+            Assert.AreEqual(1u, spline.Samples[0].Id);
+            Assert.AreEqual(2u, spline.Samples[1].Id);
+            Assert.AreEqual(3u, spline.Samples[2].Id);
+            Assert.AreEqual(4u, spline.Samples[3].Id);
+            Assert.AreEqual(added, spline.Samples[0]);
+        }
+
+        [Test]
+        public void RemoveSample_ThenRenumberSamplesInOrder_RestoresSequentialIds()
+        {
+            var spline = new BodySpline();
+            spline.Samples.Add(new BodySample { Id = 1, Position = new Vector3(0f, 0f, -1f), Radius = 1f });
+            spline.Samples.Add(new BodySample { Id = 2, Position = new Vector3(0f, 0f, 0f), Radius = 1f });
+            spline.Samples.Add(new BodySample { Id = 3, Position = new Vector3(0f, 0f, 1f), Radius = 1f });
+
+            spline.Samples.RemoveAll(s => s.Id == 2);
+            BodySplineAuthoring.RenumberSamplesInOrder(spline);
+
+            Assert.AreEqual(2, spline.Samples.Count);
+            Assert.AreEqual(new uint[] { 1u, 2u }, spline.Samples.Select(s => s.Id).ToArray());
+        }
+
         // ---- SpaceEvenly ----------------------------------------------------------
 
         [Test]
@@ -111,6 +145,21 @@ namespace ProceduralCreature.Tests.Editor
             Assert.AreEqual(1f, spline.Samples[0].Radius); // radii preserved
             Assert.AreEqual(0.6f, spline.Samples[3].Radius);
             Assert.AreEqual(4u, spline.Samples[3].Id); // order preserved
+        }
+
+        [Test]
+        public void TryRemoveEndpointSample_AtMinimumCount_LeavesSplineUnchanged()
+        {
+            var spline = new BodySpline();
+            for (int i = 0; i < BodySplineAuthoring.DefaultMinSampleCount; i++)
+            {
+                spline.Samples.Add(new BodySample { Id = (uint)i + 1, Position = new Vector3(0f, 0f, i), Radius = 1f });
+            }
+
+            bool removed = BodySplineAuthoring.TryRemoveEndpointSample(spline, removeHead: true, BodySplineAuthoring.DefaultMinSampleCount);
+
+            Assert.IsFalse(removed);
+            Assert.AreEqual(BodySplineAuthoring.DefaultMinSampleCount, spline.Samples.Count);
         }
 
         [Test]
