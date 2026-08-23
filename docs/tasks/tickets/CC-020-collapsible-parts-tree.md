@@ -113,6 +113,28 @@ survive selection, preview regeneration, undo/redo, and inspector changes.
   old classification listed exactly the four collapsed descendants; the fixed
   one lists none) and added 3 regression tests.
 
+## Rev 2 (2026-08-23) — indentation and sibling ordering
+
+- **Fixed: leaf children rendered LEFT of their parents.** The parent row used
+  `EditorGUILayout.Foldout` (whose rendered width exceeded the fixed leaf
+  spacer), so a child's label offset `(depth+1)*W + W` could be less than the
+  parent's `depth*W + foldoutWidth` — children appeared further left. Replaced
+  with a fixed-width arrow button (`▶`/`▼`, `GUILayout.Width(TreeIndentWidth)`)
+  occupying the SAME slot as the leaf spacer, so every level indents by exactly
+  16px and a child's label always renders to the RIGHT of its parent's label.
+  This also stops parents from starting too far right. The arrow toggles
+  expansion only; the label selects only (unchanged).
+- **Sibling sorting is now a strategy** (`IPartSiblingOrderer` in
+  `Assets/Scripts/Editor/PartSiblingOrderer.cs`): `Alphabetical` (default, by
+  DisplayName then Id) and `Grouped` (OrderBy(PartType).ThenBy(DisplayName)) as
+  a ready alternative for a future grouped sort. Presentation only — never
+  affects DNA/validation/serialization. All tree sibling orderings (top-level,
+  per-node children, orphans) route through the active strategy.
+- **Parts-list layout captured as CC-035**: the column is a fixed-width
+  `BeginVertical(220)` whose inner scroll view is not height-constrained (it
+  grows with content instead of scrolling), with no resizable splitter. Not
+  fixed here; tracked as a separate task.
+
 ## Validation evidence (real Unity editor via the MCP bridge)
 
 - New `CreatureEditorWindowPartsTreeStateTests` (EditMode, 7 tests): auto-reveal
@@ -120,9 +142,9 @@ survive selection, preview regeneration, undo/redo, and inspector changes.
   Body target reveals nothing; broken parent chain stops at the gap; persistence
   format round-trips deterministically; noisy/empty strings parse safely;
   expansion state never alters serialized DNA. All pass.
-- Full `ProceduralCreature.Tests.Editor` suite: **59/59 pass, 0 failures** (49
-  previous + 7 original + 3 reachability-regression tests), confirming the
-  Editor-assembly changes compile and regress nothing.
+- Full `ProceduralCreature.Tests.Editor` suite: **63/63 pass, 0 failures** (59
+  previous + 4 sibling-orderer strategy tests), confirming the Editor-assembly
+  changes compile and regress nothing.
 - Live editor check: opened the Creature Editor window on the dino creature,
   invoked `SelectPart` on a grandchild via the real definition, and confirmed the
   collapsed parent was auto-expanded and the expansion state was persisted to

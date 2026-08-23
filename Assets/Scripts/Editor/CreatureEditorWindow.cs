@@ -115,6 +115,9 @@ namespace ProceduralCreature.Editor
         private bool _bodyShowSpline = true;
         private bool _bodyShowAppearance = true;
         private bool _bodyShowAdvanced;
+        // CC-020 rev 2: active sibling-ordering strategy for the parts tree.
+        // Presentation only — it never affects DNA, validation, or serialization.
+        private readonly IPartSiblingOrderer _partSiblingOrder = PartSiblingOrderers.Alphabetical;
         private string _revealScrollId;
         private Rect _partListScrollViewRect;
         private Vector2 _validationScroll;
@@ -142,7 +145,13 @@ namespace ProceduralCreature.Editor
         private const string UsePortableSamplingKey = "ProceduralCreature.UsePortableSampling";
         private const string CurrentFilePathKey = "ProceduralCreature.CurrentFilePath";
         private const string ExpandedPartIdsKey = "ProceduralCreature.ExpandedPartIds";
-        private const float FoldoutArrowWidth = 14f;
+        // CC-020 rev 2: tree rows use a fixed-width arrow slot so every level
+        // indents by exactly TreeIndentWidth and children always render to the
+        // RIGHT of their parent (the previous EditorGUILayout.Foldout was wider
+        // than the leaf spacer, which pushed child labels left of their parents).
+        private const float TreeIndentWidth = 16f;
+        private const string CollapsedArrowGlyph = "\u25B6"; // ▶
+        private const string ExpandedArrowGlyph = "\u25BC"; // ▼
         private const float BodySampleScrollMaxHeight = 220f;
 
         /// <summary>
@@ -570,8 +579,7 @@ namespace ProceduralCreature.Editor
 
             DrawBodyNode();
             var visited = new HashSet<string> { CreatureDefinition.BodyId };
-            foreach (CreaturePart child in ChildrenOf(CreatureDefinition.BodyId)
-                .OrderBy(p => p.Id, System.StringComparer.Ordinal))
+            foreach (CreaturePart child in OrderedChildrenOf(CreatureDefinition.BodyId))
             {
                 DrawPartNode(child, depth: 1, visited);
             }
@@ -586,9 +594,8 @@ namespace ProceduralCreature.Editor
             // renderer-derived set would misclassify its hidden descendants as
             // unparented — the "children jump to Unparented when I collapse" bug.
             HashSet<string> reachable = ReachableFromBody(_definition);
-            IEnumerable<CreaturePart> orphans = _definition.Parts
-                .Where(p => p != null && !reachable.Contains(p.Id))
-                .OrderBy(p => p.Id, System.StringComparer.Ordinal);
+            IEnumerable<CreaturePart> orphans = _partSiblingOrder.OrderSiblings(
+                _definition.Parts.Where(p => p != null && !reachable.Contains(p.Id)));
             bool firstOrphan = true;
             foreach (CreaturePart orphan in orphans)
             {
@@ -629,22 +636,26 @@ namespace ProceduralCreature.Editor
             bool isExpanded = _expandedPartIds.Contains(part.Id);
             bool isSelected = part.Id == _selectedPartId;
 
-            // CC-020: one explicit top-aligned row per node — a foldout triangle
-            // (expansion only) and a selectable label (selection only). A plain
-            // click on the label selects without toggling expansion; clicking the
-            // triangle expands/collapses without changing selection. The explicit
-            // row layout also stops the tree from starting visually centered.
+            // CC-020 rev 2: one explicit row per node. A fixed-width arrow button
+            // (expansion only) occupies the SAME slot width as the leaf spacer, so
+            // every level indents by exactly TreeIndentWidth and a child's label
+            // always renders to the RIGHT of its parent's label. The selectable
+            // label follows: a plain click selects without toggling expansion, and
+            // the arrow toggles expansion without changing selection.
             EditorGUILayout.BeginHorizontal();
-            GUILayout.Space(depth * FoldoutArrowWidth);
+            GUILayout.Space(depth * TreeIndentWidth);
 
             if (hasChildren)
             {
-                bool nowExpanded = EditorGUILayout.Foldout(isExpanded, GUIContent.none, true, EditorStyles.foldout);
-                if (nowExpanded != isExpanded) SetPartExpanded(part.Id, nowExpanded);
+                string arrow = isExpanded ? ExpandedArrowGlyph : CollapsedArrowGlyph;
+                if (GUILayout.Button(arrow, EditorStyles.label, GUILayout.Width(TreeIndentWidth)))
+                {
+                    SetPartExpanded(part.Id, !isExpanded);
+                }
             }
             else
             {
-                GUILayout.Space(FoldoutArrowWidth); // keep the label gutter aligned with parents
+                GUILayout.Space(TreeIndentWidth); // align leaf labels with their expanded siblings
             }
 
             bool nowSelected = GUILayout.Toggle(isSelected, $"{part.PartType}  {GetPartLabel(part)}", EditorStyles.toolbarButton);
@@ -654,8 +665,7 @@ namespace ProceduralCreature.Editor
             RevealScrollIfTarget(part.Id);
 
             if (!hasChildren || !isExpanded) return;
-            foreach (CreaturePart child in ChildrenOf(part.Id)
-                .OrderBy(p => p.Id, System.StringComparer.Ordinal))
+            foreach (CreaturePart child in OrderedChildrenOf(part.Id))
             {
                 DrawPartNode(child, depth + 1, visited);
             }
@@ -664,6 +674,12 @@ namespace ProceduralCreature.Editor
         private IEnumerable<CreaturePart> ChildrenOf(string parentId)
         {
             return _definition.Parts.Where(p => p.ParentId == parentId);
+        }
+
+        /// <summary>Sibling parts in the tree's active ordering (strategy).</summary>
+        private IEnumerable<CreaturePart> OrderedChildrenOf(string parentId)
+        {
+            return _partSiblingOrder.OrderSiblings(ChildrenOf(parentId));
         }
 
         // ---- CC-020: parts-tree expansion state and selection ------------------------
