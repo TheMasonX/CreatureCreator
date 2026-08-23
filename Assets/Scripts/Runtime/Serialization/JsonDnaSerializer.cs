@@ -91,31 +91,102 @@ namespace ProceduralCreature.Serialization
             }
             return new BodyVerticalGradientAppearance
             {
-                TopGradient = ReadColorGradient(RequireArray(appearanceObj, "topGradient")),
-                BottomGradient = ReadColorGradient(RequireArray(appearanceObj, "bottomGradient")),
+                TopGradient = ReadGradient(RequireField(appearanceObj, "topGradient"), "topGradient"),
+                BottomGradient = ReadGradient(RequireField(appearanceObj, "bottomGradient"), "bottomGradient"),
                 VerticalOffset = (float)RequireNumber(appearanceObj, "verticalOffset"),
             };
         }
 
-        private static ColorGradient ReadColorGradient(List<object> array)
+        /// <summary>
+        /// Reads a gradient from either the current canonical form (an object with
+        /// mode + colorKeys + alphaKeys) or the legacy pre-CC-025-refactor form (an
+        /// array of { t, color } stops). Legacy arrays convert to a Unity Gradient
+        /// with the same color stops and per-stop alpha, so older saved creature
+        /// files keep loading.
+        /// </summary>
+        private static UnityEngine.Gradient ReadGradient(object value, string name)
         {
-            var gradient = new ColorGradient();
-            foreach (object entry in array)
+            if (value is List<object> legacy)
+            {
+                return ReadLegacyGradient(legacy, name);
+            }
+
+            if (value is not Dictionary<string, object> obj)
+            {
+                throw new DnaDeserializationException(
+                    $"Field '{name}' must be a gradient object or a legacy array of stops.");
+            }
+
+            UnityEngine.GradientMode mode = RequireEnum<UnityEngine.GradientMode>(obj, "mode");
+            var colorKeys = new List<UnityEngine.GradientColorKey>();
+            foreach (object entry in RequireArray(obj, "colorKeys"))
+            {
+                if (entry is not Dictionary<string, object> keyObj)
+                {
+                    throw new DnaDeserializationException("Each gradient color key must be an object.");
+                }
+                colorKeys.Add(new UnityEngine.GradientColorKey(
+                    ReadColor(RequireObject(keyObj, "color")),
+                    (float)RequireNumber(keyObj, "time")));
+            }
+
+            var alphaKeys = new List<UnityEngine.GradientAlphaKey>();
+            foreach (object entry in RequireArray(obj, "alphaKeys"))
+            {
+                if (entry is not Dictionary<string, object> keyObj)
+                {
+                    throw new DnaDeserializationException("Each gradient alpha key must be an object.");
+                }
+                alphaKeys.Add(new UnityEngine.GradientAlphaKey(
+                    (float)RequireNumber(keyObj, "alpha"),
+                    (float)RequireNumber(keyObj, "time")));
+            }
+
+            var gradient = new UnityEngine.Gradient();
+            gradient.SetKeys(colorKeys.ToArray(), alphaKeys.ToArray());
+            gradient.mode = mode;
+            return gradient;
+        }
+
+        private static UnityEngine.Gradient ReadLegacyGradient(List<object> legacy, string name)
+        {
+            var colorKeys = new List<UnityEngine.GradientColorKey>();
+            var alphaKeys = new List<UnityEngine.GradientAlphaKey>();
+            foreach (object entry in legacy)
             {
                 if (entry is not Dictionary<string, object> stopObj)
                 {
-                    throw new DnaDeserializationException("Each gradient stop must be an object.");
+                    throw new DnaDeserializationException($"Each {name} stop must be an object.");
                 }
-                Dictionary<string, object> colorObj = RequireObject(stopObj, "color");
-                gradient.Stops.Add(new GradientColorStop(
-                    (float)RequireNumber(stopObj, "t"),
-                    new UnityEngine.Color(
-                        (float)RequireNumber(colorObj, "r"),
-                        (float)RequireNumber(colorObj, "g"),
-                        (float)RequireNumber(colorObj, "b"),
-                        (float)RequireNumber(colorObj, "a"))));
+                UnityEngine.Color color = ReadColor(RequireObject(stopObj, "color"));
+                float t = (float)RequireNumber(stopObj, "t");
+                colorKeys.Add(new UnityEngine.GradientColorKey(color, t));
+                alphaKeys.Add(new UnityEngine.GradientAlphaKey(color.a, t));
             }
+            if (colorKeys.Count == 0)
+            {
+                throw new DnaDeserializationException($"{name} gradient must contain at least one stop.");
+            }
+            // Unity's Gradient always stores at least two color/alpha keys; a
+            // single-stop legacy gradient becomes a solid color.
+            if (colorKeys.Count == 1)
+            {
+                float padTime = colorKeys[0].time < 0.5f ? 1f : 0f;
+                colorKeys.Add(new UnityEngine.GradientColorKey(colorKeys[0].color, padTime));
+                alphaKeys.Add(new UnityEngine.GradientAlphaKey(alphaKeys[0].alpha, padTime));
+            }
+            var gradient = new UnityEngine.Gradient();
+            gradient.SetKeys(colorKeys.ToArray(), alphaKeys.ToArray());
             return gradient;
+        }
+
+        private static UnityEngine.Color ReadColor(Dictionary<string, object> obj)
+        {
+            return new UnityEngine.Color(
+                (float)RequireNumber(obj, "r"),
+                (float)RequireNumber(obj, "g"),
+                (float)RequireNumber(obj, "b"),
+                (float)RequireNumber(obj, "a"));
         }
 
         private static BoundsDefinition ReadBounds(Dictionary<string, object> obj)
@@ -222,14 +293,9 @@ namespace ProceduralCreature.Serialization
 
         private static AppearanceDefinition ReadAppearance(Dictionary<string, object> obj)
         {
-            Dictionary<string, object> colorObj = RequireObject(obj, "baseColor");
             return new AppearanceDefinition
             {
-                BaseColor = new UnityEngine.Color(
-                    (float)RequireNumber(colorObj, "r"),
-                    (float)RequireNumber(colorObj, "g"),
-                    (float)RequireNumber(colorObj, "b"),
-                    (float)RequireNumber(colorObj, "a")),
+                BaseColor = ReadColor(RequireObject(obj, "baseColor")),
                 NoiseSeed = (int)RequireNumber(obj, "noiseSeed"),
                 NoiseScale = (float)RequireNumber(obj, "noiseScale"),
             };

@@ -30,8 +30,28 @@ namespace ProceduralCreature.Serialization
     ///       { "id": 2, "position": { "x": 0.0000, "y": 0.0000, "z": 1.0000 }, "radius": 0.9000 }
     ///     ],
     ///     "appearance": {
-    ///       "topGradient": [ { "t": 0.0000, "color": { "r": 0.5000, "g": 0.5000, "b": 0.5000, "a": 1.0000 } } ],
-    ///       "bottomGradient": [ { "t": 0.0000, "color": { "r": 0.5000, "g": 0.5000, "b": 0.5000, "a": 1.0000 } } ],
+    ///       "topGradient": {
+    ///         "mode": "Blend",
+    ///         "colorKeys": [
+    ///           { "time": 0.0000, "color": { "r": 0.5000, "g": 0.5000, "b": 0.5000, "a": 1.0000 } },
+    ///           { "time": 1.0000, "color": { "r": 0.5000, "g": 0.5000, "b": 0.5000, "a": 1.0000 } }
+    ///         ],
+    ///         "alphaKeys": [
+    ///           { "time": 0.0000, "alpha": 1.0000 },
+    ///           { "time": 1.0000, "alpha": 1.0000 }
+    ///         ]
+    ///       },
+    ///       "bottomGradient": {
+    ///         "mode": "Blend",
+    ///         "colorKeys": [
+    ///           { "time": 0.0000, "color": { "r": 0.5000, "g": 0.5000, "b": 0.5000, "a": 1.0000 } },
+    ///           { "time": 1.0000, "color": { "r": 0.5000, "g": 0.5000, "b": 0.5000, "a": 1.0000 } }
+    ///         ],
+    ///         "alphaKeys": [
+    ///           { "time": 0.0000, "alpha": 1.0000 },
+    ///           { "time": 1.0000, "alpha": 1.0000 }
+    ///         ]
+    ///       },
     ///       "verticalOffset": 0.0000
     ///     }
     ///   },
@@ -130,28 +150,42 @@ namespace ProceduralCreature.Serialization
             if (appearance == null) return "null";
             var sb = new StringBuilder();
             sb.Append('{');
-            sb.Append("\"topGradient\":").Append(WriteColorGradient(appearance.TopGradient)).Append(',');
-            sb.Append("\"bottomGradient\":").Append(WriteColorGradient(appearance.BottomGradient)).Append(',');
+            sb.Append("\"topGradient\":").Append(WriteGradient(appearance.TopGradient)).Append(',');
+            sb.Append("\"bottomGradient\":").Append(WriteGradient(appearance.BottomGradient)).Append(',');
             sb.Append("\"verticalOffset\":").Append(Num(appearance.VerticalOffset));
             sb.Append('}');
             return sb.ToString();
         }
 
-        private static string WriteColorGradient(ColorGradient gradient)
+        private static string WriteGradient(UnityEngine.Gradient gradient)
         {
+            if (gradient == null) return "null";
             var sb = new StringBuilder();
-            sb.Append('[');
-            if (gradient != null && gradient.Stops != null)
+            sb.Append('{');
+            WriteField(sb, "mode", gradient.mode.ToString(), first: true);
+            sb.Append(",\"colorKeys\":[");
+            UnityEngine.GradientColorKey[] colorKeys = gradient.colorKeys;
+            if (colorKeys != null)
             {
-                for (int i = 0; i < gradient.Stops.Count; i++)
+                for (int i = 0; i < colorKeys.Length; i++)
                 {
                     if (i > 0) sb.Append(',');
-                    GradientColorStop stop = gradient.Stops[i];
-                    sb.Append("{\"t\":").Append(Num(stop.T));
-                    sb.Append(",\"color\":").Append(WriteColor(stop.Color)).Append('}');
+                    sb.Append("{\"time\":").Append(Num(colorKeys[i].time));
+                    sb.Append(",\"color\":").Append(WriteColor(colorKeys[i].color)).Append('}');
                 }
             }
-            sb.Append(']');
+            sb.Append("],\"alphaKeys\":[");
+            UnityEngine.GradientAlphaKey[] alphaKeys = gradient.alphaKeys;
+            if (alphaKeys != null)
+            {
+                for (int i = 0; i < alphaKeys.Length; i++)
+                {
+                    if (i > 0) sb.Append(',');
+                    sb.Append("{\"time\":").Append(Num(alphaKeys[i].time));
+                    sb.Append(",\"alpha\":").Append(Num(alphaKeys[i].alpha)).Append('}');
+                }
+            }
+            sb.Append("]}");
             return sb.ToString();
         }
 

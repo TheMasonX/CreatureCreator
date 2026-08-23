@@ -202,16 +202,27 @@ appearance as independently testable stages (design doc §8).
 model, `BodySpline.Appearance` (`BodyVerticalGradientAppearance`): a top
 gradient and a bottom gradient keyed over body length, blended along the
 vertical axis of each Body surface point — the camouflage-style underbelly
-model. `PartAppearanceSampler` is body-aware: when the Body's own SDF field is
-the nearest surface, the resolved color comes from `BodyVerticalGradientSampler`
-instead of any part's flat color. The vertical sample is
-`dot(point − centerline, frame.Normal) / radius` (via the shared
-`BodyFrameResolver`), clamped to −1 (bottom) .. +1 (top); the optional offset
-shifts the blend's zero point while keeping the surface extremes pinned at ±1.
-The gradient data is optional in canonical JSON (old v2 files load with flat
-gray), validated by `DefinitionValidator`, normalized (sorted stops +
-quantization) by `DefinitionCanonicalizer`, and authored from the Body inspector
-in the editor window.
+model. The gradients are stored as Unity's built-in `UnityEngine.Gradient`
+(color keys + alpha keys + mode); `GradientAdapter` is the conversion seam
+(evaluate, clone, compare, validate, quantize). `PartAppearanceSampler` is
+body-aware: when the Body's own SDF field is the nearest surface, the resolved
+color comes from `BodyVerticalGradientSampler` instead of any part's flat
+color. Body length t runs 0 = head (the end toward the creature's `Forward`)
+to 1 = tail, so the gradient's left edge keys the head and the right edge the
+tail. The vertical sample is the signed distance of the surface point from the
+local spine centerline in WORLD up, normalized by the local radius
+(`(point.y − centerline.y) / radius`), clamped to −1 (bottom of the surface)
+.. +1 (top) — world up is the camouflage-correct axis (the underbelly is
+always the world-down side) and is independent of the body's slope. The
+optional offset shifts the blend's zero point while keeping the surface
+extremes pinned at ±1. The gradient data is optional in canonical JSON (old v2
+files load with flat gray); the pre-CC-025-refactor array-of-stops gradient
+shape also still loads. Validated by `DefinitionValidator`, normalized (ordered
+keys + quantization) by `DefinitionCanonicalizer`, and authored from the Body
+inspector with the full Unity gradient editor
+(`EditorGUILayout.GradientField`). Note: Unity snaps gradient key times to
+1/65535 increments internally; the canonical writer's fixed formatting keeps
+save-load-save byte-stable.
 
 ## Phase 6 — skeleton inference
 

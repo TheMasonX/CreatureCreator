@@ -68,14 +68,24 @@ underbellies are lighter to counter shadows.
 
 ## Findings
 
-Implemented. The Body now owns a vertical-gradient appearance model:
+Implemented. The Body now owns a vertical-gradient appearance model, storing the
+color gradients as **Unity's built-in `UnityEngine.Gradient`** with a thin
+`GradientAdapter` (the conversion seam):
 
 - **DNA/schema:** `BodySpline.Appearance` (new `BodyVerticalGradientAppearance`)
-  holds a `TopGradient` and `BottomGradient` (`ColorGradient` of
-  `GradientColorStop` keyed over body length 0..1) plus `VerticalOffset`. The
-  field is optional in JSON: old v2 files without it load with the default flat
-  gray model, so no version bump or migration is required. The canonical writer
-  always emits it, keeping save-load-save byte-stable.
+  holds a `TopGradient` and `BottomGradient` as `UnityEngine.Gradient` (color
+  keys + alpha keys + mode) plus `VerticalOffset`. The field is optional in
+  JSON: old v2 files without it load with the default flat gray model, so no
+  version bump or migration is required. The canonical writer always emits it,
+  keeping save-load-save byte-stable.
+- **Gradient storage/evaluation:** the gradients are `UnityEngine.Gradient`
+  directly. `GradientAdapter.Evaluate` delegates to `Gradient.Evaluate`, so
+  authored Blend / Fixed / PerceptualBlend modes render exactly as Unity would;
+  the adapter is the single place to swap in pure-math key interpolation if a
+  future consumer (e.g. a Burst/compute baker) cannot take a UnityEngine.Gradient.
+  Unity snaps key times to 1/65535 increments internally and clamps times to
+  [0, 1]; the canonical writer's fixed F4 formatting normalizes serialized
+  times to 4 decimal places, so round-trips stay byte-stable despite the snap.
 - **Vertical sampling:** `BodyVerticalGradientSampler` projects the surface
   point onto the Body spline, reads the local frame from the shared
   `BodyFrameResolver`, and computes the raw vertical sample as
@@ -94,27 +104,41 @@ Implemented. The Body now owns a vertical-gradient appearance model:
   knowledge of the model. Baked per-vertex colors therefore reflect the
   gradient where the vertex is a Body surface point.
 - **Authoring:** the Body inspector (`CreatureEditorWindow.DrawBodyAppearanceFields`)
-  adds a compact multi-stop editor for both gradients and the vertical offset
-  slider, all through the single `MutateDefinition` path (undo/session intact).
+  uses `EditorGUILayout.GradientField` (the full Unity gradient editor) for
+  both gradients and a vertical offset slider, all through the single
+  `MutateDefinition` path (undo/session intact).
 - **Validation/canonicalization:** `DefinitionValidator` reports
-  `InvalidBodyAppearance` (missing/empty gradients, out-of-range T or offset)
-  and `NonFiniteBodyAppearance`; `DefinitionCanonicalizer` sorts stops by T and
-  quantizes T/color/offset.
+  `InvalidBodyAppearance` (null/empty gradients, out-of-range offset) and
+  `NonFiniteBodyAppearance` via `GradientAdapter.IsFinite`/`HasValidKeys`;
+  `DefinitionCanonicalizer` throws on null/invalid gradients and
+  `GradientAdapter.Quantize` orders + quantizes keys and the offset.
 
 Validation evidence (real Unity editor via the MCP bridge):
 
-- `BodyVerticalGradientAppearanceTests`: 33/33 pass (gradient eval, offset
-  pinned-boundary math, vertical sample, top/bottom blend, body-vs-part
-  resolution, baked-body-mesh gradient, validation, canonicalization, JSON
-  round-trip, old-v2-default fallback).
+- `BodyVerticalGradientAppearanceTests`: 35/35 pass (GradientAdapter eval/
+  clone/compare/quantize, offset pinned-boundary math, vertical sample,
+  top/bottom blend, body-vs-part resolution, baked-body-mesh gradient,
+  validation, canonicalization, JSON round-trip incl. mode preservation,
+  old-v2-default fallback).
 - Regressions: AppearanceBaker (3), PartAppearanceSampler (3), TriplanarNoise
   (4), MeshExtractionResultNormals (2), DefinitionCanonicalizer (7),
   BodyFrameResolver (11), BodyEditSolver (13), CreatureEditorWindowPartType (5),
   CreatureUndoState (3) all pass.
 - Full pipeline probe (`CreatureMeshGenerator.Generate`, body-only creature,
   top=white/bottom=black): 17,768 triangles; top vertices avg R 0.881, bottom
-  avg R 0.099, mid 0.491. Offset probe: +1 raises bottom avg R to 0.197,
-  -1 keeps it 0.000 — the gradient and offset reach the baked colors.
+  avg R 0.099, mid 0.491 — identical to the pre-refactor custom gradient model.
+  Canonical JSON emits `mode` + `colorKeys` + `alphaKeys` with fixed F4 times.
+- Orientation correction (2026-08-23, user report): the body-length parameter t
+  now runs 0 = HEAD (the end toward the creature's `Forward`) to 1 = tail
+  (previously t ran along stored sample order, which put the head at t = 1 for
+  the standard tail-first authoring flow), and the vertical sample now uses
+  WORLD up (`(point.y - centerline.y) / radius`) instead of the body frame's
+  Normal (which pointed downward on sloped bodies, flipping top/bottom).
+  Verified on the actual dino creature: near-head t = 0.026, near-tail t =
+  0.945, top surface R = 0.988 (white), belly R = 0.097 (black).
+- Backward compatibility: the deserializer also reads the pre-refactor array-of-
+  stops gradient format (`[{t, color}]`), so the committed dino creature and any
+  other old-format save still load and normalize to a Unity Gradient.
 
 Pre-existing failures observed by direct invocation (NOT caused by CC-025; the
 runtime test assembly is not discovered by the MCP test runner, so these are

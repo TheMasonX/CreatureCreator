@@ -34,3 +34,4 @@
 | CC-030 | Reusable part prefab templates (semantic subtree instantiation) | Backlog | P2 |
 | CC-031 | Composable geometry sources (multiple meshes per creature) | Backlog | P1 |
 | CC-032 | Separate gameplay geometry from 3D-print export | Backlog | P2 |
+| CC-033 | Register FastNoise2Bindings as a real git submodule | Done | P2 |

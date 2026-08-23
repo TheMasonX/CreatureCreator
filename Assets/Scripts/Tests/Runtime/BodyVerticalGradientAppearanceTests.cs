@@ -10,10 +10,10 @@ using ProceduralCreature.Serialization;
 namespace ProceduralCreature.Tests.Runtime
 {
     /// <summary>
-    /// Tests for the Body vertical-gradient appearance model (CC-025): gradient
-    /// evaluation, the vertical-sample projection + offset math, top/bottom
-    /// blending, validation, canonicalization, JSON round-trip, and the baked
-    /// per-vertex colors that the vertex-color lit shader surfaces.
+    /// Tests for the Body vertical-gradient appearance model (CC-025): Unity
+    /// Gradient adapter behavior, the vertical-sample projection + offset math,
+    /// top/bottom blending, validation, canonicalization, JSON round-trip, and
+    /// the baked per-vertex colors that the vertex-color lit shader surfaces.
     /// </summary>
     [TestFixture]
     public class BodyVerticalGradientAppearanceTests
@@ -44,65 +44,132 @@ namespace ProceduralCreature.Tests.Runtime
             return false;
         }
 
-        // ---- gradient evaluation -----------------------------------------------
+        /// <summary>Builds a UnityEngine.Gradient with the given color keys (>= 2) and constant opaque alpha.</summary>
+        private static UnityEngine.Gradient GradientWith(params (float Time, Color Color)[] keys)
+        {
+            var gradient = new UnityEngine.Gradient();
+            var colorKeys = new UnityEngine.GradientColorKey[keys.Length];
+            for (int i = 0; i < keys.Length; i++)
+            {
+                colorKeys[i] = new UnityEngine.GradientColorKey(keys[i].Color, keys[i].Time);
+            }
+            gradient.colorKeys = colorKeys;
+            gradient.alphaKeys = new[]
+            {
+                new UnityEngine.GradientAlphaKey(1f, 0f),
+                new UnityEngine.GradientAlphaKey(1f, 1f),
+            };
+            return gradient;
+        }
+
+        // ---- Unity Gradient adapter -------------------------------------------
 
         [Test]
-        public void ColorGradient_Evaluate_SingleStop_ReturnsSameColorEverywhere()
+        public void GradientAdapter_Evaluate_Solid_ReturnsSameColorEverywhere()
         {
-            var gradient = ColorGradient.Solid(new Color(0.2f, 0.3f, 0.4f));
+            var gradient = GradientAdapter.Solid(new Color(0.2f, 0.3f, 0.4f));
 
-            Assert.AreEqual(new Color(0.2f, 0.3f, 0.4f), gradient.Evaluate(0f));
-            Assert.AreEqual(new Color(0.2f, 0.3f, 0.4f), gradient.Evaluate(0.5f));
-            Assert.AreEqual(new Color(0.2f, 0.3f, 0.4f), gradient.Evaluate(1f));
+            Assert.AreEqual(new Color(0.2f, 0.3f, 0.4f), GradientAdapter.Evaluate(gradient, 0f));
+            Assert.AreEqual(new Color(0.2f, 0.3f, 0.4f), GradientAdapter.Evaluate(gradient, 0.5f));
+            Assert.AreEqual(new Color(0.2f, 0.3f, 0.4f), GradientAdapter.Evaluate(gradient, 1f));
         }
 
         [Test]
-        public void ColorGradient_Evaluate_InterpolatesBetweenTwoStops()
+        public void GradientAdapter_Evaluate_InterpolatesBetweenTwoKeys()
         {
-            var gradient = new ColorGradient();
-            gradient.Stops.Add(new GradientColorStop(0f, Color.black));
-            gradient.Stops.Add(new GradientColorStop(1f, Color.white));
+            UnityEngine.Gradient gradient = GradientWith((0f, Color.black), (1f, Color.white));
 
-            Color mid = gradient.Evaluate(0.5f);
+            Color mid = GradientAdapter.Evaluate(gradient, 0.5f);
             Assert.AreEqual(0.5f, mid.r, 1e-3f);
             Assert.AreEqual(0.5f, mid.g, 1e-3f);
             Assert.AreEqual(0.5f, mid.b, 1e-3f);
-            Assert.AreEqual(0.25f, gradient.Evaluate(0.25f).r, 1e-3f);
+            Assert.AreEqual(0.25f, GradientAdapter.Evaluate(gradient, 0.25f).r, 1e-3f);
         }
 
         [Test]
-        public void ColorGradient_Evaluate_ClampsTOutsideUnitRange()
+        public void GradientAdapter_Evaluate_ClampsToUnitRange()
         {
-            var gradient = new ColorGradient();
-            gradient.Stops.Add(new GradientColorStop(0f, Color.black));
-            gradient.Stops.Add(new GradientColorStop(1f, Color.white));
+            UnityEngine.Gradient gradient = GradientWith((0f, Color.black), (1f, Color.white));
 
-            Assert.AreEqual(Color.black, gradient.Evaluate(-0.5f));
-            Assert.AreEqual(Color.white, gradient.Evaluate(1.5f));
+            Assert.AreEqual(Color.black, GradientAdapter.Evaluate(gradient, -0.5f));
+            Assert.AreEqual(Color.white, GradientAdapter.Evaluate(gradient, 1.5f));
         }
 
         [Test]
-        public void ColorGradient_Evaluate_WhiteMidStopCreatesBelly()
+        public void GradientAdapter_Evaluate_WhiteMidKeyCreatesBelly()
         {
             // White in the middle of the body length — the authoring case the
-            // ticket calls out for creating a belly.
-            var gradient = new ColorGradient();
-            gradient.Stops.Add(new GradientColorStop(0f, Color.black));
-            gradient.Stops.Add(new GradientColorStop(0.5f, Color.white));
-            gradient.Stops.Add(new GradientColorStop(1f, Color.black));
+            // ticket calls out for creating a belly. Tolerance-based channel
+            // checks because Unity's Gradient snaps key times to 1/65535
+            // increments, so an interior key time is never exactly 0.5.
+            UnityEngine.Gradient gradient = GradientWith((0f, Color.black), (0.5f, Color.white), (1f, Color.black));
 
-            Assert.AreEqual(Color.black, gradient.Evaluate(0f));
-            Assert.AreEqual(Color.white, gradient.Evaluate(0.5f));
-            Assert.AreEqual(Color.black, gradient.Evaluate(1f));
-            Assert.AreEqual(0.5f, gradient.Evaluate(0.25f).r, 1e-3f);
-            Assert.AreEqual(0.5f, gradient.Evaluate(0.75f).r, 1e-3f);
+            Assert.AreEqual(0f, GradientAdapter.Evaluate(gradient, 0f).r, 1e-3f);
+            Assert.AreEqual(1f, GradientAdapter.Evaluate(gradient, 0.5f).r, 1e-3f);
+            Assert.AreEqual(1f, GradientAdapter.Evaluate(gradient, 0.5f).g, 1e-3f);
+            Assert.AreEqual(1f, GradientAdapter.Evaluate(gradient, 0.5f).b, 1e-3f);
+            Assert.AreEqual(0f, GradientAdapter.Evaluate(gradient, 1f).r, 1e-3f);
+            Assert.AreEqual(0.5f, GradientAdapter.Evaluate(gradient, 0.25f).r, 1e-3f);
+            Assert.AreEqual(0.5f, GradientAdapter.Evaluate(gradient, 0.75f).r, 1e-3f);
         }
 
         [Test]
-        public void ColorGradient_Evaluate_EmptyReturnsWhiteRatherThanThrowing()
+        public void GradientAdapter_Evaluate_NullGradient_ReturnsWhiteRatherThanThrowing()
         {
-            var gradient = new ColorGradient();
-            Assert.AreEqual(Color.white, gradient.Evaluate(0.5f));
+            Assert.AreEqual(Color.white, GradientAdapter.Evaluate(null, 0.5f));
+        }
+
+        [Test]
+        public void GradientAdapter_Clone_DeepCopiesKeys()
+        {
+            UnityEngine.Gradient original = GradientAdapter.Solid(Color.red);
+            UnityEngine.Gradient clone = GradientAdapter.Clone(original);
+
+            Assert.IsTrue(GradientAdapter.ContentEquals(original, clone));
+            Assert.AreNotSame(original.colorKeys, clone.colorKeys, "Clone must copy the key arrays, not share them.");
+            Assert.AreNotSame(original.alphaKeys, clone.alphaKeys);
+        }
+
+        [Test]
+        public void GradientAdapter_ContentEquals_DetectsKeyAndModeDifferences()
+        {
+            UnityEngine.Gradient a = GradientAdapter.Solid(Color.red);
+            UnityEngine.Gradient same = GradientAdapter.Clone(a);
+            UnityEngine.Gradient differentColor = GradientAdapter.Solid(Color.blue);
+            UnityEngine.Gradient differentMode = GradientAdapter.Clone(a);
+            differentMode.mode = UnityEngine.GradientMode.Fixed;
+
+            Assert.IsTrue(GradientAdapter.ContentEquals(a, same));
+            Assert.IsFalse(GradientAdapter.ContentEquals(a, differentColor));
+            Assert.IsFalse(GradientAdapter.ContentEquals(a, differentMode));
+        }
+
+        [Test]
+        public void GradientAdapter_Quantize_SortsAndQuantizesKeys()
+        {
+            var gradient = new UnityEngine.Gradient();
+            gradient.colorKeys = new[]
+            {
+                new UnityEngine.GradientColorKey(new Color(0.123456f, 0f, 0f, 1f), 0.123456f),
+                new UnityEngine.GradientColorKey(Color.white, 1f),
+            };
+            gradient.alphaKeys = new[]
+            {
+                new UnityEngine.GradientAlphaKey(0.123456f, 0f),
+                new UnityEngine.GradientAlphaKey(1f, 1f),
+            };
+
+            GradientAdapter.Quantize(gradient);
+
+            Assert.AreEqual(0.1235f, gradient.colorKeys[0].color.r, 1e-6f, "Key colors quantize to 4 decimal places.");
+            // Unity's Gradient stores key times in 1/65535 increments, so the
+            // stored time is the nearest snap; re-quantizing it must give the
+            // canonical 4-decimal value the writer emits.
+            Assert.AreEqual(0.1235f, GenerationTolerances.Quantize(gradient.colorKeys[0].time), 1e-6f,
+                "Key times must re-quantize to 4 decimal places after Unity's time snapping.");
+            Assert.AreEqual(0.1235f, GenerationTolerances.Quantize(gradient.alphaKeys[0].alpha), 1e-6f,
+                "Alpha key values quantize to 4 decimal places.");
+            Assert.LessOrEqual(gradient.colorKeys[0].time, gradient.colorKeys[1].time, "Keys remain ordered by time.");
         }
 
         // ---- vertical offset shift --------------------------------------------
@@ -170,6 +237,19 @@ namespace ProceduralCreature.Tests.Runtime
         // ---- vertical sample + top/bottom blend -------------------------------
 
         [Test]
+        public void TryGetBodySample_HeadIsForwardEnd()
+        {
+            // The head is the +Forward end. For the horizontal test body the last
+            // sample (z = +1) is the head, so a point near it has t near 0 and a
+            // point near the first sample (the tail) has t near 1.
+            CreatureDefinition definition = HorizontalBodyDefinition();
+            Assert.IsTrue(BodyVerticalGradientSampler.TryGetBodySample(definition, new Vector3(0f, 1f, 0.9f), out float nearHeadT, out _));
+            Assert.IsTrue(BodyVerticalGradientSampler.TryGetBodySample(definition, new Vector3(0f, 1f, -0.9f), out float nearTailT, out _));
+            Assert.LessOrEqual(nearHeadT, 0.1f, "The +Forward end is the head (t = 0).");
+            Assert.GreaterOrEqual(nearTailT, 0.9f, "The -Forward end is the tail (t = 1).");
+        }
+
+        [Test]
         public void TryGetBodySample_OnTopOfTube_ReturnsPlusOne()
         {
             CreatureDefinition definition = HorizontalBodyDefinition();
@@ -197,8 +277,8 @@ namespace ProceduralCreature.Tests.Runtime
         public void EvaluateColor_TopOfTube_UsesTopColor()
         {
             CreatureDefinition definition = HorizontalBodyDefinition();
-            definition.Body.Appearance.TopGradient = ColorGradient.Solid(Color.red);
-            definition.Body.Appearance.BottomGradient = ColorGradient.Solid(Color.blue);
+            definition.Body.Appearance.TopGradient = GradientAdapter.Solid(Color.red);
+            definition.Body.Appearance.BottomGradient = GradientAdapter.Solid(Color.blue);
 
             Assert.AreEqual(Color.red, BodyVerticalGradientSampler.EvaluateColor(definition, new Vector3(0f, 1f, 0f)));
         }
@@ -207,8 +287,8 @@ namespace ProceduralCreature.Tests.Runtime
         public void EvaluateColor_BottomOfTube_UsesBottomColor()
         {
             CreatureDefinition definition = HorizontalBodyDefinition();
-            definition.Body.Appearance.TopGradient = ColorGradient.Solid(Color.red);
-            definition.Body.Appearance.BottomGradient = ColorGradient.Solid(Color.blue);
+            definition.Body.Appearance.TopGradient = GradientAdapter.Solid(Color.red);
+            definition.Body.Appearance.BottomGradient = GradientAdapter.Solid(Color.blue);
 
             Assert.AreEqual(Color.blue, BodyVerticalGradientSampler.EvaluateColor(definition, new Vector3(0f, -1f, 0f)));
         }
@@ -217,8 +297,8 @@ namespace ProceduralCreature.Tests.Runtime
         public void EvaluateColor_Centerline_BlendsHalfway()
         {
             CreatureDefinition definition = HorizontalBodyDefinition();
-            definition.Body.Appearance.TopGradient = ColorGradient.Solid(Color.red);
-            definition.Body.Appearance.BottomGradient = ColorGradient.Solid(Color.blue);
+            definition.Body.Appearance.TopGradient = GradientAdapter.Solid(Color.red);
+            definition.Body.Appearance.BottomGradient = GradientAdapter.Solid(Color.blue);
 
             // vertical sample 0 -> blend 0.5 -> red/blue midpoint (purple).
             Color c = BodyVerticalGradientSampler.EvaluateColor(definition, Vector3.zero);
@@ -231,8 +311,8 @@ namespace ProceduralCreature.Tests.Runtime
         public void EvaluateColor_PositiveOffset_BiasesCenterlineTowardTop()
         {
             CreatureDefinition definition = HorizontalBodyDefinition();
-            definition.Body.Appearance.TopGradient = ColorGradient.Solid(Color.white);
-            definition.Body.Appearance.BottomGradient = ColorGradient.Solid(Color.black);
+            definition.Body.Appearance.TopGradient = GradientAdapter.Solid(Color.white);
+            definition.Body.Appearance.BottomGradient = GradientAdapter.Solid(Color.black);
             definition.Body.Appearance.VerticalOffset = 0.5f;
 
             // At the geometric center the shifted sample is 0.5 -> blend 0.75.
@@ -244,19 +324,38 @@ namespace ProceduralCreature.Tests.Runtime
         public void EvaluateColor_GradientsKeyedOverLength_HeadDiffersFromTail()
         {
             CreatureDefinition definition = HorizontalBodyDefinition();
-            var top = new ColorGradient();
-            top.Stops.Add(new GradientColorStop(0f, Color.white)); // head white
-            top.Stops.Add(new GradientColorStop(1f, Color.black)); // tail black
-            definition.Body.Appearance.TopGradient = top;
-            definition.Body.Appearance.BottomGradient = ColorGradient.Solid(Color.gray);
+            definition.Body.Appearance.TopGradient = GradientWith((0f, Color.white), (1f, Color.black)); // head white, tail black
+            definition.Body.Appearance.BottomGradient = GradientAdapter.Solid(Color.gray);
 
-            // Top-of-surface points near the head vs near the tail.
-            Color nearHead = BodyVerticalGradientSampler.EvaluateColor(definition, new Vector3(0f, 1f, -0.9f));
-            Color nearTail = BodyVerticalGradientSampler.EvaluateColor(definition, new Vector3(0f, 1f, 0.9f));
+            // Top-of-surface points near the head (+Forward end, z = +1) vs near the tail.
+            Color nearHead = BodyVerticalGradientSampler.EvaluateColor(definition, new Vector3(0f, 1f, 0.9f));
+            Color nearTail = BodyVerticalGradientSampler.EvaluateColor(definition, new Vector3(0f, 1f, -0.9f));
 
             Assert.GreaterOrEqual(nearHead.r, 0.9f, "Near the head the top gradient is white.");
             Assert.LessOrEqual(nearTail.r, 0.1f, "Near the tail the top gradient is black.");
             Assert.Greater(nearHead.r, nearTail.r + 0.5f);
+        }
+
+        [Test]
+        public void EvaluateColor_SlopedBody_TopUsesTopGradient()
+        {
+            // A body that slopes upward toward +Z. Its frame Normal would point
+            // downward (the old vertical axis made the gradient flip), but the
+            // vertical sample uses WORLD up, so the highest side of the body must
+            // still take the top gradient.
+            var definition = CreatureDefinition.CreateEmpty();
+            definition.Forward = Vector3.forward;
+            definition.Body.Samples.Add(new BodySample { Id = 1, Position = new Vector3(0f, 0f, -1f), Radius = 0.5f });
+            definition.Body.Samples.Add(new BodySample { Id = 2, Position = new Vector3(0f, 0.3f, 0f), Radius = 0.5f });
+            definition.Body.Samples.Add(new BodySample { Id = 3, Position = new Vector3(0f, 0.6f, 1f), Radius = 0.5f });
+            definition.Body.Appearance.TopGradient = GradientAdapter.Solid(Color.white);
+            definition.Body.Appearance.BottomGradient = GradientAdapter.Solid(Color.black);
+
+            Color above = BodyVerticalGradientSampler.EvaluateColor(definition, new Vector3(0f, 0.8f, 0f));
+            Color below = BodyVerticalGradientSampler.EvaluateColor(definition, new Vector3(0f, -0.2f, 0f));
+
+            Assert.GreaterOrEqual(above.r, 0.8f, "The world-up side of the body must take the top gradient.");
+            Assert.LessOrEqual(below.r, 0.2f, "The world-down side of the body must take the bottom gradient.");
         }
 
         [Test]
@@ -273,8 +372,8 @@ namespace ProceduralCreature.Tests.Runtime
         public void Resolve_PointOnBody_UsesBodyGradientNotNearestPart()
         {
             CreatureDefinition definition = HorizontalBodyDefinition();
-            definition.Body.Appearance.TopGradient = ColorGradient.Solid(Color.green);
-            definition.Body.Appearance.BottomGradient = ColorGradient.Solid(Color.green);
+            definition.Body.Appearance.TopGradient = GradientAdapter.Solid(Color.green);
+            definition.Body.Appearance.BottomGradient = GradientAdapter.Solid(Color.green);
             definition.AddPart(new CreaturePart
             {
                 Id = "part_far",
@@ -293,8 +392,8 @@ namespace ProceduralCreature.Tests.Runtime
         public void Bake_BodyOnlyMesh_ReflectsVerticalGradient()
         {
             CreatureDefinition definition = HorizontalBodyDefinition();
-            definition.Body.Appearance.TopGradient = ColorGradient.Solid(Color.red);
-            definition.Body.Appearance.BottomGradient = ColorGradient.Solid(Color.blue);
+            definition.Body.Appearance.TopGradient = GradientAdapter.Solid(Color.red);
+            definition.Body.Appearance.BottomGradient = GradientAdapter.Solid(Color.blue);
 
             ISdfNode sdf = SdfProgramBuilder.Compile(definition);
             var bounds = new BoundsDefinition { MaxX = 1.5f, MaxY = 1.5f, MaxZ = 1.5f };
@@ -347,16 +446,6 @@ namespace ProceduralCreature.Tests.Runtime
         }
 
         [Test]
-        public void Validate_EmptyBottomGradient_ReportsInvalidBodyAppearance()
-        {
-            CreatureDefinition definition = HorizontalBodyDefinition();
-            definition.Body.Appearance.BottomGradient = new ColorGradient(); // no stops
-
-            ValidationResult result = DefinitionValidator.Validate(definition);
-            Assert.IsTrue(HasCode(result, ValidationCode.InvalidBodyAppearance));
-        }
-
-        [Test]
         public void Validate_OutOfRangeOffset_ReportsInvalidBodyAppearance()
         {
             CreatureDefinition definition = HorizontalBodyDefinition();
@@ -367,21 +456,12 @@ namespace ProceduralCreature.Tests.Runtime
         }
 
         [Test]
-        public void Validate_StopTOutsideUnitRange_ReportsInvalidBodyAppearance()
+        public void Validate_NonFiniteKeyColor_ReportsNonFiniteBodyAppearance()
         {
             CreatureDefinition definition = HorizontalBodyDefinition();
-            definition.Body.Appearance.TopGradient.Stops.Add(new GradientColorStop(1.3f, Color.white));
-
-            ValidationResult result = DefinitionValidator.Validate(definition);
-            Assert.IsTrue(HasCode(result, ValidationCode.InvalidBodyAppearance));
-        }
-
-        [Test]
-        public void Validate_NonFiniteStop_ReportsNonFiniteBodyAppearance()
-        {
-            CreatureDefinition definition = HorizontalBodyDefinition();
-            definition.Body.Appearance.TopGradient.Stops[0] =
-                new GradientColorStop(0f, new Color(float.NaN, 0f, 0f, 1f));
+            UnityEngine.GradientColorKey[] keys = definition.Body.Appearance.TopGradient.colorKeys;
+            keys[0] = new UnityEngine.GradientColorKey(new Color(float.NaN, 0f, 0f, 1f), 0f);
+            definition.Body.Appearance.TopGradient.colorKeys = keys;
 
             ValidationResult result = DefinitionValidator.Validate(definition);
             Assert.IsTrue(HasCode(result, ValidationCode.NonFiniteBodyAppearance));
@@ -390,21 +470,33 @@ namespace ProceduralCreature.Tests.Runtime
         // ---- canonicalization --------------------------------------------------
 
         [Test]
-        public void Canonicalize_SortsAndQuantizesGradientStopsAndOffset()
+        public void Canonicalize_QuantizesGradientKeysAndOffset()
         {
             CreatureDefinition definition = HorizontalBodyDefinition();
-            definition.Body.Appearance.TopGradient.Stops.Clear();
-            definition.Body.Appearance.TopGradient.Stops.Add(new GradientColorStop(1f, new Color(0.123456f, 0f, 0f, 1f)));
-            definition.Body.Appearance.TopGradient.Stops.Add(new GradientColorStop(0f, Color.white));
+            definition.Body.Appearance.TopGradient = new UnityEngine.Gradient
+            {
+                colorKeys = new[]
+                {
+                    new UnityEngine.GradientColorKey(new Color(0.123456f, 0f, 0f, 1f), 0.123456f),
+                    new UnityEngine.GradientColorKey(Color.white, 1f),
+                },
+                alphaKeys = new[]
+                {
+                    new UnityEngine.GradientAlphaKey(1f, 0f),
+                    new UnityEngine.GradientAlphaKey(1f, 1f),
+                },
+            };
             definition.Body.Appearance.VerticalOffset = 0.123456f;
 
             CreatureDefinition result = DefinitionCanonicalizer.Canonicalize(definition);
 
-            Assert.AreEqual(2, result.Body.Appearance.TopGradient.Stops.Count);
-            Assert.AreEqual(0f, result.Body.Appearance.TopGradient.Stops[0].T, 1e-6f, "Stops must sort ascending by T.");
-            Assert.AreEqual(1f, result.Body.Appearance.TopGradient.Stops[1].T, 1e-6f);
-            Assert.AreEqual(0.1235f, result.Body.Appearance.TopGradient.Stops[1].Color.r, 1e-6f,
-                "Stop colors quantize to 4 decimal places.");
+            Assert.AreEqual(2, result.Body.Appearance.TopGradient.colorKeys.Length);
+            Assert.AreEqual(0.1235f, result.Body.Appearance.TopGradient.colorKeys[0].color.r, 1e-6f,
+                "Key colors quantize to 4 decimal places.");
+            Assert.AreEqual(0.1235f, GenerationTolerances.Quantize(result.Body.Appearance.TopGradient.colorKeys[0].time), 1e-6f,
+                "Key times re-quantize to 4 decimal places after Unity's time snapping.");
+            Assert.LessOrEqual(result.Body.Appearance.TopGradient.colorKeys[0].time,
+                result.Body.Appearance.TopGradient.colorKeys[1].time, "Keys remain ordered by time.");
             Assert.AreEqual(0.1235f, result.Body.Appearance.VerticalOffset, 1e-6f);
         }
 
@@ -417,29 +509,25 @@ namespace ProceduralCreature.Tests.Runtime
             Assert.Throws<DomainException>(() => DefinitionCanonicalizer.Canonicalize(definition));
         }
 
+        [Test]
+        public void Canonicalize_NullGradient_Throws()
+        {
+            CreatureDefinition definition = HorizontalBodyDefinition();
+            definition.Body.Appearance.TopGradient = null;
+
+            Assert.Throws<DomainException>(() => DefinitionCanonicalizer.Canonicalize(definition));
+        }
+
         // ---- JSON round-trip ----------------------------------------------------
 
         [Test]
         public void RoundTrip_PreservesBodyVerticalGradientAppearance()
         {
             CreatureDefinition definition = HorizontalBodyDefinition();
-            definition.Body.Appearance.TopGradient = new ColorGradient
-            {
-                Stops =
-                {
-                    new GradientColorStop(0f, Color.red),
-                    new GradientColorStop(1f, Color.white),
-                },
-            };
-            definition.Body.Appearance.BottomGradient = new ColorGradient
-            {
-                Stops =
-                {
-                    new GradientColorStop(0f, Color.blue),
-                    new GradientColorStop(0.5f, Color.green),
-                    new GradientColorStop(1f, Color.cyan),
-                },
-            };
+            definition.Body.Appearance.TopGradient = GradientWith((0f, Color.red), (1f, Color.white));
+            UnityEngine.Gradient bottom = GradientWith((0f, Color.blue), (0.5f, Color.green), (1f, Color.cyan));
+            bottom.mode = UnityEngine.GradientMode.Fixed; // mode must survive the round-trip too
+            definition.Body.Appearance.BottomGradient = bottom;
             definition.Body.Appearance.VerticalOffset = 0.35f;
 
             var serializer = new JsonDnaSerializer();
@@ -456,11 +544,8 @@ namespace ProceduralCreature.Tests.Runtime
         public void RoundTrip_SaveLoadSave_IsByteStableWithBodyAppearance()
         {
             CreatureDefinition definition = HorizontalBodyDefinition();
-            definition.Body.Appearance.TopGradient = new ColorGradient
-            {
-                Stops = { new GradientColorStop(0f, new Color(0.1f, 0.2f, 0.3f)), new GradientColorStop(0.7f, Color.white) },
-            };
-            definition.Body.Appearance.BottomGradient = ColorGradient.Solid(new Color(0.9f, 0.8f, 0.7f));
+            definition.Body.Appearance.TopGradient = GradientWith((0f, new Color(0.1f, 0.2f, 0.3f)), (0.7f, Color.white));
+            definition.Body.Appearance.BottomGradient = GradientAdapter.Solid(new Color(0.9f, 0.8f, 0.7f));
             definition.Body.Appearance.VerticalOffset = -0.2f;
 
             var serializer = new JsonDnaSerializer();
@@ -485,10 +570,39 @@ namespace ProceduralCreature.Tests.Runtime
 
             Assert.IsNotNull(loaded.Body.Appearance, "An old v2 file without a body appearance must still load.");
             Assert.AreEqual(0f, loaded.Body.Appearance.VerticalOffset, 1e-6f);
-            Assert.AreEqual(1, loaded.Body.Appearance.TopGradient.Stops.Count);
-            Assert.AreEqual(Color.gray, loaded.Body.Appearance.TopGradient.Stops[0].Color);
-            Assert.AreEqual(1, loaded.Body.Appearance.BottomGradient.Stops.Count);
-            Assert.AreEqual(Color.gray, loaded.Body.Appearance.BottomGradient.Stops[0].Color);
+            Assert.AreEqual(2, loaded.Body.Appearance.TopGradient.colorKeys.Length, "Unity gradients store at least two color keys.");
+            Assert.AreEqual(Color.gray, loaded.Body.Appearance.TopGradient.colorKeys[0].color);
+            Assert.AreEqual(2, loaded.Body.Appearance.BottomGradient.colorKeys.Length);
+            Assert.AreEqual(Color.gray, loaded.Body.Appearance.BottomGradient.colorKeys[0].color);
+        }
+
+        [Test]
+        public void Deserialize_LegacyArrayGradientFormat_LoadsAsGradient()
+        {
+            // The pre-CC-025-refactor format stored gradients as an array of
+            // { t, color } stops. These must still load (the committed dino
+            // creature used this shape) and normalize to a Unity Gradient.
+            const string json =
+                "{\"schemaVersion\":2,\"symmetryMode\":\"None\",\"bounds\":{\"maxX\":4,\"maxY\":4,\"maxZ\":4}," +
+                "\"generation\":{\"voxelsPerUnit\":16},\"forward\":{\"x\":0,\"y\":0,\"z\":1}," +
+                "\"body\":{\"samples\":[{\"id\":1,\"position\":{\"x\":0,\"y\":0,\"z\":-1},\"radius\":0.75}," +
+                "{\"id\":2,\"position\":{\"x\":0,\"y\":0,\"z\":1},\"radius\":0.9}]," +
+                "\"appearance\":{\"topGradient\":[{\"t\":0,\"color\":{\"r\":0.5,\"g\":0.5,\"b\":0.5,\"a\":1}}]," +
+                "\"bottomGradient\":[{\"t\":0,\"color\":{\"r\":0.2,\"g\":0.2,\"b\":0.2,\"a\":1}}],\"verticalOffset\":0}}," +
+                "\"parts\":[]}";
+
+            var serializer = new JsonDnaSerializer();
+            CreatureDefinition loaded = serializer.Deserialize(json);
+
+            Assert.IsNotNull(loaded.Body.Appearance.TopGradient, "Legacy array gradients must load.");
+            Assert.AreEqual(2, loaded.Body.Appearance.TopGradient.colorKeys.Length,
+                "A single-stop legacy gradient expands to a solid Unity Gradient.");
+            Assert.AreEqual(new Color(0.5f, 0.5f, 0.5f, 1f), loaded.Body.Appearance.TopGradient.colorKeys[0].color);
+            Assert.AreEqual(new Color(0.2f, 0.2f, 0.2f, 1f), loaded.Body.Appearance.BottomGradient.colorKeys[0].color);
+
+            // And it round-trips to the current canonical form byte-stably.
+            CreatureDefinition resaved = serializer.Deserialize(serializer.Serialize(loaded));
+            Assert.IsTrue(loaded.Body.Appearance.ContentEquals(resaved.Body.Appearance));
         }
     }
 }

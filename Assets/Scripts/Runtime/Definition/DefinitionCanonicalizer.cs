@@ -99,9 +99,9 @@ namespace ProceduralCreature.Definition
 
         /// <summary>
         /// Canonicalizes the Body vertical-gradient appearance (CC-025): quantizes
-        /// stop T/color components and the offset, and sorts each gradient's stops
-        /// into non-decreasing T order for deterministic serialization. Throws on
-        /// a null appearance or empty/non-finite gradients — canonicalization is
+        /// gradient key times/colors/alphas and the offset, and orders each
+        /// gradient's keys by non-decreasing time for deterministic serialization.
+        /// Throws on a null appearance or invalid gradients — canonicalization is
         /// not a repair pass, matching the body-spline and transform rules above.
         /// </summary>
         private static void CanonicalizeBodyAppearance(BodyVerticalGradientAppearance appearance)
@@ -115,29 +115,17 @@ namespace ProceduralCreature.Definition
             appearance.VerticalOffset = GenerationTolerances.Quantize(appearance.VerticalOffset);
         }
 
-        private static void CanonicalizeGradient(ColorGradient gradient, string name)
+        private static void CanonicalizeGradient(UnityEngine.Gradient gradient, string name)
         {
-            if (gradient == null || gradient.Stops == null || gradient.Stops.Count == 0)
+            if (gradient == null)
             {
-                throw new DomainException($"Cannot canonicalize a Body {name} gradient with no stops.");
+                throw new DomainException($"Cannot canonicalize a Body {name} gradient that is null.");
             }
-            foreach (GradientColorStop stop in gradient.Stops)
+            if (!GradientAdapter.IsFinite(gradient) || !GradientAdapter.HasValidKeys(gradient))
             {
-                if (!stop.IsFinite())
-                {
-                    throw new DomainException($"Cannot canonicalize a Body {name} gradient with a non-finite stop.");
-                }
+                throw new DomainException($"Cannot canonicalize an invalid Body {name} gradient.");
             }
-            gradient.Stops = gradient.Stops
-                .OrderBy(s => s.T)
-                .Select(s => new GradientColorStop(
-                    GenerationTolerances.Quantize(s.T),
-                    new Color(
-                        GenerationTolerances.Quantize(s.Color.r),
-                        GenerationTolerances.Quantize(s.Color.g),
-                        GenerationTolerances.Quantize(s.Color.b),
-                        GenerationTolerances.Quantize(s.Color.a))))
-                .ToList();
+            GradientAdapter.Quantize(gradient);
         }
 
         private static void AppendChildren(string parentId,

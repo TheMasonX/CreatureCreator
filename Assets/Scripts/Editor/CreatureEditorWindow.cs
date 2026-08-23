@@ -867,8 +867,9 @@ namespace ProceduralCreature.Editor
             EditorGUILayout.LabelField("Body Appearance", EditorStyles.boldLabel);
             EditorGUILayout.HelpBox(
                 "The Body color is a vertical gradient: a top and a bottom gradient keyed over body " +
-                "length, blended by the vertical sample (-1 = bottom .. +1 = top of the surface). The " +
-                "offset shifts the blend boundary while keeping the surface extremes fixed.",
+                "length, blended by the vertical sample (-1 = bottom .. +1 = top of the surface). In " +
+                "each gradient, left (time 0) is the head and right (time 1) is the tail. The offset " +
+                "shifts the blend boundary while keeping the surface extremes fixed.",
                 MessageType.None);
 
             BodyVerticalGradientAppearance appearance =
@@ -881,82 +882,23 @@ namespace ProceduralCreature.Editor
                     definition => definition.Body.Appearance.VerticalOffset = newOffset);
             }
 
-            ColorGradient newTop = DrawColorGradientEditor("Top Gradient", appearance.TopGradient);
-            if (!ReferenceEquals(newTop, appearance.TopGradient))
+            UnityEngine.Gradient currentTop = appearance.TopGradient;
+            UnityEngine.Gradient editedTop = EditorGUILayout.GradientField(
+                "Top Gradient", GradientAdapter.Clone(currentTop));
+            if (!GradientAdapter.ContentEquals(editedTop, currentTop))
             {
                 MutateDefinition("Edit Body Top Gradient",
-                    definition => definition.Body.Appearance.TopGradient = newTop);
+                    definition => definition.Body.Appearance.TopGradient = GradientAdapter.Clone(editedTop));
             }
 
-            ColorGradient newBottom = DrawColorGradientEditor("Bottom Gradient", appearance.BottomGradient);
-            if (!ReferenceEquals(newBottom, appearance.BottomGradient))
+            UnityEngine.Gradient currentBottom = appearance.BottomGradient;
+            UnityEngine.Gradient editedBottom = EditorGUILayout.GradientField(
+                "Bottom Gradient", GradientAdapter.Clone(currentBottom));
+            if (!GradientAdapter.ContentEquals(editedBottom, currentBottom))
             {
                 MutateDefinition("Edit Body Bottom Gradient",
-                    definition => definition.Body.Appearance.BottomGradient = newBottom);
+                    definition => definition.Body.Appearance.BottomGradient = GradientAdapter.Clone(editedBottom));
             }
-        }
-
-        /// <summary>
-        /// A compact multi-stop gradient editor. Returns a NEW ColorGradient when
-        /// any stop changed (or a stop was added/removed), otherwise returns the
-        /// same reference so the caller can skip the mutation.
-        /// </summary>
-        private ColorGradient DrawColorGradientEditor(string label, ColorGradient current)
-        {
-            EditorGUILayout.LabelField(label, EditorStyles.boldLabel);
-
-            var stops = new List<GradientColorStop>();
-            if (current != null && current.Stops != null && current.Stops.Count > 0)
-            {
-                stops.AddRange(current.Stops);
-            }
-            else
-            {
-                stops.Add(new GradientColorStop(0f, Color.gray));
-            }
-
-            const int maxStops = 6;
-            bool changed = false;
-            int visible = Mathf.Min(stops.Count, maxStops);
-            for (int i = 0; i < visible; i++)
-            {
-                EditorGUILayout.BeginHorizontal();
-                EditorGUILayout.LabelField($"#{i}", GUILayout.Width(22));
-                float newT = EditorGUILayout.Slider(stops[i].T, 0f, 1f, GUILayout.Width(200));
-                Color newColor = EditorGUILayout.ColorField(stops[i].Color, GUILayout.Width(90));
-                bool remove = GUILayout.Button("-", GUILayout.Width(24));
-                EditorGUILayout.EndHorizontal();
-
-                if (remove && stops.Count > 1)
-                {
-                    stops.RemoveAt(i);
-                    changed = true;
-                    visible = Mathf.Min(stops.Count, maxStops);
-                    i--;
-                    continue;
-                }
-                if (!Mathf.Approximately(newT, stops[i].T) || newColor != stops[i].Color)
-                {
-                    stops[i] = new GradientColorStop(newT, newColor);
-                    changed = true;
-                }
-            }
-
-            if (stops.Count < maxStops && GUILayout.Button($"+ Add {label} Stop"))
-            {
-                GradientColorStop last = stops[stops.Count - 1];
-                stops.Add(new GradientColorStop(Mathf.Min(1f, last.T + 0.1f), last.Color));
-                changed = true;
-            }
-
-            if (stops.Count > visible)
-            {
-                EditorGUILayout.LabelField(
-                    $"... {stops.Count - visible} more stop(s) hidden (editing limited to {maxStops})",
-                    EditorStyles.miniLabel);
-            }
-
-            return changed ? new ColorGradient { Stops = stops } : current;
         }
 
         private static BodySample FindBodySample(CreatureDefinition definition, uint id)

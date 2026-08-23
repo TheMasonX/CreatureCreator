@@ -131,10 +131,11 @@ namespace ProceduralCreature.Definition
 
         /// <summary>
         /// Validates the Body vertical-gradient appearance (CC-025). Reports only;
-        /// never repairs. The canonicalizer handles stop ordering and
-        /// quantization at the mutation/serialization boundary, so unsorted stops
-        /// are not an error here — non-finite or out-of-range values and missing
-        /// gradients are.
+        /// never repairs. The canonicalizer handles key ordering and quantization
+        /// at the mutation/serialization boundary, so key order is not validated
+        /// here — non-finite or out-of-range values and missing gradients are.
+        /// Gradients are Unity's built-in type, so the key checks live on
+        /// <see cref="GradientAdapter"/>.
         /// </summary>
         private static void ValidateBodyAppearance(CreatureDefinition definition, List<ValidationIssue> issues)
         {
@@ -157,35 +158,32 @@ namespace ProceduralCreature.Definition
                     "Body vertical-gradient offset must be finite and within [-1, 1]."));
             }
 
-            ValidateColorGradient(appearance.TopGradient, "top", issues);
-            ValidateColorGradient(appearance.BottomGradient, "bottom", issues);
+            ValidateGradient(appearance.TopGradient, "top", issues);
+            ValidateGradient(appearance.BottomGradient, "bottom", issues);
         }
 
-        private static void ValidateColorGradient(ColorGradient gradient, string name, List<ValidationIssue> issues)
+        private static void ValidateGradient(UnityEngine.Gradient gradient, string name, List<ValidationIssue> issues)
         {
-            if (gradient == null || gradient.Stops == null || gradient.Stops.Count == 0)
+            if (gradient == null)
             {
                 issues.Add(new ValidationIssue(
                     ValidationSeverity.Error, ValidationCode.InvalidBodyAppearance,
-                    $"Body {name} gradient must contain at least one stop."));
+                    $"Body {name} gradient must not be null."));
                 return;
             }
 
-            for (int i = 0; i < gradient.Stops.Count; i++)
+            if (!GradientAdapter.IsFinite(gradient))
             {
-                GradientColorStop stop = gradient.Stops[i];
-                if (!stop.IsFinite())
-                {
-                    issues.Add(new ValidationIssue(
-                        ValidationSeverity.Error, ValidationCode.NonFiniteBodyAppearance,
-                        $"Body {name} gradient stop {i} has a non-finite value."));
-                }
-                if (stop.T < 0f || stop.T > 1f)
-                {
-                    issues.Add(new ValidationIssue(
-                        ValidationSeverity.Error, ValidationCode.InvalidBodyAppearance,
-                        $"Body {name} gradient stop {i} has T outside [0, 1]."));
-                }
+                issues.Add(new ValidationIssue(
+                    ValidationSeverity.Error, ValidationCode.NonFiniteBodyAppearance,
+                    $"Body {name} gradient has a non-finite value."));
+            }
+
+            if (!GradientAdapter.HasValidKeys(gradient))
+            {
+                issues.Add(new ValidationIssue(
+                    ValidationSeverity.Error, ValidationCode.InvalidBodyAppearance,
+                    $"Body {name} gradient must contain at least one color key and one alpha key with T in [0, 1]."));
             }
         }
 

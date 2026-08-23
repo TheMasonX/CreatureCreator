@@ -1218,7 +1218,7 @@
     "m_Title": "Albedo",
     "m_Position": {
         "x": -2072.0,
-        "y": -944.9998779296875
+        "y": -945.0
     }
 }
 
@@ -1408,7 +1408,7 @@
     "m_PerRendererData": false,
     "m_customAttributes": [],
     "m_Value": {
-        "m_SerializedTexture": "{\"texture\":{\"fileID\":2800000,\"guid\":\"62f8403e6583657449a372b63fb3d522\",\"type\":3}}",
+        "m_SerializedTexture": "{\"texture\":{\"fileID\":2800000,\"guid\":\"1d1a59d860d4b884c910938953522cf6\",\"type\":3}}",
         "m_Guid": ""
     },
     "isMainTexture": false,
@@ -2052,7 +2052,7 @@
     "m_PerRendererData": false,
     "m_customAttributes": [],
     "m_Value": {
-        "m_SerializedTexture": "{\"texture\":{\"fileID\":2800000,\"guid\":\"2cfad40c4474dc54182b5e6dac2f6943\",\"type\":3}}",
+        "m_SerializedTexture": "{\"texture\":{\"fileID\":2800000,\"guid\":\"e07b4c868f3bc5945869b72a57c42b54\",\"type\":3}}",
         "m_Guid": ""
     },
     "isMainTexture": false,
@@ -3335,8 +3335,8 @@
     "m_ObjectId": "8f342a43504a4a13b69fa1b869558af2",
     "m_Title": "Aux1",
     "m_Position": {
-        "x": -1465.9998779296875,
-        "y": 582.0000610351563
+        "x": -1466.0,
+        "y": 582.0
     }
 }
 
@@ -3933,7 +3933,7 @@
     "m_Title": "AO",
     "m_Position": {
         "x": -414.0,
-        "y": 911.0000610351563
+        "y": 911.0
     }
 }
 
@@ -3943,8 +3943,8 @@
     "m_ObjectId": "b0af10a3d8dd4911990527006a9f465f",
     "m_Title": "Smoothness",
     "m_Position": {
-        "x": -415.9999084472656,
-        "y": 656.0000610351563
+        "x": -416.0,
+        "y": 656.0
     }
 }
 
@@ -3974,7 +3974,7 @@
     "m_Hidden": false,
     "m_PerRendererData": false,
     "m_customAttributes": [],
-    "m_Value": 0.0,
+    "m_Value": 1.0,
     "m_FloatType": 1,
     "m_LiteralFloatMode": false,
     "m_RangeValues": {
@@ -4897,8 +4897,8 @@
     "m_ObjectId": "e4d2ffa5cbcb4cd3bf5949b1fbe438b0",
     "m_Title": "Metallic",
     "m_Position": {
-        "x": -414.9999694824219,
-        "y": 405.00006103515627
+        "x": -415.0,
+        "y": 405.0
     }
 }
 
@@ -4943,7 +4943,7 @@
     "m_Title": "Normal",
     "m_Position": {
         "x": -1261.0,
-        "y": -173.9999542236328
+        "y": -174.0
     }
 }
 
@@ -5036,7 +5036,7 @@
     "m_PerRendererData": false,
     "m_customAttributes": [],
     "m_Value": {
-        "m_SerializedTexture": "",
+        "m_SerializedTexture": "{\"texture\":{\"fileID\":2800000,\"guid\":\"7f5e25377ac9aee469867b509106badd\",\"type\":3}}",
         "m_Guid": ""
     },
     "isMainTexture": false,
@@ -5152,7 +5152,7 @@
     "m_Hidden": false,
     "m_PerRendererData": false,
     "m_customAttributes": [],
-    "m_Value": 0.5,
+    "m_Value": 1.0,
     "m_FloatType": 1,
     "m_LiteralFloatMode": false,
     "m_RangeValues": {
@@ -5177,8 +5177,8 @@
     "m_ObjectId": "f03390ad601f47a2b4eeff3fc6fe3253",
     "m_Title": "VertexColor",
     "m_Position": {
-        "x": -2070.999755859375,
-        "y": -205.9999542236328
+        "x": -2071.0,
+        "y": -206.0
     }
 }
 

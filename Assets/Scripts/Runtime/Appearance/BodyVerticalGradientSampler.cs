@@ -9,12 +9,15 @@ namespace ProceduralCreature.Appearance
     /// point. For a given point this:
     ///
     /// 1. projects the point onto the authoritative Body spline to get the
-    ///    body-length parameter t (0..1, arc-length fraction) and the local
-    ///    body frame (see <see cref="BodyFrameResolver"/>);
-    /// 2. computes the raw vertical sample: the signed distance of the point
-    ///    from the spline centerline along the frame's Normal, normalized by the
-    ///    local body radius — so -1 is the bottom of the surface and +1 is the
-    ///    top;
+    ///    body-length parameter t (0..1 — 0 at the head, which is the end of the
+    ///    spline toward <see cref="CreatureDefinition.Forward"/>, 1 at the tail)
+    ///    and the local spine centerline + radius;
+    /// 2. computes the raw vertical sample: the signed distance of the point from
+    ///    the spine centerline in WORLD up (Y), normalized by the local body
+    ///    radius — so -1 is the bottom of the surface and +1 is the top. World up
+    ///    is the camouflage-correct axis (an underbelly is always the world-down
+    ///    side) and is independent of the body's slope, so the top gradient
+    ///    reliably tints the highest side of the body;
     /// 3. applies the optional vertical offset via
     ///    <see cref="ApplyVerticalOffset"/>, which shifts the zero point but
     ///    keeps the surface boundaries pinned at -1 and +1;
@@ -29,9 +32,12 @@ namespace ProceduralCreature.Appearance
         private const float EpsilonSqr = 1e-10f;
 
         /// <summary>
-        /// The vertical sample in -1..1 (bottom .. top) for a point on the Body,
-        /// plus the body-length parameter t (0..1) that keys the gradients.
-        /// Returns false when the definition has no Body spline to project onto.
+        /// The body-length parameter t (0..1) plus the vertical sample (-1..1) for
+        /// a point on the Body. t = 0 is the HEAD (the end of the spline toward
+        /// <see cref="CreatureDefinition.Forward"/>) and t = 1 is the tail;
+        /// verticalSample = -1 is the bottom of the surface (the world-down side)
+        /// and +1 is the top (the world-up side). Returns false when the
+        /// definition has no Body spline to project onto.
         /// </summary>
         public static bool TryGetBodySample(
             CreatureDefinition definition, Vector3 position, out float lengthT, out float verticalSample)
@@ -83,14 +89,38 @@ namespace ProceduralCreature.Appearance
             float arcToPoint = 0f;
             for (int i = 0; i < closestSegment; i++) arcToPoint += arcs[i];
             arcToPoint += arcs[closestSegment] * closestSegT;
-            lengthT = total <= 1e-6f ? 0f : Mathf.Clamp01(arcToPoint / total);
+            float arcFrac = total <= 1e-6f ? 0f : Mathf.Clamp01(arcToPoint / total);
 
-            float sampleUnitT = Mathf.Clamp(closestSegment + closestSegT, 0f, count - 1f);
-            BodyFrame frame = BodyFrameResolver.ResolveFrame(samples, sampleUnitT, definition.Forward);
+            // Body-length parameter: 0 at the HEAD, 1 at the tail. The head is the
+            // end of the spline with the highest projection onto the creature's
+            // Forward axis (the creature faces forward). That is the LAST sample in
+            // the standard authoring flow, so t runs backwards along the stored
+            // sample order unless the spline was authored head-first.
+            float headForward = Vector3.Dot(samples[count - 1].Position, definition.Forward);
+            float tailForward = Vector3.Dot(samples[0].Position, definition.Forward);
+            lengthT = headForward >= tailForward ? 1f - arcFrac : arcFrac;
 
-            float verticalRaw = frame.Radius <= 1e-6f
-                ? 0f
-                : Vector3.Dot(position - frame.Position, frame.Normal) / frame.Radius;
+            // Vertical sample: signed distance of the surface point from the local
+            // spine centerline in WORLD up, normalized by the local body radius.
+            // World up is the camouflage-correct axis — the underbelly is always
+            // the world-down side — and it is independent of the body's slope, so
+            // the top gradient reliably tints the highest side of the body.
+            Vector3 centerline;
+            float radius;
+            if (count == 1)
+            {
+                centerline = samples[0].Position;
+                radius = samples[0].Radius;
+            }
+            else
+            {
+                Vector3 a = samples[closestSegment].Position;
+                Vector3 b = samples[closestSegment + 1].Position;
+                centerline = Vector3.Lerp(a, b, closestSegT);
+                radius = Mathf.Lerp(samples[closestSegment].Radius, samples[closestSegment + 1].Radius, closestSegT);
+            }
+
+            float verticalRaw = radius <= 1e-6f ? 0f : (position.y - centerline.y) / radius;
             verticalSample = Mathf.Clamp(verticalRaw, -1f, 1f);
             return true;
         }
@@ -138,8 +168,11 @@ namespace ProceduralCreature.Appearance
             float shifted = ApplyVerticalOffset(verticalSample, appearance.VerticalOffset);
             float blend = (shifted + 1f) * 0.5f;
 
-            Color top = appearance.TopGradient.Evaluate(t);
-            Color bottom = appearance.BottomGradient.Evaluate(t);
+            // The gradients are Unity's built-in Gradient; evaluation goes
+            // through the adapter (which delegates to Gradient.Evaluate) so all
+            // authored modes render exactly as Unity would.
+            Color top = GradientAdapter.Evaluate(appearance.TopGradient, t);
+            Color bottom = GradientAdapter.Evaluate(appearance.BottomGradient, t);
             return Color.Lerp(bottom, top, blend);
         }
     }
