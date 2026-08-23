@@ -104,6 +104,19 @@ namespace ProceduralCreature.Editor
         private float _bodyRadiusDragTargetRadius = 1f;
 
         private Vector2 _partListScroll;
+        private Vector2 _bodySampleScroll;
+        // CC-020: parts-tree expansion + Body inspector foldout state. This is
+        // editor presentation state, never creature DNA. ExpandedPartIds is
+        // persisted via SessionState so it survives selection, regeneration,
+        // undo/redo, inspector changes, and domain reloads; the Body inspector
+        // foldouts are session-scoped only (not persisted).
+        private readonly HashSet<string> _expandedPartIds = new HashSet<string>();
+        private bool _bodyShowGeneral = true;
+        private bool _bodyShowSpline = true;
+        private bool _bodyShowAppearance = true;
+        private bool _bodyShowAdvanced;
+        private string _revealScrollId;
+        private Rect _partListScrollViewRect;
         private Vector2 _validationScroll;
         private bool _showValidationPanel = true;
         private GameObject _previewGameObject;
@@ -128,6 +141,9 @@ namespace ProceduralCreature.Editor
         private const string LogGenerationDiagnosticsKey = "ProceduralCreature.LogGenerationDiagnostics";
         private const string UsePortableSamplingKey = "ProceduralCreature.UsePortableSampling";
         private const string CurrentFilePathKey = "ProceduralCreature.CurrentFilePath";
+        private const string ExpandedPartIdsKey = "ProceduralCreature.ExpandedPartIds";
+        private const float FoldoutArrowWidth = 14f;
+        private const float BodySampleScrollMaxHeight = 220f;
 
         /// <summary>
         /// Part types that are valid to author in schema v2. Body, Root, and
@@ -208,6 +224,7 @@ namespace ProceduralCreature.Editor
             _logGenerationDiagnostics = EditorPrefs.GetBool(LogGenerationDiagnosticsKey, true);
             _usePortableSampling = EditorPrefs.GetBool(UsePortableSamplingKey, true);
             _currentFilePath = SessionState.GetString(CurrentFilePathKey, string.Empty);
+            LoadExpandedPartIds();
 
             Undo.undoRedoPerformed += OnUndoRedoPerformed;
             SceneView.duringSceneGui += OnSceneGUI;
@@ -260,6 +277,10 @@ namespace ProceduralCreature.Editor
             {
                 _selectedPartId = null;
             }
+
+            // CC-020: expansion state is keyed by stable part Ids; drop ids that
+            // no longer exist after an undo/redo restores a different definition.
+            PruneExpandedPartIds();
 
             Revalidate();
             CreatureEditorSession.Save(_definition);
@@ -319,6 +340,10 @@ namespace ProceduralCreature.Editor
 
             _definition = newDefinition;
             _undoState.Json = Serializer.Serialize(_definition);
+
+            // CC-020: expansion state is editor presentation state, never DNA;
+            // prune ids that no longer exist (part removed, definition replaced).
+            PruneExpandedPartIds();
 
             Revalidate();
             CreatureEditorSession.Save(_definition);
@@ -541,6 +566,7 @@ namespace ProceduralCreature.Editor
             EditorGUILayout.LabelField("Parts", EditorStyles.boldLabel);
 
             _partListScroll = EditorGUILayout.BeginScrollView(_partListScroll);
+            _partListScrollViewRect = GUILayoutUtility.GetLastRect(); // viewport used by scroll-into-view
 
             DrawBodyNode();
             var visited = new HashSet<string> { CreatureDefinition.BodyId };
@@ -550,11 +576,16 @@ namespace ProceduralCreature.Editor
                 DrawPartNode(child, depth: 1, visited);
             }
 
-            // Parts whose ParentId points at a missing part (or at a cycle) are
-            // not reachable from the Body root; show them explicitly so the user
-            // can reparent or remove them instead of the part silently vanishing
-            // from the tree. The validator reports the underlying error.
-            var reachable = new HashSet<string>(visited);
+            // Parts whose ParentId chain does not reach the Body root (missing
+            // parent, or a cycle) are shown explicitly so the user can reparent or
+            // remove them instead of the part silently vanishing from the tree. The
+            // validator reports the underlying error.
+            //
+            // CC-020 fix: reachability is computed from the PARENT GRAPH, never from
+            // the renderer's visited set. A collapsed node stops recursing, so a
+            // renderer-derived set would misclassify its hidden descendants as
+            // unparented — the "children jump to Unparented when I collapse" bug.
+            HashSet<string> reachable = ReachableFromBody(_definition);
             IEnumerable<CreaturePart> orphans = _definition.Parts
                 .Where(p => p != null && !reachable.Contains(p.Id))
                 .OrderBy(p => p.Id, System.StringComparer.Ordinal);
@@ -586,8 +617,7 @@ namespace ProceduralCreature.Editor
             bool nowSelected = GUILayout.Toggle(isSelected, "Body", EditorStyles.toolbarButton);
             if (nowSelected && !isSelected)
             {
-                _selectedPartId = CreatureDefinition.BodyId;
-                _activeBodySampleIndex = -1; // start with no sample grabbed
+                SelectPart(CreatureDefinition.BodyId); // start with no sample grabbed
             }
         }
 
@@ -595,16 +625,35 @@ namespace ProceduralCreature.Editor
         {
             if (!visited.Add(part.Id)) return; // parent cycle: stop descending, the validator flags it
 
-            string indent = new string(' ', depth * 2);
+            bool hasChildren = ChildrenOf(part.Id).Any();
+            bool isExpanded = _expandedPartIds.Contains(part.Id);
             bool isSelected = part.Id == _selectedPartId;
-            string label = $"{indent}{part.PartType}  {GetPartLabel(part)}";
-            bool nowSelected = GUILayout.Toggle(isSelected, label, EditorStyles.toolbarButton);
-            if (nowSelected && !isSelected)
+
+            // CC-020: one explicit top-aligned row per node — a foldout triangle
+            // (expansion only) and a selectable label (selection only). A plain
+            // click on the label selects without toggling expansion; clicking the
+            // triangle expands/collapses without changing selection. The explicit
+            // row layout also stops the tree from starting visually centered.
+            EditorGUILayout.BeginHorizontal();
+            GUILayout.Space(depth * FoldoutArrowWidth);
+
+            if (hasChildren)
             {
-                _selectedPartId = part.Id;
-                _activeBodySampleIndex = -1;
+                bool nowExpanded = EditorGUILayout.Foldout(isExpanded, GUIContent.none, true, EditorStyles.foldout);
+                if (nowExpanded != isExpanded) SetPartExpanded(part.Id, nowExpanded);
+            }
+            else
+            {
+                GUILayout.Space(FoldoutArrowWidth); // keep the label gutter aligned with parents
             }
 
+            bool nowSelected = GUILayout.Toggle(isSelected, $"{part.PartType}  {GetPartLabel(part)}", EditorStyles.toolbarButton);
+            if (nowSelected && !isSelected) SelectPart(part.Id);
+            EditorGUILayout.EndHorizontal();
+
+            RevealScrollIfTarget(part.Id);
+
+            if (!hasChildren || !isExpanded) return;
             foreach (CreaturePart child in ChildrenOf(part.Id)
                 .OrderBy(p => p.Id, System.StringComparer.Ordinal))
             {
@@ -617,16 +666,198 @@ namespace ProceduralCreature.Editor
             return _definition.Parts.Where(p => p.ParentId == parentId);
         }
 
+        // ---- CC-020: parts-tree expansion state and selection ------------------------
+
+        /// <summary>
+        /// CC-020: the single place a selection change happens so the parts tree
+        /// can auto-reveal a hidden descendant — selecting any part expands every
+        /// collapsed ancestor, making the tree and viewport two views of the same
+        /// model. Selection never toggles expansion, and the foldout triangle never
+        /// changes selection (they are separate controls in DrawPartNode).
+        /// </summary>
+        private void SelectPart(string partId)
+        {
+            _selectedPartId = partId;
+            _activeBodySampleIndex = -1;
+
+            if (partId == null || _definition == null || partId == CreatureDefinition.BodyId) return;
+
+            foreach (string ancestorId in AncestorsToReveal(_definition, partId))
+            {
+                SetPartExpanded(ancestorId, true);
+            }
+            _revealScrollId = partId;
+        }
+
+        /// <summary>
+        /// CC-020: the ancestor chain (root-most first, excluding the always-visible
+        /// Body) that must be expanded for targetId to be reachable from the Body
+        /// root in the parts tree. Empty when targetId is the Body, unknown, or its
+        /// parent chain is broken (a missing parent is separately flagged by the
+        /// validator). Pure function so EditMode tests cover the auto-reveal
+        /// contract directly.
+        /// </summary>
+        internal static IReadOnlyList<string> AncestorsToReveal(CreatureDefinition definition, string targetId)
+        {
+            if (definition == null || string.IsNullOrEmpty(targetId) || targetId == CreatureDefinition.BodyId)
+            {
+                return System.Array.Empty<string>();
+            }
+            CreaturePart target = definition.FindPart(targetId);
+            if (target == null) return System.Array.Empty<string>();
+
+            var chain = new List<string>();
+            string parentId = target.ParentId;
+            while (!string.IsNullOrEmpty(parentId) && parentId != CreatureDefinition.BodyId)
+            {
+                CreaturePart parent = definition.FindPart(parentId);
+                if (parent == null) break; // broken chain; the validator reports it separately
+                chain.Add(parentId);
+                parentId = parent.ParentId;
+            }
+            chain.Reverse(); // root-most first
+            return chain;
+        }
+
+        /// <summary>
+        /// CC-020: the set of part ids reachable from the Body root by following
+        /// ParentId links (transitive closure). Independent of tree collapse state,
+        /// so a collapsed node never causes its descendants to be misclassified as
+        /// unparented. A broken parent link or a cycle simply leaves the affected
+        /// parts unreachable (the validator flags those separately); the walk is
+        /// bounded because every iteration must add at least one new id.
+        /// </summary>
+        internal static HashSet<string> ReachableFromBody(CreatureDefinition definition)
+        {
+            var reachable = new HashSet<string> { CreatureDefinition.BodyId };
+            if (definition == null || definition.Parts == null) return reachable;
+
+            bool changed = true;
+            while (changed)
+            {
+                changed = false;
+                foreach (CreaturePart part in definition.Parts)
+                {
+                    if (part == null || part.Id == null) continue;
+                    if (reachable.Contains(part.Id)) continue;
+                    if (part.ParentId != null && reachable.Contains(part.ParentId))
+                    {
+                        reachable.Add(part.Id);
+                        changed = true;
+                    }
+                }
+            }
+            return reachable;
+        }
+
+        private void SetPartExpanded(string partId, bool expanded)
+        {
+            if (expanded) _expandedPartIds.Add(partId);
+            else _expandedPartIds.Remove(partId);
+            PersistExpandedPartIds();
+        }
+
+        private void PersistExpandedPartIds()
+        {
+            SessionState.SetString(ExpandedPartIdsKey, SerializeExpandedIds(_expandedPartIds));
+        }
+
+        private void LoadExpandedPartIds()
+        {
+            _expandedPartIds.Clear();
+            foreach (string id in DeserializeExpandedIds(SessionState.GetString(ExpandedPartIdsKey, string.Empty)))
+            {
+                _expandedPartIds.Add(id);
+            }
+        }
+
+        /// <summary>
+        /// Removes expansion entries for parts that no longer exist, keeping the
+        /// persisted presentation state tidy without ever touching the definition.
+        /// </summary>
+        private void PruneExpandedPartIds()
+        {
+            bool changed = false;
+            foreach (string id in _expandedPartIds.ToList())
+            {
+                if (id != CreatureDefinition.BodyId && _definition.FindPart(id) == null)
+                {
+                    _expandedPartIds.Remove(id);
+                    changed = true;
+                }
+            }
+            if (changed) PersistExpandedPartIds();
+        }
+
+        /// <summary>
+        /// CC-020: best-effort scroll-into-view for a just-selected node. Called
+        /// immediately after the node's row is laid out (before its children
+        /// recurse) so GetLastRect is still the node's own row. No-op when the row
+        /// is already within the visible scroll region.
+        /// </summary>
+        private void RevealScrollIfTarget(string partId)
+        {
+            if (partId != _revealScrollId) return;
+            _revealScrollId = null;
+
+            if (_partListScrollViewRect.height <= 0f) return;
+            Rect row = GUILayoutUtility.GetLastRect();
+            float visibleTop = _partListScroll.y;
+            float visibleBottom = _partListScroll.y + _partListScrollViewRect.height;
+            if (row.y < visibleTop)
+            {
+                _partListScroll.y = row.y;
+            }
+            else if (row.yMax > visibleBottom)
+            {
+                _partListScroll.y = row.yMax - _partListScrollViewRect.height;
+            }
+        }
+
+        /// <summary>
+        /// SessionState persistence format for ExpandedPartIds: sorted, comma
+        /// separated. Stable ordering keeps the persisted string deterministic.
+        /// </summary>
+        internal static string SerializeExpandedIds(IEnumerable<string> ids)
+        {
+            return string.Join(",",
+                ids.Where(id => !string.IsNullOrEmpty(id))
+                   .Distinct()
+                   .OrderBy(id => id, System.StringComparer.Ordinal));
+        }
+
+        internal static HashSet<string> DeserializeExpandedIds(string raw)
+        {
+            var result = new HashSet<string>();
+            if (string.IsNullOrEmpty(raw)) return result;
+            foreach (string id in raw.Split(','))
+            {
+                if (!string.IsNullOrEmpty(id)) result.Add(id);
+            }
+            return result;
+        }
+
         private void AddNewPart()
         {
-            string newId = PartIdGenerator.CreateNew();
-            string parentId = _selectedPartId != null && _selectedPartId != CreatureDefinition.BodyId
-                ? _selectedPartId
-                : CreatureDefinition.BodyId; // default: attach directly to the Body
+            bool hasSelectedPart = _selectedPartId != null && _selectedPartId != CreatureDefinition.BodyId;
+            string parentId = hasSelectedPart ? _selectedPartId : CreatureDefinition.BodyId;
 
-            MutateDefinition("Add Part", definition => definition.AddPart(new CreaturePart
+            // CC-029: with a non-Body part selected, seed the new child from the
+            // selected part's authoring properties (Spore-like "duplicate as child");
+            // otherwise keep the Body-rooted generic default.
+            CreaturePart created = hasSelectedPart
+                ? _definition.ClonePartAsChild(_selectedPartId, parentId)
+                : NewGenericPart(parentId);
+
+            MutateDefinition("Add Part", definition => definition.AddPart(created));
+            SelectPart(created.Id); // auto-reveals the new child under its (possibly collapsed) parent
+        }
+
+        private static CreaturePart NewGenericPart(string parentId)
+        {
+            return new CreaturePart
             {
-                Id = newId,
+                Id = PartIdGenerator.CreateNew(),
                 ParentId = parentId,
                 PartType = PartType.Part,
                 DisplayName = DefaultPartNameFor(PartType.Part),
@@ -634,10 +865,7 @@ namespace ProceduralCreature.Editor
                 Shape = ShapeDefinition.DefaultSphere,
                 Appearance = AppearanceDefinition.Default,
                 MirrorAcrossSymmetryPlane = true,
-            }));
-
-            _selectedPartId = newId;
-            _activeBodySampleIndex = -1;
+            };
         }
 
         private void RemoveSelectedPart()
@@ -755,15 +983,67 @@ namespace ProceduralCreature.Editor
         {
             EditorGUILayout.LabelField("Editing: Body", EditorStyles.boldLabel);
 
-            Vector3 newForward = EditorGUILayout.Vector3Field("Forward", _definition.Forward);
-            if (newForward != _definition.Forward)
-            {
-                MutateDefinition("Edit Body Forward", definition => definition.Forward = newForward);
-            }
+            // CC-020: the Body inspector is split into collapsible sections so
+            // dozens of samples never run the panel off-screen. The viewport stays
+            // the primary Body editing surface; the inspector is for precise values
+            // and bulk operations. Section foldout state is session-scoped editor
+            // presentation state, never DNA.
 
-            EditorGUILayout.Space();
-            EditorGUILayout.LabelField("Body Spline", EditorStyles.boldLabel);
+            _bodyShowGeneral = EditorGUILayout.BeginFoldoutHeaderGroup(_bodyShowGeneral, "General");
+            if (_bodyShowGeneral)
+            {
+                Vector3 newForward = EditorGUILayout.Vector3Field("Forward", _definition.Forward);
+                if (newForward != _definition.Forward)
+                {
+                    MutateDefinition("Edit Body Forward", definition => definition.Forward = newForward);
+                }
+            }
+            EditorGUILayout.EndFoldoutHeaderGroup();
+
+            _bodyShowSpline = EditorGUILayout.BeginFoldoutHeaderGroup(_bodyShowSpline, "Body Spline");
+            if (_bodyShowSpline)
+            {
+                DrawBodySplineSection();
+            }
+            EditorGUILayout.EndFoldoutHeaderGroup();
+
+            _bodyShowAppearance = EditorGUILayout.BeginFoldoutHeaderGroup(_bodyShowAppearance, "Appearance");
+            if (_bodyShowAppearance)
+            {
+                DrawBodyAppearanceFields();
+            }
+            EditorGUILayout.EndFoldoutHeaderGroup();
+
+            _bodyShowAdvanced = EditorGUILayout.BeginFoldoutHeaderGroup(_bodyShowAdvanced, "Advanced");
+            if (_bodyShowAdvanced)
+            {
+                EditorGUILayout.HelpBox(
+                    "Adding a sample extends the Body along its tail at the current spacing. Drag the sample " +
+                    "spheres in the Scene view (select Body in the part list first): an interior sample bends " +
+                    "the spine locally (the selected sample moves, neighbors resist and move a little), and an " +
+                    "endpoint (the larger sphere) extends or shortens the body. One drag commits as a single " +
+                    "Undo step; Esc cancels a drag. The Body Spacing slider is a developer/debug density " +
+                    "control that re-samples the whole Body (head and tail stay put); its semantics are still " +
+                    "being defined and it is not part of the core bend/edit interaction. Space Evenly re-snaps " +
+                    "spacing after manual edits.",
+                    MessageType.None);
+            }
+            EditorGUILayout.EndFoldoutHeaderGroup();
+        }
+
+        /// <summary>
+        /// The Body spline section of the inspector (CC-020): sample count, a
+        /// bounded scroll region for precise per-sample editing, and the bulk
+        /// add/space/spacing controls. The bounded scroll is what stops the panel
+        /// from running off-screen with many samples; the viewport remains the
+        /// primary sample editing surface.
+        /// </summary>
+        private void DrawBodySplineSection()
+        {
             EditorGUILayout.LabelField($"Samples: {_definition.Body.Samples.Count}");
+
+            _bodySampleScroll = EditorGUILayout.BeginScrollView(
+                _bodySampleScroll, GUILayout.MaxHeight(BodySampleScrollMaxHeight));
 
             BodySample sampleToRemove = null;
             for (int i = 0; i < _definition.Body.Samples.Count; i++)
@@ -790,6 +1070,7 @@ namespace ProceduralCreature.Editor
                 if (GUILayout.Button("Remove", GUILayout.Width(60))) sampleToRemove = sample;
                 EditorGUILayout.EndHorizontal();
             }
+            EditorGUILayout.EndScrollView();
 
             if (sampleToRemove != null)
             {
@@ -840,27 +1121,13 @@ namespace ProceduralCreature.Editor
                 _activeBodySampleIndex = -1; // sample count may have changed
                 Repaint();
             }
-
-            EditorGUILayout.HelpBox(
-                "Adding a sample extends the Body along its tail at the current spacing. Drag the sample " +
-                "spheres in the Scene view (select Body in the part list first): an interior sample bends " +
-                "the spine locally (the selected sample moves, neighbors resist and move a little), and an " +
-                "endpoint (the larger sphere) extends or shortens the body. One drag commits as a single " +
-                "Undo step; Esc cancels a drag. The Body Spacing slider is a developer/debug density " +
-                "control that re-samples the whole Body (head and tail stay put); its semantics are still " +
-                "being defined and it is not part of the core bend/edit interaction. Space Evenly re-snaps " +
-                "spacing after manual edits.",
-                MessageType.None);
-
-            EditorGUILayout.Space();
-            DrawBodyAppearanceFields();
         }
 
         /// <summary>
-        /// Authoring surface for the Body vertical-gradient appearance (CC-025):
-        /// a top gradient and a bottom gradient keyed over body length, blended by
-        /// the vertical sample, plus the vertical offset. Every edit funnels
-        /// through MutateDefinition like all other DNA fields.
+        /// Authoring surface for the Body vertical-gradient appearance
+        /// (CC-025/CC-034): a top gradient and a bottom gradient keyed over body
+        /// length, blended by a vertical-blend curve over the vertical sample.
+        /// Every edit funnels through MutateDefinition like all other DNA fields.
         /// </summary>
         private void DrawBodyAppearanceFields()
         {
@@ -868,18 +1135,21 @@ namespace ProceduralCreature.Editor
             EditorGUILayout.HelpBox(
                 "The Body color is a vertical gradient: a top and a bottom gradient keyed over body " +
                 "length, blended by the vertical sample (-1 = bottom .. +1 = top of the surface). In " +
-                "each gradient, left (time 0) is the head and right (time 1) is the tail. The offset " +
-                "shifts the blend boundary while keeping the surface extremes fixed.",
+                "each gradient, left (time 0) is the head and right (time 1) is the tail. The vertical " +
+                "curve remaps bottom-to-top (0..1) to the top/bottom blend; the default linear curve " +
+                "leaves the blend unchanged.",
                 MessageType.None);
 
             BodyVerticalGradientAppearance appearance =
                 _definition.Body.Appearance ?? BodyVerticalGradientAppearance.CreateDefault();
 
-            float newOffset = EditorGUILayout.Slider("Vertical Offset", appearance.VerticalOffset, -1f, 1f);
-            if (!Mathf.Approximately(newOffset, appearance.VerticalOffset))
+            UnityEngine.AnimationCurve currentCurve = appearance.VerticalCurve;
+            UnityEngine.AnimationCurve editedCurve =
+                EditorGUILayout.CurveField("Vertical Curve", CurveAdapter.Clone(currentCurve));
+            if (!CurveAdapter.ContentEquals(editedCurve, currentCurve))
             {
-                MutateDefinition("Edit Body Vertical Offset",
-                    definition => definition.Body.Appearance.VerticalOffset = newOffset);
+                MutateDefinition("Edit Body Vertical Curve",
+                    definition => definition.Body.Appearance.VerticalCurve = CurveAdapter.Clone(editedCurve));
             }
 
             UnityEngine.Gradient currentTop = appearance.TopGradient;
@@ -1652,8 +1922,7 @@ namespace ProceduralCreature.Editor
                 MirrorAcrossSymmetryPlane = true,
             }));
 
-            _selectedPartId = newId;
-            _activeBodySampleIndex = -1;
+            SelectPart(newId);
             Repaint();
         }
 

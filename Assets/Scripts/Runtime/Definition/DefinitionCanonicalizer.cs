@@ -98,11 +98,12 @@ namespace ProceduralCreature.Definition
         }
 
         /// <summary>
-        /// Canonicalizes the Body vertical-gradient appearance (CC-025): quantizes
-        /// gradient key times/colors/alphas and the offset, and orders each
-        /// gradient's keys by non-decreasing time for deterministic serialization.
-        /// Throws on a null appearance or invalid gradients — canonicalization is
-        /// not a repair pass, matching the body-spline and transform rules above.
+        /// Canonicalizes the Body vertical-gradient appearance (CC-025/CC-034):
+        /// quantizes gradient key times/colors/alphas and the vertical-curve
+        /// keys, and orders each gradient's and the curve's keys by
+        /// non-decreasing time for deterministic serialization. Throws on a null
+        /// appearance or invalid gradients/curve — canonicalization is not a
+        /// repair pass, matching the body-spline and transform rules above.
         /// </summary>
         private static void CanonicalizeBodyAppearance(BodyVerticalGradientAppearance appearance)
         {
@@ -112,7 +113,20 @@ namespace ProceduralCreature.Definition
             }
             CanonicalizeGradient(appearance.TopGradient, "top");
             CanonicalizeGradient(appearance.BottomGradient, "bottom");
-            appearance.VerticalOffset = GenerationTolerances.Quantize(appearance.VerticalOffset);
+            CanonicalizeVerticalCurve(appearance.VerticalCurve);
+        }
+
+        private static void CanonicalizeVerticalCurve(UnityEngine.AnimationCurve curve)
+        {
+            if (curve == null)
+            {
+                throw new DomainException("Cannot canonicalize a Body vertical curve that is null.");
+            }
+            if (!CurveAdapter.IsFinite(curve) || !CurveAdapter.HasValidKeys(curve))
+            {
+                throw new DomainException("Cannot canonicalize an invalid Body vertical curve.");
+            }
+            CurveAdapter.Quantize(curve);
         }
 
         private static void CanonicalizeGradient(UnityEngine.Gradient gradient, string name)

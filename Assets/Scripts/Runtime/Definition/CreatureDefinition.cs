@@ -129,5 +129,37 @@ namespace ProceduralCreature.Definition
             Parts.RemoveAt(index);
             return true;
         }
+
+        /// <summary>
+        /// Returns a NEW part that duplicates sourceId's authoring properties as a
+        /// child of newParentId (CC-029). The returned part is NOT added to Parts —
+        /// callers add it via AddPart so the single mutation boundary (the editor's
+        /// MutateDefinition) stays the only place definitions are written.
+        ///
+        /// Copied: PartType, Shape, Appearance, MirrorAcrossSymmetryPlane, and
+        /// DisplayName (the source's authored label; the parts tree disambiguates
+        /// duplicates by Id). Fresh: Id (via CloneAsDuplicate), ParentId, Transform
+        /// (identity relative to the new parent — the source's parent-local transform
+        /// is meaningless under a different parent), and ParentAttachment (null — the
+        /// source's anchor references its own parent's body, not the new parent's).
+        /// No generated/runtime state is copied. Shape/Appearance/Transform are value
+        /// structs, so the clone is independent of the source by construction.
+        /// </summary>
+        /// <exception cref="Common.DomainException">sourceId is not a part of this definition.</exception>
+        public CreaturePart ClonePartAsChild(string sourceId, string newParentId)
+        {
+            CreaturePart source = FindPart(sourceId);
+            if (source == null)
+            {
+                throw new Common.DomainException(
+                    $"Cannot clone unknown part '{sourceId}' as a child.");
+            }
+
+            CreaturePart clone = source.CloneAsDuplicate();
+            clone.ParentId = newParentId;
+            clone.Transform = TransformData.Identity;
+            clone.ParentAttachment = null;
+            return clone;
+        }
     }
 }

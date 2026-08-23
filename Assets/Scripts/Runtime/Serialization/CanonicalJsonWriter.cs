@@ -52,7 +52,12 @@ namespace ProceduralCreature.Serialization
     ///           { "time": 1.0000, "alpha": 1.0000 }
     ///         ]
     ///       },
-    ///       "verticalOffset": 0.0000
+    ///       "verticalCurve": {
+    ///         "keys": [
+    ///           { "time": 0.0000, "value": 0.0000, "inTangent": 1.0000, "outTangent": 1.0000 },
+    ///           { "time": 1.0000, "value": 1.0000, "inTangent": 1.0000, "outTangent": 1.0000 }
+    ///         ]
+    ///       }
     ///     }
     ///   },
     ///   "parts": [
@@ -152,8 +157,36 @@ namespace ProceduralCreature.Serialization
             sb.Append('{');
             sb.Append("\"topGradient\":").Append(WriteGradient(appearance.TopGradient)).Append(',');
             sb.Append("\"bottomGradient\":").Append(WriteGradient(appearance.BottomGradient)).Append(',');
-            sb.Append("\"verticalOffset\":").Append(Num(appearance.VerticalOffset));
+            sb.Append("\"verticalCurve\":").Append(WriteCurve(appearance.VerticalCurve));
             sb.Append('}');
+            return sb.ToString();
+        }
+
+        /// <summary>
+        /// Writes the vertical-blend curve (CC-034) as its canonical key list. Only
+        /// time / value / inTangent / outTangent are part of the contract; wrap
+        /// modes are irrelevant (the input is always clamped to [0, 1]) and
+        /// weighted/constant tangents are normalized away by CurveAdapter.
+        /// </summary>
+        private static string WriteCurve(UnityEngine.AnimationCurve curve)
+        {
+            if (curve == null) return "null";
+            var sb = new StringBuilder();
+            sb.Append('{');
+            sb.Append("\"keys\":[");
+            UnityEngine.Keyframe[] keys = curve.keys;
+            if (keys != null)
+            {
+                for (int i = 0; i < keys.Length; i++)
+                {
+                    if (i > 0) sb.Append(',');
+                    sb.Append("{\"time\":").Append(Num(keys[i].time));
+                    sb.Append(",\"value\":").Append(Num(keys[i].value));
+                    sb.Append(",\"inTangent\":").Append(Num(keys[i].inTangent));
+                    sb.Append(",\"outTangent\":").Append(Num(keys[i].outTangent)).Append('}');
+                }
+            }
+            sb.Append("]}");
             return sb.ToString();
         }
 

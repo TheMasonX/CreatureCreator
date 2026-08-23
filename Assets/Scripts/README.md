@@ -214,15 +214,20 @@ local spine centerline in WORLD up, normalized by the local radius
 (`(point.y − centerline.y) / radius`), clamped to −1 (bottom of the surface)
 .. +1 (top) — world up is the camouflage-correct axis (the underbelly is
 always the world-down side) and is independent of the body's slope. The
-optional offset shifts the blend's zero point while keeping the surface
-extremes pinned at ±1. The gradient data is optional in canonical JSON (old v2
-files load with flat gray); the pre-CC-025-refactor array-of-stops gradient
-shape also still loads. Validated by `DefinitionValidator`, normalized (ordered
-keys + quantization) by `DefinitionCanonicalizer`, and authored from the Body
-inspector with the full Unity gradient editor
-(`EditorGUILayout.GradientField`). Note: Unity snaps gradient key times to
-1/65535 increments internally; the canonical writer's fixed formatting keeps
-save-load-save byte-stable.
+vertical blend is remapped by an `AnimationCurve` (CC-034): the sample maps to
+the curve input in 0..1 via `u = (verticalSample + 1) * 0.5` and the curve
+output is the top/bottom blend factor; the default curve is linear y = x.
+`CurveAdapter` is the curve's conversion seam (evaluate, clone, compare,
+validate, quantize, and the legacy `verticalOffset` → curve migration). The
+gradient data is optional in canonical JSON (old v2 files load with flat
+gray); the pre-CC-025-refactor array-of-stops gradient shape also still loads,
+and pre-CC-034 files that carry `verticalOffset` migrate to the exact
+equivalent 3-key piecewise-linear curve. Validated by `DefinitionValidator`,
+normalized (ordered keys + quantization) by `DefinitionCanonicalizer`, and
+authored from the Body inspector with the full Unity gradient editor
+(`EditorGUILayout.GradientField`) plus a `CurveField` for the blend curve.
+Note: Unity snaps gradient key times to 1/65535 increments internally; the
+canonical writer's fixed formatting keeps save-load-save byte-stable.
 
 ## Phase 6 — skeleton inference
 

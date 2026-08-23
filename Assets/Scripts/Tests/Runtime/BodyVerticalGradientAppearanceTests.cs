@@ -10,10 +10,12 @@ using ProceduralCreature.Serialization;
 namespace ProceduralCreature.Tests.Runtime
 {
     /// <summary>
-    /// Tests for the Body vertical-gradient appearance model (CC-025): Unity
-    /// Gradient adapter behavior, the vertical-sample projection + offset math,
-    /// top/bottom blending, validation, canonicalization, JSON round-trip, and
-    /// the baked per-vertex colors that the vertex-color lit shader surfaces.
+    /// Tests for the Body vertical-gradient appearance model (CC-025/CC-034):
+    /// Unity Gradient adapter behavior, the vertical-sample projection + the
+    /// vertical-blend curve remap, top/bottom blending, validation,
+    /// canonicalization, JSON round-trip (including the legacy verticalOffset
+    /// migration), and the baked per-vertex colors that the vertex-color lit
+    /// shader surfaces.
     /// </summary>
     [TestFixture]
     public class BodyVerticalGradientAppearanceTests
@@ -60,6 +62,23 @@ namespace ProceduralCreature.Tests.Runtime
                 new UnityEngine.GradientAlphaKey(1f, 1f),
             };
             return gradient;
+        }
+
+        /// <summary>
+        /// Builds a curve from explicit time/value/tangent keys with free tangents
+        /// (matching CurveAdapter), so evaluation uses exactly the given tangents.
+        /// </summary>
+        private static UnityEngine.AnimationCurve CurveFrom(params (float Time, float Value, float In, float Out)[] keys)
+        {
+            var keyframes = new UnityEngine.Keyframe[keys.Length];
+            for (int i = 0; i < keys.Length; i++)
+            {
+                keyframes[i] = new UnityEngine.Keyframe(keys[i].Time, keys[i].Value, keys[i].In, keys[i].Out)
+                {
+                    tangentMode = 0, // Free
+                };
+            }
+            return new UnityEngine.AnimationCurve(keyframes);
         }
 
         // ---- Unity Gradient adapter -------------------------------------------
@@ -172,66 +191,122 @@ namespace ProceduralCreature.Tests.Runtime
             Assert.LessOrEqual(gradient.colorKeys[0].time, gradient.colorKeys[1].time, "Keys remain ordered by time.");
         }
 
-        // ---- vertical offset shift --------------------------------------------
+        // ---- vertical blend curve (CC-034) ------------------------------------
 
         [Test]
-        public void ApplyVerticalOffset_ZeroOffset_IsIdentity()
+        public void CurveAdapter_DefaultLinear_EvaluatesAsIdentity()
         {
-            for (float v = -1f; v <= 1f; v += 0.25f)
+            UnityEngine.AnimationCurve curve = BodyVerticalGradientAppearance.CreateDefault().VerticalCurve;
+            for (float u = 0f; u <= 1f; u += 0.1f)
             {
-                Assert.AreEqual(v, BodyVerticalGradientSampler.ApplyVerticalOffset(v, 0f), 1e-4f);
+                Assert.AreEqual(u, CurveAdapter.Evaluate(curve, u), 1e-4f, $"linear curve at u = {u}");
             }
         }
 
         [Test]
-        public void ApplyVerticalOffset_TopBoundary_IsExactlyOne()
+        public void CurveAdapter_Evaluate_ClampsInputToUnitRange()
         {
-            Assert.AreEqual(1f, BodyVerticalGradientSampler.ApplyVerticalOffset(1f, 0.5f), 1e-5f);
-            Assert.AreEqual(1f, BodyVerticalGradientSampler.ApplyVerticalOffset(1f, -0.5f), 1e-5f);
-            Assert.AreEqual(1f, BodyVerticalGradientSampler.ApplyVerticalOffset(1f, 1f), 1e-5f);
-            Assert.AreEqual(1f, BodyVerticalGradientSampler.ApplyVerticalOffset(1f, -1f), 1e-5f);
+            UnityEngine.AnimationCurve curve = CurveAdapter.Linear();
+            Assert.AreEqual(0f, CurveAdapter.Evaluate(curve, -0.5f), 1e-5f);
+            Assert.AreEqual(1f, CurveAdapter.Evaluate(curve, 1.5f), 1e-5f);
         }
 
         [Test]
-        public void ApplyVerticalOffset_BottomBoundary_IsExactlyMinusOne()
+        public void CurveAdapter_FromLegacyOffset_ZeroBecomesLinear()
         {
-            Assert.AreEqual(-1f, BodyVerticalGradientSampler.ApplyVerticalOffset(-1f, 0.5f), 1e-5f);
-            Assert.AreEqual(-1f, BodyVerticalGradientSampler.ApplyVerticalOffset(-1f, -0.5f), 1e-5f);
-            Assert.AreEqual(-1f, BodyVerticalGradientSampler.ApplyVerticalOffset(-1f, 1f), 1e-5f);
-            Assert.AreEqual(-1f, BodyVerticalGradientSampler.ApplyVerticalOffset(-1f, -1f), 1e-5f);
-        }
-
-        [Test]
-        public void ApplyVerticalOffset_ZeroPointLandsOnOffset()
-        {
-            Assert.AreEqual(0.5f, BodyVerticalGradientSampler.ApplyVerticalOffset(0f, 0.5f), 1e-5f);
-            Assert.AreEqual(-0.3f, BodyVerticalGradientSampler.ApplyVerticalOffset(0f, -0.3f), 1e-5f);
-            Assert.AreEqual(1f, BodyVerticalGradientSampler.ApplyVerticalOffset(0f, 1f), 1e-5f);
-        }
-
-        [Test]
-        public void ApplyVerticalOffset_IsMonotonicInVerticalSample()
-        {
-            float[] offsets = { -1f, -0.5f, 0f, 0.5f, 1f };
-            foreach (float offset in offsets)
+            UnityEngine.AnimationCurve curve = CurveAdapter.FromLegacyOffset(0f);
+            for (float u = 0f; u <= 1f; u += 0.1f)
             {
-                float previous = -1f;
-                for (float v = -1f; v <= 1f; v += 0.1f)
+                Assert.AreEqual(u, CurveAdapter.Evaluate(curve, u), 1e-4f, $"offset-0 curve at u = {u}");
+            }
+        }
+
+        [Test]
+        public void CurveAdapter_FromLegacyOffset_ReproducesOffsetRemapExactly()
+        {
+            // The pre-CC-034 offset remap, as a blend factor over the remapped
+            // input u = (v + 1) * 0.5, is exactly:
+            //   blend(u) = (o + 1) * u        for u <= 0.5
+            //   blend(u) = o + (1 - o) * u    for u >= 0.5
+            foreach (float o in new[] { -1f, -0.5f, 0f, 0.5f, 1f })
+            {
+                UnityEngine.AnimationCurve curve = CurveAdapter.FromLegacyOffset(o);
+                for (float u = 0f; u <= 1f; u += 0.05f)
                 {
-                    float result = BodyVerticalGradientSampler.ApplyVerticalOffset(v, offset);
-                    Assert.GreaterOrEqual(result, previous - 1e-5f, $"offset {offset}, v {v}");
-                    previous = result;
+                    float expected = u <= 0.5f ? (o + 1f) * u : o + (1f - o) * u;
+                    Assert.AreEqual(expected, CurveAdapter.Evaluate(curve, u), 1e-4f, $"offset {o}, u {u}");
                 }
             }
         }
 
         [Test]
-        public void ApplyVerticalOffset_ClampsOutOfRangeOffsetAndSample()
+        public void CurveAdapter_FromLegacyOffset_PinsSurfaceExtremes()
         {
-            Assert.AreEqual(1f, BodyVerticalGradientSampler.ApplyVerticalOffset(1f, 5f), 1e-5f);
-            Assert.AreEqual(-1f, BodyVerticalGradientSampler.ApplyVerticalOffset(-1f, -5f), 1e-5f);
-            Assert.AreEqual(1f, BodyVerticalGradientSampler.ApplyVerticalOffset(9f, 0f), 1e-5f);
-            Assert.AreEqual(-1f, BodyVerticalGradientSampler.ApplyVerticalOffset(-9f, 0f), 1e-5f);
+            foreach (float o in new[] { -1f, -0.5f, 0f, 0.5f, 1f })
+            {
+                UnityEngine.AnimationCurve curve = CurveAdapter.FromLegacyOffset(o);
+                Assert.AreEqual(0f, CurveAdapter.Evaluate(curve, 0f), 1e-5f, $"bottom pinned, offset {o}");
+                Assert.AreEqual(1f, CurveAdapter.Evaluate(curve, 1f), 1e-5f, $"top pinned, offset {o}");
+            }
+        }
+
+        [Test]
+        public void CurveAdapter_Clone_DeepCopiesKeys()
+        {
+            UnityEngine.AnimationCurve original = CurveFrom((0f, 0f, 1f, 1f), (0.5f, 0.75f, 1f, 0.5f), (1f, 1f, 0.5f, 0.5f));
+            UnityEngine.AnimationCurve clone = CurveAdapter.Clone(original);
+
+            Assert.IsTrue(CurveAdapter.ContentEquals(original, clone));
+            Assert.AreNotSame(original.keys, clone.keys, "Clone must copy the key array, not share it.");
+        }
+
+        [Test]
+        public void CurveAdapter_ContentEquals_DetectsKeyAndTangentDifferences()
+        {
+            UnityEngine.AnimationCurve a = CurveFrom((0f, 0f, 1f, 1f), (1f, 1f, 1f, 1f));
+            UnityEngine.AnimationCurve same = CurveFrom((0f, 0f, 1f, 1f), (1f, 1f, 1f, 1f));
+            UnityEngine.AnimationCurve differentValue = CurveFrom((0f, 0f, 1f, 1f), (1f, 0.8f, 1f, 1f));
+            UnityEngine.AnimationCurve differentTangent = CurveFrom((0f, 0f, 1f, 1f), (1f, 1f, 2f, 1f));
+
+            Assert.IsTrue(CurveAdapter.ContentEquals(a, same));
+            Assert.IsFalse(CurveAdapter.ContentEquals(a, differentValue));
+            Assert.IsFalse(CurveAdapter.ContentEquals(a, differentTangent));
+        }
+
+        [Test]
+        public void CurveAdapter_Quantize_SortsAndQuantizesKeys()
+        {
+            var curve = new UnityEngine.AnimationCurve(new[]
+            {
+                new UnityEngine.Keyframe(0.123456f, 0.987654f, 1.234567f, 0.5f),
+                new UnityEngine.Keyframe(1f, 1f, 1f, 1f),
+            });
+
+            CurveAdapter.Quantize(curve);
+
+            UnityEngine.Keyframe first = curve.keys[0];
+            Assert.AreEqual(0.1235f, first.time, 1e-6f, "Key time quantizes to 4 decimal places.");
+            Assert.AreEqual(0.9877f, first.value, 1e-6f, "Key value quantizes to 4 decimal places.");
+            Assert.AreEqual(1.2346f, first.inTangent, 1e-6f, "Key inTangent quantizes to 4 decimal places.");
+            Assert.LessOrEqual(curve.keys[0].time, curve.keys[1].time, "Keys remain ordered by time.");
+        }
+
+        [Test]
+        public void CurveAdapter_HasValidKeys_RejectsEmptyOutOfRangeAndNonFinite()
+        {
+            Assert.IsFalse(CurveAdapter.HasValidKeys(null));
+            Assert.IsFalse(CurveAdapter.HasValidKeys(new UnityEngine.AnimationCurve()), "A curve with no keys is invalid.");
+            Assert.IsFalse(CurveAdapter.HasValidKeys(CurveFrom((0f, 0f, 1f, 1f), (1.5f, 1f, 1f, 1f))), "A key time beyond [0, 1] is invalid.");
+            // NaN values are sanitized by Unity at curve construction, so the
+            // realistic non-finite case is an infinite (constant-key) tangent.
+            Assert.IsFalse(CurveAdapter.HasValidKeys(CurveFrom((0f, 0f, float.PositiveInfinity, 1f), (1f, 1f, 1f, 1f))), "A non-finite tangent is invalid.");
+            Assert.IsTrue(CurveAdapter.HasValidKeys(CurveFrom((0f, 0f, 1f, 1f), (1f, 1f, 1f, 1f))));
+        }
+
+        [Test]
+        public void CurveAdapter_SingleKey_IsValid()
+        {
+            Assert.IsTrue(CurveAdapter.HasValidKeys(CurveFrom((0.5f, 0.25f, 0f, 0f))));
         }
 
         // ---- vertical sample + top/bottom blend -------------------------------
@@ -308,14 +383,15 @@ namespace ProceduralCreature.Tests.Runtime
         }
 
         [Test]
-        public void EvaluateColor_PositiveOffset_BiasesCenterlineTowardTop()
+        public void EvaluateColor_PositiveOffsetCurve_BiasesCenterlineTowardTop()
         {
             CreatureDefinition definition = HorizontalBodyDefinition();
             definition.Body.Appearance.TopGradient = GradientAdapter.Solid(Color.white);
             definition.Body.Appearance.BottomGradient = GradientAdapter.Solid(Color.black);
-            definition.Body.Appearance.VerticalOffset = 0.5f;
+            // The migrated offset-0.5 curve keeps the old remap: at the geometric
+            // center (u = 0.5) the blend is 0.75.
+            definition.Body.Appearance.VerticalCurve = CurveAdapter.FromLegacyOffset(0.5f);
 
-            // At the geometric center the shifted sample is 0.5 -> blend 0.75.
             Color c = BodyVerticalGradientSampler.EvaluateColor(definition, Vector3.zero);
             Assert.AreEqual(0.75f, c.r, 1e-3f);
         }
@@ -446,10 +522,34 @@ namespace ProceduralCreature.Tests.Runtime
         }
 
         [Test]
-        public void Validate_OutOfRangeOffset_ReportsInvalidBodyAppearance()
+        public void Validate_CurveKeyOutOfRange_ReportsInvalidBodyAppearance()
         {
             CreatureDefinition definition = HorizontalBodyDefinition();
-            definition.Body.Appearance.VerticalOffset = 1.5f;
+            definition.Body.Appearance.VerticalCurve =
+                CurveFrom((0f, 0f, 1f, 1f), (1.5f, 1f, 1f, 1f));
+
+            ValidationResult result = DefinitionValidator.Validate(definition);
+            Assert.IsTrue(HasCode(result, ValidationCode.InvalidBodyAppearance));
+        }
+
+        [Test]
+        public void Validate_NonFiniteCurveValue_ReportsNonFiniteBodyAppearance()
+        {
+            // NaN values are sanitized by Unity at curve construction, so the
+            // realistic non-finite case is an infinite (constant-key) tangent.
+            CreatureDefinition definition = HorizontalBodyDefinition();
+            definition.Body.Appearance.VerticalCurve =
+                CurveFrom((0f, 0f, float.PositiveInfinity, 1f), (1f, 1f, 1f, 1f));
+
+            ValidationResult result = DefinitionValidator.Validate(definition);
+            Assert.IsTrue(HasCode(result, ValidationCode.NonFiniteBodyAppearance));
+        }
+
+        [Test]
+        public void Validate_NullCurve_ReportsInvalidBodyAppearance()
+        {
+            CreatureDefinition definition = HorizontalBodyDefinition();
+            definition.Body.Appearance.VerticalCurve = null;
 
             ValidationResult result = DefinitionValidator.Validate(definition);
             Assert.IsTrue(HasCode(result, ValidationCode.InvalidBodyAppearance));
@@ -470,7 +570,7 @@ namespace ProceduralCreature.Tests.Runtime
         // ---- canonicalization --------------------------------------------------
 
         [Test]
-        public void Canonicalize_QuantizesGradientKeysAndOffset()
+        public void Canonicalize_QuantizesGradientKeysAndCurve()
         {
             CreatureDefinition definition = HorizontalBodyDefinition();
             definition.Body.Appearance.TopGradient = new UnityEngine.Gradient
@@ -486,7 +586,11 @@ namespace ProceduralCreature.Tests.Runtime
                     new UnityEngine.GradientAlphaKey(1f, 1f),
                 },
             };
-            definition.Body.Appearance.VerticalOffset = 0.123456f;
+            definition.Body.Appearance.VerticalCurve = new UnityEngine.AnimationCurve(new[]
+            {
+                new UnityEngine.Keyframe(0.123456f, 0.5f, 1f, 1f),
+                new UnityEngine.Keyframe(1f, 1f, 1f, 1f),
+            });
 
             CreatureDefinition result = DefinitionCanonicalizer.Canonicalize(definition);
 
@@ -497,7 +601,10 @@ namespace ProceduralCreature.Tests.Runtime
                 "Key times re-quantize to 4 decimal places after Unity's time snapping.");
             Assert.LessOrEqual(result.Body.Appearance.TopGradient.colorKeys[0].time,
                 result.Body.Appearance.TopGradient.colorKeys[1].time, "Keys remain ordered by time.");
-            Assert.AreEqual(0.1235f, result.Body.Appearance.VerticalOffset, 1e-6f);
+            Assert.AreEqual(0.1235f, result.Body.Appearance.VerticalCurve.keys[0].time, 1e-6f,
+                "Curve key times quantize to 4 decimal places.");
+            Assert.LessOrEqual(result.Body.Appearance.VerticalCurve.keys[0].time,
+                result.Body.Appearance.VerticalCurve.keys[1].time, "Curve keys remain ordered by time.");
         }
 
         [Test]
@@ -528,7 +635,8 @@ namespace ProceduralCreature.Tests.Runtime
             UnityEngine.Gradient bottom = GradientWith((0f, Color.blue), (0.5f, Color.green), (1f, Color.cyan));
             bottom.mode = UnityEngine.GradientMode.Fixed; // mode must survive the round-trip too
             definition.Body.Appearance.BottomGradient = bottom;
-            definition.Body.Appearance.VerticalOffset = 0.35f;
+            definition.Body.Appearance.VerticalCurve =
+                CurveFrom((0f, 0f, 1f, 1f), (0.5f, 0.75f, 1f, 0.5f), (1f, 1f, 0.5f, 0.5f));
 
             var serializer = new JsonDnaSerializer();
             string json = serializer.Serialize(definition);
@@ -546,7 +654,8 @@ namespace ProceduralCreature.Tests.Runtime
             CreatureDefinition definition = HorizontalBodyDefinition();
             definition.Body.Appearance.TopGradient = GradientWith((0f, new Color(0.1f, 0.2f, 0.3f)), (0.7f, Color.white));
             definition.Body.Appearance.BottomGradient = GradientAdapter.Solid(new Color(0.9f, 0.8f, 0.7f));
-            definition.Body.Appearance.VerticalOffset = -0.2f;
+            definition.Body.Appearance.VerticalCurve =
+                CurveFrom((0f, 0f, 1.25f, 1.25f), (0.5f, 0.75f, 1f, 0.5f), (1f, 1f, 0.5f, 0.5f));
 
             var serializer = new JsonDnaSerializer();
             string first = serializer.Serialize(definition);
@@ -569,7 +678,8 @@ namespace ProceduralCreature.Tests.Runtime
             CreatureDefinition loaded = serializer.Deserialize(json);
 
             Assert.IsNotNull(loaded.Body.Appearance, "An old v2 file without a body appearance must still load.");
-            Assert.AreEqual(0f, loaded.Body.Appearance.VerticalOffset, 1e-6f);
+            Assert.IsTrue(CurveAdapter.ContentEquals(CurveAdapter.Linear(), loaded.Body.Appearance.VerticalCurve),
+                "The default vertical curve is linear y = x.");
             Assert.AreEqual(2, loaded.Body.Appearance.TopGradient.colorKeys.Length, "Unity gradients store at least two color keys.");
             Assert.AreEqual(Color.gray, loaded.Body.Appearance.TopGradient.colorKeys[0].color);
             Assert.AreEqual(2, loaded.Body.Appearance.BottomGradient.colorKeys.Length);
@@ -600,9 +710,41 @@ namespace ProceduralCreature.Tests.Runtime
             Assert.AreEqual(new Color(0.5f, 0.5f, 0.5f, 1f), loaded.Body.Appearance.TopGradient.colorKeys[0].color);
             Assert.AreEqual(new Color(0.2f, 0.2f, 0.2f, 1f), loaded.Body.Appearance.BottomGradient.colorKeys[0].color);
 
+            // The legacy verticalOffset: 0 migrates to the linear y = x curve.
+            Assert.AreEqual(0.25f, CurveAdapter.Evaluate(loaded.Body.Appearance.VerticalCurve, 0.25f), 1e-4f);
+            Assert.AreEqual(0.75f, CurveAdapter.Evaluate(loaded.Body.Appearance.VerticalCurve, 0.75f), 1e-4f);
+
             // And it round-trips to the current canonical form byte-stably.
             CreatureDefinition resaved = serializer.Deserialize(serializer.Serialize(loaded));
             Assert.IsTrue(loaded.Body.Appearance.ContentEquals(resaved.Body.Appearance));
+        }
+
+        [Test]
+        public void Deserialize_LegacyVerticalOffset_MigratesToEquivalentCurve()
+        {
+            // A CC-025 file carries verticalOffset instead of verticalCurve. It
+            // must load with a curve that reproduces the old remap exactly:
+            //   blend(u) = (o + 1) * u        for u <= 0.5
+            //   blend(u) = o + (1 - o) * u    for u >= 0.5
+            const string json =
+                "{\"schemaVersion\":2,\"symmetryMode\":\"None\",\"bounds\":{\"maxX\":4,\"maxY\":4,\"maxZ\":4}," +
+                "\"generation\":{\"voxelsPerUnit\":16},\"forward\":{\"x\":0,\"y\":0,\"z\":1}," +
+                "\"body\":{\"samples\":[{\"id\":1,\"position\":{\"x\":0,\"y\":0,\"z\":-1},\"radius\":0.75}," +
+                "{\"id\":2,\"position\":{\"x\":0,\"y\":0,\"z\":1},\"radius\":0.9}]," +
+                "\"appearance\":{\"topGradient\":[{\"t\":0,\"color\":{\"r\":0.5,\"g\":0.5,\"b\":0.5,\"a\":1}}]," +
+                "\"bottomGradient\":[{\"t\":0,\"color\":{\"r\":0.2,\"g\":0.2,\"b\":0.2,\"a\":1}}],\"verticalOffset\":0.5}}," +
+                "\"parts\":[]}";
+
+            var serializer = new JsonDnaSerializer();
+            CreatureDefinition loaded = serializer.Deserialize(json);
+
+            UnityEngine.AnimationCurve curve = loaded.Body.Appearance.VerticalCurve;
+            Assert.IsNotNull(curve, "A legacy verticalOffset must migrate to a curve.");
+            Assert.AreEqual(0f, CurveAdapter.Evaluate(curve, 0f), 1e-5f);
+            Assert.AreEqual(0.375f, CurveAdapter.Evaluate(curve, 0.25f), 1e-4f);
+            Assert.AreEqual(0.75f, CurveAdapter.Evaluate(curve, 0.5f), 1e-4f);
+            Assert.AreEqual(0.875f, CurveAdapter.Evaluate(curve, 0.75f), 1e-4f);
+            Assert.AreEqual(1f, CurveAdapter.Evaluate(curve, 1f), 1e-5f);
         }
     }
 }

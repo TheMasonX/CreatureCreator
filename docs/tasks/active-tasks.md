@@ -21,7 +21,7 @@
 | CC-017 | In-viewport Body sample scale (radius) editing | In Progress | P1 |
 | CC-018 | Limb parts as joint chains with between-joint metaballs | Backlog | P1 |
 | CC-019 | Bidirectional Body length editing (head-end add/remove on drag) | Backlog | P1 |
-| CC-020 | Collapsible, less-centered parts tree | Backlog | P2 |
+| CC-020 | Collapsible parts tree and Body inspector sections | Done | P2 |
 | CC-021 | Show editable control points for a selected part | Backlog | P2 |
 | CC-022 | Shared BodyFrameResolver (parallel-transport body frames) | In Progress | P1 |
 | CC-023 | Part and Eye part types with generic Part default | Done | P2 |
@@ -30,8 +30,9 @@
 | CC-026 | Body scale (radius) handles visible and usable at all times | Backlog | P2 |
 | CC-027 | Body multi-select with proportional radius scale drag | Backlog | P2 |
 | CC-028 | Per-part submaterial from a material palette | Backlog | P2 |
-| CC-029 | Add Child as Duplicate (copy selected part's authoring properties) | Backlog | P1 |
+| CC-029 | Add Child as Duplicate (copy selected part's authoring properties) | Done | P1 |
 | CC-030 | Reusable part prefab templates (semantic subtree instantiation) | Backlog | P2 |
 | CC-031 | Composable geometry sources (multiple meshes per creature) | Backlog | P1 |
 | CC-032 | Separate gameplay geometry from 3D-print export | Backlog | P2 |
 | CC-033 | Register FastNoise2Bindings as a real git submodule | Done | P2 |
+| CC-034 | Body appearance vertical blend remap as an AnimationCurve | Done | P2 |

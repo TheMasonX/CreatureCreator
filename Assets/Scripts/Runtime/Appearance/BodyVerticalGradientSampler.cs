@@ -18,11 +18,13 @@ namespace ProceduralCreature.Appearance
     ///    is the camouflage-correct axis (an underbelly is always the world-down
     ///    side) and is independent of the body's slope, so the top gradient
     ///    reliably tints the highest side of the body;
-    /// 3. applies the optional vertical offset via
-    ///    <see cref="ApplyVerticalOffset"/>, which shifts the zero point but
-    ///    keeps the surface boundaries pinned at -1 and +1;
+    /// 3. remaps the vertical sample to the top/bottom blend factor through the
+    ///    authored <see cref="Definition.BodyVerticalGradientAppearance.VerticalCurve"/>
+    ///    (CC-034): the sample in -1..1 maps to the curve input in 0..1 via
+    ///    u = (v + 1) * 0.5 and the curve output is the blend factor (default
+    ///    linear y = x);
     /// 4. evaluates the top and bottom gradients at t and lerps between them by
-    ///    the (offset-adjusted) vertical sample.
+    ///    that blend factor.
     ///
     /// Pure math over the authoritative definition; no scene objects, no Unity
     /// editor API, no generated mesh — deterministic and unit-testable.
@@ -126,28 +128,6 @@ namespace ProceduralCreature.Appearance
         }
 
         /// <summary>
-        /// Applies the vertical offset to a raw vertical sample (in -1..1).
-        /// Positive offset moves the blend's zero point toward the top (the "top"
-        /// region shrinks and the belly grows); negative moves it toward the
-        /// bottom. The surface boundaries stay pinned: at the top boundary the
-        /// result is exactly 1 and at the bottom exactly -1 for any offset in
-        /// [-1, 1], while the zero point lands exactly on the offset. This is a
-        /// continuous, monotonic remap:
-        /// <code>
-        ///   v &lt;= 0:  result = offset + (offset + 1) * v
-        ///   v &gt;= 0:  result = offset + (1 - offset) * v
-        /// </code>
-        /// </summary>
-        public static float ApplyVerticalOffset(float verticalSample, float offset)
-        {
-            float o = Mathf.Clamp(offset, -1f, 1f);
-            float v = Mathf.Clamp(verticalSample, -1f, 1f);
-            return v <= 0f
-                ? o + (o + 1f) * v
-                : o + (1f - o) * v;
-        }
-
-        /// <summary>
         /// Evaluates the Body's blended vertical-gradient color at a surface
         /// point. Falls back to the default flat-gray color when there is no Body
         /// spline or no body appearance to sample.
@@ -155,7 +135,8 @@ namespace ProceduralCreature.Appearance
         public static Color EvaluateColor(CreatureDefinition definition, Vector3 position)
         {
             BodyVerticalGradientAppearance appearance = definition?.Body?.Appearance;
-            if (appearance == null || appearance.TopGradient == null || appearance.BottomGradient == null)
+            if (appearance == null || appearance.TopGradient == null || appearance.BottomGradient == null
+                || appearance.VerticalCurve == null)
             {
                 return Color.gray;
             }
@@ -165,8 +146,14 @@ namespace ProceduralCreature.Appearance
                 return Color.gray;
             }
 
-            float shifted = ApplyVerticalOffset(verticalSample, appearance.VerticalOffset);
-            float blend = (shifted + 1f) * 0.5f;
+            // The vertical sample (-1 = bottom .. +1 = top) remaps to the curve
+            // input in 0..1; the curve output is the top/bottom blend factor
+            // (default linear y = x reproduces the pre-CC-034 offset-0 look).
+            // The curve is Unity's built-in AnimationCurve; evaluation goes
+            // through the adapter (which delegates to AnimationCurve.Evaluate)
+            // so authored curves render exactly as Unity would.
+            float u = (verticalSample + 1f) * 0.5f;
+            float blend = CurveAdapter.Evaluate(appearance.VerticalCurve, u);
 
             // The gradients are Unity's built-in Gradient; evaluation goes
             // through the adapter (which delegates to Gradient.Evaluate) so all

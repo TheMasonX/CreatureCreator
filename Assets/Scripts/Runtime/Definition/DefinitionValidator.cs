@@ -150,12 +150,27 @@ namespace ProceduralCreature.Definition
                 return;
             }
 
-            if (!IsFinite(appearance.VerticalOffset)
-                || appearance.VerticalOffset < -1f || appearance.VerticalOffset > 1f)
+            if (appearance.VerticalCurve == null)
             {
                 issues.Add(new ValidationIssue(
                     ValidationSeverity.Error, ValidationCode.InvalidBodyAppearance,
-                    "Body vertical-gradient offset must be finite and within [-1, 1]."));
+                    "Body vertical-gradient curve must not be null."));
+            }
+            else
+            {
+                if (!CurveAdapter.IsFinite(appearance.VerticalCurve))
+                {
+                    issues.Add(new ValidationIssue(
+                        ValidationSeverity.Error, ValidationCode.NonFiniteBodyAppearance,
+                        "Body vertical-gradient curve has a non-finite key value or tangent."));
+                }
+
+                if (!CurveAdapter.HasValidKeys(appearance.VerticalCurve))
+                {
+                    issues.Add(new ValidationIssue(
+                        ValidationSeverity.Error, ValidationCode.InvalidBodyAppearance,
+                        "Body vertical-gradient curve must contain at least one key with T in [0, 1]."));
+                }
             }
 
             ValidateGradient(appearance.TopGradient, "top", issues);

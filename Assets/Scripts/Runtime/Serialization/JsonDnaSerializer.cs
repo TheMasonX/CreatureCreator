@@ -78,6 +78,12 @@ namespace ProceduralCreature.Serialization
         /// schema field: existing v2 files without it load with the default flat
         /// gray model, so no migration or version bump is required. The canonical
         /// writer always emits it, making save-load-save byte-stable.
+        ///
+        /// The vertical blend is a curve (CC-034). New files carry
+        /// <c>verticalCurve</c>; files saved before CC-034 carry
+        /// <c>verticalOffset</c>, which migrates exactly (not approximately) to the
+        /// equivalent 3-key piecewise-linear curve via
+        /// <see cref="CurveAdapter.FromLegacyOffset"/>.
         /// </summary>
         private static BodyVerticalGradientAppearance ReadOptionalBodyAppearance(Dictionary<string, object> obj)
         {
@@ -89,12 +95,64 @@ namespace ProceduralCreature.Serialization
             {
                 throw new DnaDeserializationException("Field 'appearance' must be an object or null.");
             }
+
+            UnityEngine.AnimationCurve verticalCurve;
+            if (appearanceObj.TryGetValue("verticalCurve", out object curveValue) && curveValue != null)
+            {
+                verticalCurve = ReadCurve(curveValue, "verticalCurve");
+            }
+            else if (appearanceObj.TryGetValue("verticalOffset", out object offsetValue) && offsetValue is double legacyOffset)
+            {
+                verticalCurve = CurveAdapter.FromLegacyOffset((float)legacyOffset);
+            }
+            else
+            {
+                verticalCurve = CurveAdapter.Linear();
+            }
+
             return new BodyVerticalGradientAppearance
             {
                 TopGradient = ReadGradient(RequireField(appearanceObj, "topGradient"), "topGradient"),
                 BottomGradient = ReadGradient(RequireField(appearanceObj, "bottomGradient"), "bottomGradient"),
-                VerticalOffset = (float)RequireNumber(appearanceObj, "verticalOffset"),
+                VerticalCurve = verticalCurve,
             };
+        }
+
+        /// <summary>
+        /// Reads the vertical-blend curve (CC-034) from its canonical key list.
+        /// Keys are rebuilt with free tangents so
+        /// <see cref="UnityEngine.AnimationCurve.Evaluate"/> uses exactly the
+        /// numeric in/out tangents from the file.
+        /// </summary>
+        private static UnityEngine.AnimationCurve ReadCurve(object value, string name)
+        {
+            if (value is not Dictionary<string, object> obj)
+            {
+                throw new DnaDeserializationException($"Field '{name}' must be a curve object.");
+            }
+
+            var keys = new List<UnityEngine.Keyframe>();
+            foreach (object entry in RequireArray(obj, "keys"))
+            {
+                if (entry is not Dictionary<string, object> keyObj)
+                {
+                    throw new DnaDeserializationException("Each curve key must be an object.");
+                }
+                var keyframe = new UnityEngine.Keyframe(
+                    (float)RequireNumber(keyObj, "time"),
+                    (float)RequireNumber(keyObj, "value"),
+                    (float)RequireNumber(keyObj, "inTangent"),
+                    (float)RequireNumber(keyObj, "outTangent"))
+                {
+                    tangentMode = 0, // Free: evaluate the numeric tangents.
+                };
+                keys.Add(keyframe);
+            }
+            if (keys.Count == 0)
+            {
+                throw new DnaDeserializationException($"{name} curve must contain at least one key.");
+            }
+            return new UnityEngine.AnimationCurve(keys.ToArray());
         }
 
         /// <summary>
