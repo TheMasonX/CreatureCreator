@@ -26,4 +26,8 @@
 | CC-022 | Shared BodyFrameResolver (parallel-transport body frames) | In Progress | P1 |
 | CC-022 | Shared BodyFrameResolver (parallel-transport body frames) | In Progress | P1 |
 | CC-023 | Part and Eye part types with generic Part default | Done | P2 |
-| CC-024 | Vertex-color lit shader for generated previews | Backlog | P2 |
+| CC-024 | Vertex-color lit shader for generated previews | Done | P2 |
+| CC-025 | Body vertical-gradient appearance (top and bottom gradients) | Backlog | P1 |
+| CC-026 | Body scale (radius) handles visible and usable at all times | Backlog | P2 |
+| CC-027 | Ctrl+click multi-select Body points with proportional scale drag | Backlog | P2 |
+| CC-028 | Per-part submaterial from a material palette | Backlog | P2 |
