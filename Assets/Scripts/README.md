@@ -198,6 +198,21 @@ data on `MeshExtractionResult` so appearance baking stays testable without
 constructing a Unity `Mesh` first, consistent with keeping extraction and
 appearance as independently testable stages (design doc §8).
 
+**Body vertical-gradient appearance (CC-025).** The Body owns its own color
+model, `BodySpline.Appearance` (`BodyVerticalGradientAppearance`): a top
+gradient and a bottom gradient keyed over body length, blended along the
+vertical axis of each Body surface point — the camouflage-style underbelly
+model. `PartAppearanceSampler` is body-aware: when the Body's own SDF field is
+the nearest surface, the resolved color comes from `BodyVerticalGradientSampler`
+instead of any part's flat color. The vertical sample is
+`dot(point − centerline, frame.Normal) / radius` (via the shared
+`BodyFrameResolver`), clamped to −1 (bottom) .. +1 (top); the optional offset
+shifts the blend's zero point while keeping the surface extremes pinned at ±1.
+The gradient data is optional in canonical JSON (old v2 files load with flat
+gray), validated by `DefinitionValidator`, normalized (sorted stops +
+quantization) by `DefinitionCanonicalizer`, and authored from the Body inspector
+in the editor window.
+
 ## Phase 6 — skeleton inference
 
 `SkeletonInferrer.Infer(definition)` derives a `Skeleton` (a flat `List<Bone>`)

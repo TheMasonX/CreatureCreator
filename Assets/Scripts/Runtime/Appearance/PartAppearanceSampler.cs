@@ -28,6 +28,12 @@ namespace ProceduralCreature.Appearance
     /// which already handles each part's transform and symmetry mirror) and
     /// picks whichever part's surface is closest to that point.
     ///
+    /// The Body spline's field is part of the same nearest-surface decision: a
+    /// point whose closest surface is the Body resolves to the Body's
+    /// vertical-gradient appearance (CC-025) instead of any part's flat color.
+    /// That gradient color is computed and carried as <see cref="ResolvedAppearance.BaseColor"/>
+    /// so the baker needs no knowledge of the gradient model.
+    ///
     /// KNOWN SIMPLIFICATION: this picks a single nearest part rather than
     /// blending appearance between the nearest two — meaning color can change
     /// abruptly right at a smooth-blended geometric seam between two parts with
@@ -42,12 +48,17 @@ namespace ProceduralCreature.Appearance
         {
             if (definition == null) throw new DomainException("definition must not be null.");
 
-            if (definition.Parts.Count == 0)
+            bool hasBody = definition.Body != null
+                && definition.Body.Samples != null
+                && definition.Body.Samples.Count > 0;
+
+            if (definition.Parts.Count == 0 && !hasBody)
             {
                 return new ResolvedAppearance(AppearanceDefinition.Default.BaseColor, 0, 1f);
             }
 
             var compiledParts = SdfProgramBuilder.CompileIndividualParts(definition);
+            ISdfNode bodyNode = SdfProgramBuilder.CompileBodyField(definition);
 
             CreaturePart nearestPart = null;
             float nearestAbsDistance = float.PositiveInfinity;
@@ -62,7 +73,25 @@ namespace ProceduralCreature.Appearance
                 }
             }
 
-            AppearanceDefinition appearance = nearestPart!.Appearance;
+            float bodyAbsDistance = bodyNode == null
+                ? float.PositiveInfinity
+                : Mathf.Abs(bodyNode.Evaluate(position));
+
+            // The Body owns this surface point. Its gradient color (or default
+            // flat gray) becomes the base color; noise keeps the same gentle
+            // triplanar surface variation the baker applies to parts.
+            if (bodyNode != null && bodyAbsDistance <= nearestAbsDistance)
+            {
+                Color bodyColor = BodyVerticalGradientSampler.EvaluateColor(definition, position);
+                return new ResolvedAppearance(bodyColor, 0, 1f);
+            }
+
+            if (nearestPart == null)
+            {
+                return new ResolvedAppearance(AppearanceDefinition.Default.BaseColor, 0, 1f);
+            }
+
+            AppearanceDefinition appearance = nearestPart.Appearance;
             return new ResolvedAppearance(appearance.BaseColor, appearance.NoiseSeed, appearance.NoiseScale);
         }
     }

@@ -69,7 +69,53 @@ namespace ProceduralCreature.Serialization
                     Radius = (float)RequireNumber(sampleObj, "radius"),
                 });
             }
+            body.Appearance = ReadOptionalBodyAppearance(obj);
             return body;
+        }
+
+        /// <summary>
+        /// The body vertical-gradient appearance (CC-025) is an additive, optional
+        /// schema field: existing v2 files without it load with the default flat
+        /// gray model, so no migration or version bump is required. The canonical
+        /// writer always emits it, making save-load-save byte-stable.
+        /// </summary>
+        private static BodyVerticalGradientAppearance ReadOptionalBodyAppearance(Dictionary<string, object> obj)
+        {
+            if (!obj.TryGetValue("appearance", out object value) || value == null)
+            {
+                return BodyVerticalGradientAppearance.CreateDefault();
+            }
+            if (value is not Dictionary<string, object> appearanceObj)
+            {
+                throw new DnaDeserializationException("Field 'appearance' must be an object or null.");
+            }
+            return new BodyVerticalGradientAppearance
+            {
+                TopGradient = ReadColorGradient(RequireArray(appearanceObj, "topGradient")),
+                BottomGradient = ReadColorGradient(RequireArray(appearanceObj, "bottomGradient")),
+                VerticalOffset = (float)RequireNumber(appearanceObj, "verticalOffset"),
+            };
+        }
+
+        private static ColorGradient ReadColorGradient(List<object> array)
+        {
+            var gradient = new ColorGradient();
+            foreach (object entry in array)
+            {
+                if (entry is not Dictionary<string, object> stopObj)
+                {
+                    throw new DnaDeserializationException("Each gradient stop must be an object.");
+                }
+                Dictionary<string, object> colorObj = RequireObject(stopObj, "color");
+                gradient.Stops.Add(new GradientColorStop(
+                    (float)RequireNumber(stopObj, "t"),
+                    new UnityEngine.Color(
+                        (float)RequireNumber(colorObj, "r"),
+                        (float)RequireNumber(colorObj, "g"),
+                        (float)RequireNumber(colorObj, "b"),
+                        (float)RequireNumber(colorObj, "a"))));
+            }
+            return gradient;
         }
 
         private static BoundsDefinition ReadBounds(Dictionary<string, object> obj)

@@ -27,9 +27,21 @@ namespace ProceduralCreature.Definition
     {
         public List<BodySample> Samples = new List<BodySample>();
 
+        /// <summary>
+        /// The Body's vertical-gradient color model (CC-025). Geometry (the
+        /// spline samples) and appearance are both owned by the Body, but kept as
+        /// separate fields so the pure geometry consumers (BodyFrameResolver,
+        /// the SDF compiler) never touch color data. Defaults to a flat gray
+        /// model, preserving the pre-gradient Body color behavior.
+        /// </summary>
+        public BodyVerticalGradientAppearance Appearance = BodyVerticalGradientAppearance.CreateDefault();
+
         public BodySpline Clone()
         {
-            var clone = new BodySpline();
+            var clone = new BodySpline
+            {
+                Appearance = Appearance == null ? null : Appearance.Clone(),
+            };
             foreach (BodySample sample in Samples)
             {
                 clone.Samples.Add(sample == null ? null : sample.Clone());

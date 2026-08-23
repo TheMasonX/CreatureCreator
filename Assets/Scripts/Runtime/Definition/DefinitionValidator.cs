@@ -24,6 +24,7 @@ namespace ProceduralCreature.Definition
 
             ValidateSchemaVersion(definition, issues);
             ValidateBody(definition, issues);
+            ValidateBodyAppearance(definition, issues);
             ValidateBounds(definition, issues);
             ValidateGenerationBudget(definition, issues);
             ValidateDuplicateIds(definition, issues);
@@ -126,6 +127,66 @@ namespace ProceduralCreature.Definition
         private static bool IsFinite(float value)
         {
             return !float.IsNaN(value) && !float.IsInfinity(value);
+        }
+
+        /// <summary>
+        /// Validates the Body vertical-gradient appearance (CC-025). Reports only;
+        /// never repairs. The canonicalizer handles stop ordering and
+        /// quantization at the mutation/serialization boundary, so unsorted stops
+        /// are not an error here — non-finite or out-of-range values and missing
+        /// gradients are.
+        /// </summary>
+        private static void ValidateBodyAppearance(CreatureDefinition definition, List<ValidationIssue> issues)
+        {
+            if (definition.Body == null) return;
+
+            BodyVerticalGradientAppearance appearance = definition.Body.Appearance;
+            if (appearance == null)
+            {
+                issues.Add(new ValidationIssue(
+                    ValidationSeverity.Error, ValidationCode.InvalidBodyAppearance,
+                    "Body vertical-gradient appearance must not be null."));
+                return;
+            }
+
+            if (!IsFinite(appearance.VerticalOffset)
+                || appearance.VerticalOffset < -1f || appearance.VerticalOffset > 1f)
+            {
+                issues.Add(new ValidationIssue(
+                    ValidationSeverity.Error, ValidationCode.InvalidBodyAppearance,
+                    "Body vertical-gradient offset must be finite and within [-1, 1]."));
+            }
+
+            ValidateColorGradient(appearance.TopGradient, "top", issues);
+            ValidateColorGradient(appearance.BottomGradient, "bottom", issues);
+        }
+
+        private static void ValidateColorGradient(ColorGradient gradient, string name, List<ValidationIssue> issues)
+        {
+            if (gradient == null || gradient.Stops == null || gradient.Stops.Count == 0)
+            {
+                issues.Add(new ValidationIssue(
+                    ValidationSeverity.Error, ValidationCode.InvalidBodyAppearance,
+                    $"Body {name} gradient must contain at least one stop."));
+                return;
+            }
+
+            for (int i = 0; i < gradient.Stops.Count; i++)
+            {
+                GradientColorStop stop = gradient.Stops[i];
+                if (!stop.IsFinite())
+                {
+                    issues.Add(new ValidationIssue(
+                        ValidationSeverity.Error, ValidationCode.NonFiniteBodyAppearance,
+                        $"Body {name} gradient stop {i} has a non-finite value."));
+                }
+                if (stop.T < 0f || stop.T > 1f)
+                {
+                    issues.Add(new ValidationIssue(
+                        ValidationSeverity.Error, ValidationCode.InvalidBodyAppearance,
+                        $"Body {name} gradient stop {i} has T outside [0, 1]."));
+                }
+            }
         }
 
         private static void ValidateSchemaVersion(CreatureDefinition definition, List<ValidationIssue> issues)

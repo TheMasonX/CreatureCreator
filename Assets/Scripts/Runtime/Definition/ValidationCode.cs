@@ -27,5 +27,7 @@ namespace ProceduralCreature.Definition
         InvalidForward,
         InvalidBodyParent,
         InvalidAttachmentAnchor,
+        InvalidBodyAppearance,
+        NonFiniteBodyAppearance,
     }
 }

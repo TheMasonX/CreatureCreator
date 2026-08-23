@@ -24,10 +24,13 @@
 | CC-020 | Collapsible, less-centered parts tree | Backlog | P2 |
 | CC-021 | Show editable control points for a selected part | Backlog | P2 |
 | CC-022 | Shared BodyFrameResolver (parallel-transport body frames) | In Progress | P1 |
-| CC-022 | Shared BodyFrameResolver (parallel-transport body frames) | In Progress | P1 |
 | CC-023 | Part and Eye part types with generic Part default | Done | P2 |
 | CC-024 | Vertex-color lit shader for generated previews | Done | P2 |
-| CC-025 | Body vertical-gradient appearance (top and bottom gradients) | Backlog | P1 |
+| CC-025 | Body vertical-gradient appearance (top and bottom gradients) | Done | P1 |
 | CC-026 | Body scale (radius) handles visible and usable at all times | Backlog | P2 |
-| CC-027 | Ctrl+click multi-select Body points with proportional scale drag | Backlog | P2 |
+| CC-027 | Body multi-select with proportional radius scale drag | Backlog | P2 |
 | CC-028 | Per-part submaterial from a material palette | Backlog | P2 |
+| CC-029 | Add Child as Duplicate (copy selected part's authoring properties) | Backlog | P1 |
+| CC-030 | Reusable part prefab templates (semantic subtree instantiation) | Backlog | P2 |
+| CC-031 | Composable geometry sources (multiple meshes per creature) | Backlog | P1 |
+| CC-032 | Separate gameplay geometry from 3D-print export | Backlog | P2 |

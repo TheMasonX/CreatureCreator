@@ -28,7 +28,12 @@ namespace ProceduralCreature.Serialization
     ///     "samples": [
     ///       { "id": 1, "position": { "x": 0.0000, "y": 0.0000, "z": -1.0000 }, "radius": 0.7500 },
     ///       { "id": 2, "position": { "x": 0.0000, "y": 0.0000, "z": 1.0000 }, "radius": 0.9000 }
-    ///     ]
+    ///     ],
+    ///     "appearance": {
+    ///       "topGradient": [ { "t": 0.0000, "color": { "r": 0.5000, "g": 0.5000, "b": 0.5000, "a": 1.0000 } } ],
+    ///       "bottomGradient": [ { "t": 0.0000, "color": { "r": 0.5000, "g": 0.5000, "b": 0.5000, "a": 1.0000 } } ],
+    ///       "verticalOffset": 0.0000
+    ///     }
     ///   },
     ///   "parts": [
     ///     {
@@ -115,7 +120,38 @@ namespace ProceduralCreature.Serialization
                 sb.Append(",\"position\":").Append(WriteVec3(sample.Position));
                 sb.Append(",\"radius\":").Append(Num(sample.Radius)).Append('}');
             }
-            sb.Append("]}");
+            sb.Append("],\"appearance\":").Append(WriteBodyAppearance(body.Appearance));
+            sb.Append('}');
+            return sb.ToString();
+        }
+
+        private static string WriteBodyAppearance(BodyVerticalGradientAppearance appearance)
+        {
+            if (appearance == null) return "null";
+            var sb = new StringBuilder();
+            sb.Append('{');
+            sb.Append("\"topGradient\":").Append(WriteColorGradient(appearance.TopGradient)).Append(',');
+            sb.Append("\"bottomGradient\":").Append(WriteColorGradient(appearance.BottomGradient)).Append(',');
+            sb.Append("\"verticalOffset\":").Append(Num(appearance.VerticalOffset));
+            sb.Append('}');
+            return sb.ToString();
+        }
+
+        private static string WriteColorGradient(ColorGradient gradient)
+        {
+            var sb = new StringBuilder();
+            sb.Append('[');
+            if (gradient != null && gradient.Stops != null)
+            {
+                for (int i = 0; i < gradient.Stops.Count; i++)
+                {
+                    if (i > 0) sb.Append(',');
+                    GradientColorStop stop = gradient.Stops[i];
+                    sb.Append("{\"t\":").Append(Num(stop.T));
+                    sb.Append(",\"color\":").Append(WriteColor(stop.Color)).Append('}');
+                }
+            }
+            sb.Append(']');
             return sb.ToString();
         }
 

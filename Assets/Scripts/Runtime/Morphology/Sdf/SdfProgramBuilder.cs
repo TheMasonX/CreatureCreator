@@ -204,9 +204,13 @@ namespace ProceduralCreature.Morphology.Sdf
         /// <summary>
         /// Compiles the Body spline into the primary implicit surface: one sphere
         /// per sample at its authoritative position/radius, smooth-united in spline
-        /// order. Returns null when the definition has no Body samples.
+        /// order. Returns null when the definition has no Body samples. Exposed
+        /// publicly for consumers that need to reason about the Body field on its
+        /// own — Phase 4's appearance resolver uses it to decide whether a surface
+        /// point belongs to the Body (and therefore takes the Body's vertical-
+        /// gradient appearance) rather than to a part.
         /// </summary>
-        private static ISdfNode CompileBodyField(CreatureDefinition definition)
+        public static ISdfNode CompileBodyField(CreatureDefinition definition)
         {
             if (definition.Body == null || definition.Body.Samples == null || definition.Body.Samples.Count == 0)
             {

@@ -7,44 +7,131 @@ type: Task
 priority: P1
 tags: [definition, morphology, limbs, schema]
 dependsOn: [CC-006, CC-016]
-related: [CC-009]
+related: [CC-009, CC-031]
 links:
   - Assets/Scripts/Runtime/Definition/BodySpline.cs
+  - Assets/Scripts/Runtime/Definition/CreaturePart.cs
   - Assets/Scripts/Runtime/Morphology/Sdf/SdfProgramBuilder.cs
   - Assets/Scripts/Runtime/Skeleton/SkeletonInferrer.cs
+  - Assets/Scripts/Runtime/Definition/DefinitionValidator.cs
+  - Assets/Scripts/Runtime/Definition/DefinitionCanonicalizer.cs
 ---
 
 ## Summary
 
-Arms and legs should eventually be defined by joint positions, with a set of
-metaballs along the chain defining the space in-between the joints — like the
-Body, but only size is configurable (positions come from the joint chain, not
-from free-form spline editing). This is a future schema/model decision; decide
-whether limbs reuse the `BodySample` model or get a new `LimbChain` model before
-more authoring accumulates.
+Arms and legs are defined by N user-authored joint positions, with a derived
+metaball sequence filling the space between joints. Only thickness is authored;
+positions come from the joint chain, not free-form spline editing.
+
+Schema decision (recorded from the CC-018/020/027/028 review): a dedicated
+`LimbChain` model, **not** a reuse of `BodySample`.
+
+```text
+BodySpline   = editable creature centerline (direct authoring of samples)
+LimbChain    = articulated semantic structure (joints are authored,
+               intermediate geometry is derived, naturally maps to bones)
+```
 
 ## Scope
 
-- Joint-position model for limb parts.
-- Metaball sequence along each segment between joints (size-only configuration).
-- Editor authoring for joint chains.
-- Integration with skeleton inference (joints already infer bones) and the SDF.
+Phase 0 — schema decision (gate for all later phases):
+- `LimbChain { List<LimbJoint> Joints; ThicknessProfile Thickness; }`
+- `LimbJoint { uint Id; Vector3 Position; }` — variable count, stable unique
+  IDs, list order is the semantic chain order, positions are arbitrary 3D
+  within the creature bounds.
+- Coordinate frame: `CreaturePart.Transform` is the part placement frame;
+  `LimbChain.Joints` live in that local morphology frame, so
+  `Joints[0] ≈ Vector3.zero` is the limb root. Record this as a documented
+  invariant (validator check), so `Transform.position` and `Joints[0]` do not
+  become two competing placement authorities.
+- `ThicknessProfile` is a 1D function over normalized chain arc length
+  `t ∈ [0, 1]` (`t = 0` root, `t = 1` tip). Domain storage is a portable
+  keyframe record (`t`, `value`, optional tangents) — do **not** couple the
+  domain model to `UnityEngine.AnimationCurve`. An editor adapter may map to
+  `AnimationCurve`, but serialized DNA stays portable.
+- Terminal joint (`Joints[N-1]`) is a stable semantic point that children
+  (Foot, Hand, Claw, Decoration) attach to. It is not necessarily the last
+  visible geometry vertex.
+- Do not impose anatomical constraints (knee direction, bend limits, planarity).
+  Validation rejects numerical/pathological states only.
+
+Phase 1 — domain types: pure/domain data types, no UnityEditor dependency.
+
+Phase 2 — validation: joint count minimum; stable unique IDs; deterministic
+order; finite positions; joints inside configurable bounds; adjacent joints
+above a minimum separation (no zero-length segment); root-joint-at-origin
+invariant; valid thickness profile.
+
+Phase 3 — serialization: canonical JSON (`limbChain.joints[]` +
+`thicknessProfile`) deterministically ordered and quantized by
+`DefinitionCanonicalizer`; repeated serialization is byte-identical.
+
+Phase 4 — derived metaball generator: from `LimbChain` derive sampled positions
+and radii. Sample count is derived from segment length
+(`ceil(segmentLength / desiredSampleSpacing)`, curvature refinement later).
+`radius = ThicknessProfile(t)`. **Derived metaballs must never be serialized as
+authoritative DNA.**
+
+Phase 5 — SDF integration: compile generated limb metaballs into the creature
+field. Keep the current SDF path as the reference while the limb generator is
+introduced.
+
+Phase 6 — skeleton integration: generate one bone per consecutive joint pair
+directly from `LimbChain.Joints`. Do not infer the skeleton from the generated
+mesh or metaball samples (they are derived and may change density).
+
+Phase 7 — editor: viewport joint handles for the chain. Root joint moves only
+through parent attachment/component placement; interior joints reposition
+directly; terminal joint repositions and is a child-attachment target. Do not
+build a generic IK/FABRIK editor — this is morphology authoring, not posing.
+Reuse the CC-016 gesture pattern (snapshot, preview, one commit, one Undo, Esc
+cancel).
+
+Phase 8 — regression tests: deterministic chain; straight limb; bent limb;
+variable thickness; chain length changes; derived sampling; skeleton parity;
+serialization round-trip.
 
 ## Acceptance Criteria
 
 - A limb part renders as a smooth metaball chain between its joints.
-- Only size/thickness is authored per limb; positions follow the joint chain.
-- Skeleton inference still produces one bone per joint/segment.
+- Only thickness is authored per limb; thickness is a single 1D profile, not a
+  per-joint radius field.
+- Derived metaball count can change without changing limb DNA.
+- Skeleton inference produces one bone per joint segment from the authored
+  joints, independent of render geometry density.
+- Canonical JSON round-trips the limb chain byte-identically.
 
 ## Validation
 
-- Runtime SDF + skeleton tests; editor authoring tests.
+- Runtime SDF + skeleton tests; `DefinitionValidator` limb tests; canonical JSON
+  round-trip tests (schema change requires a migration note).
+- Editor authoring tests for the joint-handle phase (Editor assembly).
+- See the project validation conventions: runtime test assembly is not
+  discovered by the MCP runner — invoke runtime test methods directly via
+  `execute_code`.
 
 ## Findings
 
-(empty)
+- The review resolved the open `BodySample` vs `LimbChain` question in favor of
+  a dedicated `LimbChain`. They are different semantic models (editable
+  centerline vs articulated structure) and must not share one representation.
+- Thickness must be a 1D profile, not per-joint radii. This yields fewer
+  authoring parameters, smooth tapering, easy global edits, and sampling-density
+  freedom.
+- The authored chain is the source of skeleton topology; generated geometry is
+  never authoritative for the skeleton (this matters once CC-031 allows
+  non-implicit geometry).
+- Record an ADR/architecture note ("CreaturePart as semantic container") before
+  implementation so CC-018 does not harden the current monolithic `Transform +
+  Shape + Appearance` shape. See handoff
+  `CC-018-CC-020-CC-027-CC-028-review-and-backlog-handoff.md`.
+
+## Blockers
+
+None for the design; implementation should not start until Phase 0 (schema
+decision) is recorded as an ADR.
 
 ## Next Step
 
-Decide the data model (reuse `BodySample` vs new `LimbChain`) and record it as a
-schema decision before implementation.
+Record the Phase 0 schema decision as an ADR, then implement Phase 1 (domain
+types) and Phase 2 (validation) as the smallest owning slice.
