@@ -16,5 +16,9 @@ namespace ProceduralCreature.Definition
         Tail = 4,
         Foot = 5,
         Root = 6,
+        /// <summary>Generic part with no special locomotion or skeleton meaning.</summary>
+        Part = 7,
+        /// <summary>An eye, typically authored on a head or the Body.</summary>
+        Eye = 8,
     }
 }

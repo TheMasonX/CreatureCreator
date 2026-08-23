@@ -6,7 +6,7 @@
 | CC-002 | Enable editor and Play Mode creature previews | Done | P1 |
 | CC-003 | Document Unity MCP workflow for BeastMaster | Done | P2 |
 | CC-004 | Complete creature editor save and authoring controls | In Progress | P1 |
-| CC-005 | Add preview material and automatic regeneration settings | In Progress | P1 |
+| CC-005 | Add preview material and automatic regeneration settings | Done | P1 |
 | CC-006 | Define the Body spline and attachment tree model | In Progress | P1 |
 | CC-007 | Support surface attachment for limbs | Backlog | P1 |
 | CC-008 | Profile and optimize preview generation hotspots | In Progress | P1 |
@@ -23,3 +23,7 @@
 | CC-019 | Bidirectional Body length editing (head-end add/remove on drag) | Backlog | P1 |
 | CC-020 | Collapsible, less-centered parts tree | Backlog | P2 |
 | CC-021 | Show editable control points for a selected part | Backlog | P2 |
+| CC-022 | Shared BodyFrameResolver (parallel-transport body frames) | In Progress | P1 |
+| CC-022 | Shared BodyFrameResolver (parallel-transport body frames) | In Progress | P1 |
+| CC-023 | Part and Eye part types with generic Part default | Done | P2 |
+| CC-024 | Vertex-color lit shader for generated previews | Backlog | P2 |

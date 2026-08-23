@@ -272,6 +272,14 @@ and a one-click "Regenerate Preview" that runs the full pipeline (SDF compile �
 grid sampling → mesh extraction → mesh validation → appearance bake) and spawns
 the result as a real mesh in the open scene.
 
+Beside "Regenerate Preview", an **Auto** toggle schedules regeneration after any
+definition change, throttled to a configurable minimum interval (default one
+second) so rapid edits never queue overlapping generation jobs. The "Editor
+Settings" area holds non-creature options: a **Preview Material** picker, the
+preview mesh quality (voxels per unit, applied only to the generation clone, not
+to the creature's DNA), the auto-regeneration rate, and diagnostic toggles.
+Undo and redo re-arm a pending auto-regeneration.
+
 The same pipeline is available while the game is running. The
 `CreatureRuntimePreview` component on
 `CreatureCreatorTestScene/CreatureCreator Test Stage/Preview Anchor` generates
@@ -332,10 +340,14 @@ silently scoped out:
   compile-verify it here.
 - **Raycast staleness (delta-audit #7)** doesn't apply yet, since there's no
   raycast-based placement to be stale in the first place.
-- **Preview material** falls back through `Standard` → URP Lit → `Unlit/Color`
-  depending on what the project's render pipeline provides; if none exist, the
-  mesh still spawns (using Unity's built-in fallback material) with a console
-  warning rather than a null-reference exception.
+- **Preview material** defaults to the URP lit shader (falling back through
+  `Standard` → `Unlit/Color` only if the project has no URP), and can be
+  overridden with a dedicated **Preview Material** picker in the editor's
+  "Editor Settings" area. The picker value is stored by asset path in
+  EditorPrefs and is applied to the preview renderer immediately and on every
+  regeneration. If no shader exists at all, the mesh still spawns (using
+  Unity's built-in fallback material) with a console warning rather than a
+  null-reference exception.
 
 **Interactive viewport manipulation is now implemented**, via
 `SceneView.duringSceneGui`:

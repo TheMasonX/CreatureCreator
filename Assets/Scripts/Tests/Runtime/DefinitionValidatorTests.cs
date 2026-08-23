@@ -169,6 +169,24 @@ namespace ProceduralCreature.Tests.Runtime
         }
 
         [Test]
+        public void Validate_AcceptsPartAndEyePartTypes()
+        {
+            CreatureDefinition definition = ValidDefinitionWithBody();
+            CreaturePart generic = ValidPart("part_generic");
+            generic.PartType = PartType.Part;
+            definition.AddPart(generic);
+
+            CreaturePart eye = ValidPart("part_eye");
+            eye.PartType = PartType.Eye;
+            definition.AddPart(eye);
+
+            ValidationResult result = DefinitionValidator.Validate(definition);
+
+            Assert.IsFalse(HasCode(result, ValidationCode.UnsupportedPartType),
+                "Part and Eye are authorable v2 part types, not reserved or unsupported.");
+        }
+
+        [Test]
         public void Validate_DetectsInvalidAttachmentAnchor()
         {
             CreatureDefinition definition = ValidDefinitionWithBody();

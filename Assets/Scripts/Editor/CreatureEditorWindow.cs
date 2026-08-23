@@ -113,6 +113,7 @@ namespace ProceduralCreature.Editor
         private bool _showEditorSettings;
         private float _autoRegenerationDelaySeconds = 1f;
         private float _previewVoxelsPerUnit = 16f;
+        private Material _previewMaterial;
         private bool _logGenerationDiagnostics = true;
         private bool _usePortableSampling;
         private double _autoRegenerateAt = -1d;
@@ -123,6 +124,7 @@ namespace ProceduralCreature.Editor
         private const float MinimumAutoRegenerationDelaySeconds = 1f;
         private const string AutoRegenerationDelayKey = "ProceduralCreature.AutoRegenerationDelay";
         private const string PreviewVoxelsPerUnitKey = "ProceduralCreature.PreviewVoxelsPerUnit";
+        private const string PreviewMaterialKey = "ProceduralCreature.PreviewMaterial";
         private const string LogGenerationDiagnosticsKey = "ProceduralCreature.LogGenerationDiagnostics";
         private const string UsePortableSamplingKey = "ProceduralCreature.UsePortableSampling";
         private const string CurrentFilePathKey = "ProceduralCreature.CurrentFilePath";
@@ -130,13 +132,17 @@ namespace ProceduralCreature.Editor
         /// <summary>
         /// Part types that are valid to author in schema v2. Body, Root, and
         /// independent Tail are reserved by the validator and must not be offered.
+        /// Part is the generic default for a new part; Eye is authored like any
+        /// other part (typically on a head or the Body).
         /// </summary>
         private static readonly PartType[] ValidV2PartTypes =
         {
+            PartType.Part,
             PartType.Limb,
             PartType.Leg,
             PartType.Arm,
             PartType.Foot,
+            PartType.Eye,
         };
 
         /// <summary>
@@ -194,6 +200,11 @@ namespace ProceduralCreature.Editor
                 MinimumAutoRegenerationDelaySeconds,
                 EditorPrefs.GetFloat(AutoRegenerationDelayKey, MinimumAutoRegenerationDelaySeconds));
             _previewVoxelsPerUnit = Mathf.Max(1f, EditorPrefs.GetFloat(PreviewVoxelsPerUnitKey, 16f));
+            string previewMaterialPath = EditorPrefs.GetString(PreviewMaterialKey, string.Empty);
+            if (!string.IsNullOrEmpty(previewMaterialPath))
+            {
+                _previewMaterial = AssetDatabase.LoadAssetAtPath<Material>(previewMaterialPath);
+            }
             _logGenerationDiagnostics = EditorPrefs.GetBool(LogGenerationDiagnosticsKey, true);
             _usePortableSampling = EditorPrefs.GetBool(UsePortableSamplingKey, true);
             _currentFilePath = SessionState.GetString(CurrentFilePathKey, string.Empty);
@@ -203,6 +214,7 @@ namespace ProceduralCreature.Editor
             EditorApplication.update += ProcessAutoRegeneration;
 
             _previewGameObject = GameObject.Find(PreviewObjectName);
+            if (_previewMaterial != null) ApplyPreviewMaterialToRenderer();
         }
 
         private void OnDisable()
@@ -357,6 +369,18 @@ namespace ProceduralCreature.Editor
         {
             _showEditorSettings = EditorGUILayout.Foldout(_showEditorSettings, "Editor Settings");
             if (!_showEditorSettings) return;
+
+            Material newPreviewMaterial = (Material)EditorGUILayout.ObjectField(
+                "Preview Material", _previewMaterial, typeof(Material), allowSceneObjects: false);
+            if (newPreviewMaterial != _previewMaterial)
+            {
+                _previewMaterial = newPreviewMaterial;
+                EditorPrefs.SetString(
+                    PreviewMaterialKey,
+                    _previewMaterial != null ? AssetDatabase.GetAssetPath(_previewMaterial) : string.Empty);
+                ApplyPreviewMaterialToRenderer();
+                Repaint();
+            }
 
             float newQuality = Mathf.Max(1f, EditorGUILayout.FloatField("Preview Mesh Quality", _previewVoxelsPerUnit));
             if (!Mathf.Approximately(newQuality, _previewVoxelsPerUnit))
@@ -604,8 +628,8 @@ namespace ProceduralCreature.Editor
             {
                 Id = newId,
                 ParentId = parentId,
-                PartType = PartType.Limb,
-                DisplayName = "Limb",
+                PartType = PartType.Part,
+                DisplayName = DefaultPartNameFor(PartType.Part),
                 Transform = TransformData.Identity,
                 Shape = ShapeDefinition.DefaultSphere,
                 Appearance = AppearanceDefinition.Default,
@@ -695,7 +719,36 @@ namespace ProceduralCreature.Editor
 
             PartType newType = ValidV2PartTypes[newIndex];
             string partId = selected.Id;
-            MutateDefinition("Change Part Type", definition => definition.FindPart(partId).PartType = newType);
+            string nextDisplayName = ResolveDisplayNameAfterTypeChange(selected.DisplayName, selected.PartType, newType);
+            MutateDefinition("Change Part Type", definition =>
+            {
+                CreaturePart part = definition.FindPart(partId);
+                part.PartType = newType;
+                part.DisplayName = nextDisplayName;
+            });
+        }
+
+        /// <summary>
+        /// The author-facing default name for a part type, used when a part is
+        /// first created and when its type changes while the name is still the
+        /// auto-assigned default (so switching a "Part" to an "Eye" renames it to
+        /// "Eye" unless the user customized the name).
+        /// </summary>
+        internal static string DefaultPartNameFor(PartType type)
+        {
+            return type.ToString();
+        }
+
+        /// <summary>
+        /// Resolves the DisplayName to keep after a part type change. If the
+        /// current name is still the default for the old type, adopt the new
+        /// type's default name; otherwise preserve the user's custom name.
+        /// </summary>
+        internal static string ResolveDisplayNameAfterTypeChange(string currentDisplayName, PartType oldType, PartType newType)
+        {
+            return currentDisplayName == DefaultPartNameFor(oldType)
+                ? DefaultPartNameFor(newType)
+                : currentDisplayName;
         }
 
         private void DrawBodyInspector()
@@ -1543,8 +1596,8 @@ namespace ProceduralCreature.Editor
             {
                 Id = newId,
                 ParentId = finalParentId,
-                PartType = PartType.Limb,
-                DisplayName = "Limb",
+                PartType = PartType.Part,
+                DisplayName = DefaultPartNameFor(PartType.Part),
                 Transform = new TransformData { Position = clampedPosition, Rotation = Quaternion.identity, Scale = Vector3.one },
                 Shape = ShapeDefinition.DefaultSphere,
                 Appearance = AppearanceDefinition.Default,
@@ -1682,7 +1735,7 @@ namespace ProceduralCreature.Editor
                 _previewGameObject = new GameObject(PreviewObjectName);
                 _previewGameObject.AddComponent<MeshFilter>();
                 MeshRenderer renderer = _previewGameObject.AddComponent<MeshRenderer>();
-                Material material = CreateDefaultPreviewMaterial();
+                Material material = ResolvePreviewMaterial();
                 if (material != null) renderer.sharedMaterial = material;
                 _previewGameObject.AddComponent<MeshCollider>();
             }
@@ -1690,9 +1743,9 @@ namespace ProceduralCreature.Editor
             _previewGameObject.GetComponent<MeshFilter>().sharedMesh = mesh;
             MeshRenderer previewRenderer = _previewGameObject.GetComponent<MeshRenderer>();
             if (previewRenderer == null) previewRenderer = _previewGameObject.AddComponent<MeshRenderer>();
-            if (previewRenderer.sharedMaterial == null)
+            if (_previewMaterial != null || previewRenderer.sharedMaterial == null)
             {
-                Material material = CreateDefaultPreviewMaterial();
+                Material material = ResolvePreviewMaterial();
                 if (material != null) previewRenderer.sharedMaterial = material;
             }
 
@@ -1705,10 +1758,24 @@ namespace ProceduralCreature.Editor
             collider.sharedMesh = mesh;
         }
 
+        private Material ResolvePreviewMaterial()
+        {
+            return _previewMaterial != null ? _previewMaterial : CreateDefaultPreviewMaterial();
+        }
+
+        private void ApplyPreviewMaterialToRenderer()
+        {
+            if (_previewGameObject == null) return;
+            MeshRenderer previewRenderer = _previewGameObject.GetComponent<MeshRenderer>();
+            if (previewRenderer == null) return;
+            Material material = ResolvePreviewMaterial();
+            if (material != null) previewRenderer.sharedMaterial = material;
+        }
+
         private static Material CreateDefaultPreviewMaterial()
         {
-            Shader shader = Shader.Find("Standard")
-                             ?? Shader.Find("Universal Render Pipeline/Lit")
+            Shader shader = Shader.Find("Universal Render Pipeline/Lit")
+                             ?? Shader.Find("Standard")
                              ?? Shader.Find("Unlit/Color");
             if (shader == null)
             {

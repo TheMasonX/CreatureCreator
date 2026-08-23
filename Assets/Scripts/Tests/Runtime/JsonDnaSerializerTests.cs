@@ -89,6 +89,42 @@ namespace ProceduralCreature.Tests.Runtime
         }
 
         [Test]
+        public void RoundTrip_PreservesPartAndEyePartTypes()
+        {
+            var definition = CreatureDefinition.CreateEmpty();
+            definition.Forward = Vector3.forward;
+            definition.Body.Samples.Add(new BodySample { Id = 1, Position = Vector3.zero, Radius = 1f });
+            definition.AddPart(new CreaturePart
+            {
+                Id = "part_generic",
+                ParentId = CreatureDefinition.BodyId,
+                PartType = PartType.Part,
+                DisplayName = "Part",
+                Transform = TransformData.Identity,
+                Shape = ShapeDefinition.DefaultSphere,
+                Appearance = AppearanceDefinition.Default,
+            });
+            definition.AddPart(new CreaturePart
+            {
+                Id = "part_eye",
+                ParentId = CreatureDefinition.BodyId,
+                PartType = PartType.Eye,
+                DisplayName = "Eye",
+                Transform = TransformData.Identity,
+                Shape = ShapeDefinition.DefaultSphere,
+                Appearance = AppearanceDefinition.Default,
+            });
+
+            string json = _serializer.Serialize(definition);
+            CreatureDefinition reconstructed = _serializer.Deserialize(json);
+
+            Assert.AreEqual(PartType.Part, reconstructed.FindPart("part_generic").PartType);
+            Assert.AreEqual(PartType.Eye, reconstructed.FindPart("part_eye").PartType);
+            Assert.AreEqual("Part", reconstructed.FindPart("part_generic").DisplayName);
+            Assert.AreEqual("Eye", reconstructed.FindPart("part_eye").DisplayName);
+        }
+
+        [Test]
         public void Serialize_IsStableAcrossPartInsertionOrder()
         {
             CreatureDefinition definitionA = MakeTwoPartDefinition();
