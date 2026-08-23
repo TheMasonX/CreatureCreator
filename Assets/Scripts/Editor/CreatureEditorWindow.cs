@@ -28,16 +28,20 @@ namespace ProceduralCreature.Editor
     /// Undo.RecordObject target. Reachable via the editor's normal Ctrl+Z /
     /// Edit > Undo, not a separate custom stack.
     ///
-    /// KNOWN GRANULARITY LIMITATION: continuous drag edits (e.g. dragging a
-    /// Vector3Field's position slider) call MutateDefinition on every GUI frame
-    /// the value changes, which means a single drag gesture currently produces
-    /// many fine-grained undo steps rather than one "before drag / after drag"
-    /// step. Collapsing those into one step needs mouse-down/mouse-up-aware
-    /// grouping (Undo.CollapseUndoOperations around a drag session) that isn't
-    /// implemented in this pass — flagged rather than silently shipped as
-    /// polished, since I have no way to compile-verify that event-handling code
-    /// here. Undo still works correctly either way; it's just coarser-grained
-    /// than ideal during a drag.
+    /// KNOWN GRANULARITY LIMITATION: continuous drag edits still funnel through
+    /// MutateDefinition once per GUI frame the value changes — e.g. dragging a
+    /// Vector3Field's position slider or a part's viewport PositionHandle — which
+    /// means those gestures currently produce many fine-grained undo steps rather
+    /// than one "before drag / after drag" step. Collapsing those into one step
+    /// needs mouse-down/mouse-up-aware grouping (Undo.CollapseUndoOperations
+    /// around a drag session) that isn't implemented for them in this pass.
+    ///
+    /// The BODY SAMPLE viewport drag (CC-016) is the exception: it deliberately
+    /// does NOT mutate during the drag. It solves every frame from a mouse-down
+    /// snapshot, draws a transient preview, and commits exactly one mutation on
+    /// release, so one body drag = one Undo (Esc cancels with no Undo entry).
+    /// Undo still works correctly everywhere; it's just coarser-grained than
+    /// ideal for the inspector/part-handle drags.
     ///
     /// SCOPE NOTE: this editor implements interactive 3D viewport manipulation
     /// (a position handle for the selected part, raycast-based placement of new
@@ -82,6 +86,20 @@ namespace ProceduralCreature.Editor
         private ValidationResult _validation = ValidationResult.Valid();
         private string _selectedPartId;
         private int _activeBodySampleIndex = -1;
+
+        // CC-016 Body sample drag gesture. A whole drag solves every frame from
+        // the mouse-down snapshot and commits exactly one mutation on release, so
+        // one drag = one Undo. Esc cancels with no mutation. The definition is
+        // never mutated during the drag — the solved spline is drawn as a
+        // transient SceneView preview and the mesh regenerates only after the
+        // mouse-up commit (throttled), so the solver stays interactive even when
+        // mesh generation lags (CC-008).
+        private int _bodyDragIndex = -1;
+        private BodyEditKind _bodyDragKind = BodyEditKind.InteriorBend;
+        private Vector3[] _bodyDragSnapshot;
+        private Vector3 _bodyDragFinalTarget;
+        private Vector3[] _bodyDragPreview;
+
         private Vector2 _partListScroll;
         private Vector2 _validationScroll;
         private bool _showValidationPanel = true;
@@ -121,11 +139,18 @@ namespace ProceduralCreature.Editor
         /// <summary>
         /// A valid v2 starter creature: one Body spline along the Forward axis and
         /// no parts. Kept in sync with the schema's "exactly one Body root" rule.
+        ///
+        /// Symmetry defaults to MirrorAcrossXAxis (Spore-like): new parts are
+        /// authored with MirrorAcrossSymmetryPlane = true, so a fresh creature is
+        /// left/right symmetric across the X = 0 plane out of the box instead of
+        /// silently asymmetric. The mirror itself is derived at generation time
+        /// (SDF + skeleton); DNA still stores the single authored half.
         /// </summary>
         private static CreatureDefinition CreateDefaultCreature()
         {
             var definition = CreatureDefinition.CreateEmpty();
             definition.Forward = Vector3.forward;
+            definition.SymmetryMode = SymmetryMode.MirrorAcrossXAxis;
             definition.Body.Samples.Add(new BodySample
             {
                 Id = 1,
@@ -730,6 +755,11 @@ namespace ProceduralCreature.Editor
             // Body Spacing density control (CC-015): re-samples the whole Body
             // to the target chord spacing, keeping the head and tail in place
             // (denser spacing adds samples, sparser removes them).
+            //
+            // CC-016 review note: this slider is treated as a developer/debug
+            // control until its semantics are explicit. It is NOT part of the
+            // core bend/length editing interaction, and it must never be applied
+            // implicitly during a drag (no hidden global re-spacing coupling).
             float currentSpacing = CurrentBodySpacing(_definition.Body);
             float minSpacing = Mathf.Max(0.05f, currentSpacing * 0.2f);
             float maxSpacing = currentSpacing * 5f;
@@ -744,11 +774,14 @@ namespace ProceduralCreature.Editor
             }
 
             EditorGUILayout.HelpBox(
-                "Adding a sample extends the Body along its tail at the current spacing, so samples stay " +
-                "even. Drag the sample spheres in the Scene view to bend the Body (select Body in the part " +
-                "list first); spacing stays even while you drag. The Body Spacing slider re-samples the " +
-                "whole Body to a denser or sparser target spacing (head and tail stay put). Space Evenly " +
-                "re-snaps spacing after manual edits.",
+                "Adding a sample extends the Body along its tail at the current spacing. Drag the sample " +
+                "spheres in the Scene view (select Body in the part list first): an interior sample bends " +
+                "the spine locally (the selected sample moves, neighbors resist and move a little), and an " +
+                "endpoint (the larger sphere) extends or shortens the body. One drag commits as a single " +
+                "Undo step; Esc cancels a drag. The Body Spacing slider is a developer/debug density " +
+                "control that re-samples the whole Body (head and tail stay put); its semantics are still " +
+                "being defined and it is not part of the core bend/edit interaction. Space Evenly re-snaps " +
+                "spacing after manual edits.",
                 MessageType.None);
         }
 
@@ -941,6 +974,8 @@ namespace ProceduralCreature.Editor
                 return;
             }
 
+            if (_bodyDragIndex >= 0) CancelBodyDrag(); // left Body selection mid-gesture
+
             DrawSelectedPartHandle();
             HandlePlacementClick();
         }
@@ -976,16 +1011,47 @@ namespace ProceduralCreature.Editor
         }
 
         /// <summary>
-        /// Spore-like Body sample editing (CC-015): each sample draws a clickable
-        /// sphere cap; the active sample gets a position handle. Dragging bends
-        /// the spine as an equal-length rigid chain through BodySplineAuthoring,
-        /// so even spacing is preserved and the result stays valid. Positions are
-        /// DNA (the Body owns the creature frame), never preview mesh data.
+        /// Spore-like Body sample editing (CC-015/CC-016). Each sample draws a
+        /// clickable sphere cap (endpoints are larger to signal "length handle");
+        /// the active sample gets a position handle.
+        ///
+        /// CC-016 replaces the FABRIK rigid-chain drag with BodyEditSolver: an
+        /// interior sample drag is a local BEND (the selected sample dominates,
+        /// neighbors resist with distance-based movement weights), an endpoint
+        /// drag is a LENGTH edit, and every mouse frame solves from the mouse-down
+        /// snapshot (never the previous frame, so long drags cannot drift).
+        ///
+        /// The definition is NOT mutated during the drag — the solved spline is
+        /// drawn as a transient preview and the preview mesh is untouched. On
+        /// release the whole gesture commits as exactly one mutation (one drag =
+        /// one Undo); Esc cancels back to the snapshot with no Undo entry. The
+        /// mesh regenerates only after the commit through the throttled auto-regen
+        /// scheduler, so the solver stays interactive even when mesh generation
+        /// lags (CC-008). Positions are DNA (the Body owns the creature frame),
+        /// never preview mesh data.
         /// </summary>
         private void DrawBodySampleHandles()
         {
             BodySpline spline = _definition.Body;
             if (spline == null || spline.Samples == null || spline.Samples.Count == 0) return;
+
+            // An in-flight drag first checks for release (commit) and cancel (Esc)
+            // so the very last drag target is captured. Committing is idempotent.
+            if (_bodyDragIndex >= 0)
+            {
+                if (Event.current.type == EventType.KeyDown && Event.current.keyCode == KeyCode.Escape)
+                {
+                    CancelBodyDrag();
+                    return;
+                }
+                if ((Event.current.type == EventType.MouseUp && Event.current.button == 0)
+                    || GUIUtility.hotControl == 0)
+                {
+                    // MouseUp delivered directly, or the position handle released
+                    // hot control (the drag ended) — either way, commit.
+                    CommitBodyDrag();
+                }
+            }
 
             for (int i = 0; i < spline.Samples.Count; i++)
             {
@@ -993,9 +1059,19 @@ namespace ProceduralCreature.Editor
                 BodySample sample = spline.Samples[i];
                 if (sample == null) continue;
 
-                float handleSize = HandleUtility.GetHandleSize(sample.Position) * 0.12f;
-                if (Handles.Button(sample.Position, Quaternion.identity, handleSize, handleSize, Handles.SphereHandleCap))
+                // During an active drag the neighbors are drawn at the solved
+                // preview positions so the whole neighborhood follows the edit.
+                Vector3 drawPosition = sample.Position;
+                if (_bodyDragPreview != null && i < _bodyDragPreview.Length)
                 {
+                    drawPosition = _bodyDragPreview[i];
+                }
+
+                bool isEndpoint = i == 0 || i == spline.Samples.Count - 1;
+                float handleSize = HandleUtility.GetHandleSize(drawPosition) * (isEndpoint ? 0.16f : 0.12f);
+                if (Handles.Button(drawPosition, Quaternion.identity, handleSize, handleSize, Handles.SphereHandleCap))
+                {
+                    if (_bodyDragIndex >= 0 && _bodyDragIndex != i) CancelBodyDrag();
                     _activeBodySampleIndex = i;
                     Repaint();
                 }
@@ -1005,15 +1081,179 @@ namespace ProceduralCreature.Editor
             BodySample active = spline.Samples[_activeBodySampleIndex];
             if (active == null) return;
 
+            bool activeIsEndpoint = _activeBodySampleIndex == 0 || _activeBodySampleIndex == spline.Samples.Count - 1;
+
+            // The active handle rides the solved preview position during a drag so
+            // the grabbed sample visibly follows the cursor.
+            Vector3 handlePosition = active.Position;
+            if (_bodyDragIndex == _activeBodySampleIndex && _bodyDragPreview != null)
+            {
+                handlePosition = _bodyDragPreview[_activeBodySampleIndex];
+            }
+
             EditorGUI.BeginChangeCheck();
-            Vector3 newPosition = Handles.PositionHandle(active.Position, Quaternion.identity);
+            Vector3 newPosition = Handles.PositionHandle(handlePosition, Quaternion.identity);
             if (EditorGUI.EndChangeCheck())
             {
-                int index = _activeBodySampleIndex;
-                MutateDefinition("Move Body Sample (Viewport)",
-                    definition => BodySplineAuthoring.DragSampleEvenly(definition.Body, index, newPosition));
-                Repaint();
+                // Do not start a gesture on the release frame (the handle reports
+                // a final change on MouseUp; a real drag starts on MouseDrag).
+                if (_bodyDragIndex != _activeBodySampleIndex && Event.current.type != EventType.MouseUp)
+                {
+                    // Drag just started: freeze the mouse-down spline. Endpoints
+                    // are length edits; interior samples are bends.
+                    _bodyDragIndex = _activeBodySampleIndex;
+                    _bodyDragKind = activeIsEndpoint ? BodyEditKind.EndpointLength : BodyEditKind.InteriorBend;
+                    _bodyDragSnapshot = CopyBodyPositions(spline);
+                    _bodyDragPreview = null;
+                }
+                _bodyDragFinalTarget = newPosition;
+                _bodyDragPreview = SolveBodyDrag(_bodyDragIndex, _bodyDragFinalTarget);
+                SceneView.RepaintAll();
             }
+
+            // Draw the transient solved-spline preview (repaint only).
+            if (Event.current.type == EventType.Repaint && _bodyDragPreview != null)
+            {
+                DrawBodyEditPreview(_bodyDragPreview);
+            }
+        }
+
+        /// <summary>
+        /// Solves one mouse frame from the frozen mouse-down snapshot (CC-016).
+        /// Endpoints are length edits; interior samples are bends.
+        /// </summary>
+        private Vector3[] SolveBodyDrag(int index, Vector3 target)
+        {
+            if (_bodyDragSnapshot == null || index < 0 || index >= _bodyDragSnapshot.Length)
+            {
+                return _bodyDragSnapshot;
+            }
+            BodyEditResult result = _bodyDragKind == BodyEditKind.EndpointLength
+                ? BodyEditSolver.SolveEndpointDrag(_bodyDragSnapshot, index, target)
+                : BodyEditSolver.SolveInteriorDrag(_bodyDragSnapshot, index, target);
+            return result.Positions;
+        }
+
+        /// <summary>
+        /// Cheap transient preview of the solved spline. The definition and the
+        /// preview mesh are NOT touched during the drag; the mesh regenerates once
+        /// after the mouse-up commit.
+        /// </summary>
+        private void DrawBodyEditPreview(Vector3[] preview)
+        {
+            if (preview == null || preview.Length < 2) return;
+
+            Handles.color = new Color(0.20f, 0.85f, 0.55f, 0.85f);
+            for (int i = 1; i < preview.Length; i++)
+            {
+                Handles.DrawLine(preview[i - 1], preview[i]);
+            }
+            Handles.color = Color.white;
+            for (int i = 0; i < preview.Length; i++)
+            {
+                float size = HandleUtility.GetHandleSize(preview[i]) * 0.09f;
+                Handles.SphereHandleCap(i, preview[i], Quaternion.identity, size, EventType.Repaint);
+            }
+        }
+
+        /// <summary>
+        /// One whole drag commits exactly one mutation (one Undo). The definition
+        /// was never mutated during the drag, so this is the single canonical
+        /// write of the edited positions, flowed through the normal validation /
+        /// Undo / session / auto-regen path.
+        /// </summary>
+        private void CommitBodyDrag()
+        {
+            if (_bodyDragIndex < 0) return; // no active gesture (idempotent)
+
+            int index = _bodyDragIndex;
+            BodyEditKind kind = _bodyDragKind;
+            Vector3[] snapshot = _bodyDragSnapshot;
+            Vector3 target = _bodyDragFinalTarget;
+
+            // Clear gesture state BEFORE mutating so re-entrant GUI cannot
+            // double-commit.
+            _bodyDragIndex = -1;
+            _bodyDragKind = BodyEditKind.InteriorBend;
+            _bodyDragSnapshot = null;
+            _bodyDragPreview = null;
+
+            if (snapshot == null || index < 0 || index >= snapshot.Length) return;
+            if (snapshot.Length != _definition.Body.Samples.Count) return; // definition changed mid-gesture; drop the stale edit
+
+            // Deterministic re-solve from the frozen snapshot (identical to the
+            // last preview frame by construction) to get full diagnostics.
+            BodyEditResult final = kind == BodyEditKind.EndpointLength
+                ? BodyEditSolver.SolveEndpointDrag(snapshot, index, target)
+                : BodyEditSolver.SolveInteriorDrag(snapshot, index, target);
+
+            if (_logGenerationDiagnostics)
+            {
+                Debug.Log(
+                    $"[CreatureCreator] Body drag: selected displacement = {final.SelectedDisplacement:F3}, " +
+                    $"max neighbor displacement = {final.MaxNeighborDisplacement:F3}, " +
+                    $"arc length delta = {final.ArcLengthDelta:F3}, " +
+                    $"min segment ratio = {final.MinSegmentRatio:F3}, " +
+                    $"max curvature = {final.MaxCurvatureDegrees:F1}°");
+            }
+
+            MutateDefinition(kind == BodyEditKind.EndpointLength ? "Drag Body Endpoint (Viewport)" : "Drag Body Sample (Viewport)",
+                definition =>
+                {
+                    BodySpline targetSpline = definition.Body;
+                    for (int j = 0; j < final.Positions.Length && j < targetSpline.Samples.Count; j++)
+                    {
+                        targetSpline.Samples[j].Position = final.Positions[j];
+                    }
+
+                    // Repair/normalize only after the edit, as needed (CC-016): the
+                    // solver preserves segment lengths softly, so the committed
+                    // spline may be uneven. SpaceEvenly rides the edited polyline
+                    // and re-snaps even chords, preserving the edited shape while
+                    // keeping the committed definition valid for preview and save.
+                    // (The future authored-controls / derived-evaluation-samples
+                    // split is a separate schema decision, not part of CC-016.)
+                    if (HasUnevenBodySpacing(definition))
+                    {
+                        BodySplineAuthoring.SpaceEvenly(targetSpline);
+                    }
+                });
+
+            SceneView.RepaintAll();
+        }
+
+        /// <summary>
+        /// Esc during a drag: the definition was never mutated, so cancelling is
+        /// just dropping the gesture state — no Undo entry is created.
+        /// </summary>
+        private void CancelBodyDrag()
+        {
+            _bodyDragIndex = -1;
+            _bodyDragKind = BodyEditKind.InteriorBend;
+            _bodyDragSnapshot = null;
+            _bodyDragPreview = null;
+            SceneView.RepaintAll();
+        }
+
+        private static Vector3[] CopyBodyPositions(BodySpline spline)
+        {
+            var positions = new Vector3[spline.Samples.Count];
+            for (int i = 0; i < spline.Samples.Count; i++)
+            {
+                positions[i] = spline.Samples[i].Position;
+            }
+            return positions;
+        }
+
+        /// <summary>
+        /// True when the spline violates DefinitionValidator's even-spacing
+        /// invariant (UnevenBodySpacing). Uses the real validator so the drag
+        /// repair decision cannot drift from what validation will report.
+        /// </summary>
+        private static bool HasUnevenBodySpacing(CreatureDefinition definition)
+        {
+            return DefinitionValidator.Validate(definition).Issues
+                .Any(issue => issue.Code == ValidationCode.UnevenBodySpacing);
         }
 
         private void ApplyViewportMove(CreaturePart selected, Vector3 newWorldPosition)

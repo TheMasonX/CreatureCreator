@@ -11,8 +11,16 @@ namespace ProceduralCreature.Editor
     /// <summary>
     /// Pure authoring math for the Body spline. Spore-like body editing keeps the
     /// spline evenly spaced by construction: adding a sample extends the tail,
-    /// dragging a sample bends the spine as an equal-length rigid chain (FABRIK),
     /// and a one-click "Space Evenly" re-snaps samples to even chord spacing.
+    ///
+    /// BODY DRAG: the viewport drag path no longer lives here. CC-016 moved it to
+    /// BodyEditSolver, a local curve-edit solver over the selected sample and at
+    /// most ±3 neighbors (selected sample dominates, neighbors resist, lengths
+    /// preserved softly). DragSampleEvenly below is retained as the FABRIK
+    /// baseline (equal-link rigid chain) that CC-015 shipped and that the editor
+    /// used before CC-016; the editor now commits BodyEditSolver output and, when
+    /// the edit leaves the spline uneven, repairs with SpaceEvenly after the edit
+    /// so the committed definition stays valid for preview and save.
     ///
     /// This class deliberately uses no UnityEditor API so the EditMode test
     /// assembly can exercise it in isolation. It only mutates the BodySpline the
@@ -402,6 +410,10 @@ namespace ProceduralCreature.Editor
         }
 
         /// <summary>
+        /// FABRIK baseline spine drag (CC-015), superseded by BodyEditSolver for
+        /// the editor viewport (CC-016). Retained as a constraint primitive and
+        /// for the tests that document the old behavior.
+        ///
         /// Spore-like spine drag: moves sample <paramref name="draggedIndex"/> to
         /// <paramref name="target"/> while keeping every segment length equal, so
         /// even spacing is preserved during the drag.
