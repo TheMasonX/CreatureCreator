@@ -169,7 +169,7 @@ namespace ProceduralCreature.Morphology.Sdf
     {
         [ReadOnly] public NativeArray<SdfOperation> Operations;
         [NativeDisableParallelForRestriction] public NativeArray<float> ScratchValues;
-        [WriteOnly] public NativeArray<float> Samples;
+        [NativeDisableParallelForRestriction] public NativeArray<float> Samples;
         public int RootIndex;
         public int CornersX;
         public int CornersY;

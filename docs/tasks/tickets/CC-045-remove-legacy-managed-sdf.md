@@ -149,17 +149,22 @@ scalar evaluator API used by standalone callers and reference tests.
 
 Portable grid sampling now bounds its temporary evaluator scratch storage to an
 8M-float batch budget. Jobs retain global sample coordinates while using local
-scratch offsets, so high-resolution grids no longer require one address-sized
-sample-by-operation buffer for the entire volume.
+scratch offsets, and the output buffer explicitly permits unique global-index
+writes from parallel workers. High-resolution grids therefore no longer require
+one address-sized sample-by-operation buffer for the entire volume or trigger
+the native `ReadWriteBuffers` safety exception.
 
 The supplied repeated preview measurements show the current scaling boundary:
 96x96x96 used 1,300.8-1,825.1 ms for FieldSampling and 228.9-286.1 ms for
 AppearanceBake; 128x128x128 used 3,355.2 ms and 448.5 ms; 144x144x144 used
 4,988.4 ms and 566.2 ms; 160x160x160 used 6,308.1 ms and 675.6 ms; and
 192x192x192 used 10,198.4 ms and 914.2 ms. Mesh counts remained deterministic
-within each repeated quality sample. A quality-28 preview reached the explicit
-portable scratch-buffer addressability guard; the editor reports the failure
-instead of silently clamping the authored quality.
+within each repeated quality sample. The quality-28 preview initially reached
+the old whole-grid scratch-buffer addressability guard. After bounded batching
+and the explicit unique-output write annotation, the editor regenerated at
+224x224x224 with 11,390,625 samples, 30,084 mixed cells, 55,976 triangles, and
+27,990 vertices. That run took 17,374.9 ms for FieldSampling, 1,392.3 ms for
+MeshExtraction, and 1,197.3 ms for AppearanceBake, for 19,980.9 ms total.
 
 ## Blockers
 
