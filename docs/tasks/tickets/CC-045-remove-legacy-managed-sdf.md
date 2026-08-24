@@ -142,6 +142,11 @@ fallback is requested.
 Portable program disposal is exception-safe during field sampling, so a failed
 native sampling operation does not leave the generated operation buffer alive.
 
+Appearance queries now reuse one native evaluator scratch buffer per resolver
+instead of allocating a temporary value array for every vertex and part query.
+This targets the measured `AppearanceBake` cost while preserving the allocating
+scalar evaluator API used by standalone callers and reference tests.
+
 ## Blockers
 
 The runtime assembly is discoverable when selected explicitly. Six unrelated
@@ -167,6 +172,7 @@ it produces unrelated console warnings when Unity opens scripts.
 
 Run the repeated-generation benchmark at 96x96x96 and one additional supported
 quality, recording FieldSampling, AppearanceBake, mesh counts, and topology.
-Then audit remaining managed SDF references and remove the compiler only after
+Repeat the benchmark after scratch-buffer reuse and compare the measured
+AppearanceBake cost. Then audit remaining managed SDF references and remove the compiler only after
 all reference fixtures have equivalent portable parity coverage. Do not commit
 or update the FastNoise2 submodule until a human reviews its local changes.

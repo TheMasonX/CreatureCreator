@@ -62,6 +62,16 @@ namespace ProceduralCreature.Morphology.Sdf
             return Evaluate(program.Operations, program.RootIndex, point);
         }
 
+        public static float Evaluate(SdfProgram program, float3 point, NativeArray<float> scratchValues)
+        {
+            if (program == null) throw new DomainException("program must not be null.");
+            if (!scratchValues.IsCreated || scratchValues.Length < program.Operations.Length)
+            {
+                throw new DomainException("scratchValues must contain one entry per operation.");
+            }
+            return EvaluateInto(program.Operations, program.RootIndex, point, scratchValues, 0);
+        }
+
         public static float Evaluate(NativeArray<SdfOperation> operations, int rootIndex, float3 point)
         {
             if (!operations.IsCreated) throw new DomainException("operations must be created.");

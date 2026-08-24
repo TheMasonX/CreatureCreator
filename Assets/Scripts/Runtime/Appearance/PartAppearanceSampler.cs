@@ -1,4 +1,5 @@
 using UnityEngine;
+using Unity.Collections;
 using ProceduralCreature.Common;
 using ProceduralCreature.Definition;
 using ProceduralCreature.Morphology.Sdf;
@@ -74,12 +75,19 @@ namespace ProceduralCreature.Appearance
             private readonly CreatureDefinition _definition;
             private readonly System.Collections.Generic.List<(CreaturePart Part, SdfProgram Program)> _compiledParts;
             private readonly SdfProgram _bodyProgram;
+            private readonly NativeArray<float> _scratchValues;
 
             internal Resolver(CreatureDefinition definition)
             {
                 _definition = definition;
                 _compiledParts = SdfProgramBuilder.CompileIndividualPartsPortable(definition);
                 _bodyProgram = SdfProgramBuilder.CompilePortableBodyField(definition);
+                int scratchLength = _bodyProgram.Operations.Length;
+                foreach ((CreaturePart part, SdfProgram program) in _compiledParts)
+                {
+                    scratchLength = Mathf.Max(scratchLength, program.Operations.Length);
+                }
+                _scratchValues = new NativeArray<float>(Mathf.Max(scratchLength, 1), Allocator.Persistent);
             }
 
             public void Dispose()
@@ -89,6 +97,10 @@ namespace ProceduralCreature.Appearance
                     program.Dispose();
                 }
                 _bodyProgram.Dispose();
+                if (_scratchValues.IsCreated)
+                {
+                    _scratchValues.Dispose();
+                }
             }
 
             public ResolvedAppearance Resolve(Vector3 position)
@@ -107,7 +119,8 @@ namespace ProceduralCreature.Appearance
 
                 foreach ((CreaturePart part, SdfProgram program) in _compiledParts)
                 {
-                    float distance = Mathf.Abs(SdfProgramEvaluator.Evaluate(program, new Unity.Mathematics.float3(position.x, position.y, position.z)));
+                    float distance = Mathf.Abs(SdfProgramEvaluator.Evaluate(program,
+                        new Unity.Mathematics.float3(position.x, position.y, position.z), _scratchValues));
                     if (distance < nearestAbsDistance)
                     {
                         nearestAbsDistance = distance;
@@ -117,7 +130,8 @@ namespace ProceduralCreature.Appearance
 
                 float bodyAbsDistance = !_bodyProgram.Operations.IsCreated
                     ? float.PositiveInfinity
-                    : Mathf.Abs(SdfProgramEvaluator.Evaluate(_bodyProgram, new Unity.Mathematics.float3(position.x, position.y, position.z)));
+                    : Mathf.Abs(SdfProgramEvaluator.Evaluate(_bodyProgram,
+                        new Unity.Mathematics.float3(position.x, position.y, position.z), _scratchValues));
 
                 // The Body owns this surface point. Its gradient color (or default
                 // flat gray) becomes the base color; noise keeps the same gentle
