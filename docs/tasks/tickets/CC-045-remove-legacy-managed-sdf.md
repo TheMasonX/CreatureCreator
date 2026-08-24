@@ -139,6 +139,9 @@ The normal `CreatureMeshGenerator` path now compiles only the portable program;
 the managed graph is created only when the explicit `usePortableSampling: false`
 fallback is requested.
 
+Portable program disposal is exception-safe during field sampling, so a failed
+native sampling operation does not leave the generated operation buffer alive.
+
 ## Blockers
 
 The runtime assembly is discoverable when selected explicitly. Six unrelated

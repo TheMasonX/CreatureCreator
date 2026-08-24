@@ -74,9 +74,15 @@ namespace ProceduralCreature.Generation
                 {
                     if (usePortableSampling)
                     {
-                        grid = DensityGrid.SamplePortable(portableProgram, definition.Bounds, definition.Generation);
-                        portableProgram.Dispose();
-                        portableProgram = null;
+                        try
+                        {
+                            grid = DensityGrid.SamplePortable(portableProgram, definition.Bounds, definition.Generation);
+                        }
+                        finally
+                        {
+                            portableProgram.Dispose();
+                            portableProgram = null;
+                        }
                     }
                     else
                     {
