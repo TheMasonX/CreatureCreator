@@ -162,6 +162,49 @@ namespace ProceduralCreature.Tests.Runtime
         {
             Assert.Throws<DomainException>(() => PartAppearanceSampler.Resolve(null, Vector3.zero));
         }
+
+        [Test]
+        public void Resolver_PortableProgramsMatchManagedAppearanceSelection()
+        {
+            var definition = CreatureDefinition.CreateEmpty();
+            definition.Body.Samples.Add(new BodySample { Id = 1, Position = Vector3.zero, Radius = 0.8f });
+            definition.AddPart(ColoredSphere("part", new Vector3(2f, 0f, 0f), Color.red));
+
+            using (PartAppearanceSampler.Resolver resolver = PartAppearanceSampler.CreateResolver(definition))
+            {
+                foreach (Vector3 point in new[] { Vector3.zero, new Vector3(2f, 0f, 0f), new Vector3(-1.5f, 0f, 0f) })
+                {
+                    ResolvedAppearance expected = ResolveManaged(definition, point);
+                    ResolvedAppearance actual = resolver.Resolve(point);
+                    Assert.AreEqual(expected.BaseColor, actual.BaseColor, $"Mismatch at {point}.");
+                    Assert.AreEqual(expected.MaterialKey, actual.MaterialKey, $"Material mismatch at {point}.");
+                }
+            }
+        }
+
+        private static ResolvedAppearance ResolveManaged(CreatureDefinition definition, Vector3 position)
+        {
+            System.Collections.Generic.List<(CreaturePart Part, ISdfNode Node)> parts = SdfProgramBuilder.CompileIndividualParts(definition);
+            ISdfNode body = SdfProgramBuilder.CompileBodyField(definition);
+            CreaturePart nearest = null;
+            float nearestDistance = float.PositiveInfinity;
+            foreach ((CreaturePart part, ISdfNode node) in parts)
+            {
+                float distance = Mathf.Abs(node.Evaluate(position));
+                if (distance < nearestDistance)
+                {
+                    nearestDistance = distance;
+                    nearest = part;
+                }
+            }
+            if (body != null && Mathf.Abs(body.Evaluate(position)) <= nearestDistance)
+            {
+                return new ResolvedAppearance(BodyVerticalGradientSampler.EvaluateColor(definition, position), 0, 1f);
+            }
+            AppearanceDefinition appearance = nearest == null ? AppearanceDefinition.Default : nearest.Appearance;
+            return new ResolvedAppearance(appearance.BaseColor, appearance.NoiseSeed, appearance.NoiseScale,
+                string.IsNullOrWhiteSpace(appearance.MaterialKey) ? null : appearance.MaterialKey);
+        }
     }
 
     [TestFixture]

@@ -56,7 +56,10 @@ namespace ProceduralCreature.Appearance
     {
         public static ResolvedAppearance Resolve(CreatureDefinition definition, Vector3 position)
         {
-            return CreateResolver(definition).Resolve(position);
+            using (Resolver resolver = CreateResolver(definition))
+            {
+                return resolver.Resolve(position);
+            }
         }
 
         public static Resolver CreateResolver(CreatureDefinition definition)
@@ -66,17 +69,26 @@ namespace ProceduralCreature.Appearance
             return new Resolver(definition);
         }
 
-        public sealed class Resolver
+        public sealed class Resolver : System.IDisposable
         {
             private readonly CreatureDefinition _definition;
-            private readonly System.Collections.Generic.List<(CreaturePart Part, ISdfNode Node)> _compiledParts;
-            private readonly ISdfNode _bodyNode;
+            private readonly System.Collections.Generic.List<(CreaturePart Part, SdfProgram Program)> _compiledParts;
+            private readonly SdfProgram _bodyProgram;
 
             internal Resolver(CreatureDefinition definition)
             {
                 _definition = definition;
-                _compiledParts = SdfProgramBuilder.CompileIndividualParts(definition);
-                _bodyNode = SdfProgramBuilder.CompileBodyField(definition);
+                _compiledParts = SdfProgramBuilder.CompileIndividualPartsPortable(definition);
+                _bodyProgram = SdfProgramBuilder.CompilePortableBodyField(definition);
+            }
+
+            public void Dispose()
+            {
+                foreach ((CreaturePart part, SdfProgram program) in _compiledParts)
+                {
+                    program.Dispose();
+                }
+                _bodyProgram.Dispose();
             }
 
             public ResolvedAppearance Resolve(Vector3 position)
@@ -93,9 +105,9 @@ namespace ProceduralCreature.Appearance
                 CreaturePart nearestPart = null;
                 float nearestAbsDistance = float.PositiveInfinity;
 
-                foreach ((CreaturePart part, ISdfNode node) in _compiledParts)
+                foreach ((CreaturePart part, SdfProgram program) in _compiledParts)
                 {
-                    float distance = Mathf.Abs(node.Evaluate(position));
+                    float distance = Mathf.Abs(SdfProgramEvaluator.Evaluate(program, new Unity.Mathematics.float3(position.x, position.y, position.z)));
                     if (distance < nearestAbsDistance)
                     {
                         nearestAbsDistance = distance;
@@ -103,14 +115,14 @@ namespace ProceduralCreature.Appearance
                     }
                 }
 
-                float bodyAbsDistance = _bodyNode == null
+                float bodyAbsDistance = !_bodyProgram.Operations.IsCreated
                     ? float.PositiveInfinity
-                    : Mathf.Abs(_bodyNode.Evaluate(position));
+                    : Mathf.Abs(SdfProgramEvaluator.Evaluate(_bodyProgram, new Unity.Mathematics.float3(position.x, position.y, position.z)));
 
                 // The Body owns this surface point. Its gradient color (or default
                 // flat gray) becomes the base color; noise keeps the same gentle
                 // triplanar surface variation the baker applies to parts.
-                if (_bodyNode != null && bodyAbsDistance <= nearestAbsDistance)
+                if (_bodyProgram.Operations.IsCreated && bodyAbsDistance <= nearestAbsDistance)
                 {
                     Color bodyColor = BodyVerticalGradientSampler.EvaluateColor(_definition, position);
                     return new ResolvedAppearance(bodyColor, 0, 1f);

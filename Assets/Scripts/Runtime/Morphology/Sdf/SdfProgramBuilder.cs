@@ -216,6 +216,133 @@ namespace ProceduralCreature.Morphology.Sdf
             return new SdfProgram(new NativeArray<SdfOperation>(operations.ToArray(), Allocator.Persistent), root);
         }
 
+        public static SdfProgram CompilePortableBodyField(CreatureDefinition definition)
+        {
+            if (definition == null) throw new DomainException("Cannot compile a null CreatureDefinition.");
+
+            var operations = new List<SdfOperation>();
+            int root = AppendPortableBodyField(operations, definition);
+            if (root < 0)
+            {
+                operations.Add(SdfOperation.Primitive(SdfOperationType.Empty, float3.zero));
+                root = 0;
+            }
+
+            return new SdfProgram(new NativeArray<SdfOperation>(operations.ToArray(), Allocator.Persistent), root);
+        }
+
+        public static List<(CreaturePart Part, SdfProgram Program)> CompileIndividualPartsPortable(CreatureDefinition definition)
+        {
+            if (definition == null) throw new DomainException("Cannot compile a null CreatureDefinition.");
+
+            return definition.Parts
+                .OrderBy(p => p.Id, System.StringComparer.Ordinal)
+                .Where(part => part.MeshGeometry == null)
+                .Select(part => (part, CompilePortablePart(definition, part)))
+                .ToList();
+        }
+
+        private static int AppendPortableBodyField(List<SdfOperation> operations, CreatureDefinition definition)
+        {
+            if (definition.Body == null || definition.Body.Samples == null || definition.Body.Samples.Count == 0)
+            {
+                return -1;
+            }
+
+            int root = -1;
+            for (int i = 0; i < definition.Body.Samples.Count; i++)
+            {
+                BodySample sample = definition.Body.Samples[i];
+                int primitive = operations.Count;
+                operations.Add(SdfOperation.Primitive(SdfOperationType.Sphere, new float3(sample.Radius, 0f, 0f)));
+                operations.Add(new SdfOperation
+                {
+                    Type = SdfOperationType.Transform,
+                    A = primitive,
+                    Matrix = ToFloat4x4(Matrix4x4.TRS(sample.Position, Quaternion.identity, Vector3.one).inverse),
+                    DistanceScale = 1f,
+                });
+                int bodyNode = operations.Count - 1;
+
+                if (root < 0)
+                {
+                    root = bodyNode;
+                    continue;
+                }
+
+                BodySample previous = definition.Body.Samples[i - 1];
+                operations.Add(new SdfOperation
+                {
+                    Type = SdfOperationType.SmoothUnion,
+                    A = root,
+                    B = bodyNode,
+                    Parameters = new float3(Mathf.Min(previous.Radius, sample.Radius) * BodySampleBlendFactor, 0f, 0f),
+                });
+                root = operations.Count - 1;
+            }
+
+            return root;
+        }
+
+        private static SdfProgram CompilePortablePart(CreatureDefinition definition, CreaturePart part)
+        {
+            var operations = new List<SdfOperation>();
+            Matrix4x4 localToCreature = CreaturePartWorldTransformResolver.ResolveLocalToCreatureSpace(definition, part);
+            Vector3 scale = localToCreature.lossyScale;
+            float distanceScale = Mathf.Min(Mathf.Abs(scale.x), Mathf.Min(Mathf.Abs(scale.y), Mathf.Abs(scale.z)));
+            bool shouldMirror = part.MirrorAcrossSymmetryPlane && definition.SymmetryMode != SymmetryMode.None;
+            int root;
+
+            if (part.Limb != null)
+            {
+                root = CompileLimbChainPortable(operations, part.Limb, localToCreature, distanceScale, shouldMirror);
+            }
+            else
+            {
+                SdfOperationType primitiveType;
+                switch (part.Shape.Type)
+                {
+                    case ShapeType.Sphere: primitiveType = SdfOperationType.Sphere; break;
+                    case ShapeType.Ellipsoid: primitiveType = SdfOperationType.Ellipsoid; break;
+                    case ShapeType.Box: primitiveType = SdfOperationType.Box; break;
+                    case ShapeType.Capsule: primitiveType = SdfOperationType.Capsule; break;
+                    default: throw new DomainException($"No portable SDF primitive mapping exists for ShapeType.{part.Shape.Type}.");
+                }
+
+                float legacySize = part.Shape.PrimarySize;
+                float radius = part.Shape.Radius > 0f ? part.Shape.Radius : legacySize;
+                float height = part.Shape.CapsuleHeight > 0f ? part.Shape.CapsuleHeight : 1f;
+                float3 boxHalfExtents = part.Shape.BoxHalfExtents.x > 0f
+                    ? new float3(part.Shape.BoxHalfExtents.x, part.Shape.BoxHalfExtents.y, part.Shape.BoxHalfExtents.z)
+                    : new float3(legacySize);
+                float3 parameters = primitiveType == SdfOperationType.Box
+                    ? boxHalfExtents
+                    : primitiveType == SdfOperationType.Capsule
+                        ? new float3(radius, height, (int)part.Shape.CapsuleAxis)
+                        : primitiveType == SdfOperationType.Ellipsoid
+                            ? (part.Shape.EllipsoidRadii.x > 0f ? new float3(part.Shape.EllipsoidRadii.x, part.Shape.EllipsoidRadii.y, part.Shape.EllipsoidRadii.z) : new float3(legacySize))
+                            : new float3(radius, 0f, 0f);
+                int primitive = operations.Count;
+                operations.Add(SdfOperation.Primitive(primitiveType, parameters));
+                operations.Add(new SdfOperation
+                {
+                    Type = SdfOperationType.Transform,
+                    A = primitive,
+                    Matrix = ToFloat4x4(localToCreature.inverse),
+                    DistanceScale = distanceScale,
+                });
+                root = operations.Count - 1;
+
+                if (shouldMirror)
+                {
+                    operations.Add(new SdfOperation { Type = SdfOperationType.Symmetry, A = root });
+                    root = operations.Count - 1;
+                }
+            }
+
+            return new SdfProgram(new NativeArray<SdfOperation>(operations.ToArray(), Allocator.Persistent), root);
+        }
+
         private static float4x4 ToFloat4x4(Matrix4x4 matrix)
         {
             return new float4x4(

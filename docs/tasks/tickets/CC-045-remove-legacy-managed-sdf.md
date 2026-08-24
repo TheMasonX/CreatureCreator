@@ -130,6 +130,11 @@ nodes once, while the public one-shot `Resolve` behavior remains unchanged.
 This removes repeated managed graph construction for every mesh vertex without
 changing nearest-part, Body-gradient, or material-key ownership.
 
+Portable appearance evaluation is now implemented. The SDF builder exposes
+standalone portable programs for the Body field and each non-mesh part, and the
+appearance resolver evaluates and disposes those native programs for the bake
+scope. A managed-versus-portable appearance selection parity fixture was added.
+
 ## Blockers
 
 The runtime assembly is discoverable when selected explicitly. Six unrelated
@@ -138,9 +143,13 @@ the extraction reference contract must be confirmed before deleting `ISdfNode`
 and its managed compiler.
 
 The appearance bake still evaluates managed nodes through the cached resolver.
-This reduces allocation and compilation overhead but does not satisfy the final
-Burst-only acceptance criterion. A portable per-part and Body resolver remains
-required.
+The production appearance resolver now evaluates portable programs instead. The
+managed compiler remains in the reference path used by parity tests and has not
+yet been deleted.
+
+FastNoise2Bindings has local submodule history/build changes that are deliberately
+not part of this work. Treat the submodule as a future human-review gate before
+any submodule commit or parent pointer update is made.
 
 The configured external code editor path also points to a missing Visual Studio
 installation. This does not affect Unity compilation or preview generation, but
@@ -148,6 +157,8 @@ it produces unrelated console warnings when Unity opens scripts.
 
 ## Next Step
 
-Design the portable per-part and Body appearance query needed for the remaining
-managed consumer. Keep managed SDF compilation until that appearance migration
-has parity coverage, then remove the remaining production graph path.
+Run the repeated-generation benchmark at 96x96x96 and one additional supported
+quality, recording FieldSampling, AppearanceBake, mesh counts, and topology.
+Then audit remaining managed SDF references and remove the compiler only after
+all reference fixtures have equivalent portable parity coverage. Do not commit
+or update the FastNoise2 submodule until a human reviews its local changes.
