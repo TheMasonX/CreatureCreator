@@ -81,6 +81,8 @@ namespace ProceduralCreature.Skeleton
 
             var skeleton = new Skeleton();
 
+            AppendBodyBones(skeleton, definition);
+
             List<CreaturePart> orderedParts = definition.Parts
                 .OrderBy(p => p.Id, System.StringComparer.Ordinal)
                 .ToList();
@@ -191,6 +193,10 @@ namespace ProceduralCreature.Skeleton
                     PartType = part.PartType,
                     IsMirrored = mirrored,
                     Position = fromWorld,
+                    HasSegment = true,
+                    EndPosition = toWorld,
+                    HasChildAttachmentPosition = i == limb.Joints.Count - 2,
+                    ChildAttachmentPosition = toWorld,
                     Rotation = rotation,
                 });
                 previousBoneId = boneId;
@@ -222,12 +228,9 @@ namespace ProceduralCreature.Skeleton
 
         private static string ResolveParentBoneId(CreatureDefinition definition, CreaturePart part, bool mirrored)
         {
-            // The Body is the sole root; a part attached to the Body spline has no
-            // parent bone (the Body's own frame/bones are a later BodyFrameResolver
-            // slice).
             if (part.ParentId == null || part.ParentId == CreatureDefinition.BodyId)
             {
-                return null;
+                return ResolveBodyParentBoneId(definition, part, mirrored);
             }
 
             CreaturePart parentPart = definition.FindPart(part.ParentId);
@@ -256,6 +259,70 @@ namespace ProceduralCreature.Skeleton
             return mirrored && parentIsAlsoMirrored
                 ? parentBoneBaseId + MirrorSuffix
                 : parentBoneBaseId;
+        }
+
+        private static void AppendBodyBones(Skeleton skeleton, CreatureDefinition definition)
+        {
+            if (definition.Body == null || definition.Body.Samples == null
+                || definition.Body.Samples.Count == 0)
+            {
+                return;
+            }
+
+            BodyFrame[] frames = BodyFrameResolver.ComputeSampleFrames(
+                definition.Body.Samples, definition.Forward);
+            for (int i = 0; i < definition.Body.Samples.Count; i++)
+            {
+                Vector3 position = definition.Body.Samples[i].Position;
+                bool hasSegment = i < definition.Body.Samples.Count - 1;
+                Vector3 endPosition = hasSegment
+                    ? definition.Body.Samples[i + 1].Position
+                    : position;
+
+                skeleton.Bones.Add(new Bone
+                {
+                    Id = CreatureDefinition.BodyId + LimbJointBoneSeparator + i,
+                    ParentBoneId = i == 0 ? null : CreatureDefinition.BodyId + LimbJointBoneSeparator + (i - 1),
+                    SourcePartId = CreatureDefinition.BodyId,
+                    PartType = PartType.Body,
+                    Position = position,
+                    HasSegment = hasSegment,
+                    EndPosition = endPosition,
+                    Rotation = Quaternion.LookRotation(frames[i].Tangent, frames[i].Normal),
+                });
+            }
+        }
+
+        private static string ResolveBodyParentBoneId(
+            CreatureDefinition definition, CreaturePart part, bool mirrored)
+        {
+            if (definition.Body == null || definition.Body.Samples == null
+                || definition.Body.Samples.Count == 0)
+            {
+                return null;
+            }
+
+            Matrix4x4 world = CreaturePartWorldTransformResolver.ResolveLocalToCreatureSpace(
+                definition, part);
+            Vector3 position = part.Limb != null && part.Limb.Joints != null
+                && part.Limb.Joints.Count > 0
+                ? world.MultiplyPoint3x4(part.Limb.Joints[0].Position)
+                : world.GetColumn(3);
+            if (mirrored) position = ReflectAcrossX.MultiplyPoint3x4(position);
+
+            int nearestIndex = 0;
+            float nearestDistance = float.PositiveInfinity;
+            for (int i = 0; i < definition.Body.Samples.Count; i++)
+            {
+                float distance = (definition.Body.Samples[i].Position - position).sqrMagnitude;
+                if (distance < nearestDistance)
+                {
+                    nearestDistance = distance;
+                    nearestIndex = i;
+                }
+            }
+
+            return CreatureDefinition.BodyId + LimbJointBoneSeparator + nearestIndex;
         }
     }
 }

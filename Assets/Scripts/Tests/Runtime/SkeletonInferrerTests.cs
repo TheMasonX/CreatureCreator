@@ -64,6 +64,24 @@ namespace ProceduralCreature.Tests.Runtime
         }
 
         [Test]
+        public void Infer_BodySamplesProduceConnectedBodyChainAndBodyChildLink()
+        {
+            var definition = CreatureDefinition.CreateEmpty();
+            definition.Body.Samples.Add(new BodySample { Id = 1, Position = new Vector3(0f, 0f, 0f), Radius = 1f });
+            definition.Body.Samples.Add(new BodySample { Id = 2, Position = new Vector3(0f, 0f, 1f), Radius = 1f });
+            definition.Body.Samples.Add(new BodySample { Id = 3, Position = new Vector3(0f, 0f, 2f), Radius = 1f });
+            definition.AddPart(MakePart("leg", PartType.Leg, new Vector3(0.1f, 0f, 1.1f), CreatureDefinition.BodyId));
+
+            Skeleton.Skeleton skeleton = SkeletonInferrer.Infer(definition);
+
+            Assert.AreEqual(4, skeleton.Bones.Count);
+            Assert.AreEqual(Vector3.zero, skeleton.FindBone("body_j0").Position);
+            Assert.AreEqual(new Vector3(0f, 0f, 1f), skeleton.FindBone("body_j0").EndPosition);
+            Assert.AreEqual("body_j0", skeleton.FindBone("body_j1").ParentBoneId);
+            Assert.AreEqual("body_j1", skeleton.FindBone("leg").ParentBoneId);
+        }
+
+        [Test]
         public void Infer_MirroredLeafPart_ProducesTwoBonesBothParentedToTheSingleUnmirroredParent()
         {
             var definition = CreatureDefinition.CreateEmpty();

@@ -28,6 +28,18 @@ namespace ProceduralCreature.Skeleton
         /// <summary>Creature-space position in the rest/authored pose.</summary>
         public Vector3 Position;
 
+        /// <summary>True when this bone represents a geometry segment with an explicit endpoint.</summary>
+        public bool HasSegment;
+
+        /// <summary>Creature-space endpoint for body and limb segment bones.</summary>
+        public Vector3 EndPosition;
+
+        /// <summary>True when children attach at a position other than Position.</summary>
+        public bool HasChildAttachmentPosition;
+
+        /// <summary>Creature-space position where child bones should connect.</summary>
+        public Vector3 ChildAttachmentPosition;
+
         /// <summary>
         /// Creature-space rotation in the rest/authored pose. Extracted from the
         /// resolved world matrix via Matrix4x4.rotation — exact for uniform scale

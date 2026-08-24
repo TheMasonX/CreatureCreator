@@ -71,3 +71,4 @@
 | CC-067 | Show the SDF bounds for primitive shapes in the editor | Backlog | P2 |
 | CC-068 | Make the base limb point moveable (selection + move gizmo, no scale) | Backlog | P1 |
 | CC-069 | Runtime bone rig and pose application (drive bone Transforms from a PosedSkeleton) | Backlog | P1 |
+| CC-070 | Add body chain and body-root connections to inferred skeleton | In Progress | P1 |

@@ -29,10 +29,9 @@ namespace ProceduralCreature.Editor
         }
 
         /// <summary>
-        /// One line per bone that has a parent, from the parent's position to the
-        /// bone's own position, in creature space. Root bones
-        /// (<c>ParentBoneId == null</c>) contribute no line. A bone whose parent is
-        /// missing is skipped (invalid DNA; the validator already reports it).
+        /// Emits explicit body/limb segments and parent links for ordinary part
+        /// bones. Internal links already represented by an explicit segment are
+        /// emitted once; attachment links remain visible.
         /// Deterministic order: skeleton bone order.
         /// </summary>
         public static List<BoneLine> BuildBoneLines(CreatureSkeleton.Skeleton skeleton)
@@ -42,10 +41,25 @@ namespace ProceduralCreature.Editor
 
             foreach (CreatureSkeleton.Bone bone in skeleton.Bones)
             {
-                if (bone == null || bone.ParentBoneId == null) continue;
+                if (bone == null) continue;
+
+                if (bone.HasSegment)
+                {
+                    lines.Add(new BoneLine(bone.Position, bone.EndPosition));
+                }
+
+                if (bone.ParentBoneId == null) continue;
                 CreatureSkeleton.Bone parent = skeleton.FindBone(bone.ParentBoneId);
                 if (parent == null) continue;
-                lines.Add(new BoneLine(parent.Position, bone.Position));
+                if (parent.HasSegment
+                    && (parent.EndPosition - bone.Position).sqrMagnitude <= 1e-8f)
+                {
+                    continue;
+                }
+                Vector3 attachmentPosition = parent.HasChildAttachmentPosition
+                    ? parent.ChildAttachmentPosition
+                    : parent.Position;
+                lines.Add(new BoneLine(attachmentPosition, bone.Position));
             }
             return lines;
         }

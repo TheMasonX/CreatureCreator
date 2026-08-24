@@ -55,6 +55,59 @@ namespace ProceduralCreature.Tests.Editor
         }
 
         [Test]
+        public void BuildBoneLines_SegmentedBoneIncludesEndpointAndAttachment()
+        {
+            var skeleton = new CreatureSkeleton.Skeleton();
+            skeleton.Bones.Add(new CreatureSkeleton.Bone
+            {
+                Id = "body_j0",
+                Position = Vector3.zero,
+                HasSegment = true,
+                EndPosition = Vector3.forward,
+            });
+            skeleton.Bones.Add(new CreatureSkeleton.Bone
+            {
+                Id = "leg",
+                ParentBoneId = "body_j0",
+                Position = new Vector3(1f, 0f, 0f),
+            });
+
+            List<SkeletonDisplay.BoneLine> lines = SkeletonDisplay.BuildBoneLines(skeleton);
+            Assert.AreEqual(2, lines.Count);
+            Assert.AreEqual(Vector3.zero, lines[0].Start);
+            Assert.AreEqual(Vector3.forward, lines[0].End);
+            Assert.AreEqual(Vector3.zero, lines[1].Start);
+            Assert.AreEqual(new Vector3(1f, 0f, 0f), lines[1].End);
+        }
+
+        [Test]
+        public void BuildBoneLines_ChildOfSegmentedLimbStartsAtChildAttachmentPosition()
+        {
+            var skeleton = new CreatureSkeleton.Skeleton();
+            skeleton.Bones.Add(new CreatureSkeleton.Bone
+            {
+                Id = "leg_j1",
+                Position = Vector3.zero,
+                HasSegment = true,
+                EndPosition = Vector3.down,
+                HasChildAttachmentPosition = true,
+                ChildAttachmentPosition = Vector3.down,
+            });
+            skeleton.Bones.Add(new CreatureSkeleton.Bone
+            {
+                Id = "foot",
+                ParentBoneId = "leg_j1",
+                Position = new Vector3(0.25f, -1f, 0f),
+            });
+
+            List<SkeletonDisplay.BoneLine> lines = SkeletonDisplay.BuildBoneLines(skeleton);
+
+            Assert.AreEqual(2, lines.Count);
+            Assert.AreEqual(Vector3.down, lines[1].Start);
+            Assert.AreEqual(new Vector3(0.25f, -1f, 0f), lines[1].End);
+        }
+
+        [Test]
         public void BuildJointPoints_ReturnsEveryBonePosition()
         {
             var skeleton = new CreatureSkeleton.Skeleton();
