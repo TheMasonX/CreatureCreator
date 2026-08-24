@@ -35,6 +35,7 @@
 | CC-031 | Composable geometry sources (multiple meshes per creature) | Done | P1 |
 | CC-032 | Separate gameplay geometry from 3D-print export | Backlog | P2 |
 | CC-033 | Register FastNoise2Bindings as a real git submodule | Done | P2 |
+| CC-034 | Resolve FastNoise2Bindings compile failure (restore DllImport P/Invoke) | Done | P1 |
 | CC-034 | Body appearance vertical blend remap as an AnimationCurve | Done | P2 |
 | CC-035 | Parts list column layout (resizable splitter + height-constrained scroll) | Backlog | P2 |
 | CC-036 | Anatomical limb parent validation (Hand under Arm, Foot under Leg) | Backlog | P2 |
