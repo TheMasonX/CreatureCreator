@@ -16,3 +16,6 @@ MonoBehaviour:
   - Key: eye_white
     DisplayName: Eye White
     Material: {fileID: 2100000, guid: 69071abcf996b2046a0706a355071bb7, type: 2}
+  - Key: eye_black
+    DisplayName: Eye Black
+    Material: {fileID: 2100000, guid: 5f4e1b69500ef994cb2b782827a709d7, type: 2}
