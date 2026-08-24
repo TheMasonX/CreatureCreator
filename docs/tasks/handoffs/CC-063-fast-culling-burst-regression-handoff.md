@@ -1,20 +1,36 @@
-# Handoff: Fast preview culling regression (CC-063) — Burst job produces a broken mesh
+# Handoff: Fast preview culling regression (CC-063) — resolved
 
-**Task:** Resolve the Fast preview culling regression
-**Status:** In Progress — regression reproduced, root cause not yet confirmed
-**Owner:** Next implementation agent
+**Task:** Restore the Fast preview culling mode
+**Status:** Resolved — root cause identified and fixed (see Resolution)
+**Owner:** Implementation agent
 **Date:** 2026-08-23
 **Depends on:** CC-062 (exact consumer-chain culling, committed `06b313e`)
 **Related:** CC-062, CC-045, CC-014
 
-## Summary
+## Resolution
 
-The new editor toggle **"Fast Field Sampling (preview)"** (`SdfCullingMode.Fast`)
-produces an incomplete, non-watertight mesh that is missing roughly 40% of the
-surface, and it is slower than the first naive culling it was derived from.
-**Exact mode is correct.** The user reported the issue persists after a Unity
-restart, so it is not an in-memory stale-compilation artifact that a restart
-clears.
+The broken Fast mesh was caused by the Fast branch's own finite-sentinel design,
+not by a stale Burst cache or a Burst codegen defect. An intermediate refactor
+replaced the working `+inf` skip value with `CullSentinel` (1e6); that sentinel
+flowed through the smooth-min field and erased ~40% of the surface in Fast mode.
+
+The fix restored the original naive behavior and hardened extraction:
+
+- Fast culling writes `+inf` for skipped ops (the working first-naive behavior).
+- `CubeContourResolver.InterpolateEdge` now clamps a crossed edge with a `+inf`
+  (or NaN) endpoint to the finite endpoint, so `inf/inf` can never emit a NaN
+  vertex at coarse grids.
+- The dead `CullSentinel` constant and `SkipValue(bool)` helper were removed.
+
+Validated on the dino: 112^3 Fast == Exact triangle count (14,520) with
+FieldSampling ~3.1x faster (566.9 ms vs 1762.7 ms); 128^3 Fast = 18,760 tris /
+9,382 verts, watertight. `SdfCullingModeTests` 4/4 pass. Exact mode is unchanged.
+
+## Historical investigation
+
+The sections below record the original investigation. The "Burst job returns 0.0"
+observation and the cache-poisoning hypothesis were superseded by the Resolution
+above — no cache clearing was required.
 
 ## Symptom (live editor)
 
@@ -83,24 +99,13 @@ the Burst job still produced `0.0` at body-surface corners and the mesh was stil
    - `SdfProgramEvaluator.Evaluate(program, point, scratch, Fast)` (managed)
      returns `-0.023258`.
 
-## Fix directions for the next agent (try in order)
+## Fix applied
 
-1. **Clear the Burst AOT cache with Unity CLOSED:** delete `Library/BurstCache`,
-   reopen the project, regenerate. If the Fast mesh becomes correct, the cache was
-   poisoned. This is the highest-probability fix given the measured evidence
-   (managed correct, Burst wrong, restart did not help).
-2. **If clearing the cache does not fix it**, bisect the Fast branch against the
-   known-good first naive version. Revert the skip value to `+inf` (the existing
-   `SmoothMin` guard already handles `+inf`) and/or drop the `&& operation.Cullable`
-   check, re-test the JOB. Identify which construct Burst miscompiles.
-3. Consider whether `CullSentinel` (1e6) flowing through `SmoothMin`'s clamp, or the
-   int-mode comparison, is Burst-incompatible; if so, inline the skip decision in
-   the loop instead of through a const/helper.
-4. **Regression guard:** add a test asserting Fast produces a watertight mesh with a
-   triangle count within a tolerance of Exact for the dino-like creature. The
-   existing `SdfCullingModeTests` fixture covers a small creature only and does not
-   exercise the dino's body-chain + limb + ellipsoid structure, so it did not catch
-   this regression.
+The resolution replaced the finite-sentinel Fast branch with the original `+inf`
+skip and added the non-finite `InterpolateEdge` guard (see Resolution). Step 2 of
+the original directions — revert to `+inf` and drop the `Cullable`-only Fast
+check — was the correct path; cache clearing was never needed. A dino-scale
+Fast-vs-Exact regression test remains a follow-up.
 
 ## Files touched (uncommitted working tree)
 
@@ -122,10 +127,7 @@ is uncommitted in the working tree. `.vscode` and `Assets/Includes` remain untra
 
 ## Blockers / residual risk
 
-- The Burst cache cannot be cleared while the editor runs (file lock); the fixer
-  needs Unity closed to clear `Library/BurstCache`.
-- The exact cause is not yet confirmed. The evidence points to Burst serving
-  stale/wrong native code for the Fast branch, but a codegen defect is not ruled
-  out. Do not ship the Fast mode as default until the JOB and managed paths agree.
-- Until resolved, the user should keep "Fast Field Sampling (preview)" unchecked
-  (Exact) for a correct preview.
+- None blocking. Fast samples may be `+inf` by design; the `InterpolateEdge` guard
+  keeps extracted vertices finite and the mesh watertight.
+- Residual: `SdfCullingModeTests` covers a small creature only. A dino-scale
+  Fast-vs-Exact triangle-count regression test is a recommended follow-up.
