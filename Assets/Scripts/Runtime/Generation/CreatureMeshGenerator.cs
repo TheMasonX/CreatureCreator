@@ -58,8 +58,14 @@ namespace ProceduralCreature.Generation
             SdfProgram portableProgram = null;
             Time(diagnostics, GenerationStage.SdfCompile, () =>
             {
-                sdf = SdfProgramBuilder.Compile(definition);
-                if (usePortableSampling) portableProgram = SdfProgramBuilder.CompilePortable(definition);
+                if (usePortableSampling)
+                {
+                    portableProgram = SdfProgramBuilder.CompilePortable(definition);
+                }
+                else
+                {
+                    sdf = SdfProgramBuilder.Compile(definition);
+                }
             });
 
             DensityGrid grid = null;

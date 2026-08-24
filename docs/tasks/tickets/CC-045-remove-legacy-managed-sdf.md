@@ -135,6 +135,10 @@ standalone portable programs for the Body field and each non-mesh part, and the
 appearance resolver evaluates and disposes those native programs for the bake
 scope. A managed-versus-portable appearance selection parity fixture was added.
 
+The normal `CreatureMeshGenerator` path now compiles only the portable program;
+the managed graph is created only when the explicit `usePortableSampling: false`
+fallback is requested.
+
 ## Blockers
 
 The runtime assembly is discoverable when selected explicitly. Six unrelated
@@ -145,7 +149,8 @@ and its managed compiler.
 The appearance bake still evaluates managed nodes through the cached resolver.
 The production appearance resolver now evaluates portable programs instead. The
 managed compiler remains in the reference path used by parity tests and has not
-yet been deleted.
+yet been deleted. The explicit managed generation fallback also remains for
+diagnostics and migration comparisons.
 
 FastNoise2Bindings has local submodule history/build changes that are deliberately
 not part of this work. Treat the submodule as a future human-review gate before
