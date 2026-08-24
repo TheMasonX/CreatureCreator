@@ -42,5 +42,6 @@ namespace ProceduralCreature.Definition
         InvalidMeshGeometry,
         NonFiniteMeshGeometryAttachment,
         InvalidMeshGeometryScale,
+        InvalidLimbBlendRadius,
     }
 }

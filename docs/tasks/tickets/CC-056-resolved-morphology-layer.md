@@ -41,3 +41,10 @@ CC-007 must define surface-anchor behavior before the resolver can claim a compl
 
 ## Next Step
 Record the resolved data contract in an ADR, then migrate one consumer at a time, starting with limb sampling and skeleton attachment.
+
+## 2026-08-24 audit revision - split for incremental migration
+Split CC-056 into:
+- CC-056A - resolved Body/limb geometry guide: centerline, frames, arc length, thickness, joints.
+- CC-056B - semantic attachment resolution: BodySurface, LimbRoot, LimbTerminal, PartFrame.
+- CC-056C (later) - proxy consumers.
+Migrate consumers incrementally; avoid a mega-PR.

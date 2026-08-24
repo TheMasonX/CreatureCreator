@@ -101,6 +101,34 @@ metadata over the existing semantic skeleton.
 (`EyeMesh`/`EyeSdf`/...). `GeometryType` classifies the geometry source; the two
 enums stay orthogonal.
 
+### 7. Placement and attachment precedence (CC-051)
+
+A part has exactly one resolved morphology frame, and that frame comes from
+exactly one path. `Transform`, `ParentAttachment`, `BodySurfaceAnchor`, limb
+root/terminal sockets, `GeometryAttachment`, and `RigBinding` must NOT evolve
+independently. The single seam is
+`CreaturePartWorldTransformResolver.ResolvePartFrameToCreatureSpace` — every
+consumer (SDF compiler, skeleton inference, mesh generator, editor viewport)
+resolves placement through it, never from raw `ParentId`/`Transform`/`Limb`
+fields.
+
+| Situation              | Position authority     | Orientation authority     |
+| ---------------------- | ---------------------- | ------------------------- |
+| Body root              | Body definition        | Body Forward/frame        |
+| Body child             | BodySurfaceAnchor      | Body frame + local offset |
+| Limb root              | Parent semantic socket | socket frame              |
+| Limb child at terminal | LimbTerminal socket    | terminal frame            |
+| Mesh geometry          | GeometryAttachment     | geometry local transform  |
+| Rig binding            | Skeleton socket/bone   | rig binding frame         |
+
+Interim contract (until CC-007's body-surface projector lands): a Body child's
+`ParentAttachment` (`BodySurfaceAnchor`) is RESERVED-but-inert. It is validated
+and serialized but is NOT a placement source; placement comes from `Transform`
++ parent chain + limb child-at-tip through the single resolver. No code reads
+anchor fields for placement except through the resolver. CC-007 extends
+`ResolvePartFrameToCreatureSpace` — the one seam — to project the anchor for
+Body children.
+
 ## Consequences
 
 - The generator API no longer assumes a single `Mesh` output; consumers iterate

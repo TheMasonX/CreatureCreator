@@ -123,8 +123,13 @@ namespace ProceduralCreature.Appearance
 
                 foreach ((CreaturePart part, SdfProgram program) in _compiledParts)
                 {
-                    float distance = Mathf.Abs(SdfProgramEvaluator.Evaluate(program,
-                        new Unity.Mathematics.float3(position.x, position.y, position.z), _scratchValues, _cullingMode));
+                    // CC-064 non-finite contract: a culled/outside sample reads +inf,
+                    // which means "no candidate here" — never a giant valid distance.
+                    // Skip it so it cannot win (or poison) the nearest-part decision.
+                    float rawDistance = SdfProgramEvaluator.Evaluate(program,
+                        new Unity.Mathematics.float3(position.x, position.y, position.z), _scratchValues, _cullingMode);
+                    if (float.IsPositiveInfinity(rawDistance)) continue;
+                    float distance = Mathf.Abs(rawDistance);
                     if (distance < nearestAbsDistance)
                     {
                         nearestAbsDistance = distance;
@@ -137,10 +142,13 @@ namespace ProceduralCreature.Appearance
                     : Mathf.Abs(SdfProgramEvaluator.Evaluate(_bodyProgram,
                         new Unity.Mathematics.float3(position.x, position.y, position.z), _scratchValues, _cullingMode));
 
-                // The Body owns this surface point. Its gradient color (or default
-                // flat gray) becomes the base color; noise keeps the same gentle
-                // triplanar surface variation the baker applies to parts.
-                if (_bodyProgram.Operations.IsCreated && bodyAbsDistance <= nearestAbsDistance)
+                // The Body owns this surface point only when it is a real (finite)
+                // candidate — +inf is "outside", not "the Body is nearest". Without
+                // this guard, a point where every candidate is culled (+inf everywhere)
+                // would incorrectly fall through to the Body's gradient color (CC-064).
+                if (_bodyProgram.Operations.IsCreated
+                    && !float.IsPositiveInfinity(bodyAbsDistance)
+                    && bodyAbsDistance <= nearestAbsDistance)
                 {
                     Color bodyColor = BodyVerticalGradientSampler.EvaluateColor(_definition, position);
                     return new ResolvedAppearance(bodyColor, 0, 1f);

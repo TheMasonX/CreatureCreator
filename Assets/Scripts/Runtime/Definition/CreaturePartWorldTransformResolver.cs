@@ -16,7 +16,7 @@ namespace ProceduralCreature.Definition
     /// CHILD-AT-TIP FRAME (CC-018): a limb's TERMINAL joint is the origin of any
     /// child's local space, so a child authored at local (0,0,0) under a limb sits
     /// at the limb's tip, not its placement root.
-    /// ResolveLocalToCreatureSpace inserts each ancestor limb's terminal-joint
+    /// ResolvePartFrameToCreatureSpace inserts each ancestor limb's terminal-joint
     /// translation while composing a child's world transform;
     /// ResolveChildFrameToCreatureSpace returns the frame a direct child is
     /// authored in.
@@ -29,7 +29,33 @@ namespace ProceduralCreature.Definition
     /// </summary>
     public static class CreaturePartWorldTransformResolver
     {
-        public static Matrix4x4 ResolveLocalToCreatureSpace(CreatureDefinition definition, CreaturePart part)
+        /// <summary>
+        /// THE canonical part placement frame (CC-051, ADR-002 §7): the
+        /// creature-space matrix for <paramref name="part"/>'s own authored
+        /// placement, composed from its parent chain (each part's Transform
+        /// relative to its parent, plus limb child-at-tip for limb ancestors) and
+        /// its own local transform. Every consumer of a part's placement — the
+        /// SDF compiler, skeleton inference, the mesh generator, and the editor
+        /// viewport — must go through this one method; no consumer re-derives
+        /// placement from raw ParentId/Transform/Limb fields.
+        ///
+        /// PLACEMENT PRECEDENCE (ADR-002 §7): a part has exactly one resolved
+        /// morphology frame, from exactly one path. Today that path is Transform +
+        /// parent chain + limb child-at-tip. <see cref="BodySurfaceAnchor"/>
+        /// (ParentAttachment) is RESERVED-but-inert until CC-007's body-surface
+        /// projector lands: it is validated and serialized but is NOT a placement
+        /// source, and no code may read its fields for placement except through
+        /// this resolver. When CC-007 lands, this method is the single seam that
+        /// applies the anchor for Body children.
+        ///
+        /// Assumes the definition has already passed DefinitionValidator (no
+        /// cycles, no missing parents). Given valid input this never fails; given
+        /// invalid input it throws DomainException rather than looping or silently
+        /// truncating the chain, since reaching this method with unvalidated DNA
+        /// is a caller error — every generation stage is supposed to validate
+        /// first (§14).
+        /// </summary>
+        public static Matrix4x4 ResolvePartFrameToCreatureSpace(CreatureDefinition definition, CreaturePart part)
         {
             if (definition == null) throw new DomainException("definition must not be null.");
             if (part == null) throw new DomainException("part must not be null.");
@@ -93,11 +119,22 @@ namespace ProceduralCreature.Definition
         }
 
         /// <summary>
+        /// Alias for <see cref="ResolvePartFrameToCreatureSpace"/> retained for
+        /// callers that predate CC-051. Every consumer converges on the single
+        /// canonical method; the alias guarantees a caller cannot accidentally
+        /// drift onto a second placement path.
+        /// </summary>
+        public static Matrix4x4 ResolveLocalToCreatureSpace(CreatureDefinition definition, CreaturePart part)
+        {
+            return ResolvePartFrameToCreatureSpace(definition, part);
+        }
+
+        /// <summary>
         /// The creature-space matrix of the frame a CHILD of <paramref name="part"/>
         /// is authored in. For a limb parent this is the part matrix extended to
         /// its TERMINAL joint — children are authored relative to the tip, so local
         /// (0,0,0) sits at the limb's end. For any other parent it equals
-        /// <see cref="ResolveLocalToCreatureSpace"/>. The editor's world→local
+        /// <see cref="ResolvePartFrameToCreatureSpace"/>. The editor's world→local
         /// conversions use this so dragging/placing a child under a limb produces
         /// tip-relative local coordinates, matching what generation reads back.
         /// </summary>

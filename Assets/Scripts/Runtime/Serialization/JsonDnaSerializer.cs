@@ -347,6 +347,10 @@ namespace ProceduralCreature.Serialization
             {
                 Thickness = ReadOptionalThicknessProfile(limbObj, "thicknessProfile"),
             };
+            if (limbObj.TryGetValue("blendRadius", out object blendValue) && blendValue != null)
+            {
+                chain.BlendRadius = (float)RequireNumber(limbObj, "blendRadius");
+            }
             foreach (object entry in RequireArray(limbObj, "joints"))
             {
                 if (entry is not Dictionary<string, object> jointObj)

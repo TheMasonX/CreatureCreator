@@ -34,6 +34,18 @@ Add runtime proxy parity tests and an editor manual drag check. Record update ti
 ## Findings
 Competitor evidence shows that a cheap deformable representation can provide responsive editing without replacing the semantic or final implicit model. Current 128^3 and 256^3 regeneration timings make synchronous high-quality remeshing unsuitable for interactive gestures.
 
+## 2026-08-24 audit revision - three-tier rendering model
+Fast SDF is now a legitimate intermediate tier (~100s ms refinement), not a 60 Hz
+representation. Adopt three tiers:
+```text
+Tier 0  Interactive semantic proxy        <16 ms
+Tier 1  Fast SDF refinement               ~100s ms
+Tier 2  Exact final geometry              high quality / slower
+```
+Editor state machine: Editing -> Proxy -> idle ~100-250 ms -> Fast SDF refinement ->
+MouseUp/finalize -> Exact generation. The proxy is a fast consumer of ResolvedMorphology,
+never authoritative.
+
 ## Blockers
 CC-056 must define the shared centerline, frame, thickness, and socket values first.
 

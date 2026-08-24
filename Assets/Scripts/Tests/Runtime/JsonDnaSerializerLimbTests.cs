@@ -182,6 +182,38 @@ namespace ProceduralCreature.Tests.Runtime
         }
 
         [Test]
+        public void Canonicalize_ThrowsOnNegativeLimbBlendRadius()
+        {
+            var definition = DefinitionWithLimb();
+            definition.FindPart("part_leg").Limb.BlendRadius = -0.1f;
+
+            Assert.Throws<DomainException>(() => DefinitionCanonicalizer.Canonicalize(definition),
+                "Canonicalization is not a repair pass; a negative limb blend radius is a programmer error.");
+        }
+
+        [Test]
+        public void Canonicalize_ThrowsOnNonFiniteLimbBlendRadius()
+        {
+            var definition = DefinitionWithLimb();
+            definition.FindPart("part_leg").Limb.BlendRadius = float.NaN;
+
+            Assert.Throws<DomainException>(() => DefinitionCanonicalizer.Canonicalize(definition),
+                "Canonicalization is not a repair pass; a non-finite limb blend radius is a programmer error.");
+        }
+
+        [Test]
+        public void Canonicalize_QuantizesLimbBlendRadius()
+        {
+            var definition = DefinitionWithLimb();
+            definition.FindPart("part_leg").Limb.BlendRadius = 0.123456f;
+
+            CreatureDefinition canonical = DefinitionCanonicalizer.Canonicalize(definition);
+
+            Assert.AreEqual(0.1235f, canonical.FindPart("part_leg").Limb.BlendRadius, 1e-6f,
+                "The limb blend radius must be quantized to 4 decimal places.");
+        }
+
+        [Test]
         public void Serialize_LimbChain_ProducesCanonicalKeyOrder()
         {
             string json = _serializer.Serialize(DefinitionWithLimb());
@@ -190,6 +222,36 @@ namespace ProceduralCreature.Tests.Runtime
             Assert.GreaterOrEqual(idIndex, 0, "limbChain must be emitted as an object with joints.");
             Assert.IsTrue(json.Contains("\"thicknessProfile\":{\"keys\":"),
                 "The thickness profile must be emitted as keys.");
+        }
+
+        [Test]
+        public void RoundTrip_BlendRadius_IsPreserved()
+        {
+            var definition = DefinitionWithLimb();
+            definition.FindPart("part_leg").Limb.BlendRadius = 0.35f;
+
+            string json = _serializer.Serialize(definition);
+            CreatureDefinition loaded = _serializer.Deserialize(json);
+
+            Assert.AreEqual(0.35f, loaded.FindPart("part_leg").Limb.BlendRadius, 1e-4f,
+                "The authored limb blend radius must round-trip.");
+        }
+
+        [Test]
+        public void Deserialize_LimbChainWithoutBlendRadius_DefaultsToStandard()
+        {
+            // A file saved between CC-018 and CC-049 has a limbChain but no
+            // blendRadius field. It must load with the standard default so
+            // existing creatures generate identically (additive, no version bump).
+            string json = _serializer.Serialize(DefinitionWithLimb());
+            string legacy = json.Replace(",\"blendRadius\":0.1000", string.Empty);
+            Assert.IsFalse(legacy.Contains("blendRadius"), "Sanity: the legacy file must not mention blendRadius.");
+
+            CreatureDefinition loaded = _serializer.Deserialize(legacy);
+            Assert.AreEqual(
+                ProceduralCreature.Definition.LimbChain.DefaultBlendRadius,
+                loaded.FindPart("part_leg").Limb.BlendRadius, 1e-6f,
+                "A pre-CC-049 limbChain must load with the default blend radius.");
         }
     }
 }

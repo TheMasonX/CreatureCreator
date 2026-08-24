@@ -22,6 +22,19 @@ every operation for every grid corner with no spatial culling. Add world-space
 AABB culling so a corner far from an operation's geometry skips that operation
 (reads as +inf) instead of evaluating its full transform plus primitive.
 
+### Canonical benchmark matrix (2026-08-24 audit revision)
+Standardize all future optimization evidence on one matrix before claiming closure:
+```text
+Fixture:    Dino
+Resolution: 96^3, 112^3, 128^3, 160^3, 192^3, 256^3
+Mode:       Exact, Fast
+Metrics:    SdfCompile, FieldSampling, MeshExtraction, AppearanceBake,
+            TotalGeneration, triangles, vertices, watertightness
+```
+Also review the scratch-buffer budget (`batchSize * operationCount`) against typical
+operation counts, high-quality grids, large part counts, and native memory pressure;
+quality 28 currently hits the addressability guard.
+
 ## Scope
 
 - Give each portable `SdfOperation` a world-space AABB (`MinBound`/`MaxBound`),

@@ -616,6 +616,19 @@ namespace ProceduralCreature.Definition
                             "with unique T in [0, 1] and positive values.", part.Id));
                     }
                 }
+
+                if (float.IsNaN(limb.BlendRadius) || float.IsInfinity(limb.BlendRadius))
+                {
+                    issues.Add(new ValidationIssue(
+                        ValidationSeverity.Error, ValidationCode.InvalidLimbBlendRadius,
+                        $"Part '{part.Id}' limb blend radius must be finite.", part.Id));
+                }
+                else if (limb.BlendRadius < 0f)
+                {
+                    issues.Add(new ValidationIssue(
+                        ValidationSeverity.Error, ValidationCode.InvalidLimbBlendRadius,
+                        $"Part '{part.Id}' limb blend radius must not be negative.", part.Id));
+                }
             }
         }
     }

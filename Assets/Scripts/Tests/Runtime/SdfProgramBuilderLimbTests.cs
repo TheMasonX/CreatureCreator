@@ -171,5 +171,114 @@ namespace ProceduralCreature.Tests.Runtime
                 }
             }
         }
+
+        /// <summary>
+        /// CC-049: a limb's part-to-field union must not depend on the inert
+        /// Shape.SmoothBlendRadius. Changing that inert field must have zero
+        /// observable effect on the generated field (managed and portable).
+        /// </summary>
+        [Test]
+        public void Compile_LimbField_IsIndependentOfInertShapeBlendRadius()
+        {
+            var shapeLow = ShapeDefinition.DefaultSphere;
+            shapeLow.SmoothBlendRadius = 0.05f;
+            var shapeHigh = ShapeDefinition.DefaultSphere;
+            shapeHigh.SmoothBlendRadius = 0.5f;
+
+            CreatureDefinition low = DefinitionWithLimb(StraightDown(), mirror: false);
+            low.FindPart("part_leg").Shape = shapeLow;
+            CreatureDefinition high = DefinitionWithLimb(StraightDown(), mirror: false);
+            high.FindPart("part_leg").Shape = shapeHigh;
+
+            ISdfNode managedLow = SdfProgramBuilder.Compile(low);
+            ISdfNode managedHigh = SdfProgramBuilder.Compile(high);
+            using (SdfProgram portableLow = SdfProgramBuilder.CompilePortable(low))
+            using (SdfProgram portableHigh = SdfProgramBuilder.CompilePortable(high))
+            {
+                for (float x = -2f; x <= 2f; x += 0.3f)
+                for (float y = -2f; y <= 0.5f; y += 0.3f)
+                for (float z = -1.5f; z <= 1.5f; z += 0.3f)
+                {
+                    Vector3 point = new Vector3(x, y, z);
+                    Assert.AreEqual(managedLow.Evaluate(point), managedHigh.Evaluate(point), 1e-5f,
+                        $"Managed limb field must be independent of inert Shape blend at {point}.");
+                    Assert.AreEqual(
+                        SdfProgramEvaluator.Evaluate(portableLow, new float3(point.x, point.y, point.z)),
+                        SdfProgramEvaluator.Evaluate(portableHigh, new float3(point.x, point.y, point.z)),
+                        1e-5f,
+                        $"Portable limb field must be independent of inert Shape blend at {point}.");
+                }
+            }
+        }
+
+        /// <summary>
+        /// CC-049: the explicit LimbChain.BlendRadius is the authority for the
+        /// limb's part-to-field union. Changing it must change the field near the
+        /// body/limb seam.
+        /// </summary>
+        [Test]
+        public void Compile_LimbField_ChangesWithLimbChainBlendRadius()
+        {
+            LimbChain hard = StraightDown();
+            hard.BlendRadius = 0f;
+            LimbChain soft = StraightDown();
+            soft.BlendRadius = 0.5f;
+
+            ISdfNode hardField = SdfProgramBuilder.Compile(DefinitionWithLimb(hard, mirror: false));
+            ISdfNode softField = SdfProgramBuilder.Compile(DefinitionWithLimb(soft, mirror: false));
+
+            bool differs = false;
+            for (float x = -0.8f; x <= 0.8f && !differs; x += 0.1f)
+            for (float y = -0.6f; y <= 0.2f && !differs; y += 0.1f)
+            {
+                float a = hardField.Evaluate(new Vector3(x, y, 0f));
+                float b = softField.Evaluate(new Vector3(x, y, 0f));
+                if (Mathf.Abs(a - b) > 1e-3f)
+                {
+                    differs = true;
+                    break;
+                }
+            }
+            Assert.IsTrue(differs,
+                "The authored LimbChain.BlendRadius must affect the field near the body/limb seam.");
+        }
+
+        /// <summary>
+        /// CC-049: managed and portable limb fields must agree when an explicit
+        /// LimbChain.BlendRadius is authored. Unmirrored on purpose — mirrored
+        /// limb parity at far points has its own regression test
+        /// (CompilePortable_MirroredLimbAtXOffset_AgreesWithManagedOnBothSides);
+        /// this test isolates the explicit-blend union contract. Tolerance 1e-3:
+        /// wider authored blends amplify the known Mathf.Lerp (a+(b-a)h) vs
+        /// math.lerp (b+(a-b)h) rounding difference in the smooth-min polynomial
+        /// to ~2e-4 at far points (verified: default 0.1 blend is bit-identical;
+        /// 0.4 blend differs by 1.8e-4). A real contract break would differ by O(1).
+        /// </summary>
+        [Test]
+        public void CompilePortable_ExplicitLimbBlend_AgreesWithManaged()
+        {
+            var chain = new LimbChain();
+            chain.BlendRadius = 0.4f;
+            chain.Joints.Add(new LimbJoint { Id = 1, Position = Vector3.zero });
+            chain.Joints.Add(new LimbJoint { Id = 2, Position = new Vector3(0f, -1.2f, 0f) });
+
+            CreatureDefinition definition = DefinitionWithLimb(chain, mirror: false);
+
+            ISdfNode managed = SdfProgramBuilder.Compile(definition);
+            using (SdfProgram portable = SdfProgramBuilder.CompilePortable(definition))
+            {
+                for (float x = -3f; x <= 3f; x += 0.35f)
+                for (float y = -2.5f; y <= 0.5f; y += 0.35f)
+                for (float z = -1.5f; z <= 1.5f; z += 0.35f)
+                {
+                    Vector3 point = new Vector3(x, y, z);
+                    Assert.AreEqual(
+                        managed.Evaluate(point),
+                        SdfProgramEvaluator.Evaluate(portable, new float3(point.x, point.y, point.z)),
+                        1e-3f,
+                        $"Managed and portable limb fields with explicit blend must agree at {point}.");
+                }
+            }
+        }
     }
 }

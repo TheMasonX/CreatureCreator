@@ -127,6 +127,20 @@ namespace ProceduralCreature.Morphology.Sdf
         }
     }
 
+    /// <summary>
+    /// Evaluates a compiled portable SDF program at a point (CC-045).
+    ///
+    /// NON-FINITE FIELD CONTRACT (CC-064): every consumer of a sampled scalar
+    /// value must treat the field as follows —
+    ///   `+inf` = outside / culled / semantically absent (never a giant valid distance)
+    ///   `NaN`  = always invalid (a bug upstream; sampling must never produce it)
+    ///   `-inf` = invalid for field sampling (interior sentinel only, not a distance)
+    ///   finite = the evaluated field
+    /// Fast culling (CC-063) writes `+inf` for skipped operations; consumers must
+    /// treat `+inf` as "no candidate" (e.g. appearance selection must not let it
+    /// win a nearest decision, and interpolation must clamp to the finite
+    /// endpoint).
+    /// </summary>
     public static class SdfProgramEvaluator
     {
         public static float Evaluate(SdfProgram program, float3 point)

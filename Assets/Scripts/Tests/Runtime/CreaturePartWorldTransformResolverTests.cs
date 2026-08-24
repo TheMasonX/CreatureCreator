@@ -284,5 +284,107 @@ namespace ProceduralCreature.Tests.Runtime
             Assert.AreEqual(new Vector3(1f, -1.5f, 0f), worldPosition,
                 "A grandchild of a limb chains through the arm tip and the hand tip.");
         }
+
+        // ---- CC-051 single canonical placement path ---------------------------------
+        // ResolvePartFrameToCreatureSpace is THE part-frame resolver (ADR-002 §7);
+        // ResolveLocalToCreatureSpace is an alias. No consumer may re-derive
+        // placement, so the two must agree everywhere.
+
+        [Test]
+        public void ResolvePartFrame_IsTheSingleCanonicalPath_ForBodyChild()
+        {
+            var definition = CreatureDefinition.CreateEmpty();
+            var child = new CreaturePart
+            {
+                Id = "part_head",
+                ParentId = CreatureDefinition.BodyId,
+                Transform = new TransformData
+                {
+                    Position = new Vector3(0f, 0.5f, 1.2f),
+                    Rotation = Quaternion.Euler(0f, 30f, 0f),
+                    Scale = new Vector3(1f, 1.2f, 1f),
+                },
+                Shape = ShapeDefinition.DefaultSphere,
+                Appearance = AppearanceDefinition.Default,
+            };
+            definition.AddPart(child);
+
+            Matrix4x4 canonical = CreaturePartWorldTransformResolver.ResolvePartFrameToCreatureSpace(definition, child);
+            Matrix4x4 alias = CreaturePartWorldTransformResolver.ResolveLocalToCreatureSpace(definition, child);
+            Vector3 canonicalPosition = canonical.GetColumn(3);
+
+            Assert.AreEqual(alias, canonical,
+                "ResolveLocalToCreatureSpace must be an exact alias of the canonical part-frame resolver.");
+            Assert.AreEqual(new Vector3(0f, 0.5f, 1.2f), canonicalPosition,
+                "A Body child's frame is its authored local transform (the Body owns the creature frame).");
+        }
+
+        [Test]
+        public void ResolvePartFrame_IsTheSingleCanonicalPath_ForLimbTipChild()
+        {
+            var definition = CreatureDefinition.CreateEmpty();
+            definition.AddPart(new CreaturePart
+            {
+                Id = "part_arm",
+                Transform = new TransformData { Position = new Vector3(1f, 0f, 0f), Rotation = Quaternion.identity, Scale = Vector3.one },
+                Shape = ShapeDefinition.DefaultSphere,
+                Appearance = AppearanceDefinition.Default,
+                Limb = LimbChainWith(Vector3.zero, new Vector3(0f, -1f, 0f), new Vector3(0f, -2f, 0f)),
+            });
+            definition.AddPart(new CreaturePart
+            {
+                Id = "part_hand",
+                ParentId = "part_arm",
+                Transform = TransformData.Identity,
+                Shape = ShapeDefinition.DefaultSphere,
+                Appearance = AppearanceDefinition.Default,
+            });
+
+            Matrix4x4 canonical = CreaturePartWorldTransformResolver.ResolvePartFrameToCreatureSpace(definition, definition.FindPart("part_hand"));
+            Matrix4x4 alias = CreaturePartWorldTransformResolver.ResolveLocalToCreatureSpace(definition, definition.FindPart("part_hand"));
+            Vector3 canonicalPosition = canonical.GetColumn(3);
+
+            Assert.AreEqual(alias, canonical, "The canonical part-frame resolver and its alias must agree at a limb tip.");
+            Assert.AreEqual(new Vector3(1f, -2f, 0f), canonicalPosition,
+                "A child of a limb sits at the limb's terminal joint through the canonical path.");
+        }
+
+        /// <summary>
+        /// CC-051 / ADR-002 §7 interim contract: a Body child's ParentAttachment
+        /// (BodySurfaceAnchor) is RESERVED-but-inert until CC-007 projects it.
+        /// Placement must come from the Transform path through the single
+        /// resolver, so an authored anchor must NOT silently change placement
+        /// today. When CC-007 lands, this resolver is the one seam that applies
+        /// the anchor, and this test will be updated then.
+        /// </summary>
+        [Test]
+        public void ResolvePartFrame_BodyChildWithParentAttachment_AnchorIsInertUntilCC007()
+        {
+            var definition = CreatureDefinition.CreateEmpty();
+            definition.Body.Samples.Add(new BodySample { Id = 1, Position = new Vector3(0f, 0f, 0f), Radius = 1f });
+            var part = new CreaturePart
+            {
+                Id = "part_leg",
+                ParentId = CreatureDefinition.BodyId,
+                Transform = new TransformData { Position = new Vector3(0f, -0.5f, 0.4f), Rotation = Quaternion.identity, Scale = Vector3.one },
+                Shape = ShapeDefinition.DefaultSphere,
+                Appearance = AppearanceDefinition.Default,
+                ParentAttachment = new BodySurfaceAnchor
+                {
+                    SegmentStartSampleId = 1u,
+                    SegmentT = 0.5f,
+                    RadialAngle = 1.2f,
+                    SurfaceOffset = 0.1f,
+                    Roll = 0.3f,
+                },
+            };
+            definition.AddPart(part);
+
+            Matrix4x4 frame = CreaturePartWorldTransformResolver.ResolvePartFrameToCreatureSpace(definition, part);
+            Vector3 framePosition = frame.GetColumn(3);
+
+            Assert.AreEqual(new Vector3(0f, -0.5f, 0.4f), framePosition,
+                "Until CC-007, placement is the authored Transform; the anchor is reserved-but-inert and must not change the frame.");
+        }
     }
 }

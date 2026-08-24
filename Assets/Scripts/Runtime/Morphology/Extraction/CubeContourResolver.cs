@@ -246,6 +246,12 @@ namespace ProceduralCreature.Morphology.Extraction
             // selected as crossed; guard against the degenerate da == db case
             // (would only occur if both are exactly zero) by clamping t to the
             // midpoint rather than dividing by zero.
+            //
+            // CC-064 non-finite contract: +inf means "outside/culled" (Fast mode).
+            // The crossed edge has one finite endpoint; clamp the interpolation to
+            // that finite endpoint so +inf never leaks a NaN or an out-of-range
+            // vertex into the mesh. NaN is always invalid and falls back to the
+            // midpoint rather than corrupting the edge.
             float denominator = da - db;
             float t;
             if (float.IsNaN(da) || float.IsNaN(db))

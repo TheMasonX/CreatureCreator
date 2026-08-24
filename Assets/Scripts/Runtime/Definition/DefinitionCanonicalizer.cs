@@ -189,6 +189,12 @@ namespace ProceduralCreature.Definition
                     GenerationTolerances.Quantize(joint.Position.z));
             }
 
+            if (!IsFinite(limb.BlendRadius) || limb.BlendRadius < 0f)
+            {
+                throw new DomainException("Cannot canonicalize a limb chain with a non-finite or negative blend radius.");
+            }
+            limb.BlendRadius = GenerationTolerances.Quantize(limb.BlendRadius);
+
             if (limb.Thickness == null)
             {
                 throw new DomainException("Cannot canonicalize a limb chain without a thickness profile.");

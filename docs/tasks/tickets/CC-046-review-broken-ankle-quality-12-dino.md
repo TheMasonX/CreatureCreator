@@ -58,6 +58,13 @@ parts, creatures, or preview qualities.
   the cause is isolated.
 - Compare repeated generation output for determinism.
 
+## 2026-08-24 audit revision - instrumented architectural probe
+Treat the broken ankle as evidence for CC-050/051, not a mesh-vs-screenshot diff. Measure:
+resolved joint positions, voxel bounds, local field values, limb blend radius, SDF samples
+near the ankle, connected component count, and non-manifold edges. If the fixture exposes a
+bounds failure, limb blending failure, voxel cropping, or attachment-resolution error, move
+CC-046 ahead of CC-056 as supporting evidence for the placement contract.
+
 ## Findings
 
 The user identified the broken ankle as a common mesh-generation issue and

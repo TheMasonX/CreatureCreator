@@ -2,7 +2,7 @@
 id: creature-task-049
 key: CC-049
 title: Remove limb geometry dependence on inert Shape blend state
-status: Backlog
+status: Done
 type: Bug Fix
 priority: P1
 tags: [runtime, sdf, limbs, contract]
@@ -36,5 +36,58 @@ The current validator skips Shape validation for limbs, but `SdfProgramBuilder` 
 ## Blockers
 The final field location must align with the semantic geometry contract in CC-051.
 
+## 2026-08-24 audit revision
+- Put the blend on `LimbChain.BlendRadius` (the implicit-surface geometry source), NOT a
+  generic `CreaturePart.GeometryBlendRadius`; the same part may later use `MeshGeometry`
+  and then have no implicit blend radius at all.
+- Default value 0.1f matches `ShapeDefinition.DefaultSphere.SmoothBlendRadius` so existing
+  and default limbs generate identically after migration.
+
+## Implementation + Validation (2026-08-24) — DONE
+
+Implemented:
+- `LimbChain.BlendRadius` (default `DefaultBlendRadius` = 0.1f), copied in `Clone()` so
+  `ClonePartAsChild`/duplication propagate it.
+- `SdfProgramBuilder.PartUnionBlendRadius(part)`: limb parts use `Limb.BlendRadius`;
+  shape parts keep `Shape.SmoothBlendRadius`; used at the part-to-field union in both the
+  managed and portable paths. No limb path reads `Shape.SmoothBlendRadius` anymore.
+- Serialization: additive `"blendRadius"` in the limbChain JSON (no version bump); reader
+  defaults to `LimbChain.DefaultBlendRadius` when absent (pre-CC-049 files migrate
+  byte-stably). Canonicalizer quantizes it; validator reports
+  `ValidationCode.InvalidLimbBlendRadius` on negative/non-finite.
+- Editor UI for the new field deferred (folds naturally into CC-039 authored-blend work).
+
+Validation (Unity connected, real editor):
+- New tests: `Compile_LimbField_IsIndependentOfInertShapeBlendRadius` (managed+portable),
+  `Compile_LimbField_ChangesWithLimbChainBlendRadius`,
+  `CompilePortable_ExplicitLimbBlend_AgreesWithManaged`, `RoundTrip_BlendRadius_IsPreserved`,
+  `Deserialize_LimbChainWithoutBlendRadius_DefaultsToStandard`,
+  `Validate_LimbWithNegative/NonFiniteBlendRadius_ReportsInvalidLimbBlendRadius`. All pass.
+- Existing limb fixtures pass via execute_code: skeleton 11/11, sampler 8/8, SDF builder 4/4.
+- EditMode suite 83/83; console clean (0 errors/warnings).
+- Real dino_creature.json (2 limbs + 2 mesh parts, no blendRadius in source): loads,
+  canonicalizes, re-serializes byte-stable WITH blendRadius (additive migration); vpu-12
+  Exact generation watertight (10,626 tris / 5,315 verts, 0 non-manifold / 0 boundary).
+
+Residual / notes:
+- Larger authored limb blends widen the known `Mathf.Lerp` (a+(b-a)h) vs `math.lerp`
+  (b+(a-b)h) rounding difference in the smooth-min polynomial: default 0.1 blend is
+  bit-identical; 0.4 blend differs ~1.8e-4 at far points. Parity test uses 1e-3 with a
+  comment. Not a CC-049 contract issue — both paths use the same authored blend value.
+- The on-disk dino_creature.json is untouched; it picks up `blendRadius` on the next
+  editor save (expected additive migration).
+- Audit (2026-08-24) gap: the canonicalizer's new throw contract for a negative/non-finite
+  `LimbChain.BlendRadius` has no dedicated test. `RoundTrip_BlendRadius_IsPreserved`
+  exercises quantization indirectly, and the validator tests cover the report path, but
+  the `DefinitionCanonicalizer.Canonicalize` throw is untested. Add
+  `Canonicalize_ThrowsOnNegativeLimbBlendRadius` / `_NonFiniteLimbBlendRadius` next to the
+  existing `Canonicalize_ThrowsOnNonFiniteJointPosition` cases in `JsonDnaSerializerLimbTests`
+  or `DefinitionCanonicalizerTests`.
+  RESOLVED (2026-08-24): added `Canonicalize_ThrowsOnNegativeLimbBlendRadius`,
+  `Canonicalize_ThrowsOnNonFiniteLimbBlendRadius`, and
+  `Canonicalize_QuantizesLimbBlendRadius` to `JsonDnaSerializerLimbTests`; all pass in the
+  real editor alongside the round-trip and legacy-default tests.
+
 ## Next Step
-Choose the smallest typed blend representation, implement it in the limb compiler path, and add regression coverage.
+Consider exposing `LimbChain.BlendRadius` in the editor limb inspector (CC-039 fold-in).
+Then proceed to CC-051 (placement precedence table) as the architectural anchor.

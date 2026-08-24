@@ -246,6 +246,26 @@ namespace ProceduralCreature.Tests.Runtime
                 "A non-limb part with stale limb data must be reported for repair or cleanup.");
         }
 
+        [Test]
+        public void Validate_LimbWithNegativeBlendRadius_ReportsInvalidLimbBlendRadius()
+        {
+            LimbChain chain = StraightChain();
+            chain.BlendRadius = -0.1f;
+            ValidationResult result = DefinitionValidator.Validate(DefinitionWith(chain));
+            Assert.IsTrue(HasCode(result, ValidationCode.InvalidLimbBlendRadius),
+                "A negative limb blend radius must be reported.");
+        }
+
+        [Test]
+        public void Validate_LimbWithNonFiniteBlendRadius_ReportsInvalidLimbBlendRadius()
+        {
+            LimbChain chain = StraightChain();
+            chain.BlendRadius = float.NaN;
+            ValidationResult result = DefinitionValidator.Validate(DefinitionWith(chain));
+            Assert.IsTrue(HasCode(result, ValidationCode.InvalidLimbBlendRadius),
+                "A non-finite limb blend radius must be reported.");
+        }
+
         private static bool HasCode(ValidationResult result, ValidationCode code)
         {
             foreach (ValidationIssue issue in result.Issues)

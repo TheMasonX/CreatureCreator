@@ -188,6 +188,19 @@ namespace ProceduralCreature.Morphology.Sdf
             return maxBlend + 1e-4f;
         }
 
+        /// <summary>
+        /// The blend radius used to unite a part into the creature field
+        /// (CC-049). For a limb part, <see cref="ShapeDefinition.SmoothBlendRadius"/>
+        /// is inert (CC-018/ADR-001), so the blend comes from the limb's own
+        /// <see cref="LimbChain.BlendRadius"/>. For a shape part, the shape's
+        /// SmoothBlendRadius is the authority. Mesh-asset parts never enter the
+        /// implicit field.
+        /// </summary>
+        private static float PartUnionBlendRadius(CreaturePart part)
+        {
+            return part.Limb != null ? part.Limb.BlendRadius : part.Shape.SmoothBlendRadius;
+        }
+
         public static SdfProgram CompilePortable(CreatureDefinition definition)
         {
             if (definition == null) throw new DomainException("Cannot compile a null CreatureDefinition.");
@@ -354,7 +367,7 @@ namespace ProceduralCreature.Morphology.Sdf
                         Type = SdfOperationType.SmoothUnion,
                         A = previousRoot,
                         B = root,
-                        Parameters = new float3(part.Shape.SmoothBlendRadius, 0f, 0f),
+                        Parameters = new float3(PartUnionBlendRadius(part), 0f, 0f),
                     });
                     SetWorldAabb(operations, unionIndex, Aabb.Union(ReadAabb(operations, previousRoot), ReadAabb(operations, root)));
                     SetCullable(operations, unionIndex, ReadCullable(operations, previousRoot) && ReadCullable(operations, root));
@@ -538,7 +551,7 @@ namespace ProceduralCreature.Morphology.Sdf
             ISdfNode accumulated = CompileBodyField(definition);
             for (int i = 0; i < compiled.Count; i++)
             {
-                float blendRadius = compiled[i].Part.Shape.SmoothBlendRadius;
+                float blendRadius = PartUnionBlendRadius(compiled[i].Part);
                 accumulated = accumulated == null
                     ? compiled[i].Node
                     : new SmoothUnionNode(accumulated, compiled[i].Node, blendRadius);

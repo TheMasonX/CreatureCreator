@@ -15,6 +15,11 @@ namespace ProceduralCreature.Morphology.Extraction
     /// (Sprint 3.1), so the estimate a definition was validated against matches
     /// what actually gets allocated here — callers must have already run that
     /// budget check via DefinitionValidator before calling Sample.
+    ///
+    /// CC-064 non-finite contract: in Fast culling mode samples may read `+inf`
+    /// ("outside/culled"), never NaN. Consumers that scan the grid (min/max,
+    /// interpolation, normalization) must treat `+inf` as absent rather than a
+    /// giant finite distance.
     /// </summary>
     public sealed class DensityGrid
     {

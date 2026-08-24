@@ -96,7 +96,11 @@ namespace ProceduralCreature.Tests.Runtime
 
             Skeleton.Skeleton skeleton = SkeletonInferrer.Infer(definition);
 
-            Assert.AreEqual(6, skeleton.Bones.Count, "body + (leg, foot) x (original, mirrored)");
+            // MakePart builds non-limb parts (one bone per part per side), so the
+            // correct count is 5: body + leg x2 (mirrored) + foot x2 (mirrored).
+            // The meaningful assertion is below — the mirrored foot attaches to
+            // the mirrored leg bone, not the original.
+            Assert.AreEqual(5, skeleton.Bones.Count, "body + leg x2 (mirrored) + foot x2 (mirrored)");
 
             Bone mirroredFoot = skeleton.FindBone("part_foot" + SkeletonInferrer.MirrorSuffix);
             Assert.AreEqual("part_leg" + SkeletonInferrer.MirrorSuffix, mirroredFoot.ParentBoneId,

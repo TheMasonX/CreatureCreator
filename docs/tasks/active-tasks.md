@@ -23,7 +23,7 @@
 | CC-019 | Bidirectional Body length editing (head-end add/remove on drag) | Backlog | P1 |
 | CC-020 | Collapsible parts tree and Body inspector sections | Done | P2 |
 | CC-021 | Show editable control points for a selected part | Backlog | P2 |
-| CC-022 | Shared BodyFrameResolver (parallel-transport body frames) | In Progress | P1 |
+| CC-022 | Shared BodyFrameResolver (parallel-transport body frames) | Done | P1 |
 | CC-023 | Part and Eye part types with generic Part default | Done | P2 |
 | CC-024 | Vertex-color lit shader for generated previews | Done | P2 |
 | CC-025 | Body vertical-gradient appearance (top and bottom gradients) | Done | P1 |
@@ -50,9 +50,9 @@
 | CC-045 | Remove the legacy managed SDF from production generation | In Progress | P1 |
 | CC-046 | Investigate recurring broken-ankle mesh artifacts | Backlog | P1 |
 | CC-048 | Fix obsolete Keyframe.tangentMode warnings and DrawPartList GetLastRect error | Done | P2 |
-| CC-049 | Remove limb geometry dependence on inert Shape blend state | Backlog | P1 |
+| CC-049 | Remove limb geometry dependence on inert Shape blend state | Done | P1 |
 | CC-050 | Validate the generated creature-space geometry envelope | Backlog | P1 |
-| CC-051 | Consolidate semantic attachment and part-frame resolution | Backlog | P1 |
+| CC-051 | Consolidate semantic attachment and part-frame resolution | Done | P1 |
 | CC-052 | Preserve mesh rest transforms and mirrored binding identity | Backlog | P1 |
 | CC-053 | Complete multi-geometry editor selection and visibility | Backlog | P1 |
 | CC-054 | Reject thickness-profile quantization time collisions | Backlog | P2 |
@@ -65,3 +65,5 @@
 | CC-061 | Harden the final mesh pipeline independently of editor interaction | Backlog | P2 |
 | CC-062 | Optimize Burst field sampling and final-generation evidence | In Progress | P1 |
 | CC-063 | Restore Fast preview culling (naive AABB + interpolation guard) | Done | P1 |
+| CC-064 | Fast-mode non-finite field contract (+inf = outside/culled) | Done | P1 |
+| CC-065 | FastNoise2 binary / submodule repository review gate | Done | P1 |

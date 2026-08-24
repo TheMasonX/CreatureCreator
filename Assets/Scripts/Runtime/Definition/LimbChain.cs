@@ -23,10 +23,26 @@ namespace ProceduralCreature.Definition
     [Serializable]
     public sealed class LimbChain
     {
+        /// <summary>
+        /// Default part-to-field union blend radius for a limb. Matches
+        /// <see cref="ShapeDefinition.DefaultSphere"/>'s SmoothBlendRadius so
+        /// existing and default limbs generate identically after the CC-049
+        /// migration to an explicit limb blend.
+        /// </summary>
+        public const float DefaultBlendRadius = 0.1f;
+
         public List<LimbJoint> Joints = new List<LimbJoint>();
 
         /// <summary>1D thickness over normalized chain arc length (0 = root, 1 = tip).</summary>
         public ThicknessProfile Thickness = ThicknessProfile.CreateDefault();
+
+        /// <summary>
+        /// The blend radius used when uniting this limb's implicit surface into
+        /// the creature field (CC-049). Shape.SmoothBlendRadius is inert for
+        /// limb parts (ADR-001), so the limb carries its own explicit blend. A
+        /// value of 0 is a hard union.
+        /// </summary>
+        public float BlendRadius = DefaultBlendRadius;
 
         /// <summary>
         /// A default straight limb: a root joint at the local origin and a single
@@ -47,6 +63,7 @@ namespace ProceduralCreature.Definition
             var clone = new LimbChain
             {
                 Thickness = Thickness == null ? null : Thickness.Clone(),
+                BlendRadius = BlendRadius,
             };
             if (Joints != null)
             {

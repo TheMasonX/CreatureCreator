@@ -299,7 +299,9 @@ namespace ProceduralCreature.Serialization
                     sb.Append('}');
                 }
             }
-            sb.Append("],\"thicknessProfile\":");
+            sb.Append("],\"blendRadius\":");
+            sb.Append(Num(limb.BlendRadius));
+            sb.Append(",\"thicknessProfile\":");
             sb.Append(WriteThicknessProfile(limb.Thickness));
             sb.Append('}');
             return sb.ToString();
