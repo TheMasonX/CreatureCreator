@@ -192,5 +192,49 @@ namespace ProceduralCreature.Tests.Runtime
             Assert.AreEqual(2u, reconstructed.Body.Samples[1].Id);
             Assert.AreEqual(Vector3.forward, reconstructed.Forward);
         }
+
+        [Test]
+        public void RoundTrip_PreservesExplicitShapeParameters()
+        {
+            CreatureDefinition original = MakeTwoPartDefinition();
+            original.FindPart("part_leg").Shape = new ShapeDefinition
+            {
+                Type = ShapeType.Capsule,
+                PrimarySize = 0.2f,
+                Radius = 0.12f,
+                CapsuleAxis = ShapeAxis.Z,
+                CapsuleHeight = 1.7f,
+                EllipsoidRadii = new Vector3(0.3f, 0.4f, 0.5f),
+                BoxHalfExtents = new Vector3(0.6f, 0.7f, 0.8f),
+                SmoothBlendRadius = 0.03f,
+            };
+
+            CreatureDefinition reconstructed = _serializer.Deserialize(_serializer.Serialize(original));
+            ShapeDefinition shape = reconstructed.FindPart("part_leg").Shape;
+
+            Assert.AreEqual(0.12f, shape.Radius, 1e-4f);
+            Assert.AreEqual(ShapeAxis.Z, shape.CapsuleAxis);
+            Assert.AreEqual(1.7f, shape.CapsuleHeight, 1e-4f);
+            Assert.AreEqual(new Vector3(0.3f, 0.4f, 0.5f), shape.EllipsoidRadii);
+            Assert.AreEqual(new Vector3(0.6f, 0.7f, 0.8f), shape.BoxHalfExtents);
+        }
+
+        [Test]
+        public void Deserialize_LegacyPrimarySize_MigratesExplicitDefaults()
+        {
+            string json = _serializer.Serialize(MakeTwoPartDefinition());
+            json = json.Replace(
+                "\"radius\":0.5000,\"capsuleAxis\":\"Y\",\"capsuleHeight\":1.0000,\"ellipsoidRadii\":{\"x\":0.5000,\"y\":0.5000,\"z\":0.5000},\"boxHalfExtents\":{\"x\":0.5000,\"y\":0.5000,\"z\":0.5000}",
+                "\"primarySize\":0.5000");
+
+            CreatureDefinition migrated = _serializer.Deserialize(json);
+            ShapeDefinition shape = migrated.FindPart("part_leg").Shape;
+
+            Assert.AreEqual(0.5f, shape.Radius, 1e-4f);
+            Assert.AreEqual(ShapeAxis.Y, shape.CapsuleAxis);
+            Assert.AreEqual(1f, shape.CapsuleHeight, 1e-4f);
+            Assert.AreEqual(new Vector3(0.5f, 0.5f, 0.5f), shape.EllipsoidRadii);
+            Assert.AreEqual(new Vector3(0.5f, 0.5f, 0.5f), shape.BoxHalfExtents);
+        }
     }
 }

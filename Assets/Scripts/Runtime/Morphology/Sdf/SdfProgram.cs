@@ -13,6 +13,7 @@ namespace ProceduralCreature.Morphology.Sdf
         Sphere,
         Box,
         Capsule,
+        Ellipsoid,
         Transform,
         Symmetry,
         SmoothUnion,
@@ -96,6 +97,7 @@ namespace ProceduralCreature.Morphology.Sdf
                 case SdfOperationType.Sphere:
                 case SdfOperationType.Box:
                 case SdfOperationType.Capsule:
+                case SdfOperationType.Ellipsoid:
                     return EvaluatePrimitive(operation, point);
                 case SdfOperationType.Transform:
                     return EvaluatePrimitive(
@@ -123,9 +125,23 @@ namespace ProceduralCreature.Morphology.Sdf
                     float3 q = math.abs(point) - operation.Parameters;
                     return math.length(math.max(q, 0f)) + math.min(math.max(q.x, math.max(q.y, q.z)), 0f);
                 case SdfOperationType.Capsule:
-                    float3 ba = new float3(0f, 1f, 0f);
-                    float t = math.clamp(math.dot(point - new float3(0f, -0.5f, 0f), ba), 0f, 1f);
-                    return math.length(point - (new float3(0f, -0.5f, 0f) + ba * t)) - operation.Parameters.x;
+                    float3 axisPoint = operation.Parameters.z == 0f
+                        ? new float3(point.y, point.x, point.z)
+                        : operation.Parameters.z == 2f
+                            ? new float3(point.x, point.z, point.y)
+                            : point;
+                    float halfHeight = operation.Parameters.y * 0.5f;
+                    float3 ba = new float3(0f, operation.Parameters.y, 0f);
+                    float t = math.clamp(math.dot(axisPoint - new float3(0f, -halfHeight, 0f), ba) / math.dot(ba, ba), 0f, 1f);
+                    return math.length(axisPoint - (new float3(0f, -halfHeight, 0f) + ba * t)) - operation.Parameters.x;
+                case SdfOperationType.Ellipsoid:
+                    float3 radii = operation.Parameters;
+                    float3 normalized = point / radii;
+                    float3 gradient = point / (radii * radii);
+                    float denominator = math.length(gradient);
+                    return denominator <= math.EPSILON
+                        ? -math.cmin(radii)
+                        : (math.length(normalized) - 1f) / denominator;
                 default: return float.PositiveInfinity;
             }
         }

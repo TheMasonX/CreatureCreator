@@ -84,13 +84,12 @@ namespace ProceduralCreature.Tests.Runtime
         }
 
         [Test]
-        public void Ellipsoid_BehavesAsSphereForMvp()
+        public void Ellipsoid_UsesAllThreeRadii()
         {
-            var ellipsoid = new EllipsoidSdfNode(1f);
-            var sphere = new SphereSdfNode(1f);
-            Vector3 point = new Vector3(0.7f, -0.3f, 0.2f);
-            Assert.AreEqual(sphere.Evaluate(point), ellipsoid.Evaluate(point), Epsilon,
-                "Documented MVP simplification: Ellipsoid == Sphere until ShapeDefinition gains per-axis radii.");
+            var ellipsoid = new EllipsoidSdfNode(new Vector3(2f, 1f, 0.5f));
+            Assert.AreEqual(0f, ellipsoid.Evaluate(new Vector3(0f, 1f, 0f)), Epsilon);
+            Assert.AreEqual(0f, ellipsoid.Evaluate(new Vector3(0f, 0f, 0.5f)), Epsilon);
+            Assert.Greater(ellipsoid.Evaluate(new Vector3(0f, 0f, 0.6f)), 0f);
         }
     }
 }

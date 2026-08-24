@@ -364,7 +364,11 @@ namespace ProceduralCreature.Serialization
             var sb = new StringBuilder();
             sb.Append('{');
             WriteField(sb, "type", shape.Type.ToString(), first: true);
-            WriteField(sb, "primarySize", shape.PrimarySize);
+            WriteField(sb, "radius", shape.Radius);
+            WriteField(sb, "capsuleAxis", shape.CapsuleAxis.ToString());
+            WriteField(sb, "capsuleHeight", shape.CapsuleHeight);
+            sb.Append(",\"ellipsoidRadii\":").Append(WriteVec3(shape.EllipsoidRadii));
+            WriteRawField(sb, "boxHalfExtents", WriteVec3(shape.BoxHalfExtents));
             WriteField(sb, "smoothBlendRadius", shape.SmoothBlendRadius);
             sb.Append('}');
             return sb.ToString();

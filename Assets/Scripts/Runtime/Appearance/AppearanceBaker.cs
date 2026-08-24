@@ -46,9 +46,10 @@ namespace ProceduralCreature.Appearance
                 }
 
                 colors = new Color[mesh.Positions.Count];
+                PartAppearanceSampler.Resolver resolver = PartAppearanceSampler.CreateResolver(definition);
                 for (int i = 0; i < mesh.Positions.Count; i++)
                 {
-                    ResolvedAppearance appearance = PartAppearanceSampler.Resolve(definition, mesh.Positions[i]);
+                    ResolvedAppearance appearance = resolver.Resolve(mesh.Positions[i]);
                     colors[i] = BakeVertexColor(mesh.Positions[i], mesh.Normals[i], appearance.BaseColor, appearance.NoiseSeed, appearance.NoiseScale);
                 }
             }

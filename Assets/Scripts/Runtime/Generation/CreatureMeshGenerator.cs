@@ -82,7 +82,7 @@ namespace ProceduralCreature.Generation
             MeshExtractionResult meshResult = null;
             Time(diagnostics, GenerationStage.MeshExtraction,
                 () => meshResult = MarchingCubesExtractor.Extract(
-                    sdf, grid, diagnostics?.CollectTimings == true));
+                    grid, diagnostics?.CollectTimings == true));
             diagnostics?.RecordExtractionStatistics(
                 meshResult.MixedCellCount, meshResult.GradientEvaluationCount);
             diagnostics?.RecordExtractionTiming(

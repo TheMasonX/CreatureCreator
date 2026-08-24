@@ -1,11 +1,11 @@
 ---
 id: creature-task-046
 key: CC-046
-title: Review broken ankle in quality-12 dino creature
+title: Investigate recurring broken-ankle mesh artifacts
 status: Backlog
 type: Bug
-priority: P2
-tags: [runtime, editor, generation, topology, creature-review]
+priority: P1
+tags: [runtime, editor, generation, topology, extraction, creature-review]
 dependsOn: []
 related: [CC-008, CC-014, CC-018, CC-031, CC-043]
 links:
@@ -20,14 +20,17 @@ links:
 
 ## Summary
 
-Review the saved quality-12 dino fixture that shows a broken ankle in the
-generated creature preview. Determine whether the defect is caused by authored
-limb data, child attachment and transforms, SDF sampling or shape parameters,
-mesh extraction, skeleton inference, or preview rendering.
+Investigate the recurring broken-ankle artifact seen in generated creature
+meshes. The saved quality-12 dino fixture is the initial reproduction case;
+the review must determine the shared failure mode and whether it affects other
+parts, creatures, or preview qualities.
 
 ## Scope
 
-- Reproduce the issue from the saved JSON at the same quality setting.
+- Reproduce the issue from the saved JSON at the same quality setting and
+  collect at least one comparison quality when practical.
+- Determine whether the same artifact occurs on other generated creatures or
+  anatomical parts.
 - Inspect the ankle part and its parent/limb chain, resolved transforms, and
   generated geometry.
 - Compare managed and portable/Burst generation where both paths are available.
@@ -57,18 +60,20 @@ mesh extraction, skeleton inference, or preview rendering.
 
 ## Findings
 
-The user supplied `dino_creature_broken_ankle_at_12_quality.json` on
-2026-08-23 as a saved reproduction artifact. The cause has not been diagnosed
-yet. The fixture is currently untracked with its Unity `.meta` file and should
-remain available for the future review.
+The user identified the broken ankle as a common mesh-generation issue and
+supplied `dino_creature_broken_ankle_at_12_quality.json` on 2026-08-23 as a
+saved reproduction artifact. The cause has not been diagnosed yet. The fixture
+is currently untracked with its Unity `.meta` file and should remain available
+as the first regression case while broader examples are collected.
 
 ## Blockers
 
-No blocker is known. Unity reproduction and the exact visual failure location
-still require a focused review in the editor.
+No blocker is known. Unity reproduction and a representative sample of the
+recurring artifact still require a focused review in the editor.
 
 ## Next Step
 
 Load the fixture in Unity at quality 12, record the ankle part hierarchy and
-generation diagnostics, then classify the failure as authored DNA, transform/
-attachment, SDF, extraction, skeleton, or preview-only behavior.
+generation diagnostics, then compare other qualities and fixtures. Classify
+the shared failure as authored DNA, transform/attachment, SDF, extraction,
+skeleton, or preview-only behavior before implementing a fix.

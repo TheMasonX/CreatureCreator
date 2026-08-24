@@ -435,10 +435,18 @@ namespace ProceduralCreature.Serialization
 
         private static ShapeDefinition ReadShape(Dictionary<string, object> obj)
         {
+            float legacySize = obj.ContainsKey("primarySize")
+                ? (float)RequireNumber(obj, "primarySize")
+                : 0.5f;
             return new ShapeDefinition
             {
                 Type = RequireEnum<ShapeType>(obj, "type"),
-                PrimarySize = (float)RequireNumber(obj, "primarySize"),
+                PrimarySize = legacySize,
+                Radius = ReadOptionalNumber(obj, "radius", legacySize),
+                CapsuleAxis = ReadOptionalEnum(obj, "capsuleAxis", ShapeAxis.Y),
+                CapsuleHeight = ReadOptionalNumber(obj, "capsuleHeight", 1f),
+                EllipsoidRadii = ReadOptionalVector3(obj, "ellipsoidRadii", new UnityEngine.Vector3(legacySize, legacySize, legacySize)),
+                BoxHalfExtents = ReadOptionalVector3(obj, "boxHalfExtents", new UnityEngine.Vector3(legacySize, legacySize, legacySize)),
                 SmoothBlendRadius = (float)RequireNumber(obj, "smoothBlendRadius"),
             };
         }
@@ -512,6 +520,29 @@ namespace ProceduralCreature.Serialization
             if (!obj.TryGetValue(key, out object value) || value == null) return null;
             if (value is string s) return s;
             throw new DnaDeserializationException($"Field '{key}' must be a string.");
+        }
+
+        private static float ReadOptionalNumber(Dictionary<string, object> obj, string key, float fallback)
+        {
+            if (!obj.TryGetValue(key, out object value) || value == null) return fallback;
+            if (value is double d) return (float)d;
+            throw new DnaDeserializationException($"Field '{key}' must be a number.");
+        }
+
+        private static TEnum ReadOptionalEnum<TEnum>(Dictionary<string, object> obj, string key, TEnum fallback)
+            where TEnum : struct
+        {
+            if (!obj.TryGetValue(key, out object value) || value == null) return fallback;
+            if (value is string raw && System.Enum.TryParse(raw, ignoreCase: false, out TEnum result)) return result;
+            throw new DnaDeserializationException($"Field '{key}' has an invalid enum value.");
+        }
+
+        private static UnityEngine.Vector3 ReadOptionalVector3(
+            Dictionary<string, object> obj, string key, UnityEngine.Vector3 fallback)
+        {
+            if (!obj.TryGetValue(key, out object value) || value == null) return fallback;
+            if (value is Dictionary<string, object> nested) return ReadVec3(nested);
+            throw new DnaDeserializationException($"Field '{key}' must be an object.");
         }
 
         private static Dictionary<string, object> RequireObject(Dictionary<string, object> obj, string key)

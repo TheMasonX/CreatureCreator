@@ -1361,14 +1361,42 @@ namespace ProceduralCreature.Editor
         {
             EditorGUILayout.LabelField("Shape", EditorStyles.boldLabel);
 
-            var newShape = new ShapeDefinition
-            {
-                Type = (ShapeType)EditorGUILayout.EnumPopup("Shape Type", selected.Shape.Type),
-                PrimarySize = EditorGUILayout.FloatField("Primary Size", selected.Shape.PrimarySize),
-                SmoothBlendRadius = EditorGUILayout.FloatField("Smooth Blend Radius", selected.Shape.SmoothBlendRadius),
-            };
+            ShapeDefinition current = selected.Shape;
+            ShapeDefinition newShape = current;
+            EditorGUI.BeginChangeCheck();
+            newShape.Type = (ShapeType)EditorGUILayout.EnumPopup("Shape Type", current.Type);
 
-            if (newShape.Equals(selected.Shape)) return;
+            float legacySize = current.PrimarySize > 0f ? current.PrimarySize : 0.5f;
+            newShape.Radius = current.Radius > 0f ? current.Radius : legacySize;
+            newShape.CapsuleHeight = current.CapsuleHeight > 0f ? current.CapsuleHeight : 1f;
+            newShape.EllipsoidRadii = current.EllipsoidRadii.x > 0f
+                ? current.EllipsoidRadii
+                : new Vector3(legacySize, legacySize, legacySize);
+            newShape.BoxHalfExtents = current.BoxHalfExtents.x > 0f
+                ? current.BoxHalfExtents
+                : new Vector3(legacySize, legacySize, legacySize);
+
+            switch (newShape.Type)
+            {
+                case ShapeType.Sphere:
+                    newShape.Radius = EditorGUILayout.FloatField("Radius", newShape.Radius);
+                    break;
+                case ShapeType.Capsule:
+                    newShape.CapsuleAxis = (ShapeAxis)EditorGUILayout.EnumPopup("Axis", newShape.CapsuleAxis);
+                    newShape.Radius = EditorGUILayout.FloatField("Radius", newShape.Radius);
+                    newShape.CapsuleHeight = EditorGUILayout.FloatField("Height", newShape.CapsuleHeight);
+                    break;
+                case ShapeType.Ellipsoid:
+                    newShape.EllipsoidRadii = EditorGUILayout.Vector3Field("Radii", newShape.EllipsoidRadii);
+                    break;
+                case ShapeType.Box:
+                    newShape.BoxHalfExtents = EditorGUILayout.Vector3Field("Half Extents", newShape.BoxHalfExtents);
+                    break;
+            }
+
+            newShape.SmoothBlendRadius = EditorGUILayout.FloatField("Smooth Blend Radius", current.SmoothBlendRadius);
+
+            if (!EditorGUI.EndChangeCheck()) return;
 
             string partId = selected.Id;
             MutateDefinition("Edit Shape", definition => definition.FindPart(partId).Shape = newShape);

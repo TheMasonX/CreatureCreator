@@ -151,8 +151,10 @@ namespace ProceduralCreature.Morphology.Sdf
                     switch (part.Shape.Type)
                     {
                         case ShapeType.Sphere:
-                        case ShapeType.Ellipsoid:
                             primitiveType = SdfOperationType.Sphere;
+                            break;
+                        case ShapeType.Ellipsoid:
+                            primitiveType = SdfOperationType.Ellipsoid;
                             break;
                         case ShapeType.Box:
                             primitiveType = SdfOperationType.Box;
@@ -164,10 +166,19 @@ namespace ProceduralCreature.Morphology.Sdf
                             throw new DomainException($"No portable SDF primitive mapping exists for ShapeType.{part.Shape.Type}.");
                     }
 
-                    float size = part.Shape.PrimarySize;
+                    float legacySize = part.Shape.PrimarySize;
+                    float radius = part.Shape.Radius > 0f ? part.Shape.Radius : legacySize;
+                    float height = part.Shape.CapsuleHeight > 0f ? part.Shape.CapsuleHeight : 1f;
+                    float3 boxHalfExtents = part.Shape.BoxHalfExtents.x > 0f
+                        ? new float3(part.Shape.BoxHalfExtents.x, part.Shape.BoxHalfExtents.y, part.Shape.BoxHalfExtents.z)
+                        : new float3(legacySize);
                     float3 parameters = primitiveType == SdfOperationType.Box
-                        ? new float3(size)
-                        : new float3(size, 0f, 0f);
+                        ? boxHalfExtents
+                        : primitiveType == SdfOperationType.Capsule
+                            ? new float3(radius, height, (int)part.Shape.CapsuleAxis)
+                            : primitiveType == SdfOperationType.Ellipsoid
+                                ? (part.Shape.EllipsoidRadii.x > 0f ? new float3(part.Shape.EllipsoidRadii.x, part.Shape.EllipsoidRadii.y, part.Shape.EllipsoidRadii.z) : new float3(legacySize))
+                                : new float3(radius, 0f, 0f);
                     primitive = operations.Count;
                     operations.Add(SdfOperation.Primitive(primitiveType, parameters));
 
@@ -471,13 +482,21 @@ namespace ProceduralCreature.Morphology.Sdf
             switch (shape.Type)
             {
                 case ShapeType.Sphere:
-                    return new SphereSdfNode(shape.PrimarySize);
+                    return new SphereSdfNode(shape.Radius > 0f ? shape.Radius : shape.PrimarySize);
                 case ShapeType.Box:
-                    return new BoxSdfNode(new Vector3(shape.PrimarySize, shape.PrimarySize, shape.PrimarySize));
+                    Vector3 halfExtents = shape.BoxHalfExtents.x > 0f
+                        ? shape.BoxHalfExtents
+                        : new Vector3(shape.PrimarySize, shape.PrimarySize, shape.PrimarySize);
+                    return new BoxSdfNode(halfExtents);
                 case ShapeType.Capsule:
-                    return new CapsuleSdfNode(shape.PrimarySize);
+                    return new CapsuleSdfNode(
+                        shape.Radius > 0f ? shape.Radius : shape.PrimarySize,
+                        shape.CapsuleHeight > 0f ? shape.CapsuleHeight : 1f,
+                        shape.CapsuleAxis);
                 case ShapeType.Ellipsoid:
-                    return new EllipsoidSdfNode(shape.PrimarySize);
+                    return new EllipsoidSdfNode(shape.EllipsoidRadii.x > 0f
+                        ? shape.EllipsoidRadii
+                        : new Vector3(shape.PrimarySize, shape.PrimarySize, shape.PrimarySize));
                 default:
                     // Validated definitions never reach here (DefinitionValidator's
                     // UnsupportedPartType-adjacent checks run on PartType, and

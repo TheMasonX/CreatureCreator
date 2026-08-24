@@ -54,60 +54,68 @@ namespace ProceduralCreature.Morphology.Sdf
     }
 
     /// <summary>
-    /// Capsule aligned along the local Y axis, spanning from (0, -0.5, 0) to
-    /// (0, 0.5, 0) before any TransformNode scale is applied — a caller wanting a
-    /// longer capsule elongates it via the part's Transform.Scale.y rather than a
-    /// second shape parameter (ShapeDefinition intentionally carries only
-    /// PrimarySize; see ShapeDefinition.cs). Exact SDF for the unit-length capsule;
-    /// TransformNode's non-uniform-scale approximation applies if elongated.
+    /// Capsule with an authored axis, radius, and total segment length.
     /// </summary>
     public sealed class CapsuleSdfNode : ISdfNode
     {
-        private static readonly Vector3 EndpointA = new Vector3(0f, -0.5f, 0f);
-        private static readonly Vector3 EndpointB = new Vector3(0f, 0.5f, 0f);
-
         private readonly float _radius;
+        private readonly float _height;
+        private readonly Definition.ShapeAxis _axis;
 
-        public CapsuleSdfNode(float radius)
+        public CapsuleSdfNode(float radius, float height = 1f, Definition.ShapeAxis axis = Definition.ShapeAxis.Y)
         {
-            if (radius <= 0f || float.IsNaN(radius) || float.IsInfinity(radius))
+            if (radius <= 0f || height <= 0f || float.IsNaN(radius) || float.IsInfinity(radius)
+                || float.IsNaN(height) || float.IsInfinity(height))
             {
-                throw new DomainException($"Capsule radius must be finite and positive; got {radius}.");
+                throw new DomainException($"Capsule radius and height must be finite and positive; got {radius}, {height}.");
             }
             _radius = radius;
+            _height = height;
+            _axis = axis;
         }
 
         public float Evaluate(Vector3 point)
         {
-            Vector3 pa = point - EndpointA;
-            Vector3 ba = EndpointB - EndpointA;
+            Vector3 axisPoint = _axis == Definition.ShapeAxis.X
+                ? new Vector3(point.y, point.x, point.z)
+                : _axis == Definition.ShapeAxis.Z
+                    ? new Vector3(point.x, point.z, point.y)
+                    : point;
+            Vector3 endpoint = new Vector3(0f, _height * 0.5f, 0f);
+            Vector3 pa = axisPoint - new Vector3(0f, -_height * 0.5f, 0f);
+            Vector3 ba = endpoint - new Vector3(0f, -_height * 0.5f, 0f);
             float t = Mathf.Clamp01(Vector3.Dot(pa, ba) / Vector3.Dot(ba, ba));
             return (pa - ba * t).magnitude - _radius;
         }
     }
 
     /// <summary>
-    /// MVP simplification, documented deliberately rather than silently: an exact
-    /// per-axis ellipsoid distance field requires per-axis radii, which
-    /// ShapeDefinition does not carry (it has one PrimarySize scalar, matching every
-    /// other primitive — see ShapeDefinition.cs). This node is therefore a sphere of
-    /// radius PrimarySize; per-axis elongation comes from the part's
-    /// TransformNode.Scale exactly like Capsule/Box do, subject to the same
-    /// non-uniform-scale approximation. If true per-axis-exact ellipsoids become a
-    /// requirement, extend ShapeDefinition with a second/third radius parameter and
-    /// implement Inigo Quilez's approximate (not exact — no closed-form exact
-    /// solution exists) ellipsoid distance function here instead of delegating to
-    /// SphereSdfNode.
+    /// An ellipsoid distance approximation using the standard scaled-sphere form.
+    /// It supports independently authored radii while remaining inexpensive enough
+    /// for repeated SDF sampling.
     /// </summary>
     public sealed class EllipsoidSdfNode : ISdfNode
     {
-        private readonly SphereSdfNode _inner;
+        private readonly Vector3 _radii;
 
-        public EllipsoidSdfNode(float radius)
+        public EllipsoidSdfNode(Vector3 radii)
         {
-            _inner = new SphereSdfNode(radius);
+            if (radii.x <= 0f || radii.y <= 0f || radii.z <= 0f
+                || float.IsNaN(radii.x) || float.IsNaN(radii.y) || float.IsNaN(radii.z)
+                || float.IsInfinity(radii.x) || float.IsInfinity(radii.y) || float.IsInfinity(radii.z))
+            {
+                throw new DomainException($"Ellipsoid radii must be finite and positive; got {radii}.");
+            }
+            _radii = radii;
         }
 
-        public float Evaluate(Vector3 point) => _inner.Evaluate(point);
+        public float Evaluate(Vector3 point)
+        {
+            Vector3 normalized = new Vector3(point.x / _radii.x, point.y / _radii.y, point.z / _radii.z);
+            Vector3 gradient = new Vector3(point.x / (_radii.x * _radii.x), point.y / (_radii.y * _radii.y), point.z / (_radii.z * _radii.z));
+            float denominator = gradient.magnitude;
+            if (denominator <= Mathf.Epsilon) return -Mathf.Min(_radii.x, Mathf.Min(_radii.y, _radii.z));
+            return (normalized.magnitude - 1f) / denominator;
+        }
     }
 }

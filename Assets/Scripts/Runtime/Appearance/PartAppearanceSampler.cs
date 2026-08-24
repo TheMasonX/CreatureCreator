@@ -56,55 +56,76 @@ namespace ProceduralCreature.Appearance
     {
         public static ResolvedAppearance Resolve(CreatureDefinition definition, Vector3 position)
         {
+            return CreateResolver(definition).Resolve(position);
+        }
+
+        public static Resolver CreateResolver(CreatureDefinition definition)
+        {
             if (definition == null) throw new DomainException("definition must not be null.");
 
-            bool hasBody = definition.Body != null
-                && definition.Body.Samples != null
-                && definition.Body.Samples.Count > 0;
+            return new Resolver(definition);
+        }
 
-            if (definition.Parts.Count == 0 && !hasBody)
+        public sealed class Resolver
+        {
+            private readonly CreatureDefinition _definition;
+            private readonly System.Collections.Generic.List<(CreaturePart Part, ISdfNode Node)> _compiledParts;
+            private readonly ISdfNode _bodyNode;
+
+            internal Resolver(CreatureDefinition definition)
             {
-                return new ResolvedAppearance(AppearanceDefinition.Default.BaseColor, 0, 1f);
+                _definition = definition;
+                _compiledParts = SdfProgramBuilder.CompileIndividualParts(definition);
+                _bodyNode = SdfProgramBuilder.CompileBodyField(definition);
             }
 
-            var compiledParts = SdfProgramBuilder.CompileIndividualParts(definition);
-            ISdfNode bodyNode = SdfProgramBuilder.CompileBodyField(definition);
-
-            CreaturePart nearestPart = null;
-            float nearestAbsDistance = float.PositiveInfinity;
-
-            foreach ((CreaturePart part, ISdfNode node) in compiledParts)
+            public ResolvedAppearance Resolve(Vector3 position)
             {
-                float distance = Mathf.Abs(node.Evaluate(position));
-                if (distance < nearestAbsDistance)
+                bool hasBody = _definition.Body != null
+                    && _definition.Body.Samples != null
+                    && _definition.Body.Samples.Count > 0;
+
+                if (_definition.Parts.Count == 0 && !hasBody)
                 {
-                    nearestAbsDistance = distance;
-                    nearestPart = part;
+                    return new ResolvedAppearance(AppearanceDefinition.Default.BaseColor, 0, 1f);
                 }
+
+                CreaturePart nearestPart = null;
+                float nearestAbsDistance = float.PositiveInfinity;
+
+                foreach ((CreaturePart part, ISdfNode node) in _compiledParts)
+                {
+                    float distance = Mathf.Abs(node.Evaluate(position));
+                    if (distance < nearestAbsDistance)
+                    {
+                        nearestAbsDistance = distance;
+                        nearestPart = part;
+                    }
+                }
+
+                float bodyAbsDistance = _bodyNode == null
+                    ? float.PositiveInfinity
+                    : Mathf.Abs(_bodyNode.Evaluate(position));
+
+                // The Body owns this surface point. Its gradient color (or default
+                // flat gray) becomes the base color; noise keeps the same gentle
+                // triplanar surface variation the baker applies to parts.
+                if (_bodyNode != null && bodyAbsDistance <= nearestAbsDistance)
+                {
+                    Color bodyColor = BodyVerticalGradientSampler.EvaluateColor(_definition, position);
+                    return new ResolvedAppearance(bodyColor, 0, 1f);
+                }
+
+                if (nearestPart == null)
+                {
+                    return new ResolvedAppearance(AppearanceDefinition.Default.BaseColor, 0, 1f);
+                }
+
+                AppearanceDefinition appearance = nearestPart.Appearance;
+                return new ResolvedAppearance(
+                    appearance.BaseColor, appearance.NoiseSeed, appearance.NoiseScale,
+                    string.IsNullOrWhiteSpace(appearance.MaterialKey) ? null : appearance.MaterialKey);
             }
-
-            float bodyAbsDistance = bodyNode == null
-                ? float.PositiveInfinity
-                : Mathf.Abs(bodyNode.Evaluate(position));
-
-            // The Body owns this surface point. Its gradient color (or default
-            // flat gray) becomes the base color; noise keeps the same gentle
-            // triplanar surface variation the baker applies to parts.
-            if (bodyNode != null && bodyAbsDistance <= nearestAbsDistance)
-            {
-                Color bodyColor = BodyVerticalGradientSampler.EvaluateColor(definition, position);
-                return new ResolvedAppearance(bodyColor, 0, 1f);
-            }
-
-            if (nearestPart == null)
-            {
-                return new ResolvedAppearance(AppearanceDefinition.Default.BaseColor, 0, 1f);
-            }
-
-            AppearanceDefinition appearance = nearestPart.Appearance;
-            return new ResolvedAppearance(
-                appearance.BaseColor, appearance.NoiseSeed, appearance.NoiseScale,
-                string.IsNullOrWhiteSpace(appearance.MaterialKey) ? null : appearance.MaterialKey);
         }
     }
 }

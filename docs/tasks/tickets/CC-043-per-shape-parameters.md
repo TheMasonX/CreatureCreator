@@ -2,7 +2,7 @@
 id: creature-task-043
 key: CC-043
 title: Per-shape parameters (capsule axis + radius/height, ellipsoid 3-axis lengths, box dimensions)
-status: Backlog
+status: In Progress
 type: Task
 priority: P1
 tags: [definition, schema, sdf, editor, serialization]
@@ -86,13 +86,58 @@ shape type its own size parameters so the DNA says what the shape is.
   correctly and remove the non-uniform-scale SDF approximation (see
   `TransformNode` exactness note) that distorts the field for faked shapes.
 
+### Phase 0 implementation (2026-08-23)
+
+- ADR-004 records the explicit shape schema and the legacy `primarySize`
+  migration boundary.
+- `ShapeDefinition` now carries sphere radius, capsule axis/radius/height,
+  ellipsoid radii, and box half-extents. `PrimarySize` remains for source
+  compatibility.
+- Canonical JSON writes explicit fields. The reader accepts old
+  `primarySize`-only shapes and supplies documented defaults.
+- Canonicalization supplies explicit dimensions for legacy in-memory shapes,
+  while validation still accepts those objects before canonicalization.
+- Focused serializer coverage now includes explicit round-trip and legacy
+  migration tests.
+
+### Phase 1 implementation (2026-08-23)
+
+- `CreatureEditorWindow.DrawShapeFields` now exposes radius, capsule axis and
+  height, ellipsoid radii, and box half-extents by shape type.
+- The inspector preserves explicit fields and does not rewrite legacy values
+  during repaint. Editing a legacy shape displays documented fallback values.
+- Managed and portable SDF compilation now use capsule axis, radius, and height.
+- Managed and portable SDF compilation now use all three ellipsoid radii.
+- Managed and portable sphere compilation now use explicit radius with a
+  `PrimarySize` fallback.
+- `SdfProgramBuilderTests` covers managed and portable parity for explicit
+  capsule and ellipsoid parameters.
+
 ## Blockers
 
-- None for design; implementation must land after CC-018 so the limb metaball
-  path (which uses sphere primitives) is unaffected.
+- No known implementation blocker. Unity visual confirmation of authored
+  capsule axis and ellipsoid dimensions remains a manual follow-up.
 
 ## Next Step
 
-- Record the per-shape parameter schema as an ADR, then extend
-  `ShapeDefinition`, the canonicalizer, the JSON writer, and the editor Shape
-  inspector in one slice.
+- Open the editor in Unity and confirm capsule axis changes and ellipsoid
+  dimensions at preview qualities 12, 16, and 18.
+- Consider adding an editor test for shape inspector mutation if the window
+  authoring surface gains a test seam.
+
+## Validation Evidence
+
+- Unity refresh and compilation completed with 0 console errors and 0 warnings.
+- `JsonDnaSerializerTests`: 10/11 passed when invoked directly through Unity
+  `execute_code`. The one failure is the documented pre-existing
+  `RoundTrip_ReconstructsEquivalentDefinition` null `DisplayName` expectation.
+- Static diagnostics are clean for the changed runtime definition and
+  serialization files.
+- Managed and portable limb generation could not be rerun because the Unity
+  MCP bridge reported no connected editor during validation.
+- Static diagnostics report 0 errors for the changed editor, runtime, and test
+  files.
+- Direct Unity execution passed managed versus portable Z-axis capsule parity
+  samples and unequal ellipsoid radius checks.
+- Unity refresh completed idle with 0 console errors and 0 warnings.
+- `ProceduralCreature.Tests.Editor` passed 83/83 tests.

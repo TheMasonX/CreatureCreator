@@ -124,12 +124,23 @@ production generator remains on cached-grid extraction. After removal, the
 focused Unity PlayMode suite passed 37/37 again, and source diagnostics remained
 clean for the extractor and migrated fixtures.
 
+The first AppearanceBake optimization is complete. `PartAppearanceSampler`
+now exposes a per-bake resolver that compiles the Body and per-part reference
+nodes once, while the public one-shot `Resolve` behavior remains unchanged.
+This removes repeated managed graph construction for every mesh vertex without
+changing nearest-part, Body-gradient, or material-key ownership.
+
 ## Blockers
 
 The runtime assembly is discoverable when selected explicitly. Six unrelated
 baseline failures remain in the full suite. Per-part appearance resolution and
 the extraction reference contract must be confirmed before deleting `ISdfNode`
 and its managed compiler.
+
+The appearance bake still evaluates managed nodes through the cached resolver.
+This reduces allocation and compilation overhead but does not satisfy the final
+Burst-only acceptance criterion. A portable per-part and Body resolver remains
+required.
 
 The configured external code editor path also points to a missing Visual Studio
 installation. This does not affect Unity compilation or preview generation, but

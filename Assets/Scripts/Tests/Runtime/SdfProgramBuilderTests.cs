@@ -193,6 +193,47 @@ namespace ProceduralCreature.Tests.Runtime
         }
 
         [Test]
+        public void CompilePortable_MatchesManagedGraphForAuthoredCapsuleAxisAndEllipsoidRadii()
+        {
+            var definition = CreatureDefinition.CreateEmpty();
+            CreaturePart capsule = Sphere("capsule", Vector3.zero);
+            capsule.Shape = new ShapeDefinition
+            {
+                Type = ShapeType.Capsule,
+                PrimarySize = 0.2f,
+                Radius = 0.2f,
+                CapsuleAxis = ShapeAxis.Z,
+                CapsuleHeight = 1.7f,
+                SmoothBlendRadius = 0f,
+            };
+            definition.AddPart(capsule);
+
+            CreaturePart ellipsoid = Sphere("ellipsoid", new Vector3(1.5f, 0f, 0f));
+            ellipsoid.Shape = new ShapeDefinition
+            {
+                Type = ShapeType.Ellipsoid,
+                PrimarySize = 0.5f,
+                EllipsoidRadii = new Vector3(2f, 1f, 0.5f),
+                SmoothBlendRadius = 0f,
+            };
+            definition.AddPart(ellipsoid);
+
+            ISdfNode managed = SdfProgramBuilder.Compile(definition);
+            using (SdfProgram portable = SdfProgramBuilder.CompilePortable(definition))
+            {
+                for (float x = -2f; x <= 2f; x += 0.31f)
+                for (float y = -1.5f; y <= 1.5f; y += 0.37f)
+                for (float z = -1.5f; z <= 1.5f; z += 0.43f)
+                {
+                    Vector3 point = new Vector3(x, y, z);
+                    Assert.AreEqual(managed.Evaluate(point),
+                        SdfProgramEvaluator.Evaluate(portable, new float3(point.x, point.y, point.z)),
+                        1e-4f, $"Mismatch at {point}.");
+                }
+            }
+        }
+
+        [Test]
         public void CompilePortable_EmptyDefinitionMatchesManagedGraph()
         {
             using (SdfProgram portable = SdfProgramBuilder.CompilePortable(CreatureDefinition.CreateEmpty()))
