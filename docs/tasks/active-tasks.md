@@ -64,3 +64,4 @@
 | CC-060 | Move material ownership to geometry components | Backlog | P2 |
 | CC-061 | Harden the final mesh pipeline independently of editor interaction | Backlog | P2 |
 | CC-062 | Optimize Burst field sampling and final-generation evidence | In Progress | P1 |
+| CC-063 | Fix the Fast preview culling Burst job regression (broken/incomplete Fast mesh) | In Progress | P1 |
