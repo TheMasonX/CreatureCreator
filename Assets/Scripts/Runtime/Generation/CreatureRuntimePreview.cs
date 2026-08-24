@@ -93,9 +93,9 @@ namespace ProceduralCreature.Generation
         /// <summary>
         /// CC-028: a mesh-asset item whose part carries a submaterial key resolves
         /// it through the shared palette. A set-but-unresolvable key logs a warning
-        /// and falls back to the default preview material (the editor preview treats
-        /// it as an error; Play Mode stays resilient). Items with no region keep the
-        /// default material.
+        /// and falls back to the default surface material (the editor preview
+        /// treats it as an error; Play Mode stays resilient). Items with no region
+        /// keep the default surface material too.
         /// </summary>
         private void AssignItemMaterials(MeshRenderer renderer, GeometryItem item)
         {
@@ -131,8 +131,17 @@ namespace ProceduralCreature.Generation
 
         private void AssignFallbackMaterial(MeshRenderer renderer)
         {
-            if (_previewMaterial == null) _previewMaterial = CreatePreviewMaterial();
-            if (_previewMaterial != null) renderer.sharedMaterial = _previewMaterial;
+            // CC-074: prefer the palette's default surface material (for example
+            // the Body material) so runtime surfaces use the authored palette
+            // instead of a synthetic white material. Only synthesize a shader
+            // fallback when the palette has no resolvable default.
+            Material material = MaterialResolver.ResolveDefault(ResolveMaterialPalette());
+            if (material == null)
+            {
+                if (_previewMaterial == null) _previewMaterial = CreatePreviewMaterial();
+                material = _previewMaterial;
+            }
+            if (material != null) renderer.sharedMaterial = material;
         }
 
         private void DestroyGeneratedGeometry()

@@ -55,6 +55,21 @@ namespace ProceduralCreature.Tests.Editor
         }
 
         [Test]
+        public void SharedConfigAsset_MaterialPalette_ResolvesDefaultMaterial()
+        {
+            // CC-074: the concrete shared material palette must name a default
+            // surface material (the Body material) so the editor preview and the
+            // runtime preview both render surfaces that have no explicit region.
+            CreatureGenerationConfig config =
+                AssetDatabase.LoadAssetAtPath<CreatureGenerationConfig>(ConfigAssetPath);
+            Assert.IsNotNull(config);
+            Assert.IsNotNull(config.MaterialPalette);
+
+            Material material = MaterialResolver.ResolveDefault(config.MaterialPalette);
+            Assert.IsNotNull(material, "Material palette must resolve a default surface material.");
+        }
+
+        [Test]
         public void SharedConfigAsset_MeshPalette_ResolvesProjectKeys()
         {
             CreatureGenerationConfig config =

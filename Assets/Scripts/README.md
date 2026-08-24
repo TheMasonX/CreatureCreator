@@ -266,6 +266,14 @@ behavior, and the Body gradient (CC-025) still owns Body surfaces.
 - `MaterialResolver.Resolve(palette, key)` encodes the policy: blank → null
   (nearest-part fallback); set-but-unresolvable key or missing palette →
   `DomainException` (never a silent drop, matching the mesh resolver).
+- **Default surface material (CC-074).** A palette names one entry as its
+  default via `DefaultMaterialKey` (for example `body`).
+  `MaterialResolver.ResolveDefault(palette)` resolves it softly (returns null
+  when unset or unresolvable — never throws). Surfaces with no explicit
+  region, including the implicit body surface, use this default in both
+  previews; only when no default exists do the previews fall back to a
+  synthesized URP lit material. The concrete shared palette at
+  `Assets/Prefabs/` sets `defaultMaterialKey` to `body`.
 - `PartAppearanceSampler` surfaces the nearest part's key via
   `ResolvedAppearance.MaterialKey`.
 - The generator emits one `MaterialRegion` (submesh 0) on each mesh-asset
@@ -273,10 +281,11 @@ behavior, and the Body gradient (CC-025) still owns Body surfaces.
   the vertex-color bake — V1 does not harden per-submaterial vertex-color
   regions as the final render model (CC-031 geometry components can later
   carry their own regions).
-- Editor window: Material Palette object field (persisted in EditorPrefs), a
-  duplicate-key guard that blocks generation, and a per-part Material popup in
-  the Appearance section. The editor preview and the runtime preview resolve
-  item materials through the same palette.
+- Editor window: the shared Generation Config owns the material palette
+  reference (CC-072); a duplicate-key guard blocks generation, and a per-part
+  Material popup in the Appearance section authors each part's key. The editor
+  preview and the runtime preview resolve item materials through the same
+  palette.
 - Runtime parity note: a mesh-asset eye cannot render in Play Mode yet because
   `CreatureRuntimePreview` has no mesh resolver (CC-031 deferred); Shape/limb
   parts with a key keep the vertex-color default in both previews.
@@ -428,14 +437,17 @@ silently scoped out:
   compile-verify it here.
 - **Raycast staleness (delta-audit #7)** doesn't apply yet, since there's no
   raycast-based placement to be stale in the first place.
-- **Preview material** defaults to the URP lit shader (falling back through
-  `Standard` → `Unlit/Color` only if the project has no URP), and can be
-  overridden with a dedicated **Preview Material** picker in the editor's
-  "Editor Settings" area. The picker value is stored by asset path in
-  EditorPrefs and is applied to the preview renderer immediately and on every
-  regeneration. If no shader exists at all, the mesh still spawns (using
-  Unity's built-in fallback material) with a console warning rather than a
-  null-reference exception.
+- **Surface material** comes from the assigned Generation Config's material
+  palette default — there is no standalone Preview Material picker (CC-074).
+  Surfaces with no explicit per-part material region, including the implicit
+  body surface, resolve `MaterialResolver.ResolveDefault(palette)` (for
+  example the palette's `body` material). Only when the palette has no
+  resolvable default do the previews fall back to a synthesized URP lit
+  material (`Standard` → `Unlit/Color`), created once and cached per domain
+  reload. The `CreatureRuntimePreview` uses the same resolution in Play Mode,
+  so editor and runtime surfaces match. If no shader exists at all, the mesh
+  still spawns (using Unity's built-in fallback material) with a console
+  warning rather than a null-reference exception.
 
 **Interactive viewport manipulation is now implemented**, via
 `SceneView.duringSceneGui`:

@@ -150,7 +150,6 @@ namespace ProceduralCreature.Editor
         // EditorPrefs, never DNA. Draws a read-only SceneView overlay of the
         // inferred rest Skeleton (bones as lines, joints as caps).
         private bool _showSkeleton;
-        private Material _previewMaterial;
         private CreatureGenerationConfig _generationConfig;
         private bool _logGenerationDiagnostics = true;
         private bool _usePortableSampling;
@@ -166,7 +165,6 @@ namespace ProceduralCreature.Editor
         private const string FastPreviewCullingKey = "ProceduralCreature.FastPreviewCulling";
         // CC-066: skeleton display mode persistence key.
         private const string SkeletonDisplayKey = "ProceduralCreature.ShowSkeleton";
-        private const string PreviewMaterialKey = "ProceduralCreature.PreviewMaterial";
         private const string GenerationConfigKey = "ProceduralCreature.GenerationConfig";
         private const string LogGenerationDiagnosticsKey = "ProceduralCreature.LogGenerationDiagnostics";
         private const string UsePortableSamplingKey = "ProceduralCreature.UsePortableSampling";
@@ -264,11 +262,6 @@ namespace ProceduralCreature.Editor
             {
                 _generationConfig = AssetDatabase.LoadAssetAtPath<CreatureGenerationConfig>(generationConfigPath);
             }
-            string previewMaterialPath = EditorPrefs.GetString(PreviewMaterialKey, string.Empty);
-            if (!string.IsNullOrEmpty(previewMaterialPath))
-            {
-                _previewMaterial = AssetDatabase.LoadAssetAtPath<Material>(previewMaterialPath);
-            }
             _logGenerationDiagnostics = EditorPrefs.GetBool(LogGenerationDiagnosticsKey, true);
             _usePortableSampling = EditorPrefs.GetBool(UsePortableSamplingKey, true);
             _currentFilePath = SessionState.GetString(CurrentFilePathKey, string.Empty);
@@ -279,7 +272,6 @@ namespace ProceduralCreature.Editor
             EditorApplication.update += ProcessAutoRegeneration;
 
             _previewGameObject = GameObject.Find(PreviewObjectName);
-            if (_previewMaterial != null) ApplyPreviewMaterialToRenderer();
         }
 
         private void OnDisable()
@@ -443,18 +435,8 @@ namespace ProceduralCreature.Editor
             _showEditorSettings = EditorGUILayout.Foldout(_showEditorSettings, "Editor Settings");
             if (!_showEditorSettings) return;
 
-            Material newPreviewMaterial = (Material)EditorGUILayout.ObjectField(
-                "Preview Material", _previewMaterial, typeof(Material), allowSceneObjects: false);
-            if (newPreviewMaterial != _previewMaterial)
-            {
-                _previewMaterial = newPreviewMaterial;
-                EditorPrefs.SetString(
-                    PreviewMaterialKey,
-                    _previewMaterial != null ? AssetDatabase.GetAssetPath(_previewMaterial) : string.Empty);
-                ApplyPreviewMaterialToRenderer();
-                Repaint();
-            }
-
+            // CC-074: the surface material comes from the assigned Generation
+            // Config's material palette default — no standalone preview material.
             CreatureGenerationConfig newGenerationConfig = (CreatureGenerationConfig)EditorGUILayout.ObjectField(
                 "Generation Config", _generationConfig, typeof(CreatureGenerationConfig), allowSceneObjects: false);
             if (newGenerationConfig != _generationConfig)
@@ -2714,7 +2696,7 @@ namespace ProceduralCreature.Editor
                 _previewGameObject = new GameObject(PreviewObjectName);
                 _previewGameObject.AddComponent<MeshFilter>();
                 MeshRenderer renderer = _previewGameObject.AddComponent<MeshRenderer>();
-                Material material = ResolvePreviewMaterial();
+                Material material = ResolveDefaultMaterial();
                 if (material != null) renderer.sharedMaterial = material;
                 _previewGameObject.AddComponent<MeshCollider>();
             }
@@ -2722,11 +2704,10 @@ namespace ProceduralCreature.Editor
             _previewGameObject.GetComponent<MeshFilter>().sharedMesh = mesh;
             MeshRenderer previewRenderer = _previewGameObject.GetComponent<MeshRenderer>();
             if (previewRenderer == null) previewRenderer = _previewGameObject.AddComponent<MeshRenderer>();
-            if (_previewMaterial != null || previewRenderer.sharedMaterial == null)
-            {
-                Material material = ResolvePreviewMaterial();
-                if (material != null) previewRenderer.sharedMaterial = material;
-            }
+            // CC-074: re-resolve the palette default each regenerate so a palette
+            // or config change is reflected without reopening the window.
+            Material resolvedDefault = ResolveDefaultMaterial();
+            if (resolvedDefault != null) previewRenderer.sharedMaterial = resolvedDefault;
 
             // MeshCollider needs sharedMesh reassigned (not just relying on the
             // same Mesh object being mutated) to pick up topology changes —
@@ -2761,12 +2742,12 @@ namespace ProceduralCreature.Editor
         /// set-but-unresolvable key throws, so a missing palette entry is never
         /// silently ignored, matching the mesh-resolver contract; the throw is
         /// caught by RegeneratePreview and shown as a dialog). Items with no
-        /// material region keep the default preview material; extra submeshes keep
-        /// the default too.
+        /// material region keep the palette's default surface material (CC-074);
+        /// extra submeshes keep the default too.
         /// </summary>
         private void AssignPreviewItemMaterials(MeshRenderer renderer, GeometryItem item)
         {
-            Material fallback = ResolvePreviewMaterial();
+            Material fallback = ResolveDefaultMaterial();
             if (item.MaterialRegions.Count == 0)
             {
                 if (fallback != null) renderer.sharedMaterial = fallback;
@@ -2813,22 +2794,26 @@ namespace ProceduralCreature.Editor
         private CreatureMaterialPalette EffectiveMaterialPalette =>
             _generationConfig != null ? _generationConfig.MaterialPalette : null;
 
-        private Material ResolvePreviewMaterial()
+        /// <summary>
+        /// CC-074: the editor surface material is the material palette's default
+        /// (for example the Body material). There is no standalone preview
+        /// material override — the shared config's palette is the single source.
+        /// A synthesized material is used only when the palette has no default.
+        /// </summary>
+        private Material ResolveDefaultMaterial()
         {
-            return _previewMaterial != null ? _previewMaterial : CreateDefaultPreviewMaterial();
+            Material material = MaterialResolver.ResolveDefault(EffectiveMaterialPalette);
+            return material != null ? material : CreateDefaultPreviewMaterial();
         }
 
-        private void ApplyPreviewMaterialToRenderer()
-        {
-            if (_previewGameObject == null) return;
-            MeshRenderer previewRenderer = _previewGameObject.GetComponent<MeshRenderer>();
-            if (previewRenderer == null) return;
-            Material material = ResolvePreviewMaterial();
-            if (material != null) previewRenderer.sharedMaterial = material;
-        }
+        private static Material _cachedFallbackMaterial;
 
         private static Material CreateDefaultPreviewMaterial()
         {
+            // Cached so repeated regenerations do not leak a fresh Material each
+            // time the palette has no resolvable default.
+            if (_cachedFallbackMaterial != null) return _cachedFallbackMaterial;
+
             Shader shader = Shader.Find("Universal Render Pipeline/Lit")
                              ?? Shader.Find("Standard")
                              ?? Shader.Find("Unlit/Color");
@@ -2837,7 +2822,8 @@ namespace ProceduralCreature.Editor
                 Debug.LogWarning("[CreatureCreator] No default shader found; preview mesh will use Unity's fallback material.");
                 return null;
             }
-            return new Material(shader);
+            _cachedFallbackMaterial = new Material(shader);
+            return _cachedFallbackMaterial;
         }
 
         private static string GetPartLabel(CreaturePart part)

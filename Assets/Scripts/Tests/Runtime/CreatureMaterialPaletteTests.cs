@@ -107,5 +107,61 @@ namespace ProceduralCreature.Tests.Runtime
         {
             Assert.Throws<DomainException>(() => MaterialResolver.Resolve(_palette, "missing"));
         }
+
+        [Test]
+        public void TryResolveDefault_ReturnsFalseWhenKeyBlank()
+        {
+            Assert.IsFalse(_palette.TryResolveDefault(out _));
+        }
+
+        [Test]
+        public void TryResolveDefault_ResolvesConfiguredKey()
+        {
+            SetDefaultMaterialKey(_palette, "eye");
+            Assert.IsTrue(_palette.TryResolveDefault(out Material resolved));
+            Assert.AreSame(_material, resolved);
+        }
+
+        [Test]
+        public void TryResolveDefault_ReturnsFalseForUnresolvableKey()
+        {
+            SetDefaultMaterialKey(_palette, "missing");
+            Assert.IsFalse(_palette.TryResolveDefault(out _));
+        }
+
+        [Test]
+        public void ResolveDefault_NullPalette_ReturnsNull()
+        {
+            Assert.IsNull(MaterialResolver.ResolveDefault(null));
+        }
+
+        [Test]
+        public void ResolveDefault_BlankKey_ReturnsNull()
+        {
+            Assert.IsNull(MaterialResolver.ResolveDefault(_palette));
+        }
+
+        [Test]
+        public void ResolveDefault_ResolvesConfiguredKey()
+        {
+            SetDefaultMaterialKey(_palette, "eye");
+            Assert.AreSame(_material, MaterialResolver.ResolveDefault(_palette));
+        }
+
+        [Test]
+        public void ResolveDefault_UnresolvableKey_ReturnsNullWithoutThrowing()
+        {
+            SetDefaultMaterialKey(_palette, "missing");
+            Assert.IsNull(MaterialResolver.ResolveDefault(_palette));
+        }
+
+        private static void SetDefaultMaterialKey(CreatureMaterialPalette palette, string key)
+        {
+            var field = typeof(CreatureMaterialPalette).GetField(
+                "defaultMaterialKey",
+                System.Reflection.BindingFlags.Instance | System.Reflection.BindingFlags.NonPublic);
+            Assert.IsNotNull(field, "defaultMaterialKey field must exist.");
+            field.SetValue(palette, key);
+        }
     }
 }

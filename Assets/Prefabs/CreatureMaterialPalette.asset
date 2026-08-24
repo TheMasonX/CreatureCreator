@@ -13,9 +13,13 @@ MonoBehaviour:
   m_Name: CreatureMaterialPalette
   m_EditorClassIdentifier: ProceduralCreature.Runtime::ProceduralCreature.Appearance.CreatureMaterialPalette
   entries:
+  - Key: body
+    DisplayName: Body
+    Material: {fileID: 2100000, guid: 83c2a6504ed76e24a8b0b7b6d7ef47e2, type: 2}
   - Key: eye_white
     DisplayName: Eye White
     Material: {fileID: 2100000, guid: 69071abcf996b2046a0706a355071bb7, type: 2}
   - Key: eye_black
     DisplayName: Eye Black
     Material: {fileID: 2100000, guid: 5f4e1b69500ef994cb2b782827a709d7, type: 2}
+  defaultMaterialKey: body

@@ -14,6 +14,9 @@ namespace ProceduralCreature.Appearance
     ///
     /// Lookup is deterministic: ordinal, first match wins. Entries with a blank key
     /// or a null material are unusable and excluded from <see cref="GetUsableKeys"/>.
+    /// A palette can name one entry as its default surface material (CC-074),
+    /// resolved through <see cref="TryResolveDefault"/> or
+    /// <see cref="MaterialResolver.ResolveDefault"/>.
     /// </summary>
     [CreateAssetMenu(menuName = "Procedural Creature/Material Palette", fileName = "CreatureMaterialPalette")]
     public sealed class CreatureMaterialPalette : ScriptableObject
@@ -28,7 +31,17 @@ namespace ProceduralCreature.Appearance
 
         [SerializeField] private List<Entry> entries = new List<Entry>();
 
+        [SerializeField] private string defaultMaterialKey;
+
         public List<Entry> Entries => entries;
+
+        /// <summary>
+        /// Stable key of the palette's default surface material (for example the
+        /// Body material under the "body" key). Surfaces with no explicit
+        /// per-part material region use this material in both previews. Blank
+        /// means no default: callers fall back to their synthesized material.
+        /// </summary>
+        public string DefaultMaterialKey => defaultMaterialKey;
 
         public bool TryResolve(string key, out Material material)
         {
@@ -41,6 +54,18 @@ namespace ProceduralCreature.Appearance
 
             material = match.Material;
             return true;
+        }
+
+        /// <summary>
+        /// Resolves the configured default material key, if any. Returns false
+        /// when the key is blank or does not resolve to a usable entry (soft:
+        /// callers fall back to a synthesized material).
+        /// </summary>
+        public bool TryResolveDefault(out Material material)
+        {
+            material = null;
+            if (string.IsNullOrWhiteSpace(defaultMaterialKey)) return false;
+            return TryResolve(defaultMaterialKey, out material);
         }
 
         public string[] GetUsableKeys()

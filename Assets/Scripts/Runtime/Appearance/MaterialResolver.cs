@@ -34,5 +34,20 @@ namespace ProceduralCreature.Appearance
 
             return material;
         }
+
+        /// <summary>
+        /// Resolves the palette's configured default surface material (CC-074,
+        /// for example the Body material). Soft fallback contract: returns null
+        /// when there is no palette, the default key is blank, or the key cannot
+        /// be resolved — never throws, because a missing default must not break
+        /// the whole preview. Callers fall back to a synthesized material.
+        /// </summary>
+        public static Material ResolveDefault(CreatureMaterialPalette palette)
+        {
+            if (palette == null) return null;
+            if (string.IsNullOrWhiteSpace(palette.DefaultMaterialKey)) return null;
+            palette.TryResolve(palette.DefaultMaterialKey, out Material material);
+            return material;
+        }
     }
 }

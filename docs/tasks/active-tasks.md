@@ -75,3 +75,4 @@
 | CC-071 | Fix mirrored limb bone rotation basis | Done | P1 |
 | CC-072 | Shared generation configuration and mesh palette ownership | In Progress | P1 |
 | CC-073 | Define and prototype animated geometry binding | Backlog | P1 |
+| CC-074 | Default surface material from the palette; remove editor preview material picker | Done | P1 |
