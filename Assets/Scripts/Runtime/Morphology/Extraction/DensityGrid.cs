@@ -117,6 +117,17 @@ namespace ProceduralCreature.Morphology.Extraction
             var scratchValues = new NativeArray<float>((int)scratchLength, Allocator.TempJob);
             try
             {
+                // Fail fast on a malformed program before any batch runs. Without
+                // this, an out-of-range RootIndex reads past Operations and either
+                // crashes (safety checks on) or silently produces garbage (Burst
+                // release). Mirrors the SdfProgramEvaluator.Evaluate guard. Throwing
+                // inside the try also proves both TempJob arrays are disposed on the
+                // exception path (CC-075).
+                if (program.RootIndex < 0 || program.RootIndex >= program.Operations.Length)
+                {
+                    throw new DomainException("Portable program root index must identify an operation.");
+                }
+
                 for (int sampleStart = 0; sampleStart < grid.SampleCount; sampleStart += batchSize)
                 {
                     int sampleCount = Mathf.Min(batchSize, grid.SampleCount - sampleStart);
@@ -138,14 +149,17 @@ namespace ProceduralCreature.Morphology.Extraction
                     JobHandle handle = job.Schedule(sampleCount, 64);
                     handle.Complete();
                 }
+
+                // Copy only after every batch completes, then dispose both TempJob
+                // allocations in the finally so a throw mid-loop (an out-of-range
+                // job read surfaces at Complete) cannot leak `samples` (CC-075).
+                for (int i = 0; i < grid._samples.Length; i++) grid._samples[i] = samples[i];
             }
             finally
             {
+                samples.Dispose();
                 scratchValues.Dispose();
             }
-
-            for (int i = 0; i < grid._samples.Length; i++) grid._samples[i] = samples[i];
-            samples.Dispose();
             return grid;
         }
 

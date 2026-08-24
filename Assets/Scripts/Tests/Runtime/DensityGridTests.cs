@@ -1,5 +1,8 @@
 using NUnit.Framework;
 using UnityEngine;
+using UnityEngine.TestTools;
+using Unity.Collections;
+using Unity.Mathematics;
 using ProceduralCreature.Common;
 using ProceduralCreature.Definition;
 using ProceduralCreature.Morphology.Extraction;
@@ -73,6 +76,30 @@ namespace ProceduralCreature.Tests.Runtime
         {
             Assert.Throws<DomainException>(() =>
                 DensityGrid.Sample(null, BoundsDefinition.Default, GenerationSettings.Default));
+        }
+
+        [Test]
+        public void SamplePortable_InvalidRootIndex_ThrowsAndDisposesTemporaryAllocations()
+        {
+            var bounds = new BoundsDefinition { MaxX = 1f, MaxY = 1f, MaxZ = 1f };
+            var settings = new GenerationSettings { VoxelsPerUnit = 2f };
+
+            var operations = new NativeArray<SdfOperation>(1, Allocator.Persistent);
+            operations[0] = SdfOperation.Primitive(SdfOperationType.Sphere, new float3(1f, 0f, 0f));
+
+            // RootIndex past the end is a malformed program: SamplePortable must
+            // fail fast before any batch runs, throwing from inside the try so the
+            // finally disposes both TempJob arrays (CC-075). Leaking `samples`
+            // would surface as a leaked-Allocator warning on the next domain reload.
+            using (var program = new SdfProgram(operations, rootIndex: 1, influenceRadius: 0f))
+            {
+                Assert.Throws<DomainException>(() =>
+                    DensityGrid.SamplePortable(program, bounds, settings, SdfCullingMode.Exact));
+            }
+
+            // Best-effort leak guard: fail if any unexpected message (for example
+            // a TempJob leak warning that surfaces in-band) was logged.
+            LogAssert.NoUnexpectedReceived();
         }
 
         [Test]
