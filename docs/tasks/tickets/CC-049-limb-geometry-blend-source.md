@@ -56,6 +56,12 @@ Implemented:
   byte-stably). Canonicalizer quantizes it; validator reports
   `ValidationCode.InvalidLimbBlendRadius` on negative/non-finite.
 - Editor UI for the new field deferred (folds naturally into CC-039 authored-blend work).
+  RESOLVED (2026-08-24): `DrawLimbFields` now has a `Blend Radius` field bound to
+  `LimbChain.BlendRadius`, clamped to >= 0 (0 = hard union) so the canonicalizer never
+  throws on commit. For a limb with a chain, the Shape section's `Smooth Blend Radius`
+  is shown disabled with a tooltip pointing to the Limb section (it is inert per
+  CC-049). A limb-typed part WITHOUT a chain still renders from its Shape, so its Shape
+  blend stays active. EditMode 83/83; console clean.
 
 Validation (Unity connected, real editor):
 - New tests: `Compile_LimbField_IsIndependentOfInertShapeBlendRadius` (managed+portable),

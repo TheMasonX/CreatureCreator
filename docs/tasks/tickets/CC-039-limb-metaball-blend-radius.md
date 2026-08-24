@@ -62,3 +62,10 @@ control for how fused its chain reads.
 - Captured 2026-08-23: "The smooth blend radius for the limb metaballs should
   be its own value too." Analogous to `Shape.SmoothBlendRadius`, which is the
   established pattern.
+- CLARIFICATION (2026-08-24): this ticket is the BETWEEN-JOINT metaball fusion
+  blend (currently `LimbSampleBlendFactor = 0.5f` in `SdfProgramBuilder`). It is
+  DISTINCT from the part-to-field union blend that CC-049 moved onto
+  `LimbChain.BlendRadius` (default 0.1, how the limb's surface blends into the
+  rest of the creature field). CC-049's part-to-field blend already has its
+  editor control: `DrawLimbFields > Blend Radius` (added 2026-08-24, clamped
+  to >= 0). This ticket remains open for the within-chain fusion value.

@@ -1412,7 +1412,25 @@ namespace ProceduralCreature.Editor
                     break;
             }
 
-            newShape.SmoothBlendRadius = EditorGUILayout.FloatField("Smooth Blend Radius", current.SmoothBlendRadius);
+            // CC-049: Shape.SmoothBlendRadius is inert for a limb with a joint
+            // chain, so show it disabled (with a pointer to the Limb section)
+            // instead of presenting a field that silently does nothing. A limb-
+            // typed part WITHOUT a chain still renders from its Shape, so its
+            // blend stays active.
+            bool shapeBlendInert = selected.Limb != null;
+            if (shapeBlendInert)
+            {
+                EditorGUI.BeginDisabledGroup(true);
+                EditorGUILayout.FloatField(
+                    new GUIContent("Smooth Blend Radius",
+                        "Inert for a limb with a joint chain (CC-049). Author the part-to-field blend in the Limb section."),
+                    current.SmoothBlendRadius);
+                EditorGUI.EndDisabledGroup();
+            }
+            else
+            {
+                newShape.SmoothBlendRadius = EditorGUILayout.FloatField("Smooth Blend Radius", current.SmoothBlendRadius);
+            }
 
             if (!EditorGUI.EndChangeCheck()) return;
 
@@ -1602,6 +1620,25 @@ namespace ProceduralCreature.Editor
                     }
                 });
                 selected = _definition.FindPart(partId);
+            }
+
+            // CC-039 / CC-049: the limb's part-to-field union blend radius. Shape
+            // is inert for a limb with a chain, so this is the only authoring
+            // surface for the limb blend. Clamped to >= 0 (0 = hard union) because
+            // a negative/non-finite value would throw in DefinitionCanonicalizer
+            // during commit.
+            float currentBlend = selected.Limb.BlendRadius;
+            float editedBlend = EditorGUILayout.FloatField(
+                new GUIContent("Blend Radius",
+                    "Part-to-field union blend for this limb (CC-049). 0 = hard union; Shape.SmoothBlendRadius is inert for limbs."),
+                currentBlend);
+            if (float.IsNaN(editedBlend) || float.IsInfinity(editedBlend)) editedBlend = currentBlend;
+            editedBlend = Mathf.Max(0f, editedBlend);
+            if (!Mathf.Approximately(editedBlend, currentBlend))
+            {
+                string partId = selected.Id;
+                MutateDefinition("Edit Limb Blend Radius", definition =>
+                    definition.FindPart(partId).Limb.BlendRadius = editedBlend);
             }
 
             UnityEngine.AnimationCurve currentThickness = ThicknessCurveAdapter.ToCurve(selected.Limb.Thickness);
