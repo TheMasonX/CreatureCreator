@@ -43,8 +43,8 @@ namespace ProceduralCreature.Tests.Runtime
             PosedSkeleton pose = PosedSkeleton.FromRestPose(skeleton).WithUpdatedPositions(
                 new Dictionary<string, Vector3>
                 {
-                    ["mid"] = Vector3.zero,
-                    ["leaf"] = Vector3.up,
+                    ["mid"] = Vector3.up,
+                    ["leaf"] = Vector3.up * 2f,
                 });
 
             Dictionary<string, Quaternion> rotations = PoseRotationResolver.Resolve(skeleton, pose);
@@ -66,10 +66,8 @@ namespace ProceduralCreature.Tests.Runtime
         public void Resolve_MissingPoseBoneThrowsDomainException()
         {
             Skeleton.Skeleton skeleton = BuildChain();
-            PosedSkeleton pose = PosedSkeleton.FromRestPose(skeleton).WithUpdatedPositions(
-                new Dictionary<string, Vector3> { ["unknown"] = Vector3.one });
-
-            Assert.Throws<DomainException>(() => PoseRotationResolver.Resolve(skeleton, pose));
+            Assert.Throws<DomainException>(() => PosedSkeleton.FromRestPose(skeleton).WithUpdatedPositions(
+                new Dictionary<string, Vector3> { ["unknown"] = Vector3.one }));
         }
 
         [Test]

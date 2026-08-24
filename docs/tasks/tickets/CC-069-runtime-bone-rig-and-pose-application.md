@@ -86,6 +86,13 @@ coincident child positions. The first Unity adapter slice is also implemented:
 position-only poses and derived rotations. It does not delete unrelated host
 children during rebuild or clear.
 
+The review found that `PosedSkeleton.WithUpdatedPositions` accepted unknown bone
+IDs, which could create pose entries that no skeleton consumer could apply. It
+now rejects those IDs. Rig and rotation fixtures were also corrected to assert a
+real child direction and Unity float values with tolerances. The corrected
+focused PlayMode run passed 6/6 tests. A later broad run timed out before test
+discovery.
+
 ## Blockers
 
 - Geometry-follows-bones strategy is unresolved and needs an ADR first.
@@ -98,6 +105,6 @@ children during rebuild or clear.
 
 ## Next Step
 
-Run the new `CreatureRigTests` in Unity, then continue through CC-072 for the
-separate geometry binding contract. The welded implicit surface remains
-explicitly out of scope until that contract is recorded.
+Connect one explicit mesh item to a resolved rest bone without binding the
+welded implicit surface. Keep the failed broad-run initialization timeout as a
+validation follow-up if the full runtime suite is required.

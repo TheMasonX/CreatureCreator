@@ -48,7 +48,13 @@ follow a posed skeleton by parenting alone. A later binding slice must create a
 Static runtime and test assembly compilation passed on 2026-08-24 with zero
 errors. Unity refresh completed without project compiler errors. Unity Play Mode
 must still compare item count, source IDs, triangle counts, and a posed frame
-before this ticket can close.
+before this ticket can close. On 2026-08-24, Unity resolved the shared config to
+`CreatureMeshPalette` and `CreatureMaterialPalette`, and the console reported
+zero errors and warnings after refresh.
+
+The focused shared-config EditMode run passed 4/4 tests. The required
+editor-versus-runtime geometry comparison and PlayMode preview smoke test are
+still open.
 
 ## Findings
 
@@ -56,6 +62,12 @@ The editor already passes `ResolveMeshAsset` into the shared generator. Runtime
 preview previously called the convenience overload with no resolver. A runtime
 palette closes that asymmetry without putting UnityEditor references in Runtime.
 Both previews now select portable exact sampling and the same generator overload.
+
+The first audit missed that the generated config asset had null palette
+references. The existing assets live under `Assets/Prefabs`, not
+`Assets/Settings`. The config now references both concrete palette assets, and
+the old editor-only mesh palette asset was migrated to the shared Runtime script
+GUID.
 
 `GeneratedCreature.GeometryItem.Mesh` currently stores baked creature-space meshes.
 A skinned implementation needs rest-space vertices and bind poses, or a controlled
@@ -70,4 +82,5 @@ contains MCP port-retry warnings after refresh, but no project compile errors.
 
 ## Next Step
 
-Validate the shared asset in the editor and Play Mode, then continue with CC-073.
+Add a PlayMode parity fixture that compares editor/runtime-equivalent generated
+items, then continue with the explicit mesh-item binding slice in CC-073.

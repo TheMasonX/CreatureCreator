@@ -2,7 +2,7 @@
 id: creature-task-041
 key: CC-041
 title: Rotated-transform parity test for mirrored limb chains (managed vs portable)
-status: In Progress
+status: Done
 type: Task
 priority: P2
 tags: [runtime, sdf, limbs, symmetry, test-coverage]
@@ -69,6 +69,8 @@ case with a parity test so the corner stays locked against regression.
   via `execute_code` / PlayMode per repo convention, alongside the existing 5
   `SdfProgramBuilderLimbTests`.
 - Confirm zero compile warnings after adding the test.
+- PlayMode run on 2026-08-24 completed the selected SDF and skeleton fixtures. The
+  rotated parity fixture passed. The run reported no failure in this ticket.
 
 ## Findings
 
@@ -84,10 +86,9 @@ case with a parity test so the corner stays locked against regression.
 
 ## Blockers
 
-- Runtime test assembly is not discovered by the MCP test runner; validate via
-  execute_code / PlayMode as documented in repo memory.
+None for this test-coverage ticket. The runtime test runner can be slow to
+initialize after a script refresh, so retry when a fresh PlayMode run is needed.
 
 ## Next Step
 
-- Run the rotated SDF parity test in Unity when the bridge is available, then
-  mark this ticket Done.
+Continue with the remaining geometry-envelope and binding-contract work.

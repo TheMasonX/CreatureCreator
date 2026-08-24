@@ -43,7 +43,7 @@
 | CC-038 | Limb and Body edit modes offer both a screenspace drag and a translation gizmo | Backlog | P2 |
 | CC-039 | Limb metaball smooth blend radius as an authored value | Backlog | P2 |
 | CC-040 | Clear the limb chain when switching a part away from a limb type | Done | P2 |
-| CC-041 | Rotated-transform parity test for mirrored limb chains (managed vs portable) | In Progress | P2 |
+| CC-041 | Rotated-transform parity test for mirrored limb chains (managed vs portable) | Done | P2 |
 | CC-042 | Update ClonePartAsChild XML doc comment to list Limb as copied | Backlog | P3 |
 | CC-043 | Per-shape parameters (capsule axis + radius/height, ellipsoid 3-axis lengths, box dimensions) | In Progress | P1 |
 | CC-044 | Export the generated mesh as an asset | Backlog | P2 |
@@ -71,7 +71,7 @@
 | CC-067 | Show the SDF bounds for primitive shapes in the editor | Backlog | P2 |
 | CC-068 | Make the base limb point moveable (selection + move gizmo, no scale) | Backlog | P1 |
 | CC-069 | Runtime bone rig and pose application (drive bone Transforms from a PosedSkeleton) | In Progress | P1 |
-| CC-070 | Add body chain and body-root connections to inferred skeleton | In Progress | P1 |
-| CC-071 | Fix mirrored limb bone rotation basis | In Progress | P1 |
+| CC-070 | Add body chain and body-root connections to inferred skeleton | Done | P1 |
+| CC-071 | Fix mirrored limb bone rotation basis | Done | P1 |
 | CC-072 | Shared generation configuration and mesh palette ownership | In Progress | P1 |
 | CC-073 | Define and prototype animated geometry binding | Backlog | P1 |

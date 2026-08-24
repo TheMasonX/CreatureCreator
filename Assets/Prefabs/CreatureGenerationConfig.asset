@@ -15,5 +15,5 @@ MonoBehaviour:
   defaultVoxelsPerUnit: 16
   usePortableSampling: 1
   cullingMode: 0
-  meshPalette: {fileID: 0}
-  materialPalette: {fileID: 0}
+  meshPalette: {fileID: 11400000, guid: 7f2235606cce628499ebb299a3194a84, type: 2}
+  materialPalette: {fileID: 11400000, guid: 79602eb9d5c922a4282200ccf0df510e, type: 2}

@@ -2,7 +2,7 @@
 id: creature-task-070
 key: CC-070
 title: Add body chain and body-root connections to inferred skeleton
-status: In Progress
+status: Done
 type: Task
 priority: P1
 tags: [runtime, skeleton, editor, body]
@@ -49,6 +49,9 @@ limb bones store segment starts only.
 - Focused Unity runtime and editor tests for body inference and display lines.
 - Full runtime/editor assemblies when the focused checks pass.
 - Manual SceneView confirmation on the dino overlay.
+- PlayMode runtime fixtures passed on 2026-08-24 for body-chain topology and
+  body-root attachment. The editor display fixture still needs an EditMode run.
+  No DNA or scene state mutation was observed.
 
 ## Findings
 
@@ -59,9 +62,9 @@ segments.
 
 ## Blockers
 
-None known.
+The final visual SceneView check remains a manual residual because the test
+runner does not simulate SceneView drawing.
 
 ## Next Step
 
-Implement body-chain inference and run focused tests in the connected Unity
-editor.
+Use the connected body chain as the rest-skeleton input for CC-069 and CC-073.

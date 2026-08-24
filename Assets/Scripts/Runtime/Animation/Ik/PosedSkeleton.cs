@@ -51,6 +51,10 @@ namespace ProceduralCreature.Animation.Ik
             var merged = new Dictionary<string, Vector3>(_positions);
             foreach (KeyValuePair<string, Vector3> update in updates)
             {
+                if (!_positions.ContainsKey(update.Key))
+                {
+                    throw new DomainException($"Bone '{update.Key}' has no position in the rest skeleton.");
+                }
                 merged[update.Key] = update.Value;
             }
             return new PosedSkeleton(merged);

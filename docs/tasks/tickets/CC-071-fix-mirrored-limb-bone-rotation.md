@@ -2,7 +2,7 @@
 id: creature-task-071
 key: CC-071
 title: Fix mirrored limb bone rotation basis
-status: In Progress
+status: Done
 type: Bug
 priority: P1
 tags: [runtime, skeleton, symmetry, animation]
@@ -36,8 +36,8 @@ resulting mirrored bone rotation can be wrong before runtime rigging consumes it
 ## Validation
 
 Static runtime and test assembly compilation passed on 2026-08-24 with zero
-errors. Unity runtime execution remains pending because the Unity bridge is not
-connected.
+errors. The rotated mirrored-limb skeleton fixture passed in the 2026-08-24
+PlayMode runtime run. Existing limb and symmetry fixtures remained valid.
 
 ## Findings
 
@@ -47,9 +47,10 @@ up hint from the proper original matrix, then reflects the vector component-wise
 
 ## Blockers
 
-Unity runtime test execution is unavailable in the current session.
+None known for the rotation-basis fix. Full geometry binding remains deferred
+to CC-073.
 
 ## Next Step
 
-Reconnect Unity and run the new rotated skeleton regression with the existing
-limb fixtures.
+Consume the proper mirrored rotation basis from the runtime rig and binding
+fixtures in CC-069 and CC-073.
