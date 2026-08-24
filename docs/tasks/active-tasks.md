@@ -43,7 +43,7 @@
 | CC-038 | Limb and Body edit modes offer both a screenspace drag and a translation gizmo | Backlog | P2 |
 | CC-039 | Limb metaball smooth blend radius as an authored value | Backlog | P2 |
 | CC-040 | Clear the limb chain when switching a part away from a limb type | Done | P2 |
-| CC-041 | Rotated-transform parity test for mirrored limb chains (managed vs portable) | Backlog | P2 |
+| CC-041 | Rotated-transform parity test for mirrored limb chains (managed vs portable) | In Progress | P2 |
 | CC-042 | Update ClonePartAsChild XML doc comment to list Limb as copied | Backlog | P3 |
 | CC-043 | Per-shape parameters (capsule axis + radius/height, ellipsoid 3-axis lengths, box dimensions) | In Progress | P1 |
 | CC-044 | Export the generated mesh as an asset | Backlog | P2 |
@@ -53,7 +53,7 @@
 | CC-049 | Remove limb geometry dependence on inert Shape blend state | Done | P1 |
 | CC-050 | Validate the generated creature-space geometry envelope | Backlog | P1 |
 | CC-051 | Consolidate semantic attachment and part-frame resolution | Done | P1 |
-| CC-052 | Preserve mesh rest transforms and mirrored binding identity | Backlog | P1 |
+| CC-052 | Preserve mesh rest transforms and mirrored binding identity | In Progress | P1 |
 | CC-053 | Complete multi-geometry editor selection and visibility | Backlog | P1 |
 | CC-054 | Reject thickness-profile quantization time collisions | Backlog | P2 |
 | CC-055 | Decide limb centerline and generation-aware sampling fidelity | Backlog | P2 |
@@ -70,5 +70,6 @@
 | CC-066 | Add a display mode to show the skeleton | Done | P2 |
 | CC-067 | Show the SDF bounds for primitive shapes in the editor | Backlog | P2 |
 | CC-068 | Make the base limb point moveable (selection + move gizmo, no scale) | Backlog | P1 |
-| CC-069 | Runtime bone rig and pose application (drive bone Transforms from a PosedSkeleton) | Backlog | P1 |
+| CC-069 | Runtime bone rig and pose application (drive bone Transforms from a PosedSkeleton) | In Progress | P1 |
 | CC-070 | Add body chain and body-root connections to inferred skeleton | In Progress | P1 |
+| CC-071 | Fix mirrored limb bone rotation basis | In Progress | P1 |

@@ -2,7 +2,7 @@
 id: creature-task-052
 key: CC-052
 title: Preserve mesh rest transforms and mirrored binding identity
-status: Backlog
+status: In Progress
 type: Task
 priority: P1
 tags: [runtime, geometry, animation, skeleton, symmetry]
@@ -30,11 +30,21 @@ Replace implicit identity-baked placement with an explicit rest transform or equ
 ## Validation
 Run generator, symmetry, and skeleton tests in Unity. Manually inspect a mirrored mesh preview and verify placement and outward normals.
 
+Static validation passed on 2026-08-24: `ProceduralCreature.Runtime.csproj`
+and `ProceduralCreature.Tests.Runtime.csproj` both compiled with zero errors.
+Unity runtime tests and the manual mirrored preview check remain pending because
+the Unity bridge became unavailable during the test attempt.
+
 ## Findings
 CC-031 currently bakes part placement and attachment into creature-space vertices. That is acceptable for a static preview, but it removes the rest transform needed for future bone-driven placement. Mirrored metadata also lacks an explicit mirrored side.
+
+ADR-003 defines an additive migration. Geometry items now expose the source mesh,
+rest placement, and mirror side while retaining the baked presentation mesh for
+static preview compatibility. The implicit surface remains unbound.
 
 ## Blockers
 Depends on the canonical attachment contract and the eventual semantic bone resolver.
 
 ## Next Step
-Design the output descriptor without changing animation behavior, then migrate the preview consumer.
+Reconnect Unity and validate the descriptor. Then migrate preview and runtime
+consumers to use source mesh plus rest placement before implementing CC-069.

@@ -2,7 +2,7 @@
 id: creature-task-041
 key: CC-041
 title: Rotated-transform parity test for mirrored limb chains (managed vs portable)
-status: Backlog
+status: In Progress
 type: Task
 priority: P2
 tags: [runtime, sdf, limbs, symmetry, test-coverage]
@@ -76,6 +76,11 @@ case with a parity test so the corner stays locked against regression.
   mirrored ball matrix `S · localToCreature`; no implementation change expected.
 - The X-offset regression test covers translation off the X plane only; rotation
   remains uncovered at the time of writing.
+- Added the requested rotated-transform managed-versus-portable SDF parity test.
+- A separate skeleton issue was found during review. Mirrored limb forward and
+  up axes now use a directly reflected proper rotation basis instead of
+  extracting `Matrix4x4.rotation` from an improper reflected matrix. It is
+  tracked separately as CC-071.
 
 ## Blockers
 
@@ -84,4 +89,5 @@ case with a parity test so the corner stays locked against regression.
 
 ## Next Step
 
-- Implement the rotated-transform parity test and run it via execute_code.
+- Run the rotated SDF parity test in Unity when the bridge is available, then
+  mark this ticket Done.

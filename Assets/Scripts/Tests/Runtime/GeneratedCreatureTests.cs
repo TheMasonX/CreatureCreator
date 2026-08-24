@@ -102,6 +102,8 @@ namespace ProceduralCreature.Tests.Runtime
             Assert.AreEqual(GeometryType.MeshAsset, generated.Geometry[1].GeometryType);
             Assert.AreEqual("eye_L", generated.Geometry[1].SourcePartId);
             Assert.AreEqual("eye_L", generated.Geometry[1].RigBinding.SourcePartId);
+                Assert.IsNotNull(generated.Geometry[1].SourceMesh);
+                Assert.IsFalse(generated.Geometry[1].RigBinding.IsMirrored);
         }
 
         [Test]
@@ -171,6 +173,10 @@ namespace ProceduralCreature.Tests.Runtime
             Assert.AreEqual("eye" + GeneratedCreature.MirrorSuffix, generated.Geometry[2].SourcePartId);
             AssertVectorClose(new Vector3(0.5f, 0.5f, 0f), generated.Geometry[1].Mesh.bounds.center, 0.001f, "original copy");
             AssertVectorClose(new Vector3(-0.5f, 0.5f, 0f), generated.Geometry[2].Mesh.bounds.center, 0.001f, "mirrored copy");
+                Assert.IsTrue(generated.Geometry[2].RigBinding.IsMirrored);
+                Assert.AreEqual(generated.Geometry[1].SourceMesh, generated.Geometry[2].SourceMesh);
+                Assert.AreEqual(new Vector3(-0.5f, 0.5f, 0f),
+                    generated.Geometry[2].RestPlacement.MultiplyPoint3x4(Vector3.zero));
         }
 
         [Test]

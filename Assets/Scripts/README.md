@@ -56,6 +56,7 @@ ProceduralCreature/
       BoneChain.cs                — extracts an ordered joint chain from a Skeleton for the solver to consume
       PosedSkeleton.cs             — immutable per-bone position snapshot (the runtime pose, distinct from rest)
       IkChainSolver.cs             — the adapter: the only place FabrikSolver and Skeleton meet
+      CreatureRig.cs               — Unity Transform hierarchy adapter; applies PosedSkeleton positions and derived rotations
 Editor/
   ProceduralCreature.Editor.asmdef  — Editor-only assembly
   CreatureEditorSession.cs          — resolves delta-audit item #5 (domain-reload persistence via SessionState)

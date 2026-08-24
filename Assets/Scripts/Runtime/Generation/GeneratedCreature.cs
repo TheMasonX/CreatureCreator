@@ -49,6 +49,10 @@ namespace ProceduralCreature.Generation
         public string SourcePartId;
         public GeometryType GeometryType;
         public Mesh Mesh;
+            /// <summary>Original mesh-asset source in its authored local space.</summary>
+            public Mesh SourceMesh;
+            /// <summary>Authored source-to-creature rest placement for mesh assets.</summary>
+            public Matrix4x4 RestPlacement = Matrix4x4.identity;
         public List<MaterialRegion> MaterialRegions = new List<MaterialRegion>();
         public RigBindingMetadata RigBinding = new RigBindingMetadata();
     }
@@ -77,5 +81,6 @@ namespace ProceduralCreature.Generation
     {
         public string SourcePartId;
         public string ParentPartId;
+            public bool IsMirrored;
     }
 }

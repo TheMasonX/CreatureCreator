@@ -219,7 +219,14 @@ namespace ProceduralCreature.Generation
                 SourcePartId = mirror ? part.Id + GeneratedCreature.MirrorSuffix : part.Id,
                 GeometryType = GeometryType.MeshAsset,
                 Mesh = mesh,
-                RigBinding = new RigBindingMetadata { SourcePartId = part.Id, ParentPartId = part.ParentId },
+                    SourceMesh = source,
+                    RestPlacement = placement,
+                    RigBinding = new RigBindingMetadata
+                    {
+                        SourcePartId = part.Id,
+                        ParentPartId = part.ParentId,
+                        IsMirrored = mirror,
+                    },
             };
 
             // CC-028: a part with a submaterial override carries it as a key on its

@@ -2,7 +2,7 @@
 id: creature-task-069
 key: CC-069
 title: Runtime bone rig and pose application (drive bone Transforms from a PosedSkeleton)
-status: Backlog
+status: In Progress
 type: Task
 priority: P1
 tags: [runtime, animation, skeleton, ik, geometry]
@@ -63,6 +63,9 @@ target). Locomotion itself stays in CC-011.
 - Runtime tests: rig build (bone count, parent links, rest positions equal
   `SkeletonInferrer.Infer` output), pose application (Transforms equal
   `PosedSkeleton` positions).
+- Static validation for the first CC-069 slice passed on 2026-08-24:
+  `ProceduralCreature.Runtime.csproj` and `ProceduralCreature.Tests.Runtime.csproj`
+  compile with zero errors and zero warnings.
 - Play Mode: a `CreatureRuntimePreview`-style scene applies a solved IK target to
   one limb; confirm the limb's bone Transforms and geometry move to the target and
   the update is stable across frames.
@@ -70,7 +73,18 @@ target). Locomotion itself stays in CC-011.
 
 ## Findings
 
-(To be filled in during implementation.)
+ADR-004 resolves the V1 rotation gap without changing `PosedSkeleton`: derive a
+bone's current rotation from its current child direction, and use its rest
+rotation for terminal bones. The next implementation slice is the pure resolver
+and its runtime tests. The welded implicit surface remains out of scope for
+rigid mesh binding.
+
+The pure `PoseRotationResolver` slice is now implemented. It returns rotations
+without mutating the rest skeleton or pose and uses a deterministic fallback for
+coincident child positions. The first Unity adapter slice is also implemented:
+`CreatureRig` builds and owns a stable-ID Transform hierarchy and applies both
+position-only poses and derived rotations. It does not delete unrelated host
+children during rebuild or clear.
 
 ## Blockers
 
@@ -84,6 +98,6 @@ target). Locomotion itself stays in CC-011.
 
 ## Next Step
 
-Draft the ADR for the binding/deformation strategy, decide the `PosedSkeleton`
-rotation approach, then implement rig construction + pose application before any
-locomotion work.
+Run the new `CreatureRigTests` in Unity, then decide and implement the separate
+geometry binding contract for mesh-asset items. The welded implicit surface
+remains explicitly out of scope until that contract is recorded.

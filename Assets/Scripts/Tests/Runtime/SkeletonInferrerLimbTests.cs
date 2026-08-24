@@ -211,6 +211,30 @@ namespace ProceduralCreature.Tests.Runtime
         }
 
         [Test]
+        public void Infer_MirroredLimbWithRotatedTransform_MirrorsBoneForwardAndUpAxes()
+        {
+            var definition = DefinitionWith(
+                MakePlainPart("part_body", PartType.Body, Vector3.zero),
+                MakeLimbPart("part_leg", PartType.Leg,
+                    Chain(new Vector3(0f, 0f, 0f), new Vector3(0.7f, -1f, 0.2f)),
+                    parentId: "part_body", localPosition: new Vector3(0.8f, 0.2f, 0.1f), mirror: true));
+            definition.SymmetryMode = SymmetryMode.MirrorAcrossXAxis;
+            definition.FindPart("part_leg").Transform.Rotation = Quaternion.Euler(20f, 35f, 15f);
+
+            Skeleton.Skeleton skeleton = SkeletonInferrer.Infer(definition);
+            Bone original = skeleton.FindBone("part_leg_j0");
+            Bone mirrored = skeleton.FindBone("part_leg_j0_mirror");
+            Vector3 reflect = new Vector3(-1f, 1f, 1f);
+
+            Assert.Greater(Vector3.Dot(
+                Vector3.Scale(original.Rotation * Vector3.forward, reflect).normalized,
+                mirrored.Rotation * Vector3.forward), 0.999f);
+            Assert.Greater(Vector3.Dot(
+                Vector3.Scale(original.Rotation * Vector3.up, reflect).normalized,
+                mirrored.Rotation * Vector3.up), 0.999f);
+        }
+
+        [Test]
         public void Infer_ChildOfLimb_AttachesToTerminalBone()
         {
             var definition = DefinitionWith(

@@ -75,10 +75,24 @@ namespace ProceduralCreature.Tests.Runtime
             Skeleton.Skeleton skeleton = SkeletonInferrer.Infer(definition);
 
             Assert.AreEqual(4, skeleton.Bones.Count);
-            Assert.AreEqual(Vector3.zero, skeleton.FindBone("body_j0").Position);
-            Assert.AreEqual(new Vector3(0f, 0f, 1f), skeleton.FindBone("body_j0").EndPosition);
-            Assert.AreEqual("body_j0", skeleton.FindBone("body_j1").ParentBoneId);
-            Assert.AreEqual("body_j1", skeleton.FindBone("leg").ParentBoneId);
+            Assert.AreEqual(Vector3.zero, skeleton.FindBone("body_j1").Position);
+            Assert.AreEqual(new Vector3(0f, 0f, 1f), skeleton.FindBone("body_j1").EndPosition);
+            Assert.AreEqual("body_j1", skeleton.FindBone("body_j2").ParentBoneId);
+            Assert.AreEqual("body_j2", skeleton.FindBone("leg").ParentBoneId);
+        }
+
+        [Test]
+        public void Infer_BodyBoneIdentityUsesStableSampleIdsNotListIndices()
+        {
+            var definition = CreatureDefinition.CreateEmpty();
+            definition.Body.Samples.Add(new BodySample { Id = 40, Position = Vector3.zero, Radius = 1f });
+            definition.Body.Samples.Add(new BodySample { Id = 90, Position = Vector3.forward, Radius = 1f });
+
+            Skeleton.Skeleton skeleton = SkeletonInferrer.Infer(definition);
+
+            Assert.IsNotNull(skeleton.FindBone("body_j40"));
+            Assert.IsNotNull(skeleton.FindBone("body_j90"));
+            Assert.AreEqual("body_j40", skeleton.FindBone("body_j90").ParentBoneId);
         }
 
         [Test]

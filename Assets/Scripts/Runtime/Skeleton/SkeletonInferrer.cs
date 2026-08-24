@@ -164,9 +164,11 @@ namespace ProceduralCreature.Skeleton
             }
 
             Matrix4x4 partMatrix = CreaturePartWorldTransformResolver.ResolveLocalToCreatureSpace(definition, part);
+            Vector3 upHint = partMatrix.rotation * Vector3.up;
             if (mirrored)
             {
                 partMatrix = ReflectAcrossX * partMatrix;
+                upHint = Vector3.Scale(upHint, new Vector3(-1f, 1f, 1f));
             }
 
             string suffix = mirrored ? MirrorSuffix : string.Empty;
@@ -182,7 +184,7 @@ namespace ProceduralCreature.Skeleton
                 Vector3 fromWorld = partMatrix.MultiplyPoint3x4(from.Position);
                 Vector3 toWorld = partMatrix.MultiplyPoint3x4(to.Position);
                 Vector3 segmentDir = toWorld - fromWorld;
-                Quaternion rotation = LimbBoneRotation(segmentDir, partMatrix.rotation * Vector3.up);
+                Quaternion rotation = LimbBoneRotation(segmentDir, upHint);
 
                 string boneId = part.Id + LimbJointBoneSeparator + i + suffix;
                 skeleton.Bones.Add(new Bone
@@ -278,11 +280,17 @@ namespace ProceduralCreature.Skeleton
                 Vector3 endPosition = hasSegment
                     ? definition.Body.Samples[i + 1].Position
                     : position;
+                string boneId = CreatureDefinition.BodyId + LimbJointBoneSeparator
+                    + definition.Body.Samples[i].Id;
+                string parentBoneId = i == 0
+                    ? null
+                    : CreatureDefinition.BodyId + LimbJointBoneSeparator
+                        + definition.Body.Samples[i - 1].Id;
 
                 skeleton.Bones.Add(new Bone
                 {
-                    Id = CreatureDefinition.BodyId + LimbJointBoneSeparator + i,
-                    ParentBoneId = i == 0 ? null : CreatureDefinition.BodyId + LimbJointBoneSeparator + (i - 1),
+                    Id = boneId,
+                    ParentBoneId = parentBoneId,
                     SourcePartId = CreatureDefinition.BodyId,
                     PartType = PartType.Body,
                     Position = position,
@@ -322,7 +330,8 @@ namespace ProceduralCreature.Skeleton
                 }
             }
 
-            return CreatureDefinition.BodyId + LimbJointBoneSeparator + nearestIndex;
+            return CreatureDefinition.BodyId + LimbJointBoneSeparator
+                + definition.Body.Samples[nearestIndex].Id;
         }
     }
 }

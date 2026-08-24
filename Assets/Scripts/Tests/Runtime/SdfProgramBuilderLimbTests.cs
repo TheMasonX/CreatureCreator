@@ -172,6 +172,53 @@ namespace ProceduralCreature.Tests.Runtime
             }
         }
 
+        [Test]
+        public void CompilePortable_MirroredLimbWithRotatedPartTransform_AgreesWithManaged()
+        {
+            var chain = new LimbChain();
+            chain.Joints.Add(new LimbJoint { Id = 1, Position = new Vector3(0f, 0f, 0f) });
+            chain.Joints.Add(new LimbJoint { Id = 2, Position = new Vector3(0.6f, -1.1f, 0.2f) });
+            chain.Joints.Add(new LimbJoint { Id = 3, Position = new Vector3(1.1f, -1.4f, 0.8f) });
+
+            CreatureDefinition definition = CreatureDefinition.CreateEmpty();
+            definition.SymmetryMode = SymmetryMode.MirrorAcrossXAxis;
+            definition.Forward = Vector3.forward;
+            definition.Body.Samples.Add(new BodySample { Id = 1, Position = new Vector3(0f, 0f, -1f), Radius = 0.75f });
+            definition.Body.Samples.Add(new BodySample { Id = 2, Position = new Vector3(0f, 0f, 1f), Radius = 0.9f });
+            definition.AddPart(new CreaturePart
+            {
+                Id = "part_rotated_limb",
+                ParentId = CreatureDefinition.BodyId,
+                PartType = PartType.Arm,
+                Transform = new TransformData
+                {
+                    Position = new Vector3(0.7f, 0.4f, 0.2f),
+                    Rotation = Quaternion.Euler(20f, 35f, 15f),
+                    Scale = Vector3.one,
+                },
+                Shape = ShapeDefinition.DefaultSphere,
+                Appearance = AppearanceDefinition.Default,
+                MirrorAcrossSymmetryPlane = true,
+                Limb = chain,
+            });
+
+            ISdfNode managed = SdfProgramBuilder.Compile(definition);
+            using (SdfProgram portable = SdfProgramBuilder.CompilePortable(definition))
+            {
+                for (float x = -2.5f; x <= 2.5f; x += 0.25f)
+                for (float y = -2.0f; y <= 1.0f; y += 0.25f)
+                for (float z = -1.5f; z <= 1.5f; z += 0.25f)
+                {
+                    Vector3 point = new Vector3(x, y, z);
+                    Assert.AreEqual(
+                        managed.Evaluate(point),
+                        SdfProgramEvaluator.Evaluate(portable, new float3(point.x, point.y, point.z)),
+                        1e-4f,
+                        $"Managed and portable rotated mirrored fields must agree at {point}.");
+                }
+            }
+        }
+
         /// <summary>
         /// CC-049: a limb's part-to-field union must not depend on the inert
         /// Shape.SmoothBlendRadius. Changing that inert field must have zero
