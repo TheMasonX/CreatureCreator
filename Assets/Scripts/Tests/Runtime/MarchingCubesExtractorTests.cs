@@ -16,7 +16,7 @@ namespace ProceduralCreature.Tests.Runtime
             var settings = new GenerationSettings { VoxelsPerUnit = 6f };
 
             DensityGrid grid = DensityGrid.Sample(sphere, bounds, settings);
-            MeshExtractionResult mesh = MarchingCubesExtractor.Extract(sphere, grid);
+            MeshExtractionResult mesh = MarchingCubesExtractor.Extract(grid);
 
             Assert.Greater(mesh.TriangleCount, 0, "Sphere should produce a non-empty mesh at this resolution.");
 
@@ -42,7 +42,7 @@ namespace ProceduralCreature.Tests.Runtime
             var settings = new GenerationSettings { VoxelsPerUnit = 5f };
 
             DensityGrid grid = DensityGrid.Sample(union, bounds, settings);
-            MeshExtractionResult mesh = MarchingCubesExtractor.Extract(union, grid);
+            MeshExtractionResult mesh = MarchingCubesExtractor.Extract(grid);
 
             MeshTopologyReport report = MeshTopologyValidator.Validate(mesh);
             Assert.IsTrue(report.IsWatertight,
@@ -61,7 +61,7 @@ namespace ProceduralCreature.Tests.Runtime
             // should still produce geometry; verify the inverse (an EmptySdfNode
             // produces zero triangles) as the true "nothing here" case.
             DensityGrid grid = DensityGrid.Sample(new EmptySdfNode(), bounds, settings);
-            MeshExtractionResult mesh = MarchingCubesExtractor.Extract(new EmptySdfNode(), grid);
+            MeshExtractionResult mesh = MarchingCubesExtractor.Extract(grid);
 
             Assert.AreEqual(0, mesh.TriangleCount);
         }
@@ -74,7 +74,7 @@ namespace ProceduralCreature.Tests.Runtime
             var settings = new GenerationSettings { VoxelsPerUnit = 6f };
 
             DensityGrid grid = DensityGrid.Sample(sphere, bounds, settings);
-            MeshExtractionResult mesh = MarchingCubesExtractor.Extract(sphere, grid);
+            MeshExtractionResult mesh = MarchingCubesExtractor.Extract(grid);
 
             // A welded 2-manifold closed mesh satisfies Euler's formula
             // V - E + F = 2 (genus 0). Cross-check vertex count against triangle

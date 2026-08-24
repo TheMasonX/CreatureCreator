@@ -79,5 +79,11 @@ This turns the timings into a disciplined optimization order: target the field s
 ## Blockers
 The Unity Test Framework job previously stalled at zero progress. Direct Unity probes now cover the centered sphere, overlapping spheres, and `first_creature.json`, but deterministic parity and the post-optimization timed benchmark remain pending.
 
+Latest editor profile supplied on 2026-08-23, using the standard 96x96x96
+preview, reported 912,673 samples, 6,754 mixed cells, 13,034 triangles, and
+6,519 vertices. FieldSampling took 793.3 ms and AppearanceBake took 325.6 ms.
+The log identified Burst sampling as active. This is useful evidence for
+CC-045, but it does not prove that all managed SDF consumers have been removed.
+
 ## Next Step
 Slice 1 is implemented and validated (byte-identical parity, determinism, and a two-quality benchmark recorded above). Proceed to Slice 2 of the handoff: direct integer edge ownership replacing the tuple dictionary in `MarchingCubesExtractor`, then delete the `ExtractLegacy` reference path and its parity tests once the new path is the baseline. Keep `CubeContourResolver`, winding, and active-cell iteration unchanged. Re-run the focused extraction tests and the benchmark after the change.

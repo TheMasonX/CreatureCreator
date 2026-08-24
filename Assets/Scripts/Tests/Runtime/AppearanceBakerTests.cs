@@ -174,7 +174,7 @@ namespace ProceduralCreature.Tests.Runtime
             var bounds = new BoundsDefinition { MaxX = 1.5f, MaxY = 1.5f, MaxZ = 1.5f };
             var settings = new GenerationSettings { VoxelsPerUnit = 4f };
             DensityGrid grid = DensityGrid.Sample(sphere, bounds, settings);
-            MeshExtractionResult mesh = MarchingCubesExtractor.Extract(sphere, grid);
+            MeshExtractionResult mesh = MarchingCubesExtractor.Extract(grid);
 
             var definition = CreatureDefinition.CreateEmpty();
             definition.AddPart(new CreaturePart
@@ -197,7 +197,7 @@ namespace ProceduralCreature.Tests.Runtime
             var bounds = new BoundsDefinition { MaxX = 1.5f, MaxY = 1.5f, MaxZ = 1.5f };
             var settings = new GenerationSettings { VoxelsPerUnit = 4f };
             DensityGrid grid = DensityGrid.Sample(sphere, bounds, settings);
-            MeshExtractionResult mesh = MarchingCubesExtractor.Extract(sphere, grid);
+            MeshExtractionResult mesh = MarchingCubesExtractor.Extract(grid);
 
             var definition = CreatureDefinition.CreateEmpty();
             definition.AddPart(new CreaturePart

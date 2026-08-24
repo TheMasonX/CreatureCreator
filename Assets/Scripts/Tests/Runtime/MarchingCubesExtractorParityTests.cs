@@ -43,8 +43,8 @@ namespace ProceduralCreature.Tests.Runtime
         {
             DensityGrid grid = SphereGrid();
 
-            MeshExtractionResult first = MarchingCubesExtractor.Extract(new SphereSdfNode(1f), grid);
-            MeshExtractionResult second = MarchingCubesExtractor.Extract(new SphereSdfNode(1f), grid);
+            MeshExtractionResult first = MarchingCubesExtractor.Extract(grid);
+            MeshExtractionResult second = MarchingCubesExtractor.Extract(grid);
 
             AssertSameGeometry(first, second, "determinism");
         }
@@ -54,10 +54,8 @@ namespace ProceduralCreature.Tests.Runtime
         {
             DensityGrid grid = BodySplineGrid();
 
-            // The node argument is only null-checked by the extractor; all
-            // geometry derives from the sampled grid. Any non-null node works.
-            MeshExtractionResult first = MarchingCubesExtractor.Extract(new EmptySdfNode(), grid);
-            MeshExtractionResult second = MarchingCubesExtractor.Extract(new EmptySdfNode(), grid);
+            MeshExtractionResult first = MarchingCubesExtractor.Extract(grid);
+            MeshExtractionResult second = MarchingCubesExtractor.Extract(grid);
 
             AssertSameGeometry(first, second, "determinism");
         }
@@ -66,7 +64,7 @@ namespace ProceduralCreature.Tests.Runtime
         public void Extract_ResolvesExactlyOneContourPerMixedCell()
         {
             DensityGrid grid = SphereGrid();
-            MeshExtractionResult mesh = MarchingCubesExtractor.Extract(new SphereSdfNode(1f), grid);
+            MeshExtractionResult mesh = MarchingCubesExtractor.Extract(grid);
 
             Assert.Greater(mesh.MixedCellCount, 0);
             Assert.AreEqual(mesh.MixedCellCount, mesh.ContourResolutionCallCount,
@@ -77,7 +75,7 @@ namespace ProceduralCreature.Tests.Runtime
         public void Extract_EmptyField_NeverCallsContourResolver()
         {
             DensityGrid grid = EmptyGrid();
-            MeshExtractionResult mesh = MarchingCubesExtractor.Extract(new EmptySdfNode(), grid);
+            MeshExtractionResult mesh = MarchingCubesExtractor.Extract(grid);
 
             Assert.AreEqual(0, mesh.MixedCellCount);
             Assert.AreEqual(0, mesh.ContourResolutionCallCount);
@@ -87,7 +85,7 @@ namespace ProceduralCreature.Tests.Runtime
         public void Extract_CenteredSphere_HasNoBoundaryOrNonManifoldEdges()
         {
             DensityGrid grid = SphereGrid();
-            MeshExtractionResult mesh = MarchingCubesExtractor.Extract(new SphereSdfNode(1f), grid);
+            MeshExtractionResult mesh = MarchingCubesExtractor.Extract(grid);
 
             MeshTopologyReport report = MeshTopologyValidator.Validate(mesh);
             Assert.AreEqual(0, report.BoundaryEdgeCount);
@@ -98,11 +96,7 @@ namespace ProceduralCreature.Tests.Runtime
         public void Extract_OverlappingSpheres_HasNoBoundaryOrNonManifoldEdges()
         {
             DensityGrid grid = OverlappingSpheresGrid();
-            MeshExtractionResult mesh = MarchingCubesExtractor.Extract(new SmoothUnionNode(
-                new SphereSdfNode(1f),
-                new TransformNode(new SphereSdfNode(1f),
-                    UnityEngine.Matrix4x4.TRS(new Vector3(1f, 0f, 0f), Quaternion.identity, Vector3.one)),
-                0.3f), grid);
+            MeshExtractionResult mesh = MarchingCubesExtractor.Extract(grid);
 
             MeshTopologyReport report = MeshTopologyValidator.Validate(mesh);
             Assert.AreEqual(0, report.BoundaryEdgeCount);
@@ -111,9 +105,7 @@ namespace ProceduralCreature.Tests.Runtime
 
         private static void AssertExtractMatchesReference(DensityGrid grid, string label)
         {
-            // The node argument is only null-checked by the extractor; all
-            // geometry derives from the sampled grid, so any non-null node works.
-            MeshExtractionResult actual = MarchingCubesExtractor.Extract(new EmptySdfNode(), grid);
+            MeshExtractionResult actual = MarchingCubesExtractor.Extract(grid);
             MeshExtractionResult reference = MarchingCubesExtractor.ExtractLegacy(grid);
 
             Assert.AreEqual(reference.MixedCellCount, actual.MixedCellCount, $"{label}: mixed cell count");

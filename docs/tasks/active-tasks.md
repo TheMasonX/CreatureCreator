@@ -46,6 +46,6 @@
 | CC-042 | Update ClonePartAsChild XML doc comment to list Limb as copied | Backlog | P3 |
 | CC-043 | Per-shape parameters (capsule axis + radius/height, ellipsoid 3-axis lengths, box dimensions) | In Progress | P1 |
 | CC-044 | Export the generated mesh as an asset | Backlog | P2 |
-| CC-045 | Remove the legacy managed SDF from production generation | Backlog | P1 |
-| CC-046 | Review broken ankle in quality-12 dino creature | Backlog | P2 |
+| CC-045 | Remove the legacy managed SDF from production generation | In Progress | P1 |
+| CC-046 | Investigate recurring broken-ankle mesh artifacts | Backlog | P1 |
 | CC-036 | Fix obsolete Keyframe.tangentMode warnings and DrawPartList GetLastRect error | Done | P2 |

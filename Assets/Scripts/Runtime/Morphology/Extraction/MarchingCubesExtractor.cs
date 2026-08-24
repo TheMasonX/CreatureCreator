@@ -2,7 +2,6 @@ using System.Collections.Generic;
 using System.Diagnostics;
 using UnityEngine;
 using ProceduralCreature.Common;
-using ProceduralCreature.Morphology.Sdf;
 
 namespace ProceduralCreature.Morphology.Extraction
 {
@@ -33,14 +32,18 @@ namespace ProceduralCreature.Morphology.Extraction
     /// </summary>
     public static partial class MarchingCubesExtractor
     {
-        public static MeshExtractionResult Extract(ISdfNode node, DensityGrid grid)
+        public static MeshExtractionResult Extract(DensityGrid grid)
         {
-            return Extract(node, grid, collectTimings: false);
+            return Extract(grid, collectTimings: false);
         }
 
-        public static MeshExtractionResult Extract(ISdfNode node, DensityGrid grid, bool collectTimings)
+        public static MeshExtractionResult Extract(DensityGrid grid, bool collectTimings)
         {
-            if (node == null) throw new DomainException("node must not be null.");
+            return ExtractCachedGrid(grid, collectTimings);
+        }
+
+        private static MeshExtractionResult ExtractCachedGrid(DensityGrid grid, bool collectTimings)
+        {
             if (grid == null) throw new DomainException("grid must not be null.");
 
             var result = new MeshExtractionResult();

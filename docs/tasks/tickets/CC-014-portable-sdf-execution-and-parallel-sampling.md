@@ -113,15 +113,17 @@ evaluator scope.
 ## Blockers
 
 Performance at one preview quality is validated. A second preview quality and
-long-run regression coverage remain outstanding. Preserve the managed evaluator
-as an explicit fallback while broader profiling continues.
-Unity test discovery also needs follow-up because the focused runner returned zero
-tests.
+long-run regression coverage remain outstanding. The runtime assembly is
+discoverable when selected explicitly, but the full 339-test run still has six
+unrelated baseline failures. Preserve the managed evaluator as an explicit
+reference path while appearance parity and broader profiling continue.
 
 ## Next Step
 
-Capture FieldSampling timings at more than one preview quality and repair Unity
-test discovery so the parity fixtures run in the normal test pipeline.
+Complete the remaining parity and multi-quality evidence, then migrate reference
+extraction fixtures to the grid-only overload under CC-045. Keep the managed
+graph available for appearance reference tests until portable appearance parity
+is proven.
 
 ## Handoff
 
