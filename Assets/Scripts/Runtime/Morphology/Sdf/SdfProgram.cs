@@ -28,9 +28,46 @@ namespace ProceduralCreature.Morphology.Sdf
         public float4x4 Matrix;
         public float DistanceScale;
 
+        /// <summary>
+        /// World-space AABB of the operation's geometry, used by the evaluator for
+        /// spatial culling (CC-062). Primitives keep an empty AABB (always culled)
+        /// because the wrapping Transform op evaluates the primitive inline and the
+        /// primitive's own value slot is never read.
+        /// </summary>
+        public float3 MinBound;
+        public float3 MaxBound;
+
+        /// <summary>
+        /// Index of the smooth-union operation that consumes this op as its newly
+        /// added child (the "B" operand). -1 when the op is a chain/root (never
+        /// culled this way). The evaluator uses the consuming union's other child
+        /// (the running chain value) to decide whether this op can be skipped
+        /// exactly (CC-062).
+        /// </summary>
+        public int ConsumerUnionIndex;
+
+        /// <summary>
+        /// Whether this op's SDF output is bounded below by the distance to its
+        /// world AABB, which the culling skip relies on. True only for leaves whose
+        /// primitives are true distance fields (sphere, box, capsule). False for
+        /// any subtree containing an ellipsoid, whose approximate SDF can output a
+        /// value smaller than the distance to its bounding box.
+        /// </summary>
+        public bool Cullable;
+
         public static SdfOperation Primitive(SdfOperationType type, float3 parameters)
         {
-            return new SdfOperation { Type = type, Parameters = parameters };
+            // Primitive op slots are dead: the wrapping Transform re-evaluates the
+            // primitive inline, and unions reference transform/symmetry ops, never
+            // primitives. An empty AABB keeps them always-culled in the evaluator.
+            return new SdfOperation
+            {
+                Type = type,
+                Parameters = parameters,
+                MinBound = new float3(float.PositiveInfinity),
+                MaxBound = new float3(float.NegativeInfinity),
+                ConsumerUnionIndex = -1,
+            };
         }
     }
 
@@ -39,10 +76,18 @@ namespace ProceduralCreature.Morphology.Sdf
         public NativeArray<SdfOperation> Operations { get; }
         public int RootIndex { get; }
 
-        internal SdfProgram(NativeArray<SdfOperation> operations, int rootIndex)
+        /// <summary>
+        /// Maximum smooth-blend radius across all unions in the program, plus a
+        /// small epsilon. The evaluator inflates every op's world AABB by this so a
+        /// skipped op is provably farther from the sample than any blend can reach.
+        /// </summary>
+        public float InfluenceRadius { get; }
+
+        internal SdfProgram(NativeArray<SdfOperation> operations, int rootIndex, float influenceRadius)
         {
             Operations = operations;
             RootIndex = rootIndex;
+            InfluenceRadius = influenceRadius;
         }
 
         public void Dispose()
@@ -59,7 +104,7 @@ namespace ProceduralCreature.Morphology.Sdf
         public static float Evaluate(SdfProgram program, float3 point)
         {
             if (program == null) throw new DomainException("program must not be null.");
-            return Evaluate(program.Operations, program.RootIndex, point);
+            return Evaluate(program.Operations, program.RootIndex, point, program.InfluenceRadius);
         }
 
         public static float Evaluate(SdfProgram program, float3 point, NativeArray<float> scratchValues)
@@ -69,10 +114,11 @@ namespace ProceduralCreature.Morphology.Sdf
             {
                 throw new DomainException("scratchValues must contain one entry per operation.");
             }
-            return EvaluateInto(program.Operations, program.RootIndex, point, scratchValues, 0);
+            return EvaluateInto(program.Operations, program.RootIndex, point, scratchValues, 0, program.InfluenceRadius);
         }
 
-        public static float Evaluate(NativeArray<SdfOperation> operations, int rootIndex, float3 point)
+        public static float Evaluate(
+            NativeArray<SdfOperation> operations, int rootIndex, float3 point, float influenceRadius)
         {
             if (!operations.IsCreated) throw new DomainException("operations must be created.");
             if (rootIndex < 0 || rootIndex >= operations.Length)
@@ -81,21 +127,62 @@ namespace ProceduralCreature.Morphology.Sdf
             }
 
             var values = new NativeArray<float>(operations.Length, Allocator.Temp);
-            float result = EvaluateInto(operations, rootIndex, point, values, 0);
+            float result = EvaluateInto(operations, rootIndex, point, values, 0, influenceRadius);
             values.Dispose();
             return result;
         }
 
         internal static float EvaluateInto(
             NativeArray<SdfOperation> operations, int rootIndex, float3 point,
-            NativeArray<float> values, int valueOffset)
+            NativeArray<float> values, int valueOffset, float influenceRadius)
         {
             for (int i = 0; i <= rootIndex; i++)
             {
                 SdfOperation operation = operations[i];
+                // Dead primitive slots carry an empty AABB and are never read; cull
+                // them without evaluating (their wrapping Transform re-evaluates the
+                // primitive inline).
+                if (operation.MinBound.x > operation.MaxBound.x)
+                {
+                    values[valueOffset + i] = float.PositiveInfinity;
+                    continue;
+                }
+
+                // Exact spatial culling (CC-062). This op is the newly-added child
+                // of a smooth-union whose other child (the running chain) is already
+                // evaluated. If the op's lower bound — the distance from the sample
+                // to its world AABB box — is at least the chain value plus the
+                // program's max blend radius, then the op's true distance is far
+                // enough that the union's smooth-min clamps to the chain, so writing
+                // +inf here leaves the union (and the whole result) unchanged. The
+                // > 0 guard keeps interior samples exact: a sample inside the box
+                // (distance 0) may still be deeper inside the geometry and must be
+                // evaluated.
+                int consumer = operation.ConsumerUnionIndex;
+                if (consumer >= 0 && operation.Cullable)
+                {
+                    float chain = values[valueOffset + operations[consumer].A];
+                    float dbox = DistanceToBox(point, operation.MinBound, operation.MaxBound);
+                    if (dbox > 0f && dbox >= chain + influenceRadius)
+                    {
+                        values[valueOffset + i] = float.PositiveInfinity;
+                        continue;
+                    }
+                }
+
                 values[valueOffset + i] = EvaluateOperation(operation, values, operations, point, valueOffset);
             }
             return values[valueOffset + rootIndex];
+        }
+
+        /// <summary>
+        /// Distance from a point to an axis-aligned box. A lower bound on the SDF
+        /// value of any geometry contained in the box, for points outside the box.
+        /// </summary>
+        private static float DistanceToBox(float3 point, float3 minBound, float3 maxBound)
+        {
+            float3 q = math.max(minBound - point, 0f) + math.max(point - maxBound, 0f);
+            return math.length(q);
         }
 
         internal static float EvaluateOperation(
@@ -158,6 +245,14 @@ namespace ProceduralCreature.Morphology.Sdf
 
         private static float SmoothMin(float a, float b, float radius)
         {
+            // AABB-culled children read as +inf. math.lerp(b, a, h) computes
+            // b + (a - b) * h, which is NaN when one operand is +inf (inf * 0).
+            // Treat +inf as "absent": the finite child wins, or +inf when both are
+            // absent. Exact, not approximate.
+            if (float.IsPositiveInfinity(a) || float.IsPositiveInfinity(b))
+            {
+                return math.min(a, b);
+            }
             if (radius <= 0f) return math.min(a, b);
             float h = math.clamp(0.5f + 0.5f * (b - a) / radius, 0f, 1f);
             return math.lerp(b, a, h) - radius * h * (1f - h);
@@ -177,6 +272,7 @@ namespace ProceduralCreature.Morphology.Sdf
         public float3 Origin;
         public float CellSize;
         public int SampleStartIndex;
+        public float InfluenceRadius;
 
         public void Execute(int index)
         {
@@ -187,7 +283,7 @@ namespace ProceduralCreature.Morphology.Sdf
             float3 point = Origin + new float3(x, y, z) * CellSize;
             int valueOffset = index * Operations.Length;
             Samples[sampleIndex] = SdfProgramEvaluator.EvaluateInto(
-                Operations, RootIndex, point, ScratchValues, valueOffset);
+                Operations, RootIndex, point, ScratchValues, valueOffset, InfluenceRadius);
         }
     }
 }

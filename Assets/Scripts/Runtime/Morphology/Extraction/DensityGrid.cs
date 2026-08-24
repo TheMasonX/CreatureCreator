@@ -98,19 +98,22 @@ namespace ProceduralCreature.Morphology.Extraction
             }
 
             int batchSize = Mathf.Max(1, PortableScratchValueBudget / operationCount);
-            for (int sampleStart = 0; sampleStart < grid.SampleCount; sampleStart += batchSize)
+            long scratchLength = (long)batchSize * operationCount;
+            if (scratchLength > int.MaxValue)
             {
-                int sampleCount = Mathf.Min(batchSize, grid.SampleCount - sampleStart);
-                long scratchLength = (long)sampleCount * operationCount;
-                if (scratchLength > int.MaxValue)
-                {
-                    samples.Dispose();
-                    throw new DomainException("Portable sampler scratch buffer exceeds addressable array size.");
-                }
+                samples.Dispose();
+                throw new DomainException("Portable sampler scratch buffer exceeds addressable array size.");
+            }
 
-                var scratchValues = new NativeArray<float>((int)scratchLength, Allocator.TempJob);
-                try
+            // One scratch buffer sized for the largest batch, reused across every
+            // batch (each job completes before the next starts, so reuse is safe).
+            // Avoids allocating and freeing the buffer once per batch.
+            var scratchValues = new NativeArray<float>((int)scratchLength, Allocator.TempJob);
+            try
+            {
+                for (int sampleStart = 0; sampleStart < grid.SampleCount; sampleStart += batchSize)
                 {
+                    int sampleCount = Mathf.Min(batchSize, grid.SampleCount - sampleStart);
                     var job = new SdfSamplingJob
                     {
                         Operations = program.Operations,
@@ -123,14 +126,15 @@ namespace ProceduralCreature.Morphology.Extraction
                         Origin = new float3(grid.Origin.x, grid.Origin.y, grid.Origin.z),
                         CellSize = grid.CellSize,
                         SampleStartIndex = sampleStart,
+                        InfluenceRadius = program.InfluenceRadius,
                     };
                     JobHandle handle = job.Schedule(sampleCount, 64);
                     handle.Complete();
                 }
-                finally
-                {
-                    scratchValues.Dispose();
-                }
+            }
+            finally
+            {
+                scratchValues.Dispose();
             }
 
             for (int i = 0; i < grid._samples.Length; i++) grid._samples[i] = samples[i];

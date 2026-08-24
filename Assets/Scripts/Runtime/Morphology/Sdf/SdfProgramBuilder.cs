@@ -56,6 +56,138 @@ namespace ProceduralCreature.Morphology.Sdf
         /// </summary>
         private static readonly Matrix4x4 CreatureMirrorAcrossX = Matrix4x4.Scale(new Vector3(-1f, 1f, 1f));
 
+        /// <summary>
+        /// World-space axis-aligned bounding box used for evaluator culling (CC-062).
+        /// </summary>
+        private readonly struct Aabb
+        {
+            public readonly float3 Min;
+            public readonly float3 Max;
+
+            public Aabb(float3 min, float3 max)
+            {
+                Min = min;
+                Max = max;
+            }
+
+            public static Aabb Union(Aabb a, Aabb b)
+            {
+                return new Aabb(math.min(a.Min, b.Min), math.max(a.Max, b.Max));
+            }
+
+            /// <summary>Reflects the box across the X = 0 plane (creature-space mirror).</summary>
+            public static Aabb MirrorAcrossX(Aabb a)
+            {
+                return new Aabb(
+                    new float3(-a.Max.x, a.Min.y, a.Min.z),
+                    new float3(-a.Min.x, a.Max.y, a.Max.z));
+            }
+        }
+
+        /// <summary>Local-space AABB of a primitive operation, matching its SDF.</summary>
+        private static Aabb PrimitiveLocalAabb(SdfOperation op)
+        {
+            switch (op.Type)
+            {
+                case SdfOperationType.Sphere:
+                {
+                    float r = op.Parameters.x;
+                    return new Aabb(new float3(-r), new float3(r));
+                }
+                case SdfOperationType.Box:
+                    return new Aabb(-op.Parameters, op.Parameters);
+                case SdfOperationType.Capsule:
+                {
+                    float r = op.Parameters.x;
+                    float half = op.Parameters.y * 0.5f;
+                    int axis = (int)op.Parameters.z;
+                    if (axis == 0)
+                    {
+                        return new Aabb(new float3(-half - r, -r, -r), new float3(half + r, r, r));
+                    }
+                    if (axis == 2)
+                    {
+                        return new Aabb(new float3(-r, -r, -half - r), new float3(r, r, half + r));
+                    }
+                    return new Aabb(new float3(-r, -half - r, -r), new float3(r, half + r, r));
+                }
+                case SdfOperationType.Ellipsoid:
+                    return new Aabb(-op.Parameters, op.Parameters);
+                default:
+                    // Empty and non-primitive ops carry no geometry; an empty AABB
+                    // means always culled (slot reads +inf).
+                    return new Aabb(new float3(float.PositiveInfinity), new float3(float.NegativeInfinity));
+            }
+        }
+
+        /// <summary>World AABB of an op's geometry by transforming its local AABB corners.</summary>
+        private static Aabb TransformToWorld(Aabb local, Matrix4x4 localToCreature)
+        {
+            float3 mn = new float3(float.PositiveInfinity);
+            float3 mx = new float3(float.NegativeInfinity);
+            for (int i = 0; i < 8; i++)
+            {
+                float x = (i & 1) == 0 ? local.Min.x : local.Max.x;
+                float y = (i & 2) == 0 ? local.Min.y : local.Max.y;
+                float z = (i & 4) == 0 ? local.Min.z : local.Max.z;
+                Vector3 w = localToCreature.MultiplyPoint3x4(new Vector3(x, y, z));
+                float3 wf = new float3(w.x, w.y, w.z);
+                mn = math.min(mn, wf);
+                mx = math.max(mx, wf);
+            }
+            return new Aabb(mn, mx);
+        }
+
+        private static Aabb ReadAabb(List<SdfOperation> operations, int index)
+        {
+            return new Aabb(operations[index].MinBound, operations[index].MaxBound);
+        }
+
+        private static void SetWorldAabb(List<SdfOperation> operations, int index, Aabb aabb)
+        {
+            SdfOperation op = operations[index];
+            op.MinBound = aabb.Min;
+            op.MaxBound = aabb.Max;
+            op.ConsumerUnionIndex = -1;
+            op.Cullable = false;
+            operations[index] = op;
+        }
+
+        /// <summary>Marks <paramref name="childIndex"/> as the newly-added (B) child
+        /// of the union at <paramref name="unionIndex"/>, so the evaluator can
+        /// cull it against the union's already-evaluated chain value (CC-062).</summary>
+        private static void SetConsumer(List<SdfOperation> operations, int childIndex, int unionIndex)
+        {
+            SdfOperation op = operations[childIndex];
+            op.ConsumerUnionIndex = unionIndex;
+            operations[childIndex] = op;
+        }
+
+        private static void SetCullable(List<SdfOperation> operations, int index, bool cullable)
+        {
+            SdfOperation op = operations[index];
+            op.Cullable = cullable;
+            operations[index] = op;
+        }
+
+        private static bool ReadCullable(List<SdfOperation> operations, int index)
+        {
+            return operations[index].Cullable;
+        }
+
+        private static float ComputeInfluenceRadius(List<SdfOperation> operations)
+        {
+            float maxBlend = 0f;
+            for (int i = 0; i < operations.Count; i++)
+            {
+                if (operations[i].Type == SdfOperationType.SmoothUnion)
+                {
+                    maxBlend = Mathf.Max(maxBlend, operations[i].Parameters.x);
+                }
+            }
+            return maxBlend + 1e-4f;
+        }
+
         public static SdfProgram CompilePortable(CreatureDefinition definition)
         {
             if (definition == null) throw new DomainException("Cannot compile a null CreatureDefinition.");
@@ -75,7 +207,7 @@ namespace ProceduralCreature.Morphology.Sdf
             if (orderedParts.Count == 0 && !hasBodySamples)
             {
                 operations.Add(SdfOperation.Primitive(SdfOperationType.Empty, float3.zero));
-                return new SdfProgram(new NativeArray<SdfOperation>(operations.ToArray(), Allocator.Persistent), 0);
+                return new SdfProgram(new NativeArray<SdfOperation>(operations.ToArray(), Allocator.Persistent), 0, 0f);
             }
 
             int root = -1;
@@ -89,6 +221,7 @@ namespace ProceduralCreature.Morphology.Sdf
 
                     Matrix4x4 localToCreature = Matrix4x4.TRS(sample.Position, Quaternion.identity, Vector3.one);
                     Matrix4x4 worldToLocal = localToCreature.inverse;
+                    int bodyNode = operations.Count;
                     operations.Add(new SdfOperation
                     {
                         Type = SdfOperationType.Transform,
@@ -96,12 +229,14 @@ namespace ProceduralCreature.Morphology.Sdf
                         Matrix = ToFloat4x4(worldToLocal),
                         DistanceScale = 1f,
                     });
-                    int bodyNode = operations.Count - 1;
+                    SetWorldAabb(operations, bodyNode, TransformToWorld(PrimitiveLocalAabb(operations[primitive]), localToCreature));
+                    SetCullable(operations, bodyNode, true);
 
                     if (root >= 0)
                     {
                         BodySample previous = definition.Body.Samples[i - 1];
                         float blend = Mathf.Min(previous.Radius, sample.Radius) * BodySampleBlendFactor;
+                        int unionIndex = operations.Count;
                         operations.Add(new SdfOperation
                         {
                             Type = SdfOperationType.SmoothUnion,
@@ -109,7 +244,10 @@ namespace ProceduralCreature.Morphology.Sdf
                             B = bodyNode,
                             Parameters = new float3(blend, 0f, 0f),
                         });
-                        root = operations.Count - 1;
+                        SetWorldAabb(operations, unionIndex, Aabb.Union(ReadAabb(operations, root), ReadAabb(operations, bodyNode)));
+                        SetCullable(operations, unionIndex, ReadCullable(operations, root) && ReadCullable(operations, bodyNode));
+                        SetConsumer(operations, bodyNode, unionIndex);
+                        root = unionIndex;
                     }
                     else
                     {
@@ -181,27 +319,36 @@ namespace ProceduralCreature.Morphology.Sdf
                                 : new float3(radius, 0f, 0f);
                     primitive = operations.Count;
                     operations.Add(SdfOperation.Primitive(primitiveType, parameters));
+                    int primitiveIndex = primitive;
 
                     Matrix4x4 worldToLocal = localToCreature.inverse;
+                    int transformIndex = operations.Count;
                     operations.Add(new SdfOperation
                     {
                         Type = SdfOperationType.Transform,
-                        A = primitive,
+                        A = primitiveIndex,
                         Matrix = ToFloat4x4(worldToLocal),
                         DistanceScale = distanceScale,
                     });
-                    primitive = operations.Count - 1;
+                    SetWorldAabb(operations, transformIndex, TransformToWorld(PrimitiveLocalAabb(operations[primitiveIndex]), localToCreature));
+                    SetCullable(operations, transformIndex, primitiveType != SdfOperationType.Ellipsoid);
+                    primitive = transformIndex;
 
                     if (shouldMirror)
                     {
+                        int symmetryIndex = operations.Count;
                         operations.Add(new SdfOperation { Type = SdfOperationType.Symmetry, A = primitive });
-                        primitive = operations.Count - 1;
+                        Aabb child = ReadAabb(operations, primitive);
+                        SetWorldAabb(operations, symmetryIndex, Aabb.Union(child, Aabb.MirrorAcrossX(child)));
+                        SetCullable(operations, symmetryIndex, ReadCullable(operations, primitive));
+                        primitive = symmetryIndex;
                     }
                 }
                 root = primitive;
 
                 if (previousRoot >= 0)
                 {
+                    int unionIndex = operations.Count;
                     operations.Add(new SdfOperation
                     {
                         Type = SdfOperationType.SmoothUnion,
@@ -209,11 +356,14 @@ namespace ProceduralCreature.Morphology.Sdf
                         B = root,
                         Parameters = new float3(part.Shape.SmoothBlendRadius, 0f, 0f),
                     });
-                    root = operations.Count - 1;
+                    SetWorldAabb(operations, unionIndex, Aabb.Union(ReadAabb(operations, previousRoot), ReadAabb(operations, root)));
+                    SetCullable(operations, unionIndex, ReadCullable(operations, previousRoot) && ReadCullable(operations, root));
+                    SetConsumer(operations, root, unionIndex);
+                    root = unionIndex;
                 }
             }
 
-            return new SdfProgram(new NativeArray<SdfOperation>(operations.ToArray(), Allocator.Persistent), root);
+            return new SdfProgram(new NativeArray<SdfOperation>(operations.ToArray(), Allocator.Persistent), root, ComputeInfluenceRadius(operations));
         }
 
         public static SdfProgram CompilePortableBodyField(CreatureDefinition definition)
@@ -228,7 +378,7 @@ namespace ProceduralCreature.Morphology.Sdf
                 root = 0;
             }
 
-            return new SdfProgram(new NativeArray<SdfOperation>(operations.ToArray(), Allocator.Persistent), root);
+            return new SdfProgram(new NativeArray<SdfOperation>(operations.ToArray(), Allocator.Persistent), root, ComputeInfluenceRadius(operations));
         }
 
         public static List<(CreaturePart Part, SdfProgram Program)> CompileIndividualPartsPortable(CreatureDefinition definition)
@@ -255,14 +405,17 @@ namespace ProceduralCreature.Morphology.Sdf
                 BodySample sample = definition.Body.Samples[i];
                 int primitive = operations.Count;
                 operations.Add(SdfOperation.Primitive(SdfOperationType.Sphere, new float3(sample.Radius, 0f, 0f)));
+                Matrix4x4 localToCreature = Matrix4x4.TRS(sample.Position, Quaternion.identity, Vector3.one);
+                int bodyNode = operations.Count;
                 operations.Add(new SdfOperation
                 {
                     Type = SdfOperationType.Transform,
                     A = primitive,
-                    Matrix = ToFloat4x4(Matrix4x4.TRS(sample.Position, Quaternion.identity, Vector3.one).inverse),
+                    Matrix = ToFloat4x4(localToCreature.inverse),
                     DistanceScale = 1f,
                 });
-                int bodyNode = operations.Count - 1;
+                SetWorldAabb(operations, bodyNode, TransformToWorld(PrimitiveLocalAabb(operations[primitive]), localToCreature));
+                SetCullable(operations, bodyNode, true);
 
                 if (root < 0)
                 {
@@ -271,6 +424,7 @@ namespace ProceduralCreature.Morphology.Sdf
                 }
 
                 BodySample previous = definition.Body.Samples[i - 1];
+                int unionIndex = operations.Count;
                 operations.Add(new SdfOperation
                 {
                     Type = SdfOperationType.SmoothUnion,
@@ -278,7 +432,10 @@ namespace ProceduralCreature.Morphology.Sdf
                     B = bodyNode,
                     Parameters = new float3(Mathf.Min(previous.Radius, sample.Radius) * BodySampleBlendFactor, 0f, 0f),
                 });
-                root = operations.Count - 1;
+                SetWorldAabb(operations, unionIndex, Aabb.Union(ReadAabb(operations, root), ReadAabb(operations, bodyNode)));
+                SetCullable(operations, unionIndex, ReadCullable(operations, root) && ReadCullable(operations, bodyNode));
+                SetConsumer(operations, bodyNode, unionIndex);
+                root = unionIndex;
             }
 
             return root;
@@ -324,23 +481,32 @@ namespace ProceduralCreature.Morphology.Sdf
                             : new float3(radius, 0f, 0f);
                 int primitive = operations.Count;
                 operations.Add(SdfOperation.Primitive(primitiveType, parameters));
+                int primitiveIndex = primitive;
+
+                int transformIndex = operations.Count;
                 operations.Add(new SdfOperation
                 {
                     Type = SdfOperationType.Transform,
-                    A = primitive,
+                    A = primitiveIndex,
                     Matrix = ToFloat4x4(localToCreature.inverse),
                     DistanceScale = distanceScale,
                 });
-                root = operations.Count - 1;
+                SetWorldAabb(operations, transformIndex, TransformToWorld(PrimitiveLocalAabb(operations[primitiveIndex]), localToCreature));
+                SetCullable(operations, transformIndex, primitiveType != SdfOperationType.Ellipsoid);
+                root = transformIndex;
 
                 if (shouldMirror)
                 {
+                    int symmetryIndex = operations.Count;
                     operations.Add(new SdfOperation { Type = SdfOperationType.Symmetry, A = root });
-                    root = operations.Count - 1;
+                    Aabb child = ReadAabb(operations, root);
+                    SetWorldAabb(operations, symmetryIndex, Aabb.Union(child, Aabb.MirrorAcrossX(child)));
+                    SetCullable(operations, symmetryIndex, ReadCullable(operations, root));
+                    root = symmetryIndex;
                 }
             }
 
-            return new SdfProgram(new NativeArray<SdfOperation>(operations.ToArray(), Allocator.Persistent), root);
+            return new SdfProgram(new NativeArray<SdfOperation>(operations.ToArray(), Allocator.Persistent), root, ComputeInfluenceRadius(operations));
         }
 
         private static float4x4 ToFloat4x4(Matrix4x4 matrix)
@@ -562,6 +728,7 @@ namespace ProceduralCreature.Morphology.Sdf
 
             if (!includeMirror) return originalRoot;
 
+            int unionIndex = operations.Count;
             operations.Add(new SdfOperation
             {
                 Type = SdfOperationType.SmoothUnion,
@@ -569,7 +736,10 @@ namespace ProceduralCreature.Morphology.Sdf
                 B = mirroredRoot,
                 Parameters = new float3(0f, 0f, 0f), // blend 0 = hard min
             });
-            return operations.Count - 1;
+            SetWorldAabb(operations, unionIndex, Aabb.Union(ReadAabb(operations, originalRoot), ReadAabb(operations, mirroredRoot)));
+            SetCullable(operations, unionIndex, ReadCullable(operations, originalRoot) && ReadCullable(operations, mirroredRoot));
+            SetConsumer(operations, mirroredRoot, unionIndex);
+            return unionIndex;
         }
 
         private static int AppendLimbBall(List<SdfOperation> operations, Matrix4x4 localToCreature,
@@ -579,6 +749,7 @@ namespace ProceduralCreature.Morphology.Sdf
             operations.Add(SdfOperation.Primitive(SdfOperationType.Sphere, new float3(radius, 0f, 0f)));
 
             Matrix4x4 localToCreatureForBall = localToCreature * Matrix4x4.TRS(localPosition, Quaternion.identity, Vector3.one);
+            int ball = operations.Count;
             operations.Add(new SdfOperation
             {
                 Type = SdfOperationType.Transform,
@@ -586,7 +757,9 @@ namespace ProceduralCreature.Morphology.Sdf
                 Matrix = ToFloat4x4(localToCreatureForBall.inverse),
                 DistanceScale = distanceScale,
             });
-            return operations.Count - 1;
+            SetWorldAabb(operations, ball, TransformToWorld(PrimitiveLocalAabb(operations[primitive]), localToCreatureForBall));
+            SetCullable(operations, ball, true);
+            return ball;
         }
 
         private static int UnionLimbBall(List<SdfOperation> operations, int root, int ball,
@@ -594,6 +767,7 @@ namespace ProceduralCreature.Morphology.Sdf
         {
             if (root < 0) return ball;
             float blend = Mathf.Min(metaballs[i - 1].Radius, metaballs[i].Radius) * LimbSampleBlendFactor;
+            int unionIndex = operations.Count;
             operations.Add(new SdfOperation
             {
                 Type = SdfOperationType.SmoothUnion,
@@ -601,7 +775,10 @@ namespace ProceduralCreature.Morphology.Sdf
                 B = ball,
                 Parameters = new float3(blend, 0f, 0f),
             });
-            return operations.Count - 1;
+            SetWorldAabb(operations, unionIndex, Aabb.Union(ReadAabb(operations, root), ReadAabb(operations, ball)));
+            SetCullable(operations, unionIndex, ReadCullable(operations, root) && ReadCullable(operations, ball));
+            SetConsumer(operations, ball, unionIndex);
+            return unionIndex;
         }
 
         private static ISdfNode CompilePrimitive(ShapeDefinition shape)
