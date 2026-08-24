@@ -57,7 +57,9 @@
 | CC-053 | Complete multi-geometry editor selection and visibility | Backlog | P1 |
 | CC-054 | Reject thickness-profile quantization time collisions | Backlog | P2 |
 | CC-055 | Decide limb centerline and generation-aware sampling fidelity | Backlog | P2 |
-| CC-056 | Establish the canonical resolved morphology layer | Backlog | P1 |
+| CC-056 | Establish the canonical resolved morphology layer (umbrella; split into 056A/B) | Backlog | P1 |
+| CC-056A | Resolved Body/limb geometry (canonical derived morphology, part A) | In Progress | P1 |
+| CC-056B | Semantic attachment resolution (canonical derived morphology, part B) | Backlog | P1 |
 | CC-057 | Add a responsive interactive morphology preview proxy | Backlog | P1 |
 | CC-058 | Route editor interaction ownership by semantic mode | Backlog | P2 |
 | CC-059 | Define symmetry placement and center-merge semantics | Backlog | P2 |
@@ -77,3 +79,9 @@
 | CC-073 | Define and prototype animated geometry binding | Backlog | P1 |
 | CC-074 | Default surface material from the palette; remove editor preview material picker | Done | P1 |
 | CC-075 | Dispose TempJob samples array on the portable-sampling exception path | Done | P2 |
+| CC-076 | Create one shared semantic bone resolver service | Backlog | P1 |
+| CC-077 | Add a PartType.Tail editor authoring path for child parts | Backlog | P3 |
+| CC-078 | Split the DuplicateBodySampleId validation code for duplicates vs out-of-order ids | Backlog | P3 |
+| CC-079 | Add a minimum absolute Body-spacing / degenerate-length validation | Backlog | P3 |
+| CC-080 | Resolve the dead ParentId-null guard in HasParentCycle | Backlog | P3 |
+| CC-081 | One canonical end-to-end morphology verification run | Backlog | P2 |

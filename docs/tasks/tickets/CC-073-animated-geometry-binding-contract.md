@@ -59,3 +59,11 @@ Unity runtime execution is also required for renderer behavior.
 
 Finish shared configuration validation, then design the two-segment limb binding
 fixture and its bind-pose invariant.
+
+## 2026-08-24 audit revision (11:48 delta audit) - defer until bone resolution shared
+Exact mesh binding is premature until semantic bone resolution is a shared
+service (CC-076). Do not implement `GeometryItem -> ParentPartId ->
+nearest/parent bone -> attach renderer` independently in the geometry system.
+Skeleton construction, mesh binding, and animation queries must consume the same
+`SemanticBoneResolver`. Resolved morphology (CC-056A/B) is the prerequisite for
+both.

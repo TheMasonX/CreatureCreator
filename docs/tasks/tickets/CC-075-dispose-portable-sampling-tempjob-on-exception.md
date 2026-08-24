@@ -28,13 +28,14 @@ site. Raised as finding 3 in the 2026-08-24 audit addendum.
 - Move the final `samples` copy + dispose inside the existing `try`/`finally`
   so both `TempJob` allocations (`samples` and `scratchValues`) are disposed on
   every path, including exceptions.
-- Add a regression test that forces a mid-loop job failure and asserts the
-  exception path no longer leaks.
+- Add a regression test that forces a deterministic failure inside the `try`
+  and asserts the exception path no longer leaks.
 
 ## Acceptance Criteria
 
 - `SamplePortable` disposes both `TempJob` arrays when the batch loop throws.
-- A test drives a deterministic mid-loop failure and asserts no leak warning.
+- A test drives a deterministic failure inside the `try` and asserts no leak
+  warning.
 - Happy-path sampling behavior and value parity are unchanged.
 
 ## Validation
@@ -71,8 +72,11 @@ Two findings from implementation:
   latent defect — a malformed program either crashed (safety on) or returned
   garbage (Burst release). `SamplePortable` now fails fast with a
   `DomainException` for `RootIndex < 0 || RootIndex >= Operations.Length`
-  (mirrors `SdfProgramEvaluator.Evaluate`), thrown inside the `try` so the
-  disposal path is exercised deterministically.
+  (mirrors `SdfProgramEvaluator.Evaluate`). The guard throws before the batch
+  loop, not mid-loop at `handle.Complete()`: a genuine mid-loop job throw cannot
+  be deterministically reproduced in this editor because Burst runs without
+  NativeArray safety checks. The `finally` wraps the entire `try` (guard + loop +
+  copy), so every throw path disposes both arrays identically.
 - **Residual risk on the leak assertion.** `LogAssert.NoUnexpectedReceived()`
   only catches the TempJob leak warning if it surfaces in-band; the audit noted
   it typically fires on the next domain reload. The definitive guarantee is

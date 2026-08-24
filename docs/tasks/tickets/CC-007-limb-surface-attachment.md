@@ -46,3 +46,17 @@ This task cannot be implemented safely until CC-006 defines stable Body sample o
 
 ## Next Step
 After CC-006, implement and test hit-to-anchor projection before drag-and-drop input. Block placement when the preview definition is stale.
+
+## 2026-08-24 audit revision (11:48 delta audit) - next authoring milestone
+The delta audit makes CC-007 the next meaningful Spore-like milestone and ties it
+directly to CC-056A/056B. Implementation order:
+1. `BodySurfaceProjector` pure math.
+2. Hit -> body segment/sample -> `BodySurfaceAnchor`.
+3. Anchor -> canonical resolved part frame (CC-056B).
+4. Editor placement.
+5. Regeneration and collider refresh.
+6. Drag workflow.
+The mesh raycast is input only; the mesh must never become authoritative
+placement state. Once anchors are stored, the nearest-sample skeleton attachment
+becomes legacy transitional behavior and is replaced at one centralized seam.
+Updated dependsOn: CC-056B.

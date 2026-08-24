@@ -197,3 +197,14 @@ an explicit validated quality ceiling before treating very high preview quality
 as supported. Finally audit remaining managed SDF references and remove the compiler only after
 all reference fixtures have equivalent portable parity coverage. Do not commit
 or update the FastNoise2 submodule until a human reviews its local changes.
+
+## 2026-08-24 audit revision (11:48 delta audit) - complete via production/reference split
+The Burst path is mature enough to complete CC-045. Do an explicit split:
+- Production: portable/Burst only.
+- Reference tests: managed SDF allowed.
+Then remove managed production APIs rather than keeping a permanent optional
+fallback in the normal generator signature. A debug/reference tool may remain
+separately if genuinely useful. Note: the audit addendum's claim that the
+portable path still reads inert `Shape.SmoothBlendRadius` is STALE — CC-049
+routed limb composition through `LimbChain.BlendRadius` via
+`PartUnionBlendRadius` at both managed and portable sites.

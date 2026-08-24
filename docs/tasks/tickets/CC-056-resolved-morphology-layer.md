@@ -48,3 +48,9 @@ Split CC-056 into:
 - CC-056B - semantic attachment resolution: BodySurface, LimbRoot, LimbTerminal, PartFrame.
 - CC-056C (later) - proxy consumers.
 Migrate consumers incrementally; avoid a mega-PR.
+
+## 2026-08-24 audit revision (11:48 delta audit) - promote 056A/B to active P1
+The delta audit confirms this split and makes it the top recommendation: CC-056A
+and CC-056B become ACTIVE P1 critical-path work (see their tickets). CC-056
+remains the umbrella; CC-056C stays deferred. Critical path:
+CC-006/022 -> CC-056A/B -> CC-007 -> {CC-052/069, CC-076} + CC-010 -> CC-011.

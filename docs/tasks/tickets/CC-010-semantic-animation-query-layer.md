@@ -43,3 +43,12 @@ The current body/limb model is still under definition, so the animation query la
 
 ## Next Step
 Lock the morphology query contract against the body/limb schema and implement the first typed query + scaling tests before locomotion code depends on them.
+
+## 2026-08-24 audit revision (11:48 delta audit) - capability flags, not PartType growth
+Do not expand `PartType` into a larger enum. Keep PartType as the broad
+anatomical/editor category and let the resolved morphology layer (CC-056A/B)
+own capability classification. MVP capability flags: GroundSupport, Manipulator,
+Mouth, Sensor, Decoration. `CreatureMorphology` exposes deterministic queries
+(which parts support the body, which are manipulators, primary mouth, bilateral
+appendages). Depends on CC-056A/B; target selection and scaling build on the
+resolved morphology, not hardcoded bone ids.

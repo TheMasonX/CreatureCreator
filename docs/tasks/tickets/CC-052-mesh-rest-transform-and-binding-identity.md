@@ -48,3 +48,14 @@ Depends on the canonical attachment contract and the eventual semantic bone reso
 ## Next Step
 Reconnect Unity and validate the descriptor. Then migrate preview and runtime
 consumers to use source mesh plus rest placement before implementing CC-069.
+
+## 2026-08-24 audit revision (11:48 delta audit) - shared bone resolver + API intent
+- Create the shared `SemanticBoneResolver` (CC-076) before any exact binding.
+  Mesh binding must not do its own nearest/parent-bone lookup.
+- Finish CC-052 and CC-069; do NOT implement skinned deformation of the welded
+  surface yet.
+- Make `GeneratedCreature`'s dual representation intent explicit: conceptually
+  Source + RestTransform + PresentationMesh + Binding. Rule: binding consumes
+  source geometry + rest metadata, never the baked presentation mesh.
+- Mirror side already exists (`IsMirrored`); exact semantic bone binding stays
+  deferred until CC-076.

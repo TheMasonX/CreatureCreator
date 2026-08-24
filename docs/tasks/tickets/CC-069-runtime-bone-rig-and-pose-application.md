@@ -108,3 +108,13 @@ discovery.
 Connect one explicit mesh item to a resolved rest bone without binding the
 welded implicit surface. Keep the failed broad-run initialization timeout as a
 validation follow-up if the full runtime suite is required.
+
+## 2026-08-24 audit revision (11:48 delta audit) - keep CC-069 small
+Keep CC-069 small: finish the adapter and its tests, then stop. Do not build
+animation state machines, gait logic, or a large animator framework on top of
+`CreatureRig`. The canonical pose representation must remain data (joint
+positions, optional joint orientations, optional effector goals); the Unity
+Transform hierarchy is an output adapter. Terminal bones currently retain rest
+rotation and `FindFirstChild` is a visualization heuristic — both are acceptable
+for this adapter but must not become the definition of pose. Route exact bone
+resolution through CC-076 once it exists.

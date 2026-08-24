@@ -138,3 +138,11 @@ Consider a hierarchical (BVH) portable evaluator that prunes whole union
 subtrees by AABB min-distance against a running best, preserving exactness, for a
 meaningfully larger field-sampling speedup. The bounds and consumer metadata
 added here are the foundation for it.
+
+## 2026-08-24 audit revision (11:48 delta audit) - pause deeper perf
+Keep: Burst sampling, Fast preview culling, bounded scratch buffers,
+diagnostics, and the benchmark matrix. Pause deeper performance work after one
+reasonable quality ceiling / preview budget is established, and redirect
+attention to the morphology critical path (CC-056A/B -> CC-007). Do not optimize
+the generation pipeline into a polished system before authoring/animation
+semantics are proven.

@@ -38,3 +38,10 @@ The centerline choice should precede substantial limb authoring and sampling tun
 
 ## Next Step
 Record the product decision, then implement only the smallest sampler change needed to enforce it.
+
+## 2026-08-24 audit revision (11:48 delta audit) - MVP sampling rule
+For MVP choose the simplest deterministic rule: `sample spacing = k * voxel
+size`, with a minimum and maximum allowed spacing. Keep authored joints
+unchanged. This makes the sampler quality-aware without making quality an
+authoring property. Do not redesign the centerline into a spline unless visual
+testing proves the polyline insufficient.
