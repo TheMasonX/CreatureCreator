@@ -247,7 +247,23 @@ namespace ProceduralCreature.Morphology.Extraction
             // (would only occur if both are exactly zero) by clamping t to the
             // midpoint rather than dividing by zero.
             float denominator = da - db;
-            float t = Mathf.Approximately(denominator, 0f) ? 0.5f : da / denominator;
+            float t;
+            if (float.IsNaN(da) || float.IsNaN(db))
+            {
+                t = 0.5f;
+            }
+            else if (float.IsPositiveInfinity(da))
+            {
+                t = 1f;
+            }
+            else if (float.IsPositiveInfinity(db))
+            {
+                t = 0f;
+            }
+            else
+            {
+                t = Mathf.Approximately(denominator, 0f) ? 0.5f : da / denominator;
+            }
             t = Mathf.Clamp01(t);
 
             return Vector3.Lerp(cornerPositions[a], cornerPositions[b], t);

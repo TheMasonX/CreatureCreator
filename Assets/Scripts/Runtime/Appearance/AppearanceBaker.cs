@@ -4,6 +4,7 @@ using ProceduralCreature.Common;
 using ProceduralCreature.Definition;
 using ProceduralCreature.Generation;
 using ProceduralCreature.Morphology.Extraction;
+using ProceduralCreature.Morphology.Sdf;
 
 namespace ProceduralCreature.Appearance
 {
@@ -28,10 +29,12 @@ namespace ProceduralCreature.Appearance
 
         public static Color[] Bake(CreatureDefinition definition, MeshExtractionResult mesh)
         {
-            return Bake(definition, mesh, diagnostics: null);
+            return Bake(definition, mesh, null, SdfCullingMode.Exact);
         }
 
-        public static Color[] Bake(CreatureDefinition definition, MeshExtractionResult mesh, GenerationDiagnostics diagnostics)
+        public static Color[] Bake(
+            CreatureDefinition definition, MeshExtractionResult mesh,
+            GenerationDiagnostics diagnostics, SdfCullingMode cullingMode = SdfCullingMode.Exact)
         {
             if (definition == null) throw new DomainException("definition must not be null.");
             if (mesh == null) throw new DomainException("mesh must not be null.");
@@ -46,7 +49,7 @@ namespace ProceduralCreature.Appearance
                 }
 
                 colors = new Color[mesh.Positions.Count];
-                using (PartAppearanceSampler.Resolver resolver = PartAppearanceSampler.CreateResolver(definition))
+                using (PartAppearanceSampler.Resolver resolver = PartAppearanceSampler.CreateResolver(definition, cullingMode))
                 {
                     for (int i = 0; i < mesh.Positions.Count; i++)
                     {

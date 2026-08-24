@@ -19,6 +19,34 @@ namespace ProceduralCreature.Morphology.Sdf
         SmoothUnion,
     }
 
+    /// <summary>
+    /// Which spatial-culling strategy the portable evaluator uses (CC-063).
+    /// Exact preserves the value parity contract; Fast is an aggressive preview
+    /// mode that trades value exactness for speed while keeping the mesh finite
+    /// and watertight.
+    /// </summary>
+    public enum SdfCullingMode
+    {
+        /// <summary>
+        /// Value-exact culling (CC-062): only skip a leaf that is provably unable to
+        /// influence its smooth-union result. Preserves the exact min-field and the
+        /// managed-vs-portable parity contract. Default for generation, tests, and
+        /// export.
+        /// </summary>
+        Exact,
+
+        /// <summary>
+        /// Aggressive preview culling: skip any operation whose world AABB (inflated
+        /// by the program's max blend radius) does not contain the sample, writing
+        /// +inf for the skipped value. ~5x faster but approximate: far samples read
+        /// +inf and seam-adjacent values shift slightly. The surface itself is
+        /// always inside an op's AABB, so the isosurface is never skipped;
+        /// extraction's InterpolateEdge handles the +inf endpoint so the mesh stays
+        /// finite and watertight. For interactive previews only.
+        /// </summary>
+        Fast,
+    }
+
     public struct SdfOperation
     {
         public SdfOperationType Type;
@@ -104,21 +132,24 @@ namespace ProceduralCreature.Morphology.Sdf
         public static float Evaluate(SdfProgram program, float3 point)
         {
             if (program == null) throw new DomainException("program must not be null.");
-            return Evaluate(program.Operations, program.RootIndex, point, program.InfluenceRadius);
+            return Evaluate(program.Operations, program.RootIndex, point, program.InfluenceRadius, SdfCullingMode.Exact);
         }
 
-        public static float Evaluate(SdfProgram program, float3 point, NativeArray<float> scratchValues)
+        public static float Evaluate(
+            SdfProgram program, float3 point, NativeArray<float> scratchValues,
+            SdfCullingMode mode = SdfCullingMode.Exact)
         {
             if (program == null) throw new DomainException("program must not be null.");
             if (!scratchValues.IsCreated || scratchValues.Length < program.Operations.Length)
             {
                 throw new DomainException("scratchValues must contain one entry per operation.");
             }
-            return EvaluateInto(program.Operations, program.RootIndex, point, scratchValues, 0, program.InfluenceRadius);
+            return EvaluateInto(program.Operations, program.RootIndex, point, scratchValues, 0, program.InfluenceRadius, (int)mode);
         }
 
         public static float Evaluate(
-            NativeArray<SdfOperation> operations, int rootIndex, float3 point, float influenceRadius)
+            NativeArray<SdfOperation> operations, int rootIndex, float3 point, float influenceRadius,
+            SdfCullingMode mode = SdfCullingMode.Exact)
         {
             if (!operations.IsCreated) throw new DomainException("operations must be created.");
             if (rootIndex < 0 || rootIndex >= operations.Length)
@@ -127,15 +158,16 @@ namespace ProceduralCreature.Morphology.Sdf
             }
 
             var values = new NativeArray<float>(operations.Length, Allocator.Temp);
-            float result = EvaluateInto(operations, rootIndex, point, values, 0, influenceRadius);
+            float result = EvaluateInto(operations, rootIndex, point, values, 0, influenceRadius, (int)mode);
             values.Dispose();
             return result;
         }
 
         internal static float EvaluateInto(
             NativeArray<SdfOperation> operations, int rootIndex, float3 point,
-            NativeArray<float> values, int valueOffset, float influenceRadius)
+            NativeArray<float> values, int valueOffset, float influenceRadius, int mode)
         {
+            bool fast = mode == (int)SdfCullingMode.Fast;
             for (int i = 0; i <= rootIndex; i++)
             {
                 SdfOperation operation = operations[i];
@@ -148,25 +180,45 @@ namespace ProceduralCreature.Morphology.Sdf
                     continue;
                 }
 
-                // Exact spatial culling (CC-062). This op is the newly-added child
-                // of a smooth-union whose other child (the running chain) is already
-                // evaluated. If the op's lower bound — the distance from the sample
-                // to its world AABB box — is at least the chain value plus the
-                // program's max blend radius, then the op's true distance is far
-                // enough that the union's smooth-min clamps to the chain, so writing
-                // +inf here leaves the union (and the whole result) unchanged. The
-                // > 0 guard keeps interior samples exact: a sample inside the box
-                // (distance 0) may still be deeper inside the geometry and must be
-                // evaluated.
-                int consumer = operation.ConsumerUnionIndex;
-                if (consumer >= 0 && operation.Cullable)
+                if (fast)
                 {
-                    float chain = values[valueOffset + operations[consumer].A];
-                    float dbox = DistanceToBox(point, operation.MinBound, operation.MaxBound);
-                    if (dbox > 0f && dbox >= chain + influenceRadius)
+                    // Aggressive preview culling (CC-063): skip any op whose world
+                    // AABB, inflated by the program's max blend radius, does not
+                    // contain the sample, writing +inf. The isosurface of an op is
+                    // always inside its own AABB, so the surface itself is never
+                    // skipped; far samples read +inf and extraction's InterpolateEdge
+                    // clamps the interpolation to the finite endpoint, keeping the
+                    // mesh finite and watertight.
+                    if (point.x < operation.MinBound.x - influenceRadius || point.x > operation.MaxBound.x + influenceRadius ||
+                         point.y < operation.MinBound.y - influenceRadius || point.y > operation.MaxBound.y + influenceRadius ||
+                        point.z < operation.MinBound.z - influenceRadius || point.z > operation.MaxBound.z + influenceRadius)
                     {
                         values[valueOffset + i] = float.PositiveInfinity;
                         continue;
+                    }
+                }
+                else
+                {
+                    // Exact spatial culling (CC-062). This op is the newly-added child
+                    // of a smooth-union whose other child (the running chain) is already
+                    // evaluated. If the op's lower bound — the distance from the sample
+                    // to its world AABB box — is at least the chain value plus the
+                    // program's max blend radius, then the op's true distance is far
+                    // enough that the union's smooth-min clamps to the chain, so writing
+                    // +inf here leaves the union (and the whole result) unchanged. The
+                    // > 0 guard keeps interior samples exact: a sample inside the box
+                    // (distance 0) may still be deeper inside the geometry and must be
+                    // evaluated.
+                    int consumer = operation.ConsumerUnionIndex;
+                    if (consumer >= 0 && operation.Cullable)
+                    {
+                        float chain = values[valueOffset + operations[consumer].A];
+                        float dbox = DistanceToBox(point, operation.MinBound, operation.MaxBound);
+                        if (dbox > 0f && dbox >= chain + influenceRadius)
+                        {
+                            values[valueOffset + i] = float.PositiveInfinity;
+                            continue;
+                        }
                     }
                 }
 
@@ -273,6 +325,7 @@ namespace ProceduralCreature.Morphology.Sdf
         public float CellSize;
         public int SampleStartIndex;
         public float InfluenceRadius;
+        public int CullingMode;
 
         public void Execute(int index)
         {
@@ -283,7 +336,7 @@ namespace ProceduralCreature.Morphology.Sdf
             float3 point = Origin + new float3(x, y, z) * CellSize;
             int valueOffset = index * Operations.Length;
             Samples[sampleIndex] = SdfProgramEvaluator.EvaluateInto(
-                Operations, RootIndex, point, ScratchValues, valueOffset, InfluenceRadius);
+                Operations, RootIndex, point, ScratchValues, valueOffset, InfluenceRadius, CullingMode);
         }
     }
 }

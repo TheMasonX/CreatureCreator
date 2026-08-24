@@ -34,7 +34,8 @@ namespace ProceduralCreature.Generation
 
         public static GeneratedCreature Generate(CreatureDefinition definition, out MeshTopologyReport topologyReport, GenerationDiagnostics diagnostics = null)
         {
-            return Generate(definition, out topologyReport, diagnostics, usePortableSampling: true, meshResolver: null);
+            return Generate(definition, out topologyReport, diagnostics, usePortableSampling: true, meshResolver: null,
+                cullingMode: SdfCullingMode.Exact);
         }
 
         public static GeneratedCreature Generate(
@@ -42,7 +43,8 @@ namespace ProceduralCreature.Generation
             out MeshTopologyReport topologyReport,
             GenerationDiagnostics diagnostics,
             bool usePortableSampling,
-            Func<string, Mesh> meshResolver = null)
+            Func<string, Mesh> meshResolver = null,
+            SdfCullingMode cullingMode = SdfCullingMode.Exact)
         {
             if (definition == null) throw new DomainException("definition must not be null.");
 
@@ -76,7 +78,7 @@ namespace ProceduralCreature.Generation
                     {
                         try
                         {
-                            grid = DensityGrid.SamplePortable(portableProgram, definition.Bounds, definition.Generation);
+                            grid = DensityGrid.SamplePortable(portableProgram, definition.Bounds, definition.Generation, cullingMode);
                         }
                         finally
                         {
@@ -110,7 +112,7 @@ namespace ProceduralCreature.Generation
 
             Color[] colors = null;
             Time(diagnostics, GenerationStage.AppearanceBake,
-                () => colors = AppearanceBaker.Bake(definition, meshResult));
+                () => colors = AppearanceBaker.Bake(definition, meshResult, null, cullingMode));
 
             Mesh mesh = meshResult.ToUnityMesh();
             mesh.SetColors(colors);

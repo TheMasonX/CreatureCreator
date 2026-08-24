@@ -55,19 +55,21 @@ namespace ProceduralCreature.Appearance
     /// </summary>
     public static class PartAppearanceSampler
     {
-        public static ResolvedAppearance Resolve(CreatureDefinition definition, Vector3 position)
+        public static ResolvedAppearance Resolve(CreatureDefinition definition, Vector3 position,
+            SdfCullingMode cullingMode = SdfCullingMode.Exact)
         {
-            using (Resolver resolver = CreateResolver(definition))
+            using (Resolver resolver = CreateResolver(definition, cullingMode))
             {
                 return resolver.Resolve(position);
             }
         }
 
-        public static Resolver CreateResolver(CreatureDefinition definition)
+        public static Resolver CreateResolver(CreatureDefinition definition,
+            SdfCullingMode cullingMode = SdfCullingMode.Exact)
         {
             if (definition == null) throw new DomainException("definition must not be null.");
 
-            return new Resolver(definition);
+            return new Resolver(definition, cullingMode);
         }
 
         public sealed class Resolver : System.IDisposable
@@ -76,10 +78,12 @@ namespace ProceduralCreature.Appearance
             private readonly System.Collections.Generic.List<(CreaturePart Part, SdfProgram Program)> _compiledParts;
             private readonly SdfProgram _bodyProgram;
             private readonly NativeArray<float> _scratchValues;
+            private readonly SdfCullingMode _cullingMode;
 
-            internal Resolver(CreatureDefinition definition)
+            internal Resolver(CreatureDefinition definition, SdfCullingMode cullingMode)
             {
                 _definition = definition;
+                _cullingMode = cullingMode;
                 _compiledParts = SdfProgramBuilder.CompileIndividualPartsPortable(definition);
                 _bodyProgram = SdfProgramBuilder.CompilePortableBodyField(definition);
                 int scratchLength = _bodyProgram.Operations.Length;
@@ -120,7 +124,7 @@ namespace ProceduralCreature.Appearance
                 foreach ((CreaturePart part, SdfProgram program) in _compiledParts)
                 {
                     float distance = Mathf.Abs(SdfProgramEvaluator.Evaluate(program,
-                        new Unity.Mathematics.float3(position.x, position.y, position.z), _scratchValues));
+                        new Unity.Mathematics.float3(position.x, position.y, position.z), _scratchValues, _cullingMode));
                     if (distance < nearestAbsDistance)
                     {
                         nearestAbsDistance = distance;
@@ -131,7 +135,7 @@ namespace ProceduralCreature.Appearance
                 float bodyAbsDistance = !_bodyProgram.Operations.IsCreated
                     ? float.PositiveInfinity
                     : Mathf.Abs(SdfProgramEvaluator.Evaluate(_bodyProgram,
-                        new Unity.Mathematics.float3(position.x, position.y, position.z), _scratchValues));
+                        new Unity.Mathematics.float3(position.x, position.y, position.z), _scratchValues, _cullingMode));
 
                 // The Body owns this surface point. Its gradient color (or default
                 // flat gray) becomes the base color; noise keeps the same gentle
