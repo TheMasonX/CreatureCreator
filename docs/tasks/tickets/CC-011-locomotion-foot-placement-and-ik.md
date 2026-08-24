@@ -7,7 +7,7 @@ type: Task
 priority: P1
 tags: [runtime, locomotion, gait, terrain, ik]
 dependsOn: [CC-009, CC-010]
-related: [CC-004, CC-005, CC-008]
+related: [CC-004, CC-005, CC-008, CC-069]
 links:
   - Assets/Scripts/README.md
   - Assets/Scripts/Runtime/Animation/Ik/FabrikSolver.cs

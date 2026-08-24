@@ -7,7 +7,7 @@ type: Task
 priority: P1
 tags: [runtime, geometry, animation, skeleton, symmetry]
 dependsOn: [CC-031, CC-051]
-related: [CC-009, CC-011]
+related: [CC-009, CC-011, CC-069]
 links:
   - Assets/Scripts/Runtime/Generation/GeneratedCreature.cs
   - Assets/Scripts/Runtime/Generation/CreatureMeshGenerator.cs

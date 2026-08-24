@@ -7,7 +7,7 @@ type: Task
 priority: P1
 tags: [runtime, animation, semantics, locomotion, authoring]
 dependsOn: [CC-009]
-related: [CC-006, CC-007, CC-008]
+related: [CC-006, CC-007, CC-008, CC-069]
 links:
   - Assets/Scripts/README.md
   - Assets/Scripts/Runtime/Definition/CreatureDefinition.cs

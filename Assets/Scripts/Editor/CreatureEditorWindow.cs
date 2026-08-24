@@ -10,6 +10,9 @@ using ProceduralCreature.Generation;
 using ProceduralCreature.Morphology.Extraction;
 using ProceduralCreature.Morphology.Sdf;
 using ProceduralCreature.Serialization;
+// Alias: the namespace and its own Skeleton type share the same identifier, so
+// the unqualified name resolves to the namespace. Alias to keep both usable.
+using CreatureSkeleton = ProceduralCreature.Skeleton;
 
 namespace ProceduralCreature.Editor
 {
@@ -143,6 +146,10 @@ namespace ProceduralCreature.Editor
         private float _autoRegenerationDelaySeconds = 1f;
         private float _previewVoxelsPerUnit = 16f;
         private bool _fastPreviewCulling = true;
+        // CC-066: skeleton display mode — editor presentation state, persisted via
+        // EditorPrefs, never DNA. Draws a read-only SceneView overlay of the
+        // inferred rest Skeleton (bones as lines, joints as caps).
+        private bool _showSkeleton;
         private Material _previewMaterial;
         private CreatureMeshPalette _meshPalette;
         private CreatureMaterialPalette _materialPalette;
@@ -158,6 +165,8 @@ namespace ProceduralCreature.Editor
         private const string AutoRegenerationDelayKey = "ProceduralCreature.AutoRegenerationDelay";
         private const string PreviewVoxelsPerUnitKey = "ProceduralCreature.PreviewVoxelsPerUnit";
         private const string FastPreviewCullingKey = "ProceduralCreature.FastPreviewCulling";
+        // CC-066: skeleton display mode persistence key.
+        private const string SkeletonDisplayKey = "ProceduralCreature.ShowSkeleton";
         private const string PreviewMaterialKey = "ProceduralCreature.PreviewMaterial";
         private const string MeshPaletteKey = "ProceduralCreature.MeshPalette";
         private const string MaterialPaletteKey = "ProceduralCreature.MaterialPalette";
@@ -173,6 +182,10 @@ namespace ProceduralCreature.Editor
         private const string CollapsedArrowGlyph = "\u25B6"; // ▶
         private const string ExpandedArrowGlyph = "\u25BC"; // ▼
         private const float BodySampleScrollMaxHeight = 220f;
+
+        // CC-066: skeleton overlay color — warm amber, distinct from the white
+        // body handles and the bluish limb-chain preview.
+        private static readonly Color SkeletonOverlayColor = new Color(1f, 0.8f, 0.2f, 0.9f);
 
         /// <summary>
         /// Part types that are valid to author in schema v2. Body, Root, and
@@ -247,6 +260,7 @@ namespace ProceduralCreature.Editor
                 EditorPrefs.GetFloat(AutoRegenerationDelayKey, MinimumAutoRegenerationDelaySeconds));
             _previewVoxelsPerUnit = Mathf.Max(1f, EditorPrefs.GetFloat(PreviewVoxelsPerUnitKey, 16f));
             _fastPreviewCulling = EditorPrefs.GetBool(FastPreviewCullingKey, true);
+            _showSkeleton = EditorPrefs.GetBool(SkeletonDisplayKey, false);
             string previewMaterialPath = EditorPrefs.GetString(PreviewMaterialKey, string.Empty);
             if (!string.IsNullOrEmpty(previewMaterialPath))
             {
@@ -502,6 +516,21 @@ namespace ProceduralCreature.Editor
                 EditorGUILayout.HelpBox(
                     "Fast culling trades value exactness for speed: the preview mesh stays finite and " +
                     "watertight but can differ slightly from the exact mesh near seams. Disable for an exact preview.",
+                    MessageType.Info);
+            }
+
+            // CC-066: skeleton display mode toggle (editor presentation state, persisted).
+            bool newShowSkeleton = EditorGUILayout.Toggle("Show Skeleton", _showSkeleton);
+            if (newShowSkeleton != _showSkeleton)
+            {
+                _showSkeleton = newShowSkeleton;
+                EditorPrefs.SetBool(SkeletonDisplayKey, _showSkeleton);
+                SceneView.RepaintAll();
+            }
+            if (_showSkeleton)
+            {
+                EditorGUILayout.HelpBox(
+                    "Read-only overlay of the inferred rest skeleton (bones + joints). It never edits the definition.",
                     MessageType.Info);
             }
 
@@ -1754,8 +1783,50 @@ namespace ProceduralCreature.Editor
 
         // ---- viewport interaction -------------------------------------------------------------------
 
+        /// <summary>
+        /// CC-066: read-only skeleton overlay. When the display mode is enabled,
+        /// infers the working definition's rest Skeleton and draws bone lines +
+        /// joint caps in creature space (the same resolver geometry uses). Never
+        /// mutates the definition and never creates an Undo entry. Invalid DNA (a
+        /// DomainException from inference) draws nothing — the validation panel
+        /// already surfaces the error.
+        /// </summary>
+        private void DrawSkeletonOverlay()
+        {
+            if (!_showSkeleton || _definition == null) return;
+
+            CreatureSkeleton.Skeleton skeleton;
+            try
+            {
+                skeleton = CreatureSkeleton.SkeletonInferrer.Infer(_definition);
+            }
+            catch (DomainException)
+            {
+                return;
+            }
+
+            List<SkeletonDisplay.BoneLine> lines = SkeletonDisplay.BuildBoneLines(skeleton);
+            List<Vector3> joints = SkeletonDisplay.BuildJointPoints(skeleton);
+
+            Handles.color = SkeletonOverlayColor;
+            for (int i = 0; i < lines.Count; i++)
+            {
+                Handles.DrawLine(lines[i].Start, lines[i].End);
+            }
+            for (int i = 0; i < joints.Count; i++)
+            {
+                float handleSize = HandleUtility.GetHandleSize(joints[i]) * 0.06f;
+                Handles.SphereHandleCap(0, joints[i], Quaternion.identity, handleSize, EventType.Repaint);
+            }
+            Handles.color = Color.white;
+        }
+
         private void OnSceneGUI(SceneView sceneView)
         {
+            // CC-066: read-only skeleton overlay draws first (behind every
+            // selection/authoring handle), whenever the display mode is enabled.
+            DrawSkeletonOverlay();
+
             // Body sample handles are the Body's scene editing surface (CC-015).
             // They are suppressed in Place Part Mode so mesh clicks keep placing parts.
             if (_selectedPartId == CreatureDefinition.BodyId && !_placementModeActive)

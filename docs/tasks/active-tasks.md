@@ -67,3 +67,7 @@
 | CC-063 | Restore Fast preview culling (naive AABB + interpolation guard) | Done | P1 |
 | CC-064 | Fast-mode non-finite field contract (+inf = outside/culled) | Done | P1 |
 | CC-065 | FastNoise2 binary / submodule repository review gate | Done | P1 |
+| CC-066 | Add a display mode to show the skeleton | Done | P2 |
+| CC-067 | Show the SDF bounds for primitive shapes in the editor | Backlog | P2 |
+| CC-068 | Make the base limb point moveable (selection + move gizmo, no scale) | Backlog | P1 |
+| CC-069 | Runtime bone rig and pose application (drive bone Transforms from a PosedSkeleton) | Backlog | P1 |
