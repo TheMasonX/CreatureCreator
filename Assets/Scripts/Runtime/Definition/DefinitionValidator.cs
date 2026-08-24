@@ -33,8 +33,107 @@ namespace ProceduralCreature.Definition
             ValidateTransformsAndShapesAndAppearance(definition, issues);
             ValidateLimbChains(definition, issues);
             ValidateMeshGeometry(definition, issues);
+            ValidateResolvedEnvelope(definition, issues);
 
             return new ValidationResult(issues);
+        }
+
+        /// <summary>
+        /// CC-050 (audit Finding 4): the local-frame checks cannot see a nested
+        /// part, limb joint, or mesh attachment whose RESOLVED creature-space
+        /// position falls outside the generation bounds — the voxel domain that
+        /// would crop it. This stage re-resolves every geometry source through the
+        /// shared world-frame resolver and reports any origin that lands outside
+        /// <see cref="BoundsDefinition"/>. Report-only; a Body sample's radius may
+        /// extend past the box by design (cropping). Skips when the definition has
+        /// unresolved parent/cycle errors, because resolution is undefined for a
+        /// broken chain.
+        /// </summary>
+        private static void ValidateResolvedEnvelope(CreatureDefinition definition, List<ValidationIssue> issues)
+        {
+            if (HasStructuralParentIssue(issues)) return;
+
+            if (definition.Body != null && definition.Body.Samples != null)
+            {
+                foreach (BodySample sample in definition.Body.Samples)
+                {
+                    if (sample == null) continue;
+                    if (!IsFinite(sample.Position.x) || !IsFinite(sample.Position.y) || !IsFinite(sample.Position.z)) continue;
+                    if (!definition.Bounds.Contains(sample.Position))
+                    {
+                        issues.Add(new ValidationIssue(
+                            ValidationSeverity.Error, ValidationCode.ResolvedBodySampleOutOfBounds,
+                            $"Body sample '{sample.Id}' lies outside the creature bounds."));
+                    }
+                }
+            }
+
+            foreach (CreaturePart part in definition.Parts)
+            {
+                if (part == null) continue;
+                if (!IsFinite(part.Transform.Position.x) || !IsFinite(part.Transform.Position.y) || !IsFinite(part.Transform.Position.z)) continue;
+
+                Matrix4x4 world;
+                try
+                {
+                    world = CreaturePartWorldTransformResolver.ResolveLocalToCreatureSpace(definition, part);
+                }
+                catch (DomainException)
+                {
+                    continue;
+                }
+
+                if (part.Limb != null && part.Limb.Joints != null && part.Limb.Joints.Count > 0)
+                {
+                    foreach (LimbJoint joint in part.Limb.Joints)
+                    {
+                        if (joint == null) continue;
+                        Vector3 resolved = world.MultiplyPoint3x4(joint.Position);
+                        if (!definition.Bounds.Contains(resolved))
+                        {
+                            issues.Add(new ValidationIssue(
+                                ValidationSeverity.Error, ValidationCode.ResolvedLimbJointOutOfBounds,
+                                $"Part '{part.Id}' limb joint '{joint.Id}' lies outside the creature bounds.", part.Id));
+                        }
+                    }
+                    continue;
+                }
+
+                Vector3 origin = world.GetColumn(3);
+                if (!definition.Bounds.Contains(origin))
+                {
+                    issues.Add(new ValidationIssue(
+                        ValidationSeverity.Error, ValidationCode.ResolvedPartOutOfBounds,
+                        $"Part '{part.Id}' lies outside the creature bounds.", part.Id));
+                }
+
+                if (part.MeshGeometry != null)
+                {
+                    GeometryAttachment attachment = part.MeshGeometry.Attachment ?? new GeometryAttachment();
+                    if (IsFinite(attachment.Offset.x) && IsFinite(attachment.Offset.y) && IsFinite(attachment.Offset.z))
+                    {
+                        Vector3 attachmentPoint = world.MultiplyPoint3x4(attachment.Offset);
+                        if (!definition.Bounds.Contains(attachmentPoint))
+                        {
+                            issues.Add(new ValidationIssue(
+                                ValidationSeverity.Error, ValidationCode.ResolvedMeshAttachmentOutOfBounds,
+                                $"Part '{part.Id}' mesh attachment lies outside the creature bounds.", part.Id));
+                        }
+                    }
+                }
+            }
+        }
+
+        private static bool HasStructuralParentIssue(List<ValidationIssue> issues)
+        {
+            foreach (ValidationIssue issue in issues)
+            {
+                if (issue.Code == ValidationCode.MissingParent || issue.Code == ValidationCode.ParentCycle)
+                {
+                    return true;
+                }
+            }
+            return false;
         }
 
         private static void ValidateBody(CreatureDefinition definition, List<ValidationIssue> issues)

@@ -152,8 +152,6 @@ namespace ProceduralCreature.Editor
         private bool _showSkeleton;
         private Material _previewMaterial;
         private CreatureGenerationConfig _generationConfig;
-        private CreatureMeshPalette _meshPalette;
-        private CreatureMaterialPalette _materialPalette;
         private bool _logGenerationDiagnostics = true;
         private bool _usePortableSampling;
         private double _autoRegenerateAt = -1d;
@@ -169,9 +167,7 @@ namespace ProceduralCreature.Editor
         // CC-066: skeleton display mode persistence key.
         private const string SkeletonDisplayKey = "ProceduralCreature.ShowSkeleton";
         private const string PreviewMaterialKey = "ProceduralCreature.PreviewMaterial";
-        private const string MeshPaletteKey = "ProceduralCreature.MeshPalette";
         private const string GenerationConfigKey = "ProceduralCreature.GenerationConfig";
-        private const string MaterialPaletteKey = "ProceduralCreature.MaterialPalette";
         private const string LogGenerationDiagnosticsKey = "ProceduralCreature.LogGenerationDiagnostics";
         private const string UsePortableSamplingKey = "ProceduralCreature.UsePortableSampling";
         private const string CurrentFilePathKey = "ProceduralCreature.CurrentFilePath";
@@ -273,17 +269,6 @@ namespace ProceduralCreature.Editor
             {
                 _previewMaterial = AssetDatabase.LoadAssetAtPath<Material>(previewMaterialPath);
             }
-            string meshPalettePath = EditorPrefs.GetString(MeshPaletteKey, string.Empty);
-            if (!string.IsNullOrEmpty(meshPalettePath))
-            {
-                _meshPalette = AssetDatabase.LoadAssetAtPath<CreatureMeshPalette>(meshPalettePath);
-            }
-            string materialPalettePath = EditorPrefs.GetString(MaterialPaletteKey, string.Empty);
-            if (!string.IsNullOrEmpty(materialPalettePath))
-            {
-                _materialPalette = AssetDatabase.LoadAssetAtPath<CreatureMaterialPalette>(materialPalettePath);
-            }
-            ApplyGenerationConfigReferences();
             _logGenerationDiagnostics = EditorPrefs.GetBool(LogGenerationDiagnosticsKey, true);
             _usePortableSampling = EditorPrefs.GetBool(UsePortableSamplingKey, true);
             _currentFilePath = SessionState.GetString(CurrentFilePathKey, string.Empty);
@@ -478,42 +463,17 @@ namespace ProceduralCreature.Editor
                 EditorPrefs.SetString(
                     GenerationConfigKey,
                     _generationConfig != null ? AssetDatabase.GetAssetPath(_generationConfig) : string.Empty);
-                ApplyGenerationConfigReferences();
                 Repaint();
             }
 
-            EditorGUI.BeginDisabledGroup(_generationConfig != null);
-            CreatureMeshPalette newMeshPalette = (CreatureMeshPalette)EditorGUILayout.ObjectField(
-                "Mesh Palette", _meshPalette, typeof(CreatureMeshPalette), allowSceneObjects: false);
-            if (newMeshPalette != _meshPalette)
-            {
-                _meshPalette = newMeshPalette;
-                EditorPrefs.SetString(
-                    MeshPaletteKey,
-                    _meshPalette != null ? AssetDatabase.GetAssetPath(_meshPalette) : string.Empty);
-                Repaint();
-            }
-            EditorGUI.EndDisabledGroup();
-            if (_meshPalette != null && _meshPalette.HasDuplicateKeys(out string duplicateKey))
+            if (EffectiveMeshPalette != null && EffectiveMeshPalette.HasDuplicateKeys(out string duplicateKey))
             {
                 EditorGUILayout.HelpBox(
                     $"Mesh palette contains duplicate key '{duplicateKey}'. Remove the duplicate before generating.",
                     MessageType.Error);
             }
 
-            EditorGUI.BeginDisabledGroup(_generationConfig != null);
-            CreatureMaterialPalette newMaterialPalette = (CreatureMaterialPalette)EditorGUILayout.ObjectField(
-                "Material Palette", _materialPalette, typeof(CreatureMaterialPalette), allowSceneObjects: false);
-            if (newMaterialPalette != _materialPalette)
-            {
-                _materialPalette = newMaterialPalette;
-                EditorPrefs.SetString(
-                    MaterialPaletteKey,
-                    _materialPalette != null ? AssetDatabase.GetAssetPath(_materialPalette) : string.Empty);
-                Repaint();
-            }
-            EditorGUI.EndDisabledGroup();
-            if (_materialPalette != null && _materialPalette.HasDuplicateKeys(out string duplicateMaterialKey))
+            if (EffectiveMaterialPalette != null && EffectiveMaterialPalette.HasDuplicateKeys(out string duplicateMaterialKey))
             {
                 EditorGUILayout.HelpBox(
                     $"Material palette contains duplicate key '{duplicateMaterialKey}'. Remove the duplicate before generating.",
@@ -1512,11 +1472,11 @@ namespace ProceduralCreature.Editor
 
             if (selected.MeshGeometry == null) return;
 
-            string[] keys = _meshPalette != null ? _meshPalette.GetUsableKeys() : System.Array.Empty<string>();
+            string[] keys = EffectiveMeshPalette != null ? EffectiveMeshPalette.GetUsableKeys() : System.Array.Empty<string>();
             if (keys.Length == 0)
             {
                 EditorGUILayout.HelpBox(
-                    "Assign a mesh palette with at least one usable key in Editor Settings.",
+                    "Assign a Generation Config with a mesh palette that has at least one usable key.",
                     MessageType.Warning);
                 return;
             }
@@ -1553,7 +1513,7 @@ namespace ProceduralCreature.Editor
 
         private string FirstPaletteKey()
         {
-            string[] keys = _meshPalette != null ? _meshPalette.GetUsableKeys() : System.Array.Empty<string>();
+            string[] keys = EffectiveMeshPalette != null ? EffectiveMeshPalette.GetUsableKeys() : System.Array.Empty<string>();
             return keys.Length > 0 ? keys[0] : string.Empty;
         }
 
@@ -1712,8 +1672,8 @@ namespace ProceduralCreature.Editor
             EditorGUILayout.LabelField("Appearance", EditorStyles.boldLabel);
 
             string currentKey = selected.Appearance.MaterialKey;
-            string[] usableKeys = _materialPalette != null
-                ? _materialPalette.GetUsableKeys()
+            string[] usableKeys = EffectiveMaterialPalette != null
+                ? EffectiveMaterialPalette.GetUsableKeys()
                 : System.Array.Empty<string>();
             var keys = new List<string>(usableKeys);
             if (!string.IsNullOrWhiteSpace(currentKey) && !keys.Contains(currentKey))
@@ -1729,7 +1689,7 @@ namespace ProceduralCreature.Editor
             labels[0] = "(none)";
             for (int i = 0; i < keys.Count; i++)
             {
-                labels[i + 1] = _materialPalette != null ? _materialPalette.GetDisplayName(keys[i]) : keys[i];
+                labels[i + 1] = EffectiveMaterialPalette != null ? EffectiveMaterialPalette.GetDisplayName(keys[i]) : keys[i];
             }
             int currentIndex = System.Array.IndexOf(keys.ToArray(), currentKey) + 1;
             if (currentIndex < 0) currentIndex = 0;
@@ -2657,7 +2617,7 @@ namespace ProceduralCreature.Editor
                 return;
             }
 
-            if (_meshPalette != null && _meshPalette.HasDuplicateKeys(out string duplicateKey))
+            if (EffectiveMeshPalette != null && EffectiveMeshPalette.HasDuplicateKeys(out string duplicateKey))
             {
                 EditorUtility.DisplayDialog(
                     "Cannot Generate",
@@ -2666,7 +2626,7 @@ namespace ProceduralCreature.Editor
                 return;
             }
 
-            if (_materialPalette != null && _materialPalette.HasDuplicateKeys(out string duplicateMaterialKey))
+            if (EffectiveMaterialPalette != null && EffectiveMaterialPalette.HasDuplicateKeys(out string duplicateMaterialKey))
             {
                 EditorUtility.DisplayDialog(
                     "Cannot Generate",
@@ -2813,7 +2773,7 @@ namespace ProceduralCreature.Editor
                 return;
             }
 
-            Material resolved = MaterialResolver.Resolve(_materialPalette, item.MaterialRegions[0].MaterialKey);
+            Material resolved = MaterialResolver.Resolve(EffectiveMaterialPalette, item.MaterialRegions[0].MaterialKey);
             if (fallback == null && resolved == null) return;
 
             int subMeshCount = Mathf.Max(1, item.Mesh != null ? item.Mesh.subMeshCount : 1);
@@ -2844,15 +2804,14 @@ namespace ProceduralCreature.Editor
 
         private Mesh ResolveMeshAsset(string key)
         {
-            return _meshPalette != null && _meshPalette.TryResolve(key, out Mesh mesh) ? mesh : null;
+            return EffectiveMeshPalette != null && EffectiveMeshPalette.TryResolve(key, out Mesh mesh) ? mesh : null;
         }
 
-        private void ApplyGenerationConfigReferences()
-        {
-            if (_generationConfig == null) return;
-            _meshPalette = _generationConfig.MeshPalette;
-            _materialPalette = _generationConfig.MaterialPalette;
-        }
+        private CreatureMeshPalette EffectiveMeshPalette =>
+            _generationConfig != null ? _generationConfig.MeshPalette : null;
+
+        private CreatureMaterialPalette EffectiveMaterialPalette =>
+            _generationConfig != null ? _generationConfig.MaterialPalette : null;
 
         private Material ResolvePreviewMaterial()
         {

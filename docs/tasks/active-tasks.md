@@ -51,7 +51,7 @@
 | CC-046 | Investigate recurring broken-ankle mesh artifacts | Backlog | P1 |
 | CC-048 | Fix obsolete Keyframe.tangentMode warnings and DrawPartList GetLastRect error | Done | P2 |
 | CC-049 | Remove limb geometry dependence on inert Shape blend state | Done | P1 |
-| CC-050 | Validate the generated creature-space geometry envelope | Backlog | P1 |
+| CC-050 | Validate the generated creature-space geometry envelope | Done | P1 |
 | CC-051 | Consolidate semantic attachment and part-frame resolution | Done | P1 |
 | CC-052 | Preserve mesh rest transforms and mirrored binding identity | In Progress | P1 |
 | CC-053 | Complete multi-geometry editor selection and visibility | Backlog | P1 |

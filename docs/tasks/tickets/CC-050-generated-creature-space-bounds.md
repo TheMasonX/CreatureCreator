@@ -2,7 +2,7 @@
 id: creature-task-050
 key: CC-050
 title: Validate the generated creature-space geometry envelope
-status: Backlog
+status: Done
 type: Task
 priority: P1
 tags: [runtime, validation, transforms, bounds]
@@ -28,13 +28,31 @@ Resolve Body samples, part frames, limb joints, child-at-tip frames, attachment 
 - Tests distinguish local-valid/world-invalid from valid nested placement.
 
 ## Validation
-Run focused validator and resolver tests in Unity. Generate a nested limb fixture and confirm no cropped geometry when the definition validates.
+A new `ValidateResolvedEnvelope` stage in `DefinitionValidator` re-resolves every
+geometry source through `CreaturePartWorldTransformResolver` and reports origins
+outside `BoundsDefinition`. New codes: `ResolvedBodySampleOutOfBounds`,
+`ResolvedPartOutOfBounds`, `ResolvedLimbJointOutOfBounds`,
+`ResolvedMeshAttachmentOutOfBounds`. Six new PlayMode tests pass 6/6 (body sample
+outside, nested part local-valid/world-invalid, valid nested placement, limb
+joint resolved outside, mesh attachment resolved outside, child-at-tip inside).
+The wider validator PlayMode run shows only the four documented pre-existing
+failures (duplicate-id `ToDictionary` throw in `HasParentCycle` and the
+`ValidPart` null-coalescing helper). A generation-level crop smoke test remains a
+manual residual.
 
 ## Findings
-`DefinitionValidator` compares `part.Transform.Position` directly with creature bounds. That value is parent-local. Local limb clamps and attachment offsets can also produce a resolved position outside the generation domain.
+`DefinitionValidator` compared `part.Transform.Position` directly with creature
+bounds. That value is parent-local. Local limb clamps and attachment offsets can
+also produce a resolved position outside the generation domain. The new stage
+keeps the local checks and adds the resolved-envelope report on top; it skips
+when structural parent/cycle errors make resolution undefined. This resolves the
+further-audit Finding 4 (global bounds in generated creature space).
 
 ## Blockers
-The envelope rules must consume the canonical frame contract from CC-051.
+Source mesh bounds are unknown at validation time, so the mesh check covers the
+attachment origin only (documented). The generation-level crop smoke test still
+needs a manual editor run.
 
 ## Next Step
-Define conservative bounds for each geometry source and add a pure resolved-envelope validator.
+None for this ticket. The next contract-hardening item is the mesh-item
+rest-binding slice tracked by CC-069/CC-073.

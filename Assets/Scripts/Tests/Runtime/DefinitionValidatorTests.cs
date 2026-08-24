@@ -381,6 +381,147 @@ namespace ProceduralCreature.Tests.Runtime
             }
         }
 
+        // ---- CC-050 resolved creature-space envelope ------------------------------------
+
+        [Test]
+        public void Validate_ResolvedEnvelope_BodySampleOutsideBounds_Reports()
+        {
+            var definition = CreatureDefinition.CreateEmpty();
+            definition.Forward = Vector3.forward;
+            definition.Body.Samples.Add(new BodySample { Id = 1, Position = new Vector3(6f, 0f, 0f), Radius = 0.75f });
+            definition.Body.Samples.Add(new BodySample { Id = 2, Position = new Vector3(0f, 0f, 1f), Radius = 0.9f });
+
+            ValidationResult result = DefinitionValidator.Validate(definition);
+
+            Assert.IsTrue(HasCode(result, ValidationCode.ResolvedBodySampleOutOfBounds));
+        }
+
+        [Test]
+        public void Validate_ResolvedEnvelope_NestedPartResolvedOutside_LocalInside_Reports()
+        {
+            // Audit Finding 4 example: parent at creature X=3.5 (inside), child at
+            // local X=1 -> resolved X=4.5 (outside the default 4-box). The old
+            // local-only check cannot see this.
+            var definition = CreatureDefinition.CreateEmpty();
+            definition.Forward = Vector3.forward;
+            definition.Body.Samples.Add(new BodySample { Id = 1, Position = Vector3.zero, Radius = 0.75f });
+            CreaturePart parent = ValidPart("parent");
+            parent.Transform = new TransformData
+            {
+                Position = new Vector3(3.5f, 0f, 0f),
+                Rotation = Quaternion.identity,
+                Scale = Vector3.one,
+            };
+            definition.AddPart(parent);
+            CreaturePart child = ValidPart("child", "parent");
+            child.Transform = new TransformData
+            {
+                Position = new Vector3(1f, 0f, 0f),
+                Rotation = Quaternion.identity,
+                Scale = Vector3.one,
+            };
+            definition.AddPart(child);
+
+            ValidationResult result = DefinitionValidator.Validate(definition);
+
+            Assert.IsFalse(HasCode(result, ValidationCode.OutOfBoundsTransform),
+                "the child's local position is inside bounds, so the old local check must not fire");
+            Assert.IsTrue(HasCode(result, ValidationCode.ResolvedPartOutOfBounds),
+                "the resolved creature-space position is outside bounds and must be reported");
+        }
+
+        [Test]
+        public void Validate_ResolvedEnvelope_NestedPartResolvedInside_NoResolvedIssue()
+        {
+            var definition = CreatureDefinition.CreateEmpty();
+            definition.Forward = Vector3.forward;
+            definition.Body.Samples.Add(new BodySample { Id = 1, Position = Vector3.zero, Radius = 0.75f });
+            CreaturePart parent = ValidPart("parent");
+            parent.Transform = new TransformData
+            {
+                Position = new Vector3(1f, 0f, 0f),
+                Rotation = Quaternion.identity,
+                Scale = Vector3.one,
+            };
+            definition.AddPart(parent);
+            definition.AddPart(ValidPart("child", "parent"));
+
+            ValidationResult result = DefinitionValidator.Validate(definition);
+
+            Assert.IsTrue(result.IsValid);
+            Assert.IsFalse(HasCode(result, ValidationCode.ResolvedPartOutOfBounds));
+        }
+
+        [Test]
+        public void Validate_ResolvedEnvelope_LimbJointResolvedOutside_LocalInside_Reports()
+        {
+            var definition = CreatureDefinition.CreateEmpty();
+            definition.Forward = Vector3.forward;
+            definition.Body.Samples.Add(new BodySample { Id = 1, Position = Vector3.zero, Radius = 0.75f });
+            CreaturePart leg = ValidPart("part_leg");
+            leg.Transform = new TransformData
+            {
+                Position = new Vector3(3.5f, 0f, 0f),
+                Rotation = Quaternion.identity,
+                Scale = Vector3.one,
+            };
+            leg.Limb = new LimbChain();
+            leg.Limb.Joints.Add(new LimbJoint { Id = 1, Position = Vector3.zero });
+            leg.Limb.Joints.Add(new LimbJoint { Id = 2, Position = new Vector3(1f, 0f, 0f) });
+            definition.AddPart(leg);
+
+            ValidationResult result = DefinitionValidator.Validate(definition);
+
+            Assert.IsFalse(HasCode(result, ValidationCode.LimbJointOutOfBounds),
+                "the joint's local position is inside bounds, so the old local check must not fire");
+            Assert.IsTrue(HasCode(result, ValidationCode.ResolvedLimbJointOutOfBounds),
+                "the resolved joint position is outside bounds and must be reported");
+        }
+
+        [Test]
+        public void Validate_ResolvedEnvelope_MeshAttachmentResolvedOutside_Reports()
+        {
+            var definition = CreatureDefinition.CreateEmpty();
+            definition.Forward = Vector3.forward;
+            definition.Body.Samples.Add(new BodySample { Id = 1, Position = Vector3.zero, Radius = 0.75f });
+            CreaturePart eye = ValidPart("part_eye");
+            eye.PartType = PartType.Eye;
+            eye.MeshGeometry = new MeshGeometry
+            {
+                MeshAssetKey = "sphere",
+                Attachment = new GeometryAttachment { Offset = new Vector3(5f, 0f, 0f) },
+            };
+            definition.AddPart(eye);
+
+            ValidationResult result = DefinitionValidator.Validate(definition);
+
+            Assert.IsTrue(HasCode(result, ValidationCode.ResolvedMeshAttachmentOutOfBounds));
+        }
+
+        [Test]
+        public void Validate_ResolvedEnvelope_ChildAtTipInside_NoResolvedIssue()
+        {
+            // A child authored at local (0,0,0) under a limb resolves to the limb's
+            // terminal joint (tip). With the limb at the origin and a short chain,
+            // the tip stays inside bounds, so the resolved-envelope stage must not
+            // flag valid child-at-tip placement.
+            var definition = CreatureDefinition.CreateEmpty();
+            definition.Forward = Vector3.forward;
+            definition.Body.Samples.Add(new BodySample { Id = 1, Position = Vector3.zero, Radius = 0.75f });
+            CreaturePart leg = ValidPart("part_leg");
+            leg.Limb = new LimbChain();
+            leg.Limb.Joints.Add(new LimbJoint { Id = 1, Position = Vector3.zero });
+            leg.Limb.Joints.Add(new LimbJoint { Id = 2, Position = new Vector3(0f, -1f, 0f) });
+            definition.AddPart(leg);
+            definition.AddPart(ValidPart("part_foot", "part_leg"));
+
+            ValidationResult result = DefinitionValidator.Validate(definition);
+
+            Assert.IsTrue(result.IsValid);
+            Assert.IsFalse(HasCode(result, ValidationCode.ResolvedPartOutOfBounds));
+            Assert.IsFalse(HasCode(result, ValidationCode.ResolvedLimbJointOutOfBounds));
+        }
+
         private static bool HasCode(ValidationResult result, ValidationCode code)
         {
             foreach (ValidationIssue issue in result.Issues)

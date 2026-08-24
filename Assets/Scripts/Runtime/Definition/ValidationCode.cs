@@ -43,5 +43,9 @@ namespace ProceduralCreature.Definition
         NonFiniteMeshGeometryAttachment,
         InvalidMeshGeometryScale,
         InvalidLimbBlendRadius,
+        ResolvedBodySampleOutOfBounds,
+        ResolvedPartOutOfBounds,
+        ResolvedLimbJointOutOfBounds,
+        ResolvedMeshAttachmentOutOfBounds,
     }
 }

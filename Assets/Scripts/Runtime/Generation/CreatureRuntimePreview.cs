@@ -16,15 +16,6 @@ namespace ProceduralCreature.Generation
 
         [SerializeField] private CreatureGenerationConfig generationConfig;
 
-        /// <summary>
-        /// The shared material palette (CC-028). When a geometry item's part carries
-        /// a submaterial key, it resolves through this palette — the same asset the
-        /// editor preview uses, so both resolve identically. Null means mesh-asset
-        /// items keep the default preview material (and a set-but-unresolvable key
-        /// logs a warning rather than breaking Play Mode).
-        /// </summary>
-        [SerializeField] private CreatureMaterialPalette materialPalette;
-
         private const string GeometryChildPrefix = "GeneratedGeometry_";
 
         private readonly List<GameObject> _geometryObjects = new List<GameObject>();
@@ -85,9 +76,7 @@ namespace ProceduralCreature.Generation
 
         private CreatureMaterialPalette ResolveMaterialPalette()
         {
-            return generationConfig != null && generationConfig.MaterialPalette != null
-                ? generationConfig.MaterialPalette
-                : materialPalette;
+            return generationConfig != null ? generationConfig.MaterialPalette : null;
         }
 
         private void CreateGeometryObject(int index, GeometryItem item)
