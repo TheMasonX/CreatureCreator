@@ -2,7 +2,7 @@
 id: creature-task-031
 key: CC-031
 title: Composable geometry sources (multiple meshes per creature)
-status: In Progress
+status: Done
 type: Task
 priority: P1
 tags: [definition, geometry, architecture, schema]
@@ -130,9 +130,10 @@ Validation evidence (2026-08-23):
 
 ## Next Step
 
-Pass 2: editor mesh palette + resolver and authoring UI (assign a mesh key to a
-part), multi-item editor preview rendering, and the body-surface anchor on
-`GeometryAttachment` for the "eye attached to Body surface" manual check.
+The implemented pass is complete. Continue with CC-051 for canonical semantic
+attachment resolution, CC-052 for rest-transform and binding identity, and
+CC-053 for editor selection and visibility. Do not add another geometry source
+until the provisional exclusive-source rule has a typed composition design.
 
 ## Pass 2 Review and Implementation Scope
 

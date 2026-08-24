@@ -1,6 +1,6 @@
 ---
-id: creature-task-036
-key: CC-036
+id: creature-task-048
+key: CC-048
 title: Fix obsolete Keyframe.tangentMode warnings and DrawPartList GetLastRect error
 status: Done
 type: Bug Fix

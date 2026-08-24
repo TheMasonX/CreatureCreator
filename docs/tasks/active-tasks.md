@@ -35,7 +35,7 @@
 | CC-031 | Composable geometry sources (multiple meshes per creature) | Done | P1 |
 | CC-032 | Separate gameplay geometry from 3D-print export | Backlog | P2 |
 | CC-033 | Register FastNoise2Bindings as a real git submodule | Done | P2 |
-| CC-034 | Resolve FastNoise2Bindings compile failure (restore DllImport P/Invoke) | Done | P1 |
+| CC-047 | Resolve FastNoise2Bindings compile failure (restore DllImport P/Invoke) | Done | P1 |
 | CC-034 | Body appearance vertical blend remap as an AnimationCurve | Done | P2 |
 | CC-035 | Parts list column layout (resizable splitter + height-constrained scroll) | Backlog | P2 |
 | CC-036 | Anatomical limb parent validation (Hand under Arm, Foot under Leg) | Backlog | P2 |
@@ -49,4 +49,18 @@
 | CC-044 | Export the generated mesh as an asset | Backlog | P2 |
 | CC-045 | Remove the legacy managed SDF from production generation | In Progress | P1 |
 | CC-046 | Investigate recurring broken-ankle mesh artifacts | Backlog | P1 |
-| CC-036 | Fix obsolete Keyframe.tangentMode warnings and DrawPartList GetLastRect error | Done | P2 |
+| CC-048 | Fix obsolete Keyframe.tangentMode warnings and DrawPartList GetLastRect error | Done | P2 |
+| CC-049 | Remove limb geometry dependence on inert Shape blend state | Backlog | P1 |
+| CC-050 | Validate the generated creature-space geometry envelope | Backlog | P1 |
+| CC-051 | Consolidate semantic attachment and part-frame resolution | Backlog | P1 |
+| CC-052 | Preserve mesh rest transforms and mirrored binding identity | Backlog | P1 |
+| CC-053 | Complete multi-geometry editor selection and visibility | Backlog | P1 |
+| CC-054 | Reject thickness-profile quantization time collisions | Backlog | P2 |
+| CC-055 | Decide limb centerline and generation-aware sampling fidelity | Backlog | P2 |
+| CC-056 | Establish the canonical resolved morphology layer | Backlog | P1 |
+| CC-057 | Add a responsive interactive morphology preview proxy | Backlog | P1 |
+| CC-058 | Route editor interaction ownership by semantic mode | Backlog | P2 |
+| CC-059 | Define symmetry placement and center-merge semantics | Backlog | P2 |
+| CC-060 | Move material ownership to geometry components | Backlog | P2 |
+| CC-061 | Harden the final mesh pipeline independently of editor interaction | Backlog | P2 |
+| CC-062 | Optimize Burst field sampling and final-generation evidence | In Progress | P1 |

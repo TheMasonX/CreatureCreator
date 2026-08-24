@@ -1,6 +1,6 @@
 ---
-id: creature-task-034
-key: CC-034
+id: creature-task-047
+key: CC-047
 title: Resolve FastNoise2Bindings compile failure (restore DllImport P/Invoke)
 status: Done
 type: Task
