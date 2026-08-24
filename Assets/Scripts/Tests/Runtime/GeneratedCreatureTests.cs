@@ -197,6 +197,62 @@ namespace ProceduralCreature.Tests.Runtime
         }
 
         [Test]
+        public void Generate_MeshAssetPart_BakesAuthoredVertexColors()
+        {
+            // CC-031 pass 2: a mesh-asset item must carry the part's OWN authored
+            // appearance as vertex colors (like the implicit surface does), so a
+            // non-white authored color reaches the mesh rather than staying white.
+            CreatureDefinition definition = DefinitionWithBody();
+            CreaturePart eye = MeshEyePart("eye", new Vector3(0f, 0.5f, 0f), EyeGeometry("eye", Vector3.zero));
+            eye.Appearance = new AppearanceDefinition { BaseColor = new Color(1f, 0f, 0f), NoiseSeed = 0, NoiseScale = 1f };
+            definition.AddPart(eye);
+
+            GeneratedCreature generated = GenerateWithResolver(definition, _ => UnitCube());
+            Mesh mesh = generated.Geometry[1].Mesh;
+            Color[] colors = mesh.colors;
+
+            Assert.AreEqual(mesh.vertexCount, colors.Length, "every mesh-asset vertex must carry a color");
+            Assert.Greater(colors.Length, 0);
+            foreach (Color c in colors)
+            {
+                Assert.GreaterOrEqual(c.r, 0.84f, "red channel stays near the authored base within the brightness band");
+                Assert.LessOrEqual(c.r, 1.16f);
+                Assert.AreEqual(0f, c.g, "a pure-red authored color must not gain green");
+                Assert.AreEqual(0f, c.b, "a pure-red authored color must not gain blue");
+            }
+        }
+
+        [Test]
+        public void Generate_MirroredMeshPart_BakesVertexColorsOnBothCopies()
+        {
+            CreatureDefinition definition = DefinitionWithBody();
+            definition.SymmetryMode = SymmetryMode.MirrorAcrossXAxis;
+            CreaturePart eye = MeshEyePart("eye", new Vector3(0.5f, 0.5f, 0f), EyeGeometry("eye", Vector3.zero));
+            eye.MirrorAcrossSymmetryPlane = true;
+            eye.Appearance = new AppearanceDefinition { BaseColor = new Color(1f, 0f, 0f), NoiseSeed = 0, NoiseScale = 1f };
+            definition.AddPart(eye);
+
+            GeneratedCreature generated = GenerateWithResolver(definition, _ => UnitCube());
+
+            Assert.AreEqual(3, generated.Count, "implicit + original + mirrored");
+            AssertColorsBaked(generated.Geometry[1].Mesh, "original copy");
+            AssertColorsBaked(generated.Geometry[2].Mesh, "mirrored copy");
+        }
+
+        private static void AssertColorsBaked(Mesh mesh, string message)
+        {
+            Color[] colors = mesh.colors;
+            Assert.AreEqual(mesh.vertexCount, colors.Length, $"{message}: every vertex must carry a color");
+            Assert.Greater(colors.Length, 0);
+            foreach (Color c in colors)
+            {
+                Assert.AreEqual(0f, c.g, $"{message}: a pure-red authored color must not gain green");
+                Assert.AreEqual(0f, c.b, $"{message}: a pure-red authored color must not gain blue");
+                Assert.GreaterOrEqual(c.r, 0.84f);
+            }
+        }
+
+        [Test]
         public void Generate_MeshPart_WithoutResolver_ThrowsDomainException()
         {
             CreatureDefinition definition = DefinitionWithBody();
@@ -213,6 +269,48 @@ namespace ProceduralCreature.Tests.Runtime
 
             Assert.Throws<DomainException>(() =>
                 GenerateWithResolver(definition, _ => null));
+        }
+
+        [Test]
+        public void Generate_MeshPart_WithMaterialKey_PopulatesMaterialRegions()
+        {
+            // CC-028: a mesh-asset part carrying a submaterial key surfaces it as a
+            // MaterialRegion on its geometry item (key only — resolution to a
+            // UnityEngine.Material is render-layer), including the mirrored copy.
+            CreatureDefinition definition = DefinitionWithBody();
+            definition.SymmetryMode = SymmetryMode.MirrorAcrossXAxis;
+            CreaturePart eye = MeshEyePart("eye", new Vector3(0.5f, 0.5f, 0f), EyeGeometry("eye", Vector3.zero));
+            eye.MirrorAcrossSymmetryPlane = true;
+            eye.Appearance = new AppearanceDefinition { BaseColor = Color.white, NoiseSeed = 0, NoiseScale = 1f, MaterialKey = "eye_white" };
+            definition.AddPart(eye);
+
+            GeneratedCreature generated = GenerateWithResolver(definition, _ => UnitCube());
+
+            Assert.AreEqual(3, generated.Count, "implicit + original + mirrored");
+            AssertMaterialRegion(generated.Geometry[1], "eye_white", "original copy");
+            AssertMaterialRegion(generated.Geometry[2], "eye_white", "mirrored copy");
+            Assert.AreEqual(0, generated.Geometry[0].MaterialRegions.Count,
+                "the implicit combined item keeps the vertex-color default path (no material regions)");
+        }
+
+        [Test]
+        public void Generate_MeshPart_WithoutMaterialKey_HasNoMaterialRegions()
+        {
+            CreatureDefinition definition = DefinitionWithBody();
+            definition.AddPart(MeshEyePart("eye", new Vector3(0f, 0.5f, 0f), EyeGeometry("eye", Vector3.zero)));
+
+            GeneratedCreature generated = GenerateWithResolver(definition, _ => UnitCube());
+
+            Assert.AreEqual(0, generated.Geometry[1].MaterialRegions.Count,
+                "a part without a submaterial override keeps the nearest-part appearance path");
+        }
+
+        private static void AssertMaterialRegion(GeometryItem item, string expectedKey, string message)
+        {
+            Assert.AreEqual(1, item.MaterialRegions.Count, $"{message}: one region per mesh-asset item");
+            Assert.AreEqual(expectedKey, item.MaterialRegions[0].MaterialKey, $"{message}: region carries the part's key");
+            Assert.AreEqual(0, item.MaterialRegions[0].StartIndex, $"{message}: region starts at the first index");
+            Assert.Greater(item.MaterialRegions[0].IndexCount, 0, $"{message}: region covers the item's indices");
         }
 
         [Test]

@@ -132,6 +132,32 @@ namespace ProceduralCreature.Tests.Runtime
         }
 
         [Test]
+        public void Resolve_NearestPartWithMaterialKey_SurfacesKey()
+        {
+            var definition = CreatureDefinition.CreateEmpty();
+            CreaturePart eye = ColoredSphere("eye", new Vector3(0f, 0f, 0f), Color.white);
+            eye.Appearance.MaterialKey = "eye_white";
+            definition.AddPart(eye);
+
+            ResolvedAppearance resolved = PartAppearanceSampler.Resolve(definition, Vector3.zero);
+
+            Assert.AreEqual("eye_white", resolved.MaterialKey,
+                "a part with a submaterial override surfaces its key through appearance resolution");
+        }
+
+        [Test]
+        public void Resolve_PartWithoutMaterialKey_SurfacesNull()
+        {
+            var definition = CreatureDefinition.CreateEmpty();
+            definition.AddPart(ColoredSphere("part", new Vector3(0f, 0f, 0f), Color.red));
+
+            ResolvedAppearance resolved = PartAppearanceSampler.Resolve(definition, Vector3.zero);
+
+            Assert.IsNull(resolved.MaterialKey,
+                "a part without an override keeps the nearest-part fallback (no material key)");
+        }
+
+        [Test]
         public void Resolve_NullDefinition_ThrowsDomainException()
         {
             Assert.Throws<DomainException>(() => PartAppearanceSampler.Resolve(null, Vector3.zero));
@@ -199,6 +225,61 @@ namespace ProceduralCreature.Tests.Runtime
 
             Assert.Throws<DomainException>(() => AppearanceBaker.Bake(null, mesh));
             Assert.Throws<DomainException>(() => AppearanceBaker.Bake(definition, null));
+        }
+
+        [Test]
+        public void BakePart_SolidNonWhiteAppearance_ProducesMatchingColors()
+        {
+            var positions = new[] { new Vector3(0f, 0f, 0f), new Vector3(1f, 0.5f, 0f) };
+            var normals = new[] { Vector3.up, Vector3.up };
+            var part = new CreaturePart
+            {
+                Id = "part",
+                Appearance = new AppearanceDefinition { BaseColor = new Color(1f, 0f, 0f), NoiseSeed = 0, NoiseScale = 1f },
+            };
+
+            Color[] colors = AppearanceBaker.BakePart(part, positions, normals);
+
+            Assert.AreEqual(positions.Length, colors.Length);
+            foreach (Color c in colors)
+            {
+                Assert.GreaterOrEqual(c.r, 0.84f, "red channel stays near the authored base within the brightness band");
+                Assert.LessOrEqual(c.r, 1.16f);
+                Assert.AreEqual(0f, c.g, "a pure-red authored color must not gain green");
+                Assert.AreEqual(0f, c.b, "a pure-red authored color must not gain blue");
+                Assert.AreEqual(1f, c.a);
+            }
+        }
+
+        [Test]
+        public void BakePart_IgnoresNearestPartAndBodyGradient_ByDesign()
+        {
+            // A mesh-asset part is not part of the implicit SDF field, so its color
+            // must come from the part itself even when another part or the Body
+            // surface is nearer. BakePart resolves the part's own appearance only.
+            var positions = new[] { Vector3.zero };
+            var normals = new[] { Vector3.up };
+            var part = new CreaturePart
+            {
+                Id = "mesh_part",
+                Appearance = new AppearanceDefinition { BaseColor = new Color(0f, 0f, 1f), NoiseSeed = 0, NoiseScale = 1f },
+            };
+
+            Color[] colors = AppearanceBaker.BakePart(part, positions, normals);
+
+            Assert.AreEqual(0f, colors[0].r);
+            Assert.AreEqual(0f, colors[0].g);
+            Assert.GreaterOrEqual(colors[0].b, 0.84f);
+        }
+
+        [Test]
+        public void BakePart_NullArguments_ThrowDomainException()
+        {
+            Assert.Throws<DomainException>(() => AppearanceBaker.BakePart(null, new Vector3[1], new Vector3[1]));
+            Assert.Throws<DomainException>(() => AppearanceBaker.BakePart(new CreaturePart(), null, new Vector3[1]));
+            Assert.Throws<DomainException>(() => AppearanceBaker.BakePart(new CreaturePart(), new Vector3[1], null));
+            Assert.Throws<DomainException>(() =>
+                AppearanceBaker.BakePart(new CreaturePart(), new Vector3[1], new Vector3[2]));
         }
     }
 }

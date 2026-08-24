@@ -193,13 +193,39 @@ namespace ProceduralCreature.Generation
             mesh.RecalculateNormals();
             mesh.RecalculateBounds();
 
-            return new GeometryItem
+            // Bake the part's own authored appearance onto the item (CC-031 pass-2
+            // vertex-color parity with the implicit surface). A mesh-asset part is
+            // not part of the implicit SDF field, so AppearanceBaker.BakePart
+            // resolves its color from the part itself rather than nearest-surface
+            // sampling — never from the Body's implicit gradient.
+            mesh.SetColors(AppearanceBaker.BakePart(part, mesh.vertices, mesh.normals));
+
+            var item = new GeometryItem
             {
                 SourcePartId = mirror ? part.Id + GeneratedCreature.MirrorSuffix : part.Id,
                 GeometryType = GeometryType.MeshAsset,
                 Mesh = mesh,
                 RigBinding = new RigBindingMetadata { SourcePartId = part.Id, ParentPartId = part.ParentId },
             };
+
+            // CC-028: a part with a submaterial override carries it as a key on its
+            // geometry item. V1 emits one region covering submesh 0 — the whole item
+            // in the common single-material case. Resolution of the key to a
+            // UnityEngine.Material is a render-layer concern (MaterialResolver), so
+            // the generator output stays key-only and the domain stays portable.
+            // The implicit combined item (item 0) deliberately gets no regions — the
+            // single-mesh vertex-color bake remains the default path (CC-028 scope).
+            if (!string.IsNullOrWhiteSpace(part.Appearance.MaterialKey))
+            {
+                item.MaterialRegions.Add(new MaterialRegion
+                {
+                    StartIndex = 0,
+                    IndexCount = mesh.triangles.Length,
+                    MaterialKey = part.Appearance.MaterialKey,
+                });
+            }
+
+            return item;
         }
 
         private static int[] CopyTriangles(int[] triangles, bool reverseWinding)

@@ -105,3 +105,26 @@ non-uniform transform scale, but they do not replace the vertex-color fix.
 Diagnose the vertex-color path using the four checks above, then implement the
 smallest shader/material fix. After that, start CC-043 with its ADR and schema
 migration design before changing `ShapeDefinition` or SDF primitive APIs.
+
+## Status update (2026-08-23) — mesh side implemented
+
+The mesh-side gap is closed. Mesh-asset geometry items now bake the part's own
+authored appearance as vertex colors, matching the implicit surface:
+
+- `AppearanceBaker.BakePart` resolves the part's OWN appearance directly (never
+  the Body gradient or nearest-part sampler) and reuses the implicit bake's
+  per-vertex color formula.
+- `CreatureMeshGenerator.BuildMeshAssetItem` calls
+  `mesh.SetColors(AppearanceBaker.BakePart(...))` for every mesh-asset item,
+  original and mirrored.
+- Validation: compile clean; PlayMode appearance/generator 18/18 (5 new tests);
+  Body gradient 45/45 (no regression); EditMode 83/83. Real-dino check: Eye gray,
+  Pupil black, body pink, `colors.Length == vertexCount` on all items.
+
+Still open, intentionally deferred:
+
+1. The shader must implement `finalColor = materialBaseColor * vertexColor`
+   (`Assets/Shaders/VertexLit.shadergraph` / `Assets/Materials/TestMaterial.mat`).
+   This is the render-path half of the original complaint and was deferred per
+   user direction to keep this change mesh-only.
+2. CC-043 per-shape parameters remains a separate P1 schema + SDF task.

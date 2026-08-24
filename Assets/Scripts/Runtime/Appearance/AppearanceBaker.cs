@@ -1,3 +1,4 @@
+using System.Collections.Generic;
 using UnityEngine;
 using ProceduralCreature.Common;
 using ProceduralCreature.Definition;
@@ -47,21 +48,8 @@ namespace ProceduralCreature.Appearance
                 colors = new Color[mesh.Positions.Count];
                 for (int i = 0; i < mesh.Positions.Count; i++)
                 {
-                    Vector3 position = mesh.Positions[i];
-                    Vector3 normal = mesh.Normals[i];
-
-                    ResolvedAppearance appearance = PartAppearanceSampler.Resolve(definition, position);
-                    float noise = TriplanarNoise.Evaluate(position, normal, appearance.NoiseSeed, appearance.NoiseScale);
-
-                    // Remap noise from [0,1] to [1-BrightnessVariation, 1+BrightnessVariation].
-                    float brightness = 1f + (noise * 2f - 1f) * BrightnessVariation;
-
-                    Color baseColor = appearance.BaseColor;
-                    colors[i] = new Color(
-                        Mathf.Clamp01(baseColor.r * brightness),
-                        Mathf.Clamp01(baseColor.g * brightness),
-                        Mathf.Clamp01(baseColor.b * brightness),
-                        baseColor.a);
+                    ResolvedAppearance appearance = PartAppearanceSampler.Resolve(definition, mesh.Positions[i]);
+                    colors[i] = BakeVertexColor(mesh.Positions[i], mesh.Normals[i], appearance.BaseColor, appearance.NoiseSeed, appearance.NoiseScale);
                 }
             }
 
@@ -75,6 +63,49 @@ namespace ProceduralCreature.Appearance
             }
 
             return colors;
+        }
+
+        /// <summary>
+        /// Bakes a single part's OWN authored appearance (BaseColor + triplanar
+        /// noise) onto an arbitrary set of vertices. Used for mesh-asset geometry
+        /// items (CC-031): a mesh-asset part is not part of the implicit SDF field,
+        /// so nearest-surface appearance resolution cannot reach it. Its appearance
+        /// resolves directly from the part instead, while keeping the exact same
+        /// noise modulation the implicit bake applies. This deliberately does NOT
+        /// run the Body vertical-gradient or nearest-part samplers — a mesh-asset
+        /// part's color is its own, never the Body's implicit color.
+        /// </summary>
+        public static Color[] BakePart(CreaturePart part, IReadOnlyList<Vector3> positions, IReadOnlyList<Vector3> normals)
+        {
+            if (part == null) throw new DomainException("part must not be null.");
+            if (positions == null) throw new DomainException("positions must not be null.");
+            if (normals == null) throw new DomainException("normals must not be null.");
+            if (positions.Count != normals.Count)
+            {
+                throw new DomainException("positions and normals must have the same length.");
+            }
+
+            AppearanceDefinition appearance = part.Appearance;
+            var colors = new Color[positions.Count];
+            for (int i = 0; i < positions.Count; i++)
+            {
+                colors[i] = BakeVertexColor(positions[i], normals[i], appearance.BaseColor, appearance.NoiseSeed, appearance.NoiseScale);
+            }
+            return colors;
+        }
+
+        private static Color BakeVertexColor(Vector3 position, Vector3 normal, Color baseColor, int noiseSeed, float noiseScale)
+        {
+            float noise = TriplanarNoise.Evaluate(position, normal, noiseSeed, noiseScale);
+
+            // Remap noise from [0,1] to [1-BrightnessVariation, 1+BrightnessVariation].
+            float brightness = 1f + (noise * 2f - 1f) * BrightnessVariation;
+
+            return new Color(
+                Mathf.Clamp01(baseColor.r * brightness),
+                Mathf.Clamp01(baseColor.g * brightness),
+                Mathf.Clamp01(baseColor.b * brightness),
+                baseColor.a);
         }
     }
 }

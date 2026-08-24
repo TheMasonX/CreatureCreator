@@ -198,3 +198,42 @@ Residual risk:
 - The runtime preview component still requires an injected resolver and has no
   runtime palette binding. This pass intentionally changes editor integration
   only.
+
+## Pass 3 — Mesh-asset vertex-color parity (2026-08-23)
+
+User feedback: authored non-white colors are baked onto the implicit SDF mesh,
+but mesh-asset items carried no vertex colors at all, so authored appearance was
+invisible on mesh parts (e.g. a black Pupil or gray Eye rendered neutral).
+
+Implemented (mesh side only; shader vertex-color multiply is a separate follow-up):
+
+- `AppearanceBaker.BakePart(part, positions, normals)` resolves the part's OWN
+  authored appearance (BaseColor + triplanar noise) onto arbitrary vertices,
+  reusing the exact per-vertex color formula the implicit bake uses. A mesh-asset
+  part is not part of the implicit SDF field, so nearest-surface sampling cannot
+  reach it; this deliberately never runs the Body vertical-gradient or
+  nearest-part samplers — a mesh part's color is its own, never the Body's
+  implicit color.
+- `CreatureMeshGenerator.BuildMeshAssetItem` now calls
+  `mesh.SetColors(AppearanceBaker.BakePart(...))` so every mesh-asset item
+  (original and mirrored copy) carries the part's authored color on the mesh.
+
+Validation evidence (2026-08-23):
+
+- Unity compile clean (0 errors/warnings).
+- PlayMode `AppearanceBakerTests` + `GeneratedCreatureTests`: `18/18` passed
+  (3 new `BakePart` tests + 2 new generator tests).
+- PlayMode `BodyVerticalGradientAppearanceTests`: `45/45` passed — the refactored
+  implicit `Bake` path and CC-025 gradient ownership are intact.
+- EditMode suite: `83/83` passed.
+- Real-editor check (dino_creature.json, palette resolver): implicit body item
+  pink (non-white 10152/10152); mesh-asset Eye gray and Pupil black with
+  `colors.Length == vertexCount` on both original and mirrored copies — matching
+  the authored Base Colors.
+
+Residual risk (unchanged/deferred):
+
+- The shader must multiply `materialBaseColor * vertexColor` for the baked mesh
+  colors to be visible; see the CC-031/CC-043 handoff for the shader
+  investigation, which was intentionally deferred to keep this change mesh-only.
+- Body-surface anchoring on `GeometryAttachment` remains deferred.

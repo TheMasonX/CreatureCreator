@@ -32,7 +32,7 @@
 | CC-028 | Per-part submaterial from a material palette | Backlog | P2 |
 | CC-029 | Add Child as Duplicate (copy selected part's authoring properties) | Done | P1 |
 | CC-030 | Reusable part prefab templates (semantic subtree instantiation) | Backlog | P2 |
-| CC-031 | Composable geometry sources (multiple meshes per creature) | In Progress | P1 |
+| CC-031 | Composable geometry sources (multiple meshes per creature) | Done | P1 |
 | CC-032 | Separate gameplay geometry from 3D-print export | Backlog | P2 |
 | CC-033 | Register FastNoise2Bindings as a real git submodule | Done | P2 |
 | CC-034 | Body appearance vertical blend remap as an AnimationCurve | Done | P2 |
