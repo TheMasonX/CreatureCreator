@@ -1,3 +1,4 @@
+using System.Collections.Generic;
 using ProceduralCreature.Definition;
 using ProceduralCreature.Morphology.Extraction;
 using ProceduralCreature.Serialization;
@@ -10,10 +11,10 @@ namespace ProceduralCreature.Generation
         [SerializeField] private TextAsset definitionJson;
         [SerializeField] private bool generateOnStart = true;
 
-        private MeshFilter _meshFilter;
-        private MeshRenderer _meshRenderer;
-        private MeshCollider _meshCollider;
-        private Mesh _generatedMesh;
+        private const string GeometryChildPrefix = "GeneratedGeometry_";
+
+        private readonly List<GameObject> _geometryObjects = new List<GameObject>();
+        private Material _previewMaterial;
 
         private void Start()
         {
@@ -26,19 +27,21 @@ namespace ProceduralCreature.Generation
             CreatureDefinition definition = LoadDefinition();
             var diagnostics = new GenerationDiagnostics(collectTimings: false);
             MeshTopologyReport topology;
-            Mesh mesh = CreatureMeshGenerator.Generate(definition, out topology, diagnostics);
+            GeneratedCreature generated = CreatureMeshGenerator.Generate(definition, out topology, diagnostics);
 
-            EnsureComponents();
-            DestroyGeneratedMesh();
-            _generatedMesh = mesh;
-            _meshFilter.sharedMesh = mesh;
-            _meshCollider.sharedMesh = mesh;
-            AssignPreviewMaterial();
+            DestroyGeneratedGeometry();
 
-            Debug.Log($"[CreatureCreator] Runtime preview generated: {mesh.triangles.Length / 3} triangles.", this);
+            for (int i = 0; i < generated.Geometry.Count; i++)
+            {
+                CreateGeometryObject(i, generated.Geometry[i].Mesh);
+            }
+
+            int implicitTriangles = generated.MainMesh != null ? generated.MainMesh.triangles.Length / 3 : 0;
+            Debug.Log($"[CreatureCreator] Runtime preview generated: {generated.Count} geometry item(s), " +
+                      $"{implicitTriangles} implicit triangles.", this);
             if (!topology.IsWatertight)
             {
-                Debug.LogWarning("[CreatureCreator] Runtime preview mesh is not watertight.", this);
+                Debug.LogWarning("[CreatureCreator] Runtime preview implicit mesh is not watertight.", this);
             }
         }
 
@@ -51,33 +54,40 @@ namespace ProceduralCreature.Generation
             return CreateDemoDefinition();
         }
 
-        private void EnsureComponents()
+        private void CreateGeometryObject(int index, Mesh mesh)
         {
-            _meshFilter = GetComponent<MeshFilter>();
-            if (_meshFilter == null) _meshFilter = gameObject.AddComponent<MeshFilter>();
-
-            _meshRenderer = GetComponent<MeshRenderer>();
-            if (_meshRenderer == null) _meshRenderer = gameObject.AddComponent<MeshRenderer>();
-
-            _meshCollider = GetComponent<MeshCollider>();
-            if (_meshCollider == null) _meshCollider = gameObject.AddComponent<MeshCollider>();
+            var go = new GameObject($"{GeometryChildPrefix}{index}");
+            go.transform.SetParent(transform, worldPositionStays: false);
+            go.AddComponent<MeshFilter>().sharedMesh = mesh;
+            MeshRenderer renderer = go.AddComponent<MeshRenderer>();
+            if (_previewMaterial == null) _previewMaterial = CreatePreviewMaterial();
+            if (_previewMaterial != null) renderer.sharedMaterial = _previewMaterial;
+            go.AddComponent<MeshCollider>().sharedMesh = mesh;
+            _geometryObjects.Add(go);
         }
 
-        private void AssignPreviewMaterial()
+        private void DestroyGeneratedGeometry()
         {
-            if (_meshRenderer.sharedMaterial != null) return;
+            for (int i = _geometryObjects.Count - 1; i >= 0; i--)
+            {
+                if (_geometryObjects[i] == null) continue;
+                if (Application.isPlaying) Destroy(_geometryObjects[i]);
+                else DestroyImmediate(_geometryObjects[i]);
+            }
+            _geometryObjects.Clear();
+        }
+
+        private static Material CreatePreviewMaterial()
+        {
             Shader shader = Shader.Find("Universal Render Pipeline/Lit")
                             ?? Shader.Find("Standard")
                             ?? Shader.Find("Unlit/Color");
-            if (shader != null) _meshRenderer.sharedMaterial = new Material(shader);
-        }
-
-        private void DestroyGeneratedMesh()
-        {
-            if (_generatedMesh == null) return;
-            if (Application.isPlaying) Destroy(_generatedMesh);
-            else DestroyImmediate(_generatedMesh);
-            _generatedMesh = null;
+            if (shader == null)
+            {
+                Debug.LogWarning("[CreatureCreator] No default shader found; preview meshes will use Unity's fallback material.");
+                return null;
+            }
+            return new Material(shader);
         }
 
         private static CreatureDefinition CreateDemoDefinition()

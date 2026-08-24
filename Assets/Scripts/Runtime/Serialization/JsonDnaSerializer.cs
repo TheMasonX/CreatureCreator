@@ -290,7 +290,40 @@ namespace ProceduralCreature.Serialization
                 MirrorAcrossSymmetryPlane = RequireBool(obj, "mirrorAcrossSymmetryPlane"),
                 ParentAttachment = ReadNullableAnchor(obj, "parentAttachment"),
                 Limb = ReadNullableLimbChain(obj, "limbChain"),
+                MeshGeometry = ReadNullableMeshGeometry(obj, "meshGeometry"),
             };
+        }
+
+        /// <summary>
+        /// Reads an optional mesh-asset geometry source (CC-031). A missing or null
+        /// field yields null (the part is a plain primitive/limb); pre-CC-031 v2
+        /// files load unchanged, so this additive field needs no schema version
+        /// bump. The attachment is optional and defaults to identity when absent.
+        /// </summary>
+        private static MeshGeometry ReadNullableMeshGeometry(Dictionary<string, object> obj, string key)
+        {
+            if (!obj.TryGetValue(key, out object value) || value == null) return null;
+            if (value is not Dictionary<string, object> meshObj)
+            {
+                throw new DnaDeserializationException($"Field '{key}' must be an object or null.");
+            }
+
+            var mesh = new MeshGeometry
+            {
+                MeshAssetKey = ReadOptionalString(meshObj, "meshAssetKey"),
+            };
+
+            if (meshObj.TryGetValue("attachment", out object attachmentValue)
+                && attachmentValue is Dictionary<string, object> attachmentObj)
+            {
+                mesh.Attachment = new GeometryAttachment
+                {
+                    Offset = ReadVec3(RequireObject(attachmentObj, "offset")),
+                    Orientation = ReadQuat(RequireObject(attachmentObj, "orientation")),
+                    Scale = ReadVec3(RequireObject(attachmentObj, "scale")),
+                };
+            }
+            return mesh;
         }
 
         /// <summary>

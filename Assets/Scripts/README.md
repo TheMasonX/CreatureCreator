@@ -18,10 +18,12 @@ ProceduralCreature/
       TransformData.cs, ShapeDefinition.cs, AppearanceDefinition.cs
       BoundsDefinition.cs, GenerationSettings.cs
       PartIdGenerator.cs, CreaturePart.cs, CreatureDefinition.cs
+      GeometryType.cs, GeometryAttachment.cs, MeshGeometry.cs  — mesh-asset geometry source + placement attachment (CC-031)
       ValidationSeverity.cs, ValidationCode.cs, ValidationIssue.cs, ValidationResult.cs
       QuantizeUtil.cs, DefinitionCanonicalizer.cs, DefinitionValidator.cs
     Generation/
       GenerationDiagnostics.cs  — stage timing + structured issues, no per-voxel logging
+      GeneratedCreature.cs      — multi-item output: GeometryItem[] (implicit surface + mesh-asset/procedural parts) (CC-031)
     Morphology/
       Sdf/
         ISdfNode.cs              — sign convention fixed here: negative=inside, positive=outside
@@ -197,6 +199,24 @@ by triplanar projection, which needs a real normal, not just whatever
 data on `MeshExtractionResult` so appearance baking stays testable without
 constructing a Unity `Mesh` first, consistent with keeping extraction and
 appearance as independently testable stages (design doc §8).
+
+## CC-031 — composable geometry (multi-item output)
+
+A creature is no longer one implicit surface → one `Mesh`.
+`CreatureMeshGenerator.Generate` returns a `GeneratedCreature`, a deterministic,
+ordered collection of `GeometryItem`s (see ADR-002). Item 0 is always the
+implicit combined surface (Body + Shape/Limb parts). A part can carry a nullable
+`MeshGeometry` source (`meshAssetKey` + `GeometryAttachment`); its mesh resolves
+through an injected resolver and is placed at the part's local-space position.
+`Limb` and `MeshGeometry` are mutually exclusive geometry sources. The SDF
+compiler skips mesh parts in all three compile paths, so a mesh part does not
+contribute a `Shape` sphere to the implicit surface.
+
+**Pass-1 scope (implemented):** multi-item output, mesh-asset source + DNA key,
+local-space placement (offset/orientation/scale), validator + canonical JSON,
+and a multi-item runtime preview. **Deferred:** body-surface anchor, the editor
+mesh palette + authoring UI, multi-item editor preview rendering, procedural
+geometry, material-region population, and exact bone binding.
 
 **Body vertical-gradient appearance (CC-025).** The Body owns its own color
 model, `BodySpline.Appearance` (`BodyVerticalGradientAppearance`): a top

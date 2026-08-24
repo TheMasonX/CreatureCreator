@@ -32,6 +32,7 @@ namespace ProceduralCreature.Definition
             ValidatePartTypes(definition, issues);
             ValidateTransformsAndShapesAndAppearance(definition, issues);
             ValidateLimbChains(definition, issues);
+            ValidateMeshGeometry(definition, issues);
 
             return new ValidationResult(issues);
         }
@@ -379,10 +380,11 @@ namespace ProceduralCreature.Definition
                     }
                 }
 
-                // A limb part's geometry derives from its LimbChain; Shape is inert
-                // (ADR-001 §2). Skip the shape-parameter check for limb parts so a
-                // limb is not forced to carry a meaningful Shape.
-                if (part.Limb == null && !part.Shape.HasValidParameters())
+                // A limb part's geometry derives from its LimbChain and a mesh part's
+                // from its MeshGeometry; Shape is inert for both (ADR-001 §2, ADR-002
+                // §2). Skip the shape-parameter check so neither is forced to carry a
+                // meaningful Shape.
+                if (part.Limb == null && part.MeshGeometry == null && !part.Shape.HasValidParameters())
                 {
                     issues.Add(new ValidationIssue(
                         ValidationSeverity.Error,
@@ -411,6 +413,66 @@ namespace ProceduralCreature.Definition
                     issues.Add(new ValidationIssue(
                         ValidationSeverity.Error, ValidationCode.InvalidAttachmentAnchor,
                         $"Part '{part.Id}' has an invalid semantic attachment anchor.", part.Id));
+                }
+            }
+        }
+
+        /// <summary>
+        /// Validates every part's mesh-asset geometry source (CC-031, ADR-002).
+        /// Reports only; never repairs. A part declares exactly one geometry source:
+        /// a mesh geometry is invalid when its key is empty, when a limb chain is
+        /// also present, or when its attachment is non-finite or has a scale
+        /// component below the minimum. Only numerical/pathological states are
+        /// rejected — resolution of the key against an external mesh palette is a
+        /// generator/editor-layer concern, not DNA validity.
+        /// </summary>
+        private static void ValidateMeshGeometry(CreatureDefinition definition, List<ValidationIssue> issues)
+        {
+            foreach (CreaturePart part in definition.Parts)
+            {
+                if (part == null || part.MeshGeometry == null) continue;
+
+                MeshGeometry mesh = part.MeshGeometry;
+
+                if (string.IsNullOrWhiteSpace(mesh.MeshAssetKey))
+                {
+                    issues.Add(new ValidationIssue(
+                        ValidationSeverity.Error, ValidationCode.InvalidMeshGeometry,
+                        $"Part '{part.Id}' has a mesh geometry with an empty mesh asset key.", part.Id));
+                }
+
+                if (part.Limb != null)
+                {
+                    issues.Add(new ValidationIssue(
+                        ValidationSeverity.Error, ValidationCode.InvalidMeshGeometry,
+                        $"Part '{part.Id}' declares both a limb chain and a mesh geometry; " +
+                        "a part has exactly one geometry source.", part.Id));
+                }
+
+                if (mesh.Attachment == null)
+                {
+                    issues.Add(new ValidationIssue(
+                        ValidationSeverity.Error, ValidationCode.InvalidMeshGeometry,
+                        $"Part '{part.Id}' has a mesh geometry with a null attachment.", part.Id));
+                    continue;
+                }
+
+                if (!mesh.Attachment.IsFinite())
+                {
+                    issues.Add(new ValidationIssue(
+                        ValidationSeverity.Error, ValidationCode.NonFiniteMeshGeometryAttachment,
+                        $"Part '{part.Id}' has a non-finite mesh geometry attachment.", part.Id));
+                }
+
+                UnityEngine.Vector3 scale = mesh.Attachment.Scale;
+                if (scale.x < GenerationTolerances.MinScaleComponent ||
+                    scale.y < GenerationTolerances.MinScaleComponent ||
+                    scale.z < GenerationTolerances.MinScaleComponent)
+                {
+                    issues.Add(new ValidationIssue(
+                        ValidationSeverity.Error, ValidationCode.InvalidMeshGeometryScale,
+                        $"Part '{part.Id}' mesh geometry scale has a component below the minimum " +
+                        $"({GenerationTolerances.MinScaleComponent}).", part.Id));
                 }
             }
         }

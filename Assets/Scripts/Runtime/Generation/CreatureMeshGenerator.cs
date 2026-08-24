@@ -1,3 +1,5 @@
+using System;
+using System.Linq;
 using ProceduralCreature.Common;
 using ProceduralCreature.Definition;
 using ProceduralCreature.Appearance;
@@ -7,18 +9,40 @@ using UnityEngine;
 
 namespace ProceduralCreature.Generation
 {
+    /// <summary>
+    /// Generates a creature's geometry (CC-031). The output is a
+    /// <see cref="GeneratedCreature"/> — a deterministic, ordered collection of
+    /// geometry items — rather than a single Mesh. Item 0 is always the implicit
+    /// combined surface (Body + Shape/Limb parts) extracted from the SDF field;
+    /// mesh-asset parts follow in ascending SourcePartId order, placed at each
+    /// part's local-space position via its GeometryAttachment (pass 1, ADR-002 §2).
+    ///
+    /// Mesh asset keys are resolved through the injected
+    /// <paramref name="meshResolver"/>; a mesh part whose key cannot be resolved is
+    /// a programmer/config error and throws DomainException (no silent drop). The
+    /// domain model never stores UnityEngine.Object references.
+    /// </summary>
     public static class CreatureMeshGenerator
     {
-        public static Mesh Generate(CreatureDefinition definition, out MeshTopologyReport topologyReport, GenerationDiagnostics diagnostics = null)
+        /// <summary>
+        /// The creature-space reflection across the X = 0 plane, matching the
+        /// convention SkeletonInferrer uses for mirrored bones and the SDF
+        /// compiler's mirrored limb chains — so mirrored mesh-asset geometry lands
+        /// on the same side as the mirrored implicit field.
+        /// </summary>
+        private static readonly Matrix4x4 ReflectAcrossX = Matrix4x4.Scale(new Vector3(-1f, 1f, 1f));
+
+        public static GeneratedCreature Generate(CreatureDefinition definition, out MeshTopologyReport topologyReport, GenerationDiagnostics diagnostics = null)
         {
-            return Generate(definition, out topologyReport, diagnostics, usePortableSampling: true);
+            return Generate(definition, out topologyReport, diagnostics, usePortableSampling: true, meshResolver: null);
         }
 
-        public static Mesh Generate(
+        public static GeneratedCreature Generate(
             CreatureDefinition definition,
             out MeshTopologyReport topologyReport,
             GenerationDiagnostics diagnostics,
-            bool usePortableSampling)
+            bool usePortableSampling,
+            Func<string, Mesh> meshResolver = null)
         {
             if (definition == null) throw new DomainException("definition must not be null.");
 
@@ -78,7 +102,104 @@ namespace ProceduralCreature.Generation
 
             Mesh mesh = meshResult.ToUnityMesh();
             mesh.SetColors(colors);
-            return mesh;
+
+            var generated = new GeneratedCreature();
+            generated.Geometry.Add(new GeometryItem
+            {
+                SourcePartId = GeneratedCreature.ImplicitSurfaceSourceId,
+                GeometryType = GeometryType.Implicit,
+                Mesh = mesh,
+                RigBinding = new RigBindingMetadata(),
+            });
+
+            // Items 1..n: mesh-asset parts, ordered by SourcePartId for a
+            // deterministic output independent of authoring order.
+            var meshParts = definition.Parts
+                .Where(p => p != null && p.MeshGeometry != null)
+                .OrderBy(p => p.Id, StringComparer.Ordinal);
+
+            foreach (CreaturePart part in meshParts)
+            {
+                Matrix4x4 localToCreature = CreaturePartWorldTransformResolver.ResolveLocalToCreatureSpace(definition, part);
+                Mesh sourceMesh = ResolveMesh(part, meshResolver);
+
+                GeometryAttachment attachment = part.MeshGeometry.Attachment ?? new GeometryAttachment();
+                Matrix4x4 placement = localToCreature
+                    * Matrix4x4.TRS(attachment.Offset, attachment.Orientation.normalized, attachment.Scale);
+
+                generated.Geometry.Add(BuildMeshAssetItem(part, sourceMesh, placement, mirror: false));
+
+                if (part.MirrorAcrossSymmetryPlane && definition.SymmetryMode != SymmetryMode.None)
+                {
+                    generated.Geometry.Add(BuildMeshAssetItem(part, sourceMesh, ReflectAcrossX * placement, mirror: true));
+                }
+            }
+
+            return generated;
+        }
+
+        private static Mesh ResolveMesh(CreaturePart part, Func<string, Mesh> meshResolver)
+        {
+            if (meshResolver == null)
+            {
+                throw new DomainException(
+                    $"Part '{part.Id}' declares mesh geometry ('{part.MeshGeometry.MeshAssetKey}') " +
+                    "but no mesh resolver was provided.");
+            }
+            Mesh resolved = meshResolver(part.MeshGeometry.MeshAssetKey);
+            if (resolved == null)
+            {
+                throw new DomainException(
+                    $"Mesh asset '{part.MeshGeometry.MeshAssetKey}' for part '{part.Id}' could not be resolved.");
+            }
+            return resolved;
+        }
+
+        /// <summary>
+        /// Bakes a mesh-asset item's final creature-space placement into a new Mesh
+        /// (pass-1 simplification: consumers assign the mesh at identity). Submesh
+        /// structure is preserved and normals are recomputed so the transformed mesh
+        /// shades correctly. The source mesh asset is never mutated. Mirrored items
+        /// reuse the same source mesh with a reflected placement.
+        /// </summary>
+        private static GeometryItem BuildMeshAssetItem(CreaturePart part, Mesh source, Matrix4x4 placement, bool mirror)
+        {
+            Vector3[] positions = source.vertices;
+            Vector3[] transformed = new Vector3[positions.Length];
+            for (int i = 0; i < positions.Length; i++)
+            {
+                transformed[i] = placement.MultiplyPoint3x4(positions[i]);
+            }
+
+            var mesh = new Mesh
+            {
+                name = $"Generated_{part.Id}{(mirror ? GeneratedCreature.MirrorSuffix : string.Empty)}",
+            };
+            mesh.SetVertices(transformed);
+
+            if (source.subMeshCount > 1)
+            {
+                mesh.subMeshCount = source.subMeshCount;
+                for (int s = 0; s < source.subMeshCount; s++)
+                {
+                    mesh.SetTriangles(source.GetTriangles(s), s);
+                }
+            }
+            else
+            {
+                mesh.SetTriangles(source.triangles, 0);
+            }
+
+            mesh.RecalculateNormals();
+            mesh.RecalculateBounds();
+
+            return new GeometryItem
+            {
+                SourcePartId = mirror ? part.Id + GeneratedCreature.MirrorSuffix : part.Id,
+                GeometryType = GeometryType.MeshAsset,
+                Mesh = mesh,
+                RigBinding = new RigBindingMetadata { SourcePartId = part.Id, ParentPartId = part.ParentId },
+            };
         }
 
         private static void Time(GenerationDiagnostics diagnostics, GenerationStage stage, System.Action action)

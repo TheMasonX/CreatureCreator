@@ -42,6 +42,18 @@ namespace ProceduralCreature.Definition
         public LimbChain Limb;
 
         /// <summary>
+        /// The mesh-asset geometry source (CC-031). When non-null, the part's
+        /// geometry is a pre-authored mesh resolved by
+        /// <see cref="MeshGeometry.MeshAssetKey"/> instead of the implicit SDF
+        /// field; <see cref="Shape"/> and <see cref="Limb"/> are inert for
+        /// generation (the two geometry sources are mutually exclusive —
+        /// validator-enforced). Null for every pre-CC-031 part, so existing
+        /// creatures are unaffected. See ADR-002 for the composable-geometry model
+        /// this establishes.
+        /// </summary>
+        public MeshGeometry MeshGeometry;
+
+        /// <summary>
         /// Whether the SDF compiler and skeleton inferer should generate a mirrored
         /// counterpart for this part when the owning CreatureDefinition's
         /// SymmetryMode is not None. See SymmetryMode.cs for the storage-model
@@ -64,6 +76,7 @@ namespace ProceduralCreature.Definition
                 Shape = Shape,
                 Appearance = Appearance,
                 Limb = Limb == null ? null : Limb.Clone(),
+                MeshGeometry = MeshGeometry == null ? null : MeshGeometry.Clone(),
                 MirrorAcrossSymmetryPlane = MirrorAcrossSymmetryPlane,
                 ParentAttachment = ParentAttachment == null ? null : ParentAttachment.Clone(),
             };

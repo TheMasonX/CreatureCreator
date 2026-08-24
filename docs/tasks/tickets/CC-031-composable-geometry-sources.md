@@ -2,7 +2,7 @@
 id: creature-task-031
 key: CC-031
 title: Composable geometry sources (multiple meshes per creature)
-status: Backlog
+status: In Progress
 type: Task
 priority: P1
 tags: [definition, geometry, architecture, schema]
@@ -86,8 +86,47 @@ geometry is determined by components, not by a monolithic primitive.
 None for design; implementation should follow CC-018's LimbChain schema decision
 so the implicit geometry path stays replaceable.
 
+## Pass 1 (implemented 2026-08-23)
+
+First pass landed: the `GeneratedCreature` multi-item output, a mesh-asset
+geometry source, and local-space placement. Body-surface attachment and the
+editor mesh palette are deliberately deferred.
+
+Implemented:
+- ADR-002 (`docs/adr/ADR-002-composable-geometry-and-generatedcreature-output.md`)
+  records the component model, the multi-item output, and the pass-1 scope.
+- Output model: `GeneratedCreature` + `GeometryItem`
+  (`Runtime/Generation/GeneratedCreature.cs`); item 0 is always the implicit
+  combined surface; mesh-asset items follow in ascending `SourcePartId` order.
+- DNA: `CreaturePart.MeshGeometry` (nullable, `Runtime/Definition/MeshGeometry.cs`),
+  mutually exclusive with `Limb`; `GeometryAttachment` (offset/orientation/scale
+  in the part's local frame); `GeometryType` enum. `PartType` stays semantic.
+- Generator: `CreatureMeshGenerator.Generate` returns `GeneratedCreature`; mesh
+  asset keys resolve through an injected `Func<string, Mesh>` resolver (throws
+  `DomainException` on unresolvable key — no silent drop); placement baked into a
+  new Mesh at the part's local position; mirrored parts emit a `_mirror` copy.
+- SDF compiler skips mesh parts in all three compile paths (managed, portable,
+  per-part) so they do not contribute a Shape sphere to the implicit surface.
+- Serialization: additive `meshGeometry` JSON field (null default, no version
+  bump), canonicalizer quantizes the attachment.
+- Validator: `ValidateMeshGeometry` — empty key, Limb+Mesh conflict, non-finite
+  attachment, scale below minimum (new `ValidationCode`s).
+- Callers: `CreatureRuntimePreview` renders all geometry items as children; the
+  editor window renders item 0 (pass 2 adds the editor mesh palette + multi-item
+  preview).
+
+Validation evidence (2026-08-23):
+- Unity compile clean (0 errors/warnings).
+- New runtime fixtures via execute_code: `GeneratedCreatureTests` 9/9,
+  `JsonDnaSerializerMeshGeometryTests` 4/4, `DefinitionValidatorMeshGeometryTests`
+  6/6 — all PASS.
+- Regression runtime fixtures (validator/serializer/SDF/extraction parity) 69/70;
+  the 1 failure is the documented pre-existing DisplayName canonicalization
+  issue in `JsonDnaSerializerTests`, unrelated to CC-031.
+- EditMode suite 79/79 PASS.
+
 ## Next Step
 
-Record the component/geometry attachment design as an ADR, then introduce the
-`GeneratedCreature` multi-item output (starting with the existing Body mesh as
-item one) and an eye-mesh second geometry part.
+Pass 2: editor mesh palette + resolver and authoring UI (assign a mesh key to a
+part), multi-item editor preview rendering, and the body-surface anchor on
+`GeometryAttachment` for the "eye attached to Body surface" manual check.

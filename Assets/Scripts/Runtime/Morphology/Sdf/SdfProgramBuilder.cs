@@ -120,6 +120,11 @@ namespace ProceduralCreature.Morphology.Sdf
 
             foreach (CreaturePart part in orderedParts)
             {
+                // A mesh-asset part (CC-031) has no implicit surface; its geometry
+                // comes from the resolved mesh asset, so it does not join the
+                // portable SDF field.
+                if (part.MeshGeometry != null) continue;
+
                 int previousRoot = root;
                 Matrix4x4 localToCreature = CreaturePartWorldTransformResolver.ResolveLocalToCreatureSpace(definition, part);
                 Vector3 scale = localToCreature.lossyScale;
@@ -301,6 +306,7 @@ namespace ProceduralCreature.Morphology.Sdf
                 .ToList();
 
             return orderedParts
+                .Where(part => part.MeshGeometry == null)
                 .Select(part => (part, CompilePart(definition, part)))
                 .ToList();
         }
@@ -321,12 +327,15 @@ namespace ProceduralCreature.Morphology.Sdf
 
         /// <summary>
         /// The geometry source for a part in its local frame. A limb part compiles
-        /// to its derived metaball chain (CC-018); any other part compiles to its
-        /// single Shape primitive. <see cref="Shape"/> is inert for limb parts
-        /// (ADR-001 §2).
+        /// to its derived metaball chain (CC-018); a mesh-asset part (CC-031) has no
+        /// implicit surface and compiles to empty — its geometry comes from the
+        /// resolved mesh asset, not the SDF field; any other part compiles to its
+        /// single Shape primitive. <see cref="Shape"/> is inert for limb and mesh
+        /// parts (ADR-001 §2, ADR-002 §2).
         /// </summary>
         private static ISdfNode CompilePartGeometry(CreaturePart part)
         {
+            if (part.MeshGeometry != null) return new EmptySdfNode();
             return part.Limb != null ? CompileLimbChain(part.Limb) : CompilePrimitive(part.Shape);
         }
 

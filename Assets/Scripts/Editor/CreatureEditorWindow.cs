@@ -2341,8 +2341,13 @@ namespace ProceduralCreature.Editor
                 CreatureDefinition generationDefinition = _definition.Clone();
                 generationDefinition.Generation.VoxelsPerUnit = _previewVoxelsPerUnit;
                 MeshTopologyReport topologyReport = null;
-                Mesh unityMesh = CreatureMeshGenerator.Generate(
+                GeneratedCreature generated = CreatureMeshGenerator.Generate(
                     generationDefinition, out topologyReport, diagnostics, _usePortableSampling);
+                // CC-031 pass 1 renders item 0 (the implicit surface) on the single
+                // preview object. Editor-authored creatures have no mesh-asset parts
+                // yet (the mesh palette resolver lands in pass 2), so item 0 is the
+                // whole creature today. Multi-item preview rendering is pass 2.
+                Mesh unityMesh = generated.MainMesh;
                 ApplyPreviewMesh(unityMesh);
                 _autoRegenerateAt = -1d;
 

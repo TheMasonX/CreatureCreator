@@ -32,7 +32,7 @@
 | CC-028 | Per-part submaterial from a material palette | Backlog | P2 |
 | CC-029 | Add Child as Duplicate (copy selected part's authoring properties) | Done | P1 |
 | CC-030 | Reusable part prefab templates (semantic subtree instantiation) | Backlog | P2 |
-| CC-031 | Composable geometry sources (multiple meshes per creature) | Backlog | P1 |
+| CC-031 | Composable geometry sources (multiple meshes per creature) | In Progress | P1 |
 | CC-032 | Separate gameplay geometry from 3D-print export | Backlog | P2 |
 | CC-033 | Register FastNoise2Bindings as a real git submodule | Done | P2 |
 | CC-034 | Body appearance vertical blend remap as an AnimationCurve | Done | P2 |
@@ -42,4 +42,8 @@
 | CC-038 | Limb and Body edit modes offer both a screenspace drag and a translation gizmo | Backlog | P2 |
 | CC-039 | Limb metaball smooth blend radius as an authored value | Backlog | P2 |
 | CC-040 | Clear the limb chain when switching a part away from a limb type | Done | P2 |
+| CC-041 | Rotated-transform parity test for mirrored limb chains (managed vs portable) | Backlog | P2 |
+| CC-042 | Update ClonePartAsChild XML doc comment to list Limb as copied | Backlog | P3 |
+| CC-043 | Per-shape parameters (capsule axis + radius/height, ellipsoid 3-axis lengths, box dimensions) | Backlog | P1 |
+| CC-044 | Export the generated mesh as an asset | Backlog | P2 |
 | CC-036 | Fix obsolete Keyframe.tangentMode warnings and DrawPartList GetLastRect error | Done | P2 |

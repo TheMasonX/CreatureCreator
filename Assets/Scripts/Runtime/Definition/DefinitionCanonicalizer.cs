@@ -79,6 +79,11 @@ namespace ProceduralCreature.Definition
                 {
                     CanonicalizeLimbChain(part.Limb);
                 }
+
+                if (part.MeshGeometry != null)
+                {
+                    CanonicalizeMeshGeometry(part.MeshGeometry);
+                }
             }
 
             // Stable ordering independent of authoring/insertion order — this is what
@@ -182,6 +187,44 @@ namespace ProceduralCreature.Definition
                 throw new DomainException("Cannot canonicalize an invalid limb thickness profile.");
             }
             limb.Thickness.Quantize();
+        }
+
+        /// <summary>
+        /// Canonicalizes a part's mesh-asset geometry source (CC-031): quantizes the
+        /// attachment's offset/orientation/scale and normalizes the orientation, so
+        /// repeated serialization is byte-identical. The mesh asset key is a stable
+        /// name and is left as authored. Throws on a non-finite attachment;
+        /// canonicalization is not a repair pass.
+        /// </summary>
+        private static void CanonicalizeMeshGeometry(MeshGeometry mesh)
+        {
+            if (mesh.Attachment == null)
+            {
+                throw new DomainException("Cannot canonicalize a mesh geometry with a null attachment.");
+            }
+            GeometryAttachment attachment = mesh.Attachment;
+            if (!attachment.IsFinite())
+            {
+                throw new DomainException("Cannot canonicalize a mesh geometry with a non-finite attachment.");
+            }
+            attachment.Offset = new Vector3(
+                GenerationTolerances.Quantize(attachment.Offset.x),
+                GenerationTolerances.Quantize(attachment.Offset.y),
+                GenerationTolerances.Quantize(attachment.Offset.z));
+            attachment.Scale = new Vector3(
+                GenerationTolerances.Quantize(attachment.Scale.x),
+                GenerationTolerances.Quantize(attachment.Scale.y),
+                GenerationTolerances.Quantize(attachment.Scale.z));
+            attachment.Orientation = NormalizeAndQuantizeQuaternion(attachment.Orientation);
+        }
+
+        private static Quaternion NormalizeAndQuantizeQuaternion(Quaternion q)
+        {
+            return new Quaternion(
+                GenerationTolerances.Quantize(q.x),
+                GenerationTolerances.Quantize(q.y),
+                GenerationTolerances.Quantize(q.z),
+                GenerationTolerances.Quantize(q.w)).normalized;
         }
 
         private static void AppendChildren(string parentId,

@@ -98,6 +98,18 @@ Burst sampling is now the default for the public mesh-generation overload and
 for new editor sessions. The managed sampler remains available through the
 editor setting as an explicit fallback.
 
+Portable `Symmetry` op composite-subtree limitation (audit provenance, 2026-08-23):
+the portable `SdfProgramEvaluator` Symmetry op reads pre-cached `values[]`
+computed for the ORIGINAL query point, so it cannot wrap a composite
+(smooth-union) subtree such as a multi-ball limb chain. CC-018's compiler works
+around this correctly today: `CompileLimbChainPortable` bakes the mirrored chain
+via `mirroredPartMatrix = CreatureMirrorAcrossX * localToCreature` with original
+joints and hard-unions the two sides, which equals `SymmetryNode(chain)` for any
+transform (verified at HEAD `ff0806d`). A future evaluator improvement would let
+Symmetry re-run `EvaluateInto` for the mirrored point and drop the compiler
+special case entirely. Not a defect at present; owned by this ticket's portable
+evaluator scope.
+
 ## Blockers
 
 Performance at one preview quality is validated. A second preview quality and

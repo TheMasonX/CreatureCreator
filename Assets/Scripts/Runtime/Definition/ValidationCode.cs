@@ -39,5 +39,8 @@ namespace ProceduralCreature.Definition
         LimbRootNotAtOrigin,
         InvalidThicknessProfile,
         NonFiniteThickness,
+        InvalidMeshGeometry,
+        NonFiniteMeshGeometryAttachment,
+        InvalidMeshGeometryScale,
     }
 }

@@ -237,6 +237,38 @@ namespace ProceduralCreature.Serialization
             WriteField(sb, "mirrorAcrossSymmetryPlane", part.MirrorAcrossSymmetryPlane);
             WriteRawField(sb, "parentAttachment", WriteNullableAnchor(part.ParentAttachment));
             WriteRawField(sb, "limbChain", WriteNullableLimbChain(part.Limb));
+            WriteRawField(sb, "meshGeometry", WriteNullableMeshGeometry(part.MeshGeometry));
+            sb.Append('}');
+            return sb.ToString();
+        }
+
+        /// <summary>
+        /// Writes a part's mesh-asset geometry source (CC-031). Always emitted —
+        /// null for parts without one — so save/load/save stays byte-stable.
+        /// MeshAssetKey is a stable name, never a UnityEngine.Object reference;
+        /// the attachment carries the semantic placement intent (pass 1: local
+        /// offset/orientation/scale only, ADR-002 §2).
+        /// </summary>
+        private static string WriteNullableMeshGeometry(MeshGeometry mesh)
+        {
+            if (mesh == null) return "null";
+            var sb = new StringBuilder();
+            sb.Append("{\"meshAssetKey\":");
+            sb.Append('"').Append(Escape(mesh.MeshAssetKey ?? string.Empty)).Append('"');
+            sb.Append(",\"attachment\":");
+            sb.Append(WriteGeometryAttachment(mesh.Attachment));
+            sb.Append('}');
+            return sb.ToString();
+        }
+
+        private static string WriteGeometryAttachment(GeometryAttachment attachment)
+        {
+            if (attachment == null) return "null";
+            var sb = new StringBuilder();
+            sb.Append('{');
+            sb.Append("\"offset\":").Append(WriteVec3(attachment.Offset)).Append(',');
+            sb.Append("\"orientation\":").Append(WriteQuat(attachment.Orientation)).Append(',');
+            sb.Append("\"scale\":").Append(WriteVec3(attachment.Scale));
             sb.Append('}');
             return sb.ToString();
         }
