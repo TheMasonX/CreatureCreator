@@ -52,9 +52,12 @@ before this ticket can close. On 2026-08-24, Unity resolved the shared config to
 `CreatureMeshPalette` and `CreatureMaterialPalette`, and the console reported
 zero errors and warnings after refresh.
 
-The focused shared-config EditMode run passed 4/4 tests. The required
-editor-versus-runtime geometry comparison and PlayMode preview smoke test are
-still open.
+The focused shared-config EditMode run passed 4/4 tests, including a concrete
+asset parity fixture: the shared config resolves both project palette assets,
+its mesh palette resolves the `Sphere`/`Cylinder` keys, and a resolver derived
+from the config (the runtime-preview semantics) produces deterministic,
+mirrored, watertight output where both mesh copies share one source asset. The
+PlayMode preview smoke test remains open.
 
 ## Findings
 
