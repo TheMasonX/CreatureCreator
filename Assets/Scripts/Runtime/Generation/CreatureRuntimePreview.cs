@@ -3,6 +3,7 @@ using ProceduralCreature.Appearance;
 using ProceduralCreature.Common;
 using ProceduralCreature.Definition;
 using ProceduralCreature.Morphology.Extraction;
+using ProceduralCreature.Morphology.Sdf;
 using ProceduralCreature.Serialization;
 using UnityEngine;
 
@@ -12,6 +13,8 @@ namespace ProceduralCreature.Generation
     {
         [SerializeField] private TextAsset definitionJson;
         [SerializeField] private bool generateOnStart = true;
+
+        [SerializeField] private CreatureMeshPalette meshPalette;
 
         /// <summary>
         /// The shared material palette (CC-028). When a geometry item's part carries
@@ -38,7 +41,9 @@ namespace ProceduralCreature.Generation
             CreatureDefinition definition = LoadDefinition();
             var diagnostics = new GenerationDiagnostics(collectTimings: false);
             MeshTopologyReport topology;
-            GeneratedCreature generated = CreatureMeshGenerator.Generate(definition, out topology, diagnostics);
+            GeneratedCreature generated = CreatureMeshGenerator.Generate(
+                definition, out topology, diagnostics, usePortableSampling: true,
+                meshResolver: ResolveMeshAsset, cullingMode: SdfCullingMode.Exact);
 
             DestroyGeneratedGeometry();
 
@@ -63,6 +68,12 @@ namespace ProceduralCreature.Generation
                 return new JsonDnaSerializer().Deserialize(definitionJson.text);
             }
             return CreateDemoDefinition();
+        }
+
+        private Mesh ResolveMeshAsset(string key)
+        {
+            if (meshPalette != null && meshPalette.TryResolve(key, out Mesh mesh)) return mesh;
+            return null;
         }
 
         private void CreateGeometryObject(int index, GeometryItem item)

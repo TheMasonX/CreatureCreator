@@ -73,3 +73,4 @@
 | CC-069 | Runtime bone rig and pose application (drive bone Transforms from a PosedSkeleton) | In Progress | P1 |
 | CC-070 | Add body chain and body-root connections to inferred skeleton | In Progress | P1 |
 | CC-071 | Fix mirrored limb bone rotation basis | In Progress | P1 |
+| CC-072 | Share runtime/editor generated output and add animated geometry binding | In Progress | P1 |

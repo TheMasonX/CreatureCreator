@@ -24,6 +24,7 @@ ProceduralCreature/
     Generation/
       GenerationDiagnostics.cs  — stage timing + structured issues, no per-voxel logging
       GeneratedCreature.cs      — multi-item output: GeometryItem[] (implicit surface + mesh-asset/procedural parts) (CC-031)
+      CreatureMeshPalette.cs    — runtime MeshAssetKey resolver for Play Mode generation
     Morphology/
       Sdf/
         ISdfNode.cs              — sign convention fixed here: negative=inside, positive=outside

@@ -7,7 +7,7 @@ type: Task
 priority: P1
 tags: [runtime, animation, skeleton, ik, geometry]
 dependsOn: [CC-052]
-related: [CC-009, CC-010, CC-011, CC-018, CC-066]
+related: [CC-009, CC-010, CC-011, CC-018, CC-066, CC-072]
 links:
   - Assets/Scripts/Runtime/Skeleton/SkeletonInferrer.cs
   - Assets/Scripts/Runtime/Skeleton/Bone.cs
@@ -98,6 +98,6 @@ children during rebuild or clear.
 
 ## Next Step
 
-Run the new `CreatureRigTests` in Unity, then decide and implement the separate
-geometry binding contract for mesh-asset items. The welded implicit surface
-remains explicitly out of scope until that contract is recorded.
+Run the new `CreatureRigTests` in Unity, then continue through CC-072 for the
+separate geometry binding contract. The welded implicit surface remains
+explicitly out of scope until that contract is recorded.
