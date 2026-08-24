@@ -1,12 +1,12 @@
 ---
 id: creature-task-072
 key: CC-072
-title: Share runtime/editor generated output and add animated geometry binding
+title: Shared generation configuration and mesh palette ownership
 status: In Progress
 type: Task
 priority: P1
 tags: [runtime, editor, generation, animation, skinning]
-dependsOn: [CC-031, CC-052, CC-069]
+dependsOn: [CC-031]
 related: [CC-009, CC-010, CC-011]
 links:
   - Assets/Scripts/Runtime/Generation/CreatureMeshGenerator.cs
@@ -28,20 +28,19 @@ follow a posed skeleton by parenting alone. A later binding slice must create a
 
 ## Scope
 
-- Provide a runtime `CreatureMeshPalette` keyed by `MeshAssetKey`.
-- Make `CreatureRuntimePreview` call the same portable exact generator contract
-  and resolve mesh assets through that palette.
-- Define and implement explicit geometry binding for animated output.
-- Preserve the editor-only mesh palette and editor APIs until an asset migration
-  plan exists.
+- Provide one runtime-safe `CreatureMeshPalette` keyed by `MeshAssetKey`.
+- Provide one shared `CreatureGenerationConfig` with palette references and
+  runtime-safe defaults.
+- Make editor and `CreatureRuntimePreview` consume the same asset types and
+  generator contract.
+- Keep animated geometry binding in CC-073 until its rest-space and weighting
+  contract is accepted.
 
 ## Acceptance Criteria
 
 - The same valid DNA and mesh keys produce equivalent geometry items in the
   editor and Play Mode.
 - Runtime mesh-asset items resolve without editor assembly references.
-- Animated implicit geometry uses explicit bone weights or a documented alternate
-  deformation path.
 - Missing runtime keys fail clearly and do not silently change geometry.
 
 ## Validation
@@ -71,5 +70,4 @@ contains MCP port-retry warnings after refresh, but no project compile errors.
 
 ## Next Step
 
-Create the binding ADR, then add a small skinned renderer fixture with deterministic
-weights for one limb and verify it against `CreatureRig`.
+Validate the shared asset in the editor and Play Mode, then continue with CC-073.

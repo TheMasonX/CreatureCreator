@@ -151,6 +151,7 @@ namespace ProceduralCreature.Editor
         // inferred rest Skeleton (bones as lines, joints as caps).
         private bool _showSkeleton;
         private Material _previewMaterial;
+        private CreatureGenerationConfig _generationConfig;
         private CreatureMeshPalette _meshPalette;
         private CreatureMaterialPalette _materialPalette;
         private bool _logGenerationDiagnostics = true;
@@ -169,6 +170,7 @@ namespace ProceduralCreature.Editor
         private const string SkeletonDisplayKey = "ProceduralCreature.ShowSkeleton";
         private const string PreviewMaterialKey = "ProceduralCreature.PreviewMaterial";
         private const string MeshPaletteKey = "ProceduralCreature.MeshPalette";
+        private const string GenerationConfigKey = "ProceduralCreature.GenerationConfig";
         private const string MaterialPaletteKey = "ProceduralCreature.MaterialPalette";
         private const string LogGenerationDiagnosticsKey = "ProceduralCreature.LogGenerationDiagnostics";
         private const string UsePortableSamplingKey = "ProceduralCreature.UsePortableSampling";
@@ -261,6 +263,11 @@ namespace ProceduralCreature.Editor
             _previewVoxelsPerUnit = Mathf.Max(1f, EditorPrefs.GetFloat(PreviewVoxelsPerUnitKey, 16f));
             _fastPreviewCulling = EditorPrefs.GetBool(FastPreviewCullingKey, true);
             _showSkeleton = EditorPrefs.GetBool(SkeletonDisplayKey, false);
+            string generationConfigPath = EditorPrefs.GetString(GenerationConfigKey, string.Empty);
+            if (!string.IsNullOrEmpty(generationConfigPath))
+            {
+                _generationConfig = AssetDatabase.LoadAssetAtPath<CreatureGenerationConfig>(generationConfigPath);
+            }
             string previewMaterialPath = EditorPrefs.GetString(PreviewMaterialKey, string.Empty);
             if (!string.IsNullOrEmpty(previewMaterialPath))
             {
@@ -276,6 +283,7 @@ namespace ProceduralCreature.Editor
             {
                 _materialPalette = AssetDatabase.LoadAssetAtPath<CreatureMaterialPalette>(materialPalettePath);
             }
+            ApplyGenerationConfigReferences();
             _logGenerationDiagnostics = EditorPrefs.GetBool(LogGenerationDiagnosticsKey, true);
             _usePortableSampling = EditorPrefs.GetBool(UsePortableSamplingKey, true);
             _currentFilePath = SessionState.GetString(CurrentFilePathKey, string.Empty);
@@ -462,6 +470,19 @@ namespace ProceduralCreature.Editor
                 Repaint();
             }
 
+            CreatureGenerationConfig newGenerationConfig = (CreatureGenerationConfig)EditorGUILayout.ObjectField(
+                "Generation Config", _generationConfig, typeof(CreatureGenerationConfig), allowSceneObjects: false);
+            if (newGenerationConfig != _generationConfig)
+            {
+                _generationConfig = newGenerationConfig;
+                EditorPrefs.SetString(
+                    GenerationConfigKey,
+                    _generationConfig != null ? AssetDatabase.GetAssetPath(_generationConfig) : string.Empty);
+                ApplyGenerationConfigReferences();
+                Repaint();
+            }
+
+            EditorGUI.BeginDisabledGroup(_generationConfig != null);
             CreatureMeshPalette newMeshPalette = (CreatureMeshPalette)EditorGUILayout.ObjectField(
                 "Mesh Palette", _meshPalette, typeof(CreatureMeshPalette), allowSceneObjects: false);
             if (newMeshPalette != _meshPalette)
@@ -472,6 +493,7 @@ namespace ProceduralCreature.Editor
                     _meshPalette != null ? AssetDatabase.GetAssetPath(_meshPalette) : string.Empty);
                 Repaint();
             }
+            EditorGUI.EndDisabledGroup();
             if (_meshPalette != null && _meshPalette.HasDuplicateKeys(out string duplicateKey))
             {
                 EditorGUILayout.HelpBox(
@@ -479,6 +501,7 @@ namespace ProceduralCreature.Editor
                     MessageType.Error);
             }
 
+            EditorGUI.BeginDisabledGroup(_generationConfig != null);
             CreatureMaterialPalette newMaterialPalette = (CreatureMaterialPalette)EditorGUILayout.ObjectField(
                 "Material Palette", _materialPalette, typeof(CreatureMaterialPalette), allowSceneObjects: false);
             if (newMaterialPalette != _materialPalette)
@@ -489,6 +512,7 @@ namespace ProceduralCreature.Editor
                     _materialPalette != null ? AssetDatabase.GetAssetPath(_materialPalette) : string.Empty);
                 Repaint();
             }
+            EditorGUI.EndDisabledGroup();
             if (_materialPalette != null && _materialPalette.HasDuplicateKeys(out string duplicateMaterialKey))
             {
                 EditorGUILayout.HelpBox(
@@ -2821,6 +2845,13 @@ namespace ProceduralCreature.Editor
         private Mesh ResolveMeshAsset(string key)
         {
             return _meshPalette != null && _meshPalette.TryResolve(key, out Mesh mesh) ? mesh : null;
+        }
+
+        private void ApplyGenerationConfigReferences()
+        {
+            if (_generationConfig == null) return;
+            _meshPalette = _generationConfig.MeshPalette;
+            _materialPalette = _generationConfig.MaterialPalette;
         }
 
         private Material ResolvePreviewMaterial()

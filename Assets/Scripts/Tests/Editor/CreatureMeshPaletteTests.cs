@@ -1,6 +1,6 @@
 using NUnit.Framework;
 using UnityEngine;
-using ProceduralCreature.Editor;
+using ProceduralCreature.Generation;
 
 namespace ProceduralCreature.Tests.Editor
 {

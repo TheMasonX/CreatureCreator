@@ -14,7 +14,7 @@ namespace ProceduralCreature.Generation
         [SerializeField] private TextAsset definitionJson;
         [SerializeField] private bool generateOnStart = true;
 
-        [SerializeField] private CreatureMeshPalette meshPalette;
+        [SerializeField] private CreatureGenerationConfig generationConfig;
 
         /// <summary>
         /// The shared material palette (CC-028). When a geometry item's part carries
@@ -38,12 +38,18 @@ namespace ProceduralCreature.Generation
         [ContextMenu("Generate Creature")]
         public void Generate()
         {
-            CreatureDefinition definition = LoadDefinition();
+            CreatureDefinition definition = LoadDefinition().Clone();
+            if (generationConfig != null)
+            {
+                definition.Generation.VoxelsPerUnit = generationConfig.DefaultVoxelsPerUnit;
+            }
             var diagnostics = new GenerationDiagnostics(collectTimings: false);
             MeshTopologyReport topology;
             GeneratedCreature generated = CreatureMeshGenerator.Generate(
-                definition, out topology, diagnostics, usePortableSampling: true,
-                meshResolver: ResolveMeshAsset, cullingMode: SdfCullingMode.Exact);
+                definition, out topology, diagnostics,
+                usePortableSampling: generationConfig == null || generationConfig.UsePortableSampling,
+                meshResolver: ResolveMeshAsset,
+                cullingMode: generationConfig != null ? generationConfig.CullingMode : SdfCullingMode.Exact);
 
             DestroyGeneratedGeometry();
 
@@ -72,8 +78,16 @@ namespace ProceduralCreature.Generation
 
         private Mesh ResolveMeshAsset(string key)
         {
-            if (meshPalette != null && meshPalette.TryResolve(key, out Mesh mesh)) return mesh;
+            CreatureMeshPalette palette = generationConfig != null ? generationConfig.MeshPalette : null;
+            if (palette != null && palette.TryResolve(key, out Mesh mesh)) return mesh;
             return null;
+        }
+
+        private CreatureMaterialPalette ResolveMaterialPalette()
+        {
+            return generationConfig != null && generationConfig.MaterialPalette != null
+                ? generationConfig.MaterialPalette
+                : materialPalette;
         }
 
         private void CreateGeometryObject(int index, GeometryItem item)
@@ -105,7 +119,7 @@ namespace ProceduralCreature.Generation
             Material resolved = null;
             try
             {
-                resolved = MaterialResolver.Resolve(materialPalette, item.MaterialRegions[0].MaterialKey);
+                resolved = MaterialResolver.Resolve(ResolveMaterialPalette(), item.MaterialRegions[0].MaterialKey);
             }
             catch (DomainException ex)
             {

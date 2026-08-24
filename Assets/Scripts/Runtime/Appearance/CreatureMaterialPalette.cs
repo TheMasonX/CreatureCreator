@@ -7,8 +7,7 @@ namespace ProceduralCreature.Appearance
 {
     /// <summary>
     /// Resolves a part's optional submaterial override (CC-028) by stable key.
-    /// Lives in the Runtime assembly (unlike the editor-only
-    /// <see cref="ProceduralCreature.Editor.CreatureMeshPalette"/>) so the editor
+    /// Lives in the Runtime assembly so the editor
     /// preview and the runtime preview resolve through the SAME asset and show the
     /// same result — a CC-028 acceptance criterion. Keys are unique and stable;
     /// DNA stores keys, never UnityEngine.Object references.
