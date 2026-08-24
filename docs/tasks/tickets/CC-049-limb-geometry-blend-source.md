@@ -94,6 +94,14 @@ Residual / notes:
   `Canonicalize_QuantizesLimbBlendRadius` to `JsonDnaSerializerLimbTests`; all pass in the
   real editor alongside the round-trip and legacy-default tests.
 
+## Confirmation (2026-08-24) — COMPLETE
+User verified in the real editor: the Limb > `Blend Radius` field (added in commit
+`252a3bc`) changes the body/limb seam as authored (0 = hard union, larger = softer),
+undo restores the previous value, and a non-limb part's Shape `Smooth Blend Radius` still
+edits normally. The Shape blend field is correctly shown disabled for a limb with a joint
+chain. CC-049 is fully closed, including the editor UI fold-in.
+
 ## Next Step
-Consider exposing `LimbChain.BlendRadius` in the editor limb inspector (CC-039 fold-in).
-Then proceed to CC-051 (placement precedence table) as the architectural anchor.
+None for CC-049. CC-051 and CC-064 are done; the placement/attachment precedence anchor is
+recorded in ADR-002 §7. The next feature slice is CC-007 (BodySurfaceProjector against the
+CC-051 seam).
