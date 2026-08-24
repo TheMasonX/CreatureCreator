@@ -29,7 +29,7 @@
 | CC-025 | Body vertical-gradient appearance (top and bottom gradients) | Done | P1 |
 | CC-026 | Body scale (radius) handles visible and usable at all times | Backlog | P2 |
 | CC-027 | Body multi-select with proportional radius scale drag | Backlog | P2 |
-| CC-028 | Per-part submaterial from a material palette | Backlog | P2 |
+| CC-028 | Per-part submaterial from a material palette | In Progress | P2 |
 | CC-029 | Add Child as Duplicate (copy selected part's authoring properties) | Done | P1 |
 | CC-030 | Reusable part prefab templates (semantic subtree instantiation) | Backlog | P2 |
 | CC-031 | Composable geometry sources (multiple meshes per creature) | Done | P1 |

@@ -144,6 +144,7 @@ namespace ProceduralCreature.Editor
         private float _previewVoxelsPerUnit = 16f;
         private Material _previewMaterial;
         private CreatureMeshPalette _meshPalette;
+        private CreatureMaterialPalette _materialPalette;
         private bool _logGenerationDiagnostics = true;
         private bool _usePortableSampling;
         private double _autoRegenerateAt = -1d;
@@ -157,6 +158,7 @@ namespace ProceduralCreature.Editor
         private const string PreviewVoxelsPerUnitKey = "ProceduralCreature.PreviewVoxelsPerUnit";
         private const string PreviewMaterialKey = "ProceduralCreature.PreviewMaterial";
         private const string MeshPaletteKey = "ProceduralCreature.MeshPalette";
+        private const string MaterialPaletteKey = "ProceduralCreature.MaterialPalette";
         private const string LogGenerationDiagnosticsKey = "ProceduralCreature.LogGenerationDiagnostics";
         private const string UsePortableSamplingKey = "ProceduralCreature.UsePortableSampling";
         private const string CurrentFilePathKey = "ProceduralCreature.CurrentFilePath";
@@ -251,6 +253,11 @@ namespace ProceduralCreature.Editor
             if (!string.IsNullOrEmpty(meshPalettePath))
             {
                 _meshPalette = AssetDatabase.LoadAssetAtPath<CreatureMeshPalette>(meshPalettePath);
+            }
+            string materialPalettePath = EditorPrefs.GetString(MaterialPaletteKey, string.Empty);
+            if (!string.IsNullOrEmpty(materialPalettePath))
+            {
+                _materialPalette = AssetDatabase.LoadAssetAtPath<CreatureMaterialPalette>(materialPalettePath);
             }
             _logGenerationDiagnostics = EditorPrefs.GetBool(LogGenerationDiagnosticsKey, true);
             _usePortableSampling = EditorPrefs.GetBool(UsePortableSamplingKey, true);
@@ -452,6 +459,23 @@ namespace ProceduralCreature.Editor
             {
                 EditorGUILayout.HelpBox(
                     $"Mesh palette contains duplicate key '{duplicateKey}'. Remove the duplicate before generating.",
+                    MessageType.Error);
+            }
+
+            CreatureMaterialPalette newMaterialPalette = (CreatureMaterialPalette)EditorGUILayout.ObjectField(
+                "Material Palette", _materialPalette, typeof(CreatureMaterialPalette), allowSceneObjects: false);
+            if (newMaterialPalette != _materialPalette)
+            {
+                _materialPalette = newMaterialPalette;
+                EditorPrefs.SetString(
+                    MaterialPaletteKey,
+                    _materialPalette != null ? AssetDatabase.GetAssetPath(_materialPalette) : string.Empty);
+                Repaint();
+            }
+            if (_materialPalette != null && _materialPalette.HasDuplicateKeys(out string duplicateMaterialKey))
+            {
+                EditorGUILayout.HelpBox(
+                    $"Material palette contains duplicate key '{duplicateMaterialKey}'. Remove the duplicate before generating.",
                     MessageType.Error);
             }
 
@@ -1551,11 +1575,37 @@ namespace ProceduralCreature.Editor
         {
             EditorGUILayout.LabelField("Appearance", EditorStyles.boldLabel);
 
+            string currentKey = selected.Appearance.MaterialKey;
+            string[] usableKeys = _materialPalette != null
+                ? _materialPalette.GetUsableKeys()
+                : System.Array.Empty<string>();
+            var keys = new List<string>(usableKeys);
+            if (!string.IsNullOrWhiteSpace(currentKey) && !keys.Contains(currentKey))
+            {
+                EditorGUILayout.HelpBox(
+                    $"Material key '{currentKey}' is not in the assigned material palette. " +
+                    "Reassign it here or add the key to the palette.",
+                    MessageType.Error);
+                keys.Add(currentKey);
+            }
+
+            var labels = new string[keys.Count + 1];
+            labels[0] = "(none)";
+            for (int i = 0; i < keys.Count; i++)
+            {
+                labels[i + 1] = _materialPalette != null ? _materialPalette.GetDisplayName(keys[i]) : keys[i];
+            }
+            int currentIndex = System.Array.IndexOf(keys.ToArray(), currentKey) + 1;
+            if (currentIndex < 0) currentIndex = 0;
+            int newIndex = EditorGUILayout.Popup("Material", currentIndex, labels);
+            string newKey = newIndex == 0 ? null : keys[newIndex - 1];
+
             var newAppearance = new AppearanceDefinition
             {
                 BaseColor = EditorGUILayout.ColorField("Base Color", selected.Appearance.BaseColor),
                 NoiseSeed = EditorGUILayout.IntField("Noise Seed", selected.Appearance.NoiseSeed),
                 NoiseScale = EditorGUILayout.FloatField("Noise Scale", selected.Appearance.NoiseScale),
+                MaterialKey = newKey,
             };
 
             if (newAppearance.Equals(selected.Appearance)) return;
@@ -2438,6 +2488,15 @@ namespace ProceduralCreature.Editor
                 return;
             }
 
+            if (_materialPalette != null && _materialPalette.HasDuplicateKeys(out string duplicateMaterialKey))
+            {
+                EditorUtility.DisplayDialog(
+                    "Cannot Generate",
+                    $"Material palette contains duplicate key '{duplicateMaterialKey}'. Remove the duplicate before generating a preview.",
+                    "OK");
+                return;
+            }
+
             var diagnostics = new GenerationDiagnostics(_logGenerationDiagnostics);
             try
             {
@@ -2551,10 +2610,38 @@ namespace ProceduralCreature.Editor
                 child.transform.SetParent(_previewGameObject.transform, worldPositionStays: false);
                 child.AddComponent<MeshFilter>().sharedMesh = item.Mesh;
                 MeshRenderer renderer = child.AddComponent<MeshRenderer>();
-                Material material = ResolvePreviewMaterial();
-                if (material != null) renderer.sharedMaterial = material;
+                AssignPreviewItemMaterials(renderer, item);
                 _previewGeometryObjects.Add(child);
             }
+        }
+
+        /// <summary>
+        /// Assigns materials to a preview item's renderer. A mesh-asset item whose
+        /// part carries a submaterial key (CC-028) resolves that key through the
+        /// assigned material palette (<see cref="MaterialResolver"/> — a
+        /// set-but-unresolvable key throws, so a missing palette entry is never
+        /// silently ignored, matching the mesh-resolver contract; the throw is
+        /// caught by RegeneratePreview and shown as a dialog). Items with no
+        /// material region keep the default preview material; extra submeshes keep
+        /// the default too.
+        /// </summary>
+        private void AssignPreviewItemMaterials(MeshRenderer renderer, GeometryItem item)
+        {
+            Material fallback = ResolvePreviewMaterial();
+            if (item.MaterialRegions.Count == 0)
+            {
+                if (fallback != null) renderer.sharedMaterial = fallback;
+                return;
+            }
+
+            Material resolved = MaterialResolver.Resolve(_materialPalette, item.MaterialRegions[0].MaterialKey);
+            if (fallback == null && resolved == null) return;
+
+            int subMeshCount = Mathf.Max(1, item.Mesh != null ? item.Mesh.subMeshCount : 1);
+            var materials = new Material[subMeshCount];
+            for (int i = 0; i < materials.Length; i++) materials[i] = fallback;
+            materials[0] = resolved != null ? resolved : fallback;
+            renderer.sharedMaterials = materials;
         }
 
         private void ClearPreviewGeometryChildren()

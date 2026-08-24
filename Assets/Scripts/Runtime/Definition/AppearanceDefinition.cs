@@ -18,11 +18,22 @@ namespace ProceduralCreature.Definition
 
         public float NoiseScale;
 
+        /// <summary>
+        /// Optional submaterial override (CC-028). A stable name resolved through an
+        /// external material palette at render time — never a UnityEngine.Object
+        /// reference (same convention as <see cref="MeshGeometry.MeshAssetKey"/>).
+        /// Null or whitespace means "no override": the part keeps the existing
+        /// nearest-part appearance behavior. The Body owns its gradient appearance
+        /// (CC-025) and never carries a material key.
+        /// </summary>
+        public string MaterialKey;
+
         public static AppearanceDefinition Default => new AppearanceDefinition
         {
             BaseColor = Color.gray,
             NoiseSeed = 0,
             NoiseScale = 1f,
+            MaterialKey = null,
         };
 
         public readonly bool IsFinite()
@@ -36,11 +47,17 @@ namespace ProceduralCreature.Definition
         {
             return BaseColor.Equals(other.BaseColor)
                 && NoiseSeed == other.NoiseSeed
-                && NoiseScale.Equals(other.NoiseScale);
+                && NoiseScale.Equals(other.NoiseScale)
+                && string.Equals(NormalizedKey(MaterialKey), NormalizedKey(other.MaterialKey), StringComparison.Ordinal);
         }
 
         public override readonly bool Equals(object obj) => obj is AppearanceDefinition other && Equals(other);
 
-        public override readonly int GetHashCode() => HashCode.Combine(BaseColor, NoiseSeed, NoiseScale);
+        public override readonly int GetHashCode() => HashCode.Combine(BaseColor, NoiseSeed, NoiseScale, NormalizedKey(MaterialKey));
+
+        private static string NormalizedKey(string key)
+        {
+            return string.IsNullOrWhiteSpace(key) ? null : key;
+        }
     }
 }

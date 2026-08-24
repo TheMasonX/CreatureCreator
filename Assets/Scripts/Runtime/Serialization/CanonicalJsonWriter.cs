@@ -377,6 +377,10 @@ namespace ProceduralCreature.Serialization
             sb.Append("\"baseColor\":").Append(WriteColor(appearance.BaseColor));
             WriteField(sb, "noiseSeed", appearance.NoiseSeed);
             WriteField(sb, "noiseScale", appearance.NoiseScale);
+            // CC-028: optional submaterial override by stable name. Null when blank
+            // so save-load-save stays byte-stable regardless of authored whitespace.
+            WriteNullableField(sb, "materialKey",
+                string.IsNullOrWhiteSpace(appearance.MaterialKey) ? null : appearance.MaterialKey);
             sb.Append('}');
             return sb.ToString();
         }

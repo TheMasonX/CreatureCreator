@@ -249,6 +249,41 @@ authored from the Body inspector with the full Unity gradient editor
 Note: Unity snaps gradient key times to 1/65535 increments internally; the
 canonical writer's fixed formatting keeps save-load-save byte-stable.
 
+## CC-028 — per-part submaterial from a material palette
+
+A part can override its surface with a named submaterial (for example, an eye
+with a separate eye-white material). `AppearanceDefinition.MaterialKey` is an
+optional stable name resolved from a `CreatureMaterialPalette` at render time
+(ADR-003). DNA stores the key, never a `UnityEngine.Object` reference. Blank
+means no override: the part keeps the existing nearest-part appearance
+behavior, and the Body gradient (CC-025) still owns Body surfaces.
+
+- `CreatureMaterialPalette` (Runtime assembly, so the editor preview and the
+  runtime preview resolve through the SAME asset) maps unique stable keys →
+  `Material` + optional `DisplayName`.
+- `MaterialResolver.Resolve(palette, key)` encodes the policy: blank → null
+  (nearest-part fallback); set-but-unresolvable key or missing palette →
+  `DomainException` (never a silent drop, matching the mesh resolver).
+- `PartAppearanceSampler` surfaces the nearest part's key via
+  `ResolvedAppearance.MaterialKey`.
+- The generator emits one `MaterialRegion` (submesh 0) on each mesh-asset
+  `GeometryItem` whose part carries a key. The implicit combined item keeps
+  the vertex-color bake — V1 does not harden per-submaterial vertex-color
+  regions as the final render model (CC-031 geometry components can later
+  carry their own regions).
+- Editor window: Material Palette object field (persisted in EditorPrefs), a
+  duplicate-key guard that blocks generation, and a per-part Material popup in
+  the Appearance section. The editor preview and the runtime preview resolve
+  item materials through the same palette.
+- Runtime parity note: a mesh-asset eye cannot render in Play Mode yet because
+  `CreatureRuntimePreview` has no mesh resolver (CC-031 deferred); Shape/limb
+  parts with a key keep the vertex-color default in both previews.
+
+**Migration note (additive).** `materialKey` is an optional field inside each
+part's `appearance` in canonical JSON. It defaults to `null` and is always
+emitted, so pre-CC-028 v2 files load unchanged and save-load-save stays
+byte-stable. No schema version bump was required.
+
 ## Phase 6 — skeleton inference
 
 `SkeletonInferrer.Infer(definition)` derives a `Skeleton` (a flat `List<Bone>`)

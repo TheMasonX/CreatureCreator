@@ -1,4 +1,6 @@
 using System.Collections.Generic;
+using ProceduralCreature.Appearance;
+using ProceduralCreature.Common;
 using ProceduralCreature.Definition;
 using ProceduralCreature.Morphology.Extraction;
 using ProceduralCreature.Serialization;
@@ -10,6 +12,15 @@ namespace ProceduralCreature.Generation
     {
         [SerializeField] private TextAsset definitionJson;
         [SerializeField] private bool generateOnStart = true;
+
+        /// <summary>
+        /// The shared material palette (CC-028). When a geometry item's part carries
+        /// a submaterial key, it resolves through this palette — the same asset the
+        /// editor preview uses, so both resolve identically. Null means mesh-asset
+        /// items keep the default preview material (and a set-but-unresolvable key
+        /// logs a warning rather than breaking Play Mode).
+        /// </summary>
+        [SerializeField] private CreatureMaterialPalette materialPalette;
 
         private const string GeometryChildPrefix = "GeneratedGeometry_";
 
@@ -33,7 +44,7 @@ namespace ProceduralCreature.Generation
 
             for (int i = 0; i < generated.Geometry.Count; i++)
             {
-                CreateGeometryObject(i, generated.Geometry[i].Mesh);
+                CreateGeometryObject(i, generated.Geometry[i]);
             }
 
             int implicitTriangles = generated.MainMesh != null ? generated.MainMesh.triangles.Length / 3 : 0;
@@ -54,16 +65,60 @@ namespace ProceduralCreature.Generation
             return CreateDemoDefinition();
         }
 
-        private void CreateGeometryObject(int index, Mesh mesh)
+        private void CreateGeometryObject(int index, GeometryItem item)
         {
             var go = new GameObject($"{GeometryChildPrefix}{index}");
             go.transform.SetParent(transform, worldPositionStays: false);
-            go.AddComponent<MeshFilter>().sharedMesh = mesh;
+            go.AddComponent<MeshFilter>().sharedMesh = item.Mesh;
             MeshRenderer renderer = go.AddComponent<MeshRenderer>();
+            AssignItemMaterials(renderer, item);
+            go.AddComponent<MeshCollider>().sharedMesh = item.Mesh;
+            _geometryObjects.Add(go);
+        }
+
+        /// <summary>
+        /// CC-028: a mesh-asset item whose part carries a submaterial key resolves
+        /// it through the shared palette. A set-but-unresolvable key logs a warning
+        /// and falls back to the default preview material (the editor preview treats
+        /// it as an error; Play Mode stays resilient). Items with no region keep the
+        /// default material.
+        /// </summary>
+        private void AssignItemMaterials(MeshRenderer renderer, GeometryItem item)
+        {
+            if (item.MaterialRegions.Count == 0)
+            {
+                AssignFallbackMaterial(renderer);
+                return;
+            }
+
+            Material resolved = null;
+            try
+            {
+                resolved = MaterialResolver.Resolve(materialPalette, item.MaterialRegions[0].MaterialKey);
+            }
+            catch (DomainException ex)
+            {
+                Debug.LogWarning(
+                    $"[CreatureCreator] {ex.Message} Using the default preview material for item '{item.SourcePartId}'.",
+                    this);
+            }
+
+            if (resolved == null)
+            {
+                AssignFallbackMaterial(renderer);
+                return;
+            }
+
+            int subMeshCount = Mathf.Max(1, item.Mesh != null ? item.Mesh.subMeshCount : 1);
+            var materials = new Material[subMeshCount];
+            for (int i = 0; i < materials.Length; i++) materials[i] = resolved;
+            renderer.sharedMaterials = materials;
+        }
+
+        private void AssignFallbackMaterial(MeshRenderer renderer)
+        {
             if (_previewMaterial == null) _previewMaterial = CreatePreviewMaterial();
             if (_previewMaterial != null) renderer.sharedMaterial = _previewMaterial;
-            go.AddComponent<MeshCollider>().sharedMesh = mesh;
-            _geometryObjects.Add(go);
         }
 
         private void DestroyGeneratedGeometry()

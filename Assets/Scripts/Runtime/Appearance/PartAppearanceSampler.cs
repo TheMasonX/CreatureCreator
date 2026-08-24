@@ -11,11 +11,21 @@ namespace ProceduralCreature.Appearance
         public readonly int NoiseSeed;
         public readonly float NoiseScale;
 
-        public ResolvedAppearance(Color baseColor, int noiseSeed, float noiseScale)
+        /// <summary>
+        /// The nearest part's optional submaterial key (CC-028), or null when no
+        /// part owns this surface point (Body/default) or the part has no override.
+        /// Resolution of the key to an actual material is a render-layer concern
+        /// (<see cref="MaterialResolver"/>); the sampler only surfaces which key
+        /// applies so editor and runtime previews share the same decision.
+        /// </summary>
+        public readonly string MaterialKey;
+
+        public ResolvedAppearance(Color baseColor, int noiseSeed, float noiseScale, string materialKey = null)
         {
             BaseColor = baseColor;
             NoiseSeed = noiseSeed;
             NoiseScale = noiseScale;
+            MaterialKey = materialKey;
         }
     }
 
@@ -92,7 +102,9 @@ namespace ProceduralCreature.Appearance
             }
 
             AppearanceDefinition appearance = nearestPart.Appearance;
-            return new ResolvedAppearance(appearance.BaseColor, appearance.NoiseSeed, appearance.NoiseScale);
+            return new ResolvedAppearance(
+                appearance.BaseColor, appearance.NoiseSeed, appearance.NoiseScale,
+                string.IsNullOrWhiteSpace(appearance.MaterialKey) ? null : appearance.MaterialKey);
         }
     }
 }

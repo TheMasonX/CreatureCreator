@@ -450,6 +450,10 @@ namespace ProceduralCreature.Serialization
                 BaseColor = ReadColor(RequireObject(obj, "baseColor")),
                 NoiseSeed = (int)RequireNumber(obj, "noiseSeed"),
                 NoiseScale = (float)RequireNumber(obj, "noiseScale"),
+                // CC-028: optional submaterial override by stable name. Missing or
+                // null yields null (no override); pre-CC-028 v2 files load unchanged,
+                // so this additive field needs no schema version bump.
+                MaterialKey = ReadOptionalString(obj, "materialKey"),
             };
         }
 
