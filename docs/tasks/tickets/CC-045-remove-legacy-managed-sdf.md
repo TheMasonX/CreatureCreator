@@ -147,6 +147,15 @@ instead of allocating a temporary value array for every vertex and part query.
 This targets the measured `AppearanceBake` cost while preserving the allocating
 scalar evaluator API used by standalone callers and reference tests.
 
+The supplied repeated preview measurements show the current scaling boundary:
+96x96x96 used 1,300.8-1,825.1 ms for FieldSampling and 228.9-286.1 ms for
+AppearanceBake; 128x128x128 used 3,355.2 ms and 448.5 ms; 144x144x144 used
+4,988.4 ms and 566.2 ms; 160x160x160 used 6,308.1 ms and 675.6 ms; and
+192x192x192 used 10,198.4 ms and 914.2 ms. Mesh counts remained deterministic
+within each repeated quality sample. A quality-28 preview reached the explicit
+portable scratch-buffer addressability guard; the editor reports the failure
+instead of silently clamping the authored quality.
+
 ## Blockers
 
 The runtime assembly is discoverable when selected explicitly. Six unrelated
@@ -173,6 +182,8 @@ it produces unrelated console warnings when Unity opens scripts.
 Run the repeated-generation benchmark at 96x96x96 and one additional supported
 quality, recording FieldSampling, AppearanceBake, mesh counts, and topology.
 Repeat the benchmark after scratch-buffer reuse and compare the measured
-AppearanceBake cost. Then audit remaining managed SDF references and remove the compiler only after
+AppearanceBake cost. Then reduce portable field-sampling scratch memory or add
+an explicit validated quality ceiling before treating very high preview quality
+as supported. Finally audit remaining managed SDF references and remove the compiler only after
 all reference fixtures have equivalent portable parity coverage. Do not commit
 or update the FastNoise2 submodule until a human reviews its local changes.
