@@ -174,6 +174,29 @@ namespace ProceduralCreature.Tests.Runtime
         }
 
         [Test]
+        public void Generate_MirroredMeshPart_PreservesOutwardWinding()
+        {
+            CreatureDefinition definition = DefinitionWithBody();
+            definition.SymmetryMode = SymmetryMode.MirrorAcrossXAxis;
+            CreaturePart eye = MeshEyePart("eye", new Vector3(0.5f, 0.5f, 0f), EyeGeometry("eye", Vector3.zero));
+            eye.MirrorAcrossSymmetryPlane = true;
+            definition.AddPart(eye);
+
+            GeneratedCreature generated = GenerateWithResolver(definition, _ => UnitCube());
+            Mesh original = generated.Geometry[1].Mesh;
+            Mesh mirrored = generated.Geometry[2].Mesh;
+            Vector3 originalNormal = Vector3.Cross(
+                original.vertices[original.triangles[1]] - original.vertices[original.triangles[0]],
+                original.vertices[original.triangles[2]] - original.vertices[original.triangles[0]]).normalized;
+            Vector3 mirroredNormal = Vector3.Cross(
+                mirrored.vertices[mirrored.triangles[1]] - mirrored.vertices[mirrored.triangles[0]],
+                mirrored.vertices[mirrored.triangles[2]] - mirrored.vertices[mirrored.triangles[0]]).normalized;
+
+            Assert.Greater(Vector3.Dot(originalNormal, original.vertices[original.triangles[0]] - original.bounds.center), 0f);
+            Assert.Greater(Vector3.Dot(mirroredNormal, mirrored.vertices[mirrored.triangles[0]] - mirrored.bounds.center), 0f);
+        }
+
+        [Test]
         public void Generate_MeshPart_WithoutResolver_ThrowsDomainException()
         {
             CreatureDefinition definition = DefinitionWithBody();

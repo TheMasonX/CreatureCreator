@@ -12,6 +12,9 @@ links:
   - Assets/Scripts/Runtime/Generation/CreatureMeshGenerator.cs
   - Assets/Scripts/Runtime/Generation/CreatureRuntimePreview.cs
   - Assets/Scripts/Runtime/Definition/CreaturePart.cs
+  - Assets/Scripts/Editor/CreatureMeshPalette.cs
+  - Assets/Scripts/Tests/Editor/CreatureMeshPaletteTests.cs
+  - Assets/Scripts/Tests/Runtime/GeneratedCreatureTests.cs
 ---
 
 ## Summary
@@ -130,3 +133,68 @@ Validation evidence (2026-08-23):
 Pass 2: editor mesh palette + resolver and authoring UI (assign a mesh key to a
 part), multi-item editor preview rendering, and the body-surface anchor on
 `GeometryAttachment` for the "eye attached to Body surface" manual check.
+
+## Pass 2 Review and Implementation Scope
+
+Peer review found that pass 1 correctly keeps mesh resolution outside DNA, but
+the editor calls the generator without a resolver and renders only item 0.
+Mesh-authored parts therefore cannot be assigned or previewed through the
+editor.
+
+This pass implements the editor palette, stable-key authoring, resolver wiring,
+and child rendering for non-implicit geometry items. It keeps the deferred
+body-surface anchor out of the schema until its attachment contract is defined.
+
+Acceptance criteria:
+
+- A `CreatureMeshPalette` asset maps unique stable keys to mesh assets.
+- The editor can select a palette, enable mesh geometry on a part, and assign a
+  palette key through the existing mutation path.
+- Editor generation resolves mesh keys and renders every generated item.
+- Only the implicit item owns the placement `MeshCollider`.
+- Palette references remain editor configuration and never enter DNA JSON.
+
+Focused validation:
+
+- EditMode tests cover palette resolution, duplicate/blank key handling, and
+  stable-key authoring helpers.
+- Unity compile and the full EditMode suite run after implementation.
+- Manual Unity check confirms an Eye mesh appears beside the implicit surface,
+  including its mirrored copy when symmetry is enabled.
+
+Findings and residual risk:
+
+- The runtime preview component has no runtime palette binding, so pass 2 does
+  not change its resolver contract.
+- Body-surface anchoring remains deferred and still requires a later manual
+  attachment check.
+
+## Pass 2 Validation
+
+Implemented on 2026-08-23:
+
+- `CreatureMeshPalette` is an editor-only asset with ordinal stable-key lookup,
+  usable-key enumeration, and duplicate-key detection.
+- `CreatureEditorWindow` persists the selected palette in `EditorPrefs`, lets
+  users enable mesh geometry, select a palette key, and edit the attachment.
+- Editor generation injects the palette resolver and renders non-implicit items
+  as identity children. The implicit item keeps the placement collider.
+- Peer review found that reflected mesh assets retained their original triangle
+  order. The generator now reverses mirrored triangle winding for every
+  submesh. This prevents inward-facing mirrored geometry.
+
+Validation evidence:
+
+- Unity script refresh and compiler diagnostics: clean.
+- `ProceduralCreature.Tests.Editor` EditMode suite: `83/83` passed.
+- `ProceduralCreature.Tests.Runtime.GeneratedCreatureTests.Generate_MirroredMeshPart_PreservesOutwardWinding`
+  PlayMode test: `1/1` passed.
+- Unity error and warning console after refresh: empty. Earlier test-runner
+  setup warnings are external package messages and not source diagnostics.
+
+Residual risk:
+
+- The body-surface anchor is still deferred.
+- The runtime preview component still requires an injected resolver and has no
+  runtime palette binding. This pass intentionally changes editor integration
+  only.

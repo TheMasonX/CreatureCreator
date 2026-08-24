@@ -182,12 +182,12 @@ namespace ProceduralCreature.Generation
                 mesh.subMeshCount = source.subMeshCount;
                 for (int s = 0; s < source.subMeshCount; s++)
                 {
-                    mesh.SetTriangles(source.GetTriangles(s), s);
+                    mesh.SetTriangles(CopyTriangles(source.GetTriangles(s), mirror), s);
                 }
             }
             else
             {
-                mesh.SetTriangles(source.triangles, 0);
+                mesh.SetTriangles(CopyTriangles(source.triangles, mirror), 0);
             }
 
             mesh.RecalculateNormals();
@@ -200,6 +200,20 @@ namespace ProceduralCreature.Generation
                 Mesh = mesh,
                 RigBinding = new RigBindingMetadata { SourcePartId = part.Id, ParentPartId = part.ParentId },
             };
+        }
+
+        private static int[] CopyTriangles(int[] triangles, bool reverseWinding)
+        {
+            var copy = (int[])triangles.Clone();
+            if (!reverseWinding) return copy;
+
+            for (int i = 0; i < copy.Length; i += 3)
+            {
+                int first = copy[i];
+                copy[i] = copy[i + 2];
+                copy[i + 2] = first;
+            }
+            return copy;
         }
 
         private static void Time(GenerationDiagnostics diagnostics, GenerationStage stage, System.Action action)

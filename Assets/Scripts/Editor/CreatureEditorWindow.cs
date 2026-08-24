@@ -135,6 +135,7 @@ namespace ProceduralCreature.Editor
         private Vector2 _validationScroll;
         private bool _showValidationPanel = true;
         private GameObject _previewGameObject;
+        private readonly List<GameObject> _previewGeometryObjects = new List<GameObject>();
         private CreatureUndoState _undoState;
         private bool _placementModeActive;
         private bool _autoRegenerate;
@@ -142,6 +143,7 @@ namespace ProceduralCreature.Editor
         private float _autoRegenerationDelaySeconds = 1f;
         private float _previewVoxelsPerUnit = 16f;
         private Material _previewMaterial;
+        private CreatureMeshPalette _meshPalette;
         private bool _logGenerationDiagnostics = true;
         private bool _usePortableSampling;
         private double _autoRegenerateAt = -1d;
@@ -149,10 +151,12 @@ namespace ProceduralCreature.Editor
 
         private static readonly IDnaSerializer Serializer = new JsonDnaSerializer();
         private const string PreviewObjectName = "CreatureCreator Preview";
+        private const string PreviewGeometryChildPrefix = "CreatureCreator Preview Geometry ";
         private const float MinimumAutoRegenerationDelaySeconds = 1f;
         private const string AutoRegenerationDelayKey = "ProceduralCreature.AutoRegenerationDelay";
         private const string PreviewVoxelsPerUnitKey = "ProceduralCreature.PreviewVoxelsPerUnit";
         private const string PreviewMaterialKey = "ProceduralCreature.PreviewMaterial";
+        private const string MeshPaletteKey = "ProceduralCreature.MeshPalette";
         private const string LogGenerationDiagnosticsKey = "ProceduralCreature.LogGenerationDiagnostics";
         private const string UsePortableSamplingKey = "ProceduralCreature.UsePortableSampling";
         private const string CurrentFilePathKey = "ProceduralCreature.CurrentFilePath";
@@ -242,6 +246,11 @@ namespace ProceduralCreature.Editor
             if (!string.IsNullOrEmpty(previewMaterialPath))
             {
                 _previewMaterial = AssetDatabase.LoadAssetAtPath<Material>(previewMaterialPath);
+            }
+            string meshPalettePath = EditorPrefs.GetString(MeshPaletteKey, string.Empty);
+            if (!string.IsNullOrEmpty(meshPalettePath))
+            {
+                _meshPalette = AssetDatabase.LoadAssetAtPath<CreatureMeshPalette>(meshPalettePath);
             }
             _logGenerationDiagnostics = EditorPrefs.GetBool(LogGenerationDiagnosticsKey, true);
             _usePortableSampling = EditorPrefs.GetBool(UsePortableSamplingKey, true);
@@ -427,6 +436,23 @@ namespace ProceduralCreature.Editor
                     _previewMaterial != null ? AssetDatabase.GetAssetPath(_previewMaterial) : string.Empty);
                 ApplyPreviewMaterialToRenderer();
                 Repaint();
+            }
+
+            CreatureMeshPalette newMeshPalette = (CreatureMeshPalette)EditorGUILayout.ObjectField(
+                "Mesh Palette", _meshPalette, typeof(CreatureMeshPalette), allowSceneObjects: false);
+            if (newMeshPalette != _meshPalette)
+            {
+                _meshPalette = newMeshPalette;
+                EditorPrefs.SetString(
+                    MeshPaletteKey,
+                    _meshPalette != null ? AssetDatabase.GetAssetPath(_meshPalette) : string.Empty);
+                Repaint();
+            }
+            if (_meshPalette != null && _meshPalette.HasDuplicateKeys(out string duplicateKey))
+            {
+                EditorGUILayout.HelpBox(
+                    $"Mesh palette contains duplicate key '{duplicateKey}'. Remove the duplicate before generating.",
+                    MessageType.Error);
             }
 
             float newQuality = Mathf.Max(1f, EditorGUILayout.FloatField("Preview Mesh Quality", _previewVoxelsPerUnit));
@@ -968,6 +994,8 @@ namespace ProceduralCreature.Editor
             EditorGUILayout.Space();
             DrawShapeFields(selected);
             EditorGUILayout.Space();
+            DrawMeshGeometryFields(selected);
+            EditorGUILayout.Space();
             DrawLimbFields(selected);
             EditorGUILayout.Space();
             DrawAppearanceFields(selected);
@@ -1320,6 +1348,72 @@ namespace ProceduralCreature.Editor
 
             string partId = selected.Id;
             MutateDefinition("Edit Shape", definition => definition.FindPart(partId).Shape = newShape);
+        }
+
+        private void DrawMeshGeometryFields(CreaturePart selected)
+        {
+            EditorGUILayout.LabelField("Mesh Geometry", EditorStyles.boldLabel);
+
+            bool useMeshGeometry = EditorGUILayout.Toggle("Use Mesh Asset", selected.MeshGeometry != null);
+            if (useMeshGeometry != (selected.MeshGeometry != null))
+            {
+                string partId = selected.Id;
+                MutateDefinition("Change Mesh Geometry Source", definition =>
+                {
+                    CreaturePart part = definition.FindPart(partId);
+                    part.MeshGeometry = useMeshGeometry
+                        ? new MeshGeometry { MeshAssetKey = FirstPaletteKey() }
+                        : null;
+                    if (useMeshGeometry) part.Limb = null;
+                });
+                selected = _definition.FindPart(partId);
+            }
+
+            if (selected.MeshGeometry == null) return;
+
+            string[] keys = _meshPalette != null ? _meshPalette.GetUsableKeys() : System.Array.Empty<string>();
+            if (keys.Length == 0)
+            {
+                EditorGUILayout.HelpBox(
+                    "Assign a mesh palette with at least one usable key in Editor Settings.",
+                    MessageType.Warning);
+                return;
+            }
+
+            int currentIndex = System.Array.IndexOf(keys, selected.MeshGeometry.MeshAssetKey);
+            if (currentIndex < 0) currentIndex = 0;
+            int newIndex = EditorGUILayout.Popup("Mesh Asset", currentIndex, keys);
+            if (newIndex != currentIndex || selected.MeshGeometry.MeshAssetKey != keys[newIndex])
+            {
+                string partId = selected.Id;
+                string key = keys[newIndex];
+                MutateDefinition("Assign Mesh Asset", definition =>
+                    definition.FindPart(partId).MeshGeometry.MeshAssetKey = key);
+                selected = _definition.FindPart(partId);
+            }
+
+            GeometryAttachment attachment = selected.MeshGeometry.Attachment ?? new GeometryAttachment();
+            Vector3 offset = EditorGUILayout.Vector3Field("Offset", attachment.Offset);
+            Vector3 rotation = EditorGUILayout.Vector3Field("Rotation (Euler)", attachment.Orientation.eulerAngles);
+            Vector3 scale = EditorGUILayout.Vector3Field("Scale", attachment.Scale);
+            if (offset != attachment.Offset || rotation != attachment.Orientation.eulerAngles || scale != attachment.Scale)
+            {
+                string partId = selected.Id;
+                MutateDefinition("Edit Mesh Attachment", definition =>
+                {
+                    GeometryAttachment next = definition.FindPart(partId).MeshGeometry.Attachment ?? new GeometryAttachment();
+                    next.Offset = offset;
+                    next.Orientation = Quaternion.Euler(rotation);
+                    next.Scale = scale;
+                    definition.FindPart(partId).MeshGeometry.Attachment = next;
+                });
+            }
+        }
+
+        private string FirstPaletteKey()
+        {
+            string[] keys = _meshPalette != null ? _meshPalette.GetUsableKeys() : System.Array.Empty<string>();
+            return keys.Length > 0 ? keys[0] : string.Empty;
         }
 
         /// <summary>
@@ -2335,6 +2429,15 @@ namespace ProceduralCreature.Editor
                 return;
             }
 
+            if (_meshPalette != null && _meshPalette.HasDuplicateKeys(out string duplicateKey))
+            {
+                EditorUtility.DisplayDialog(
+                    "Cannot Generate",
+                    $"Mesh palette contains duplicate key '{duplicateKey}'. Remove the duplicate before generating a preview.",
+                    "OK");
+                return;
+            }
+
             var diagnostics = new GenerationDiagnostics(_logGenerationDiagnostics);
             try
             {
@@ -2342,13 +2445,10 @@ namespace ProceduralCreature.Editor
                 generationDefinition.Generation.VoxelsPerUnit = _previewVoxelsPerUnit;
                 MeshTopologyReport topologyReport = null;
                 GeneratedCreature generated = CreatureMeshGenerator.Generate(
-                    generationDefinition, out topologyReport, diagnostics, _usePortableSampling);
-                // CC-031 pass 1 renders item 0 (the implicit surface) on the single
-                // preview object. Editor-authored creatures have no mesh-asset parts
-                // yet (the mesh palette resolver lands in pass 2), so item 0 is the
-                // whole creature today. Multi-item preview rendering is pass 2.
+                    generationDefinition, out topologyReport, diagnostics, _usePortableSampling,
+                    ResolveMeshAsset);
                 Mesh unityMesh = generated.MainMesh;
-                ApplyPreviewMesh(unityMesh);
+                ApplyPreviewGeometry(generated);
                 _autoRegenerateAt = -1d;
 
                 if (!topologyReport.IsWatertight)
@@ -2437,6 +2537,48 @@ namespace ProceduralCreature.Editor
             MeshCollider collider = _previewGameObject.GetComponent<MeshCollider>();
             if (collider == null) collider = _previewGameObject.AddComponent<MeshCollider>();
             collider.sharedMesh = mesh;
+        }
+
+        private void ApplyPreviewGeometry(GeneratedCreature generated)
+        {
+            ApplyPreviewMesh(generated.MainMesh);
+            ClearPreviewGeometryChildren();
+
+            for (int i = 1; i < generated.Geometry.Count; i++)
+            {
+                GeometryItem item = generated.Geometry[i];
+                var child = new GameObject(PreviewGeometryChildPrefix + i);
+                child.transform.SetParent(_previewGameObject.transform, worldPositionStays: false);
+                child.AddComponent<MeshFilter>().sharedMesh = item.Mesh;
+                MeshRenderer renderer = child.AddComponent<MeshRenderer>();
+                Material material = ResolvePreviewMaterial();
+                if (material != null) renderer.sharedMaterial = material;
+                _previewGeometryObjects.Add(child);
+            }
+        }
+
+        private void ClearPreviewGeometryChildren()
+        {
+            for (int i = _previewGeometryObjects.Count - 1; i >= 0; i--)
+            {
+                if (_previewGeometryObjects[i] != null) Object.DestroyImmediate(_previewGeometryObjects[i]);
+            }
+            _previewGeometryObjects.Clear();
+
+            if (_previewGameObject == null) return;
+            for (int i = _previewGameObject.transform.childCount - 1; i >= 0; i--)
+            {
+                Transform child = _previewGameObject.transform.GetChild(i);
+                if (child.name.StartsWith(PreviewGeometryChildPrefix, System.StringComparison.Ordinal))
+                {
+                    Object.DestroyImmediate(child.gameObject);
+                }
+            }
+        }
+
+        private Mesh ResolveMeshAsset(string key)
+        {
+            return _meshPalette != null && _meshPalette.TryResolve(key, out Mesh mesh) ? mesh : null;
         }
 
         private Material ResolvePreviewMaterial()
