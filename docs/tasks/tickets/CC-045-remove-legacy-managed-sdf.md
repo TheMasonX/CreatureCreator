@@ -147,6 +147,11 @@ instead of allocating a temporary value array for every vertex and part query.
 This targets the measured `AppearanceBake` cost while preserving the allocating
 scalar evaluator API used by standalone callers and reference tests.
 
+Portable grid sampling now bounds its temporary evaluator scratch storage to an
+8M-float batch budget. Jobs retain global sample coordinates while using local
+scratch offsets, so high-resolution grids no longer require one address-sized
+sample-by-operation buffer for the entire volume.
+
 The supplied repeated preview measurements show the current scaling boundary:
 96x96x96 used 1,300.8-1,825.1 ms for FieldSampling and 228.9-286.1 ms for
 AppearanceBake; 128x128x128 used 3,355.2 ms and 448.5 ms; 144x144x144 used

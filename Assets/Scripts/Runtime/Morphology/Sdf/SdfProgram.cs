@@ -176,15 +176,17 @@ namespace ProceduralCreature.Morphology.Sdf
         public int CornersZ;
         public float3 Origin;
         public float CellSize;
+        public int SampleStartIndex;
 
         public void Execute(int index)
         {
-            int x = index % CornersX;
-            int y = (index / CornersX) % CornersY;
-            int z = index / (CornersX * CornersY);
+            int sampleIndex = SampleStartIndex + index;
+            int x = sampleIndex % CornersX;
+            int y = (sampleIndex / CornersX) % CornersY;
+            int z = sampleIndex / (CornersX * CornersY);
             float3 point = Origin + new float3(x, y, z) * CellSize;
             int valueOffset = index * Operations.Length;
-            Samples[index] = SdfProgramEvaluator.EvaluateInto(
+            Samples[sampleIndex] = SdfProgramEvaluator.EvaluateInto(
                 Operations, RootIndex, point, ScratchValues, valueOffset);
         }
     }

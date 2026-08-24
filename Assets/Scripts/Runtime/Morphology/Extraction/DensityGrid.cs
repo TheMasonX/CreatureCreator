@@ -18,6 +18,7 @@ namespace ProceduralCreature.Morphology.Extraction
     /// </summary>
     public sealed class DensityGrid
     {
+        private const int PortableScratchValueBudget = 8 * 1024 * 1024;
         private readonly float[] _samples;
 
         public int CellsX { get; }
@@ -89,30 +90,51 @@ namespace ProceduralCreature.Morphology.Extraction
             var grid = new DensityGrid(cellsX, cellsY, cellsZ,
                 new Vector3(-bounds.MaxX, -bounds.MaxY, -bounds.MaxZ), cellSize);
             var samples = new NativeArray<float>(grid.SampleCount, Allocator.TempJob);
-            long scratchLength = (long)grid.SampleCount * program.Operations.Length;
-            if (scratchLength > int.MaxValue)
+            int operationCount = program.Operations.Length;
+            if (operationCount <= 0)
             {
                 samples.Dispose();
-                throw new DomainException("Portable sampler scratch buffer exceeds addressable array size.");
+                throw new DomainException("Portable program must contain at least one operation.");
             }
-            var scratchValues = new NativeArray<float>((int)scratchLength, Allocator.TempJob);
-            var job = new SdfSamplingJob
+
+            int batchSize = Mathf.Max(1, PortableScratchValueBudget / operationCount);
+            for (int sampleStart = 0; sampleStart < grid.SampleCount; sampleStart += batchSize)
             {
-                Operations = program.Operations,
-                ScratchValues = scratchValues,
-                Samples = samples,
-                RootIndex = program.RootIndex,
-                CornersX = grid.CornersX,
-                CornersY = grid.CornersY,
-                CornersZ = grid.CornersZ,
-                Origin = new float3(grid.Origin.x, grid.Origin.y, grid.Origin.z),
-                CellSize = grid.CellSize,
-            };
-            JobHandle handle = job.Schedule(grid.SampleCount, 64);
-            handle.Complete();
+                int sampleCount = Mathf.Min(batchSize, grid.SampleCount - sampleStart);
+                long scratchLength = (long)sampleCount * operationCount;
+                if (scratchLength > int.MaxValue)
+                {
+                    samples.Dispose();
+                    throw new DomainException("Portable sampler scratch buffer exceeds addressable array size.");
+                }
+
+                var scratchValues = new NativeArray<float>((int)scratchLength, Allocator.TempJob);
+                try
+                {
+                    var job = new SdfSamplingJob
+                    {
+                        Operations = program.Operations,
+                        ScratchValues = scratchValues,
+                        Samples = samples,
+                        RootIndex = program.RootIndex,
+                        CornersX = grid.CornersX,
+                        CornersY = grid.CornersY,
+                        CornersZ = grid.CornersZ,
+                        Origin = new float3(grid.Origin.x, grid.Origin.y, grid.Origin.z),
+                        CellSize = grid.CellSize,
+                        SampleStartIndex = sampleStart,
+                    };
+                    JobHandle handle = job.Schedule(sampleCount, 64);
+                    handle.Complete();
+                }
+                finally
+                {
+                    scratchValues.Dispose();
+                }
+            }
+
             for (int i = 0; i < grid._samples.Length; i++) grid._samples[i] = samples[i];
             samples.Dispose();
-            scratchValues.Dispose();
             return grid;
         }
 
