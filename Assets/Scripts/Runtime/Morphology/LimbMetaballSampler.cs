@@ -53,35 +53,42 @@ namespace ProceduralCreature.Morphology
             {
                 throw new DomainException("Cannot sample a null LimbChain.");
             }
-            if (chain.Joints == null || chain.Joints.Count == 0)
-            {
-                throw new DomainException("Cannot sample a LimbChain with no joints.");
-            }
+            return Sample(ResolvedLimb.Resolve(chain));
+        }
 
-            float totalLength = 0f;
-            for (int i = 0; i < chain.Joints.Count - 1; i++)
+        /// <summary>
+        /// Samples a derived <see cref="ResolvedLimb"/> (CC-056A). Segment
+        /// lengths, total length, and arc length come from the resolved model
+        /// instead of being re-derived here; this generator owns only the
+        /// fidelity knob (per-segment ball count). Pure and deterministic, and
+        /// bit-identical to sampling the source chain directly.
+        /// </summary>
+        public static List<LimbMetaball> Sample(ResolvedLimb limb)
+        {
+            if (limb.JointPositions == null || limb.JointPositions.Length == 0)
             {
-                totalLength += Vector3.Distance(chain.Joints[i].Position, chain.Joints[i + 1].Position);
+                throw new DomainException("Cannot sample a ResolvedLimb with no joints.");
             }
 
             var result = new List<LimbMetaball>();
-            if (totalLength <= 1e-6f)
+            if (limb.TotalLength <= 1e-6f)
             {
                 // Defensive degenerate guard (the validator rejects zero-length
                 // chains; this keeps the generator total for direct calls).
-                float radius = chain.Thickness == null ? 0f : chain.Thickness.Evaluate(0.5f);
-                result.Add(new LimbMetaball(chain.Joints[0].Position, radius));
+                float radius = limb.Thickness == null ? 0f : limb.Thickness.Evaluate(0.5f);
+                result.Add(new LimbMetaball(limb.RootSocket, radius));
                 return result;
             }
 
-            ThicknessProfile thickness = chain.Thickness ?? ThicknessProfile.CreateDefault();
+            ThicknessProfile thickness = limb.Thickness ?? ThicknessProfile.CreateDefault();
+            float totalLength = limb.TotalLength;
             float cumulative = 0f;
 
-            for (int i = 0; i < chain.Joints.Count - 1; i++)
+            for (int i = 0; i < limb.JointPositions.Length - 1; i++)
             {
-                Vector3 start = chain.Joints[i].Position;
-                Vector3 end = chain.Joints[i + 1].Position;
-                float segmentLength = Vector3.Distance(start, end);
+                Vector3 start = limb.JointPositions[i];
+                Vector3 end = limb.JointPositions[i + 1];
+                float segmentLength = limb.SegmentLengths[i];
 
                 int count = Mathf.Max(1, Mathf.CeilToInt(segmentLength / DesiredSampleSpacing));
                 for (int k = 0; k < count; k++)
@@ -97,9 +104,7 @@ namespace ProceduralCreature.Morphology
             // The terminal joint (t = 1) is a stable semantic point; ensure a
             // metaball sits there so the tip is closed and children attach to a
             // real surface.
-            result.Add(new LimbMetaball(
-                chain.Joints[chain.Joints.Count - 1].Position,
-                thickness.Evaluate(1f)));
+            result.Add(new LimbMetaball(limb.TerminalSocket, thickness.Evaluate(1f)));
 
             return result;
         }
