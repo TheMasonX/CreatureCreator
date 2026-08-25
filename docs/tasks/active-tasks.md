@@ -85,3 +85,6 @@
 | CC-079 | Add a minimum absolute Body-spacing / degenerate-length validation | Backlog | P3 |
 | CC-080 | Resolve the dead ParentId-null guard in HasParentCycle | Backlog | P3 |
 | CC-081 | One canonical end-to-end morphology verification run | Backlog | P2 |
+| CC-082 | Fix the validator ToDictionary throw on duplicate part IDs | Backlog | P2 |
+| CC-083 | Reject a non-Body part with no parent (MissingParent gap) | Backlog | P2 |
+| CC-084 | Fix DisplayName round-trip mismatch after JSON round-trip | Backlog | P2 |
