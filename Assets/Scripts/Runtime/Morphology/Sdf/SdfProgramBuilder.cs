@@ -226,13 +226,17 @@ namespace ProceduralCreature.Morphology.Sdf
             int root = -1;
             if (hasBodySamples)
             {
-                for (int i = 0; i < definition.Body.Samples.Count; i++)
+                // CC-056A increment 3: consume the shared ResolvedBody derivation
+                // (positions/radii) instead of reading authored samples here.
+                ResolvedBody body = ResolvedBody.Resolve(definition.Body);
+                for (int i = 0; i < body.SamplePositions.Length; i++)
                 {
-                    BodySample sample = definition.Body.Samples[i];
+                    Vector3 position = body.SamplePositions[i];
+                    float radius = body.SampleRadii[i];
                     int primitive = operations.Count;
-                    operations.Add(SdfOperation.Primitive(SdfOperationType.Sphere, new float3(sample.Radius, 0f, 0f)));
+                    operations.Add(SdfOperation.Primitive(SdfOperationType.Sphere, new float3(radius, 0f, 0f)));
 
-                    Matrix4x4 localToCreature = Matrix4x4.TRS(sample.Position, Quaternion.identity, Vector3.one);
+                    Matrix4x4 localToCreature = Matrix4x4.TRS(position, Quaternion.identity, Vector3.one);
                     Matrix4x4 worldToLocal = localToCreature.inverse;
                     int bodyNode = operations.Count;
                     operations.Add(new SdfOperation
@@ -247,8 +251,7 @@ namespace ProceduralCreature.Morphology.Sdf
 
                     if (root >= 0)
                     {
-                        BodySample previous = definition.Body.Samples[i - 1];
-                        float blend = Mathf.Min(previous.Radius, sample.Radius) * BodySampleBlendFactor;
+                        float blend = Mathf.Min(body.SampleRadii[i - 1], radius) * BodySampleBlendFactor;
                         int unionIndex = operations.Count;
                         operations.Add(new SdfOperation
                         {
@@ -412,13 +415,16 @@ namespace ProceduralCreature.Morphology.Sdf
                 return -1;
             }
 
+            // CC-056A increment 3: consume the shared ResolvedBody derivation.
+            ResolvedBody body = ResolvedBody.Resolve(definition.Body);
             int root = -1;
-            for (int i = 0; i < definition.Body.Samples.Count; i++)
+            for (int i = 0; i < body.SamplePositions.Length; i++)
             {
-                BodySample sample = definition.Body.Samples[i];
+                Vector3 position = body.SamplePositions[i];
+                float radius = body.SampleRadii[i];
                 int primitive = operations.Count;
-                operations.Add(SdfOperation.Primitive(SdfOperationType.Sphere, new float3(sample.Radius, 0f, 0f)));
-                Matrix4x4 localToCreature = Matrix4x4.TRS(sample.Position, Quaternion.identity, Vector3.one);
+                operations.Add(SdfOperation.Primitive(SdfOperationType.Sphere, new float3(radius, 0f, 0f)));
+                Matrix4x4 localToCreature = Matrix4x4.TRS(position, Quaternion.identity, Vector3.one);
                 int bodyNode = operations.Count;
                 operations.Add(new SdfOperation
                 {
@@ -436,14 +442,13 @@ namespace ProceduralCreature.Morphology.Sdf
                     continue;
                 }
 
-                BodySample previous = definition.Body.Samples[i - 1];
                 int unionIndex = operations.Count;
                 operations.Add(new SdfOperation
                 {
                     Type = SdfOperationType.SmoothUnion,
                     A = root,
                     B = bodyNode,
-                    Parameters = new float3(Mathf.Min(previous.Radius, sample.Radius) * BodySampleBlendFactor, 0f, 0f),
+                    Parameters = new float3(Mathf.Min(body.SampleRadii[i - 1], radius) * BodySampleBlendFactor, 0f, 0f),
                 });
                 SetWorldAabb(operations, unionIndex, Aabb.Union(ReadAabb(operations, root), ReadAabb(operations, bodyNode)));
                 SetCullable(operations, unionIndex, ReadCullable(operations, root) && ReadCullable(operations, bodyNode));
@@ -576,13 +581,16 @@ namespace ProceduralCreature.Morphology.Sdf
                 return null;
             }
 
+            // CC-056A increment 3: consume the shared ResolvedBody derivation.
+            ResolvedBody body = ResolvedBody.Resolve(definition.Body);
             ISdfNode accumulated = null;
-            for (int i = 0; i < definition.Body.Samples.Count; i++)
+            for (int i = 0; i < body.SamplePositions.Length; i++)
             {
-                BodySample sample = definition.Body.Samples[i];
+                Vector3 position = body.SamplePositions[i];
+                float radius = body.SampleRadii[i];
                 ISdfNode sphere = new TransformNode(
-                    new SphereSdfNode(sample.Radius),
-                    Matrix4x4.TRS(sample.Position, Quaternion.identity, Vector3.one));
+                    new SphereSdfNode(radius),
+                    Matrix4x4.TRS(position, Quaternion.identity, Vector3.one));
 
                 if (accumulated == null)
                 {
@@ -590,8 +598,7 @@ namespace ProceduralCreature.Morphology.Sdf
                     continue;
                 }
 
-                BodySample previous = definition.Body.Samples[i - 1];
-                float blend = Mathf.Min(previous.Radius, sample.Radius) * BodySampleBlendFactor;
+                float blend = Mathf.Min(body.SampleRadii[i - 1], radius) * BodySampleBlendFactor;
                 accumulated = new SmoothUnionNode(accumulated, sphere, blend);
             }
 

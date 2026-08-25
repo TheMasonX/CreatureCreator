@@ -2,6 +2,7 @@ using System;
 using System.Collections.Generic;
 using UnityEngine;
 using ProceduralCreature.Common;
+using ProceduralCreature.Morphology;
 
 namespace ProceduralCreature.Definition
 {
@@ -78,23 +79,26 @@ namespace ProceduralCreature.Definition
         {
             if (samples == null) throw new DomainException("samples must not be null.");
             if (samples.Count == 0) return BodyFrame.Default;
-            int i = Mathf.Clamp(index, 0, samples.Count - 1);
+            return ResolveSampleFrame(ResolvedBody.Resolve(samples), index, forward);
+        }
 
-            Vector3[] positions = new Vector3[samples.Count];
-            float[] radii = new float[samples.Count];
-            for (int k = 0; k < samples.Count; k++)
+        /// <summary>
+        /// Resolves the frame at the given sample index of a derived
+        /// <see cref="ResolvedBody"/> (CC-056A). Same contract as the sample-list
+        /// overload, but consumes the shared snapshot so the caller resolves the
+        /// Body once and reuses it. A default-constructed (empty) resolved body
+        /// falls back to <see cref="BodyFrame.Default"/>.
+        /// </summary>
+        public static BodyFrame ResolveSampleFrame(
+            ResolvedBody body, int index, Vector3 forward)
+        {
+            if (body.SamplePositions == null || body.SamplePositions.Length == 0)
             {
-                BodySample s = samples[k];
-                if (s == null)
-                {
-                    throw new DomainException(
-                        "Body spline contains a null sample; validation should have rejected it.");
-                }
-                positions[k] = s.Position;
-                radii[k] = s.Radius;
+                return BodyFrame.Default;
             }
 
-            BodyFrame[] frames = TransportFrames(positions, radii, forward);
+            int i = Mathf.Clamp(index, 0, body.SamplePositions.Length - 1);
+            BodyFrame[] frames = TransportFrames(body.SamplePositions, body.SampleRadii, forward);
             return frames[i];
         }
 
@@ -111,30 +115,32 @@ namespace ProceduralCreature.Definition
         {
             if (samples == null) throw new DomainException("samples must not be null.");
             if (samples.Count == 0) return BodyFrame.Default;
+            return ResolveFrame(ResolvedBody.Resolve(samples), t, forward);
+        }
 
-            int count = samples.Count;
-            if (count == 1) return ResolveSampleFrame(samples, 0, forward);
+        /// <summary>
+        /// Resolves the frame at a continuous position along a derived
+        /// <see cref="ResolvedBody"/> in "sample units": t = 0 is the first
+        /// sample, t = (count-1) is the last (CC-056A). Same contract as the
+        /// sample-list overload, but consumes the shared snapshot.
+        /// </summary>
+        public static BodyFrame ResolveFrame(
+            ResolvedBody body, float t, Vector3 forward)
+        {
+            if (body.SamplePositions == null || body.SamplePositions.Length == 0)
+            {
+                return BodyFrame.Default;
+            }
+
+            int count = body.SamplePositions.Length;
+            if (count == 1) return ResolveSampleFrame(body, 0, forward);
 
             float clamped = Mathf.Clamp(t, 0f, count - 1f);
             int a = Mathf.FloorToInt(clamped);
             int b = Mathf.Min(a + 1, count - 1);
             float frac = clamped - a;
 
-            Vector3[] positions = new Vector3[count];
-            float[] radii = new float[count];
-            for (int k = 0; k < count; k++)
-            {
-                BodySample s = samples[k];
-                if (s == null)
-                {
-                    throw new DomainException(
-                        "Body spline contains a null sample; validation should have rejected it.");
-                }
-                positions[k] = s.Position;
-                radii[k] = s.Radius;
-            }
-
-            BodyFrame[] frames = TransportFrames(positions, radii, forward);
+            BodyFrame[] frames = TransportFrames(body.SamplePositions, body.SampleRadii, forward);
             return Interpolate(frames[a], frames[b], frac);
         }
 
@@ -148,12 +154,30 @@ namespace ProceduralCreature.Definition
             IReadOnlyList<BodySample> samples, int segmentIndex, float segmentT, Vector3 forward)
         {
             if (samples == null) throw new DomainException("samples must not be null.");
-            int count = samples.Count;
-            if (count == 0) return BodyFrame.Default;
-            if (count == 1) return ResolveSampleFrame(samples, 0, forward);
+            if (samples.Count == 0) return BodyFrame.Default;
+            return ResolveSegmentFrame(ResolvedBody.Resolve(samples), segmentIndex, segmentT, forward);
+        }
+
+        /// <summary>
+        /// Resolves the frame at a point inside one segment of a derived
+        /// <see cref="ResolvedBody"/> (CC-056A): <paramref name="segmentIndex"/>
+        /// is the 0-based start sample of the segment, <paramref name="segmentT"/>
+        /// is 0..1 along that segment. Same contract as the sample-list overload,
+        /// but consumes the shared snapshot.
+        /// </summary>
+        public static BodyFrame ResolveSegmentFrame(
+            ResolvedBody body, int segmentIndex, float segmentT, Vector3 forward)
+        {
+            if (body.SamplePositions == null || body.SamplePositions.Length == 0)
+            {
+                return BodyFrame.Default;
+            }
+
+            int count = body.SamplePositions.Length;
+            if (count == 1) return ResolveSampleFrame(body, 0, forward);
 
             int seg = Mathf.Clamp(segmentIndex, 0, count - 2);
-            return ResolveFrame(samples, seg + Mathf.Clamp01(segmentT), forward);
+            return ResolveFrame(body, seg + Mathf.Clamp01(segmentT), forward);
         }
 
         /// <summary>
@@ -165,22 +189,26 @@ namespace ProceduralCreature.Definition
             IReadOnlyList<BodySample> samples, Vector3 forward)
         {
             if (samples == null) throw new DomainException("samples must not be null.");
+            if (samples.Count == 0) return new BodyFrame[0];
+            return ComputeSampleFrames(ResolvedBody.Resolve(samples), forward);
+        }
 
-            var positions = new Vector3[samples.Count];
-            var radii = new float[samples.Count];
-            for (int k = 0; k < samples.Count; k++)
+        /// <summary>
+        /// Computes the full frame chain (one frame per sample) for a derived
+        /// <see cref="ResolvedBody"/> (CC-056A). Same contract as the sample-list
+        /// overload, but consumes the shared snapshot so the caller resolves the
+        /// Body once and reuses it. A default-constructed (empty) resolved body
+        /// yields an empty frame array.
+        /// </summary>
+        public static BodyFrame[] ComputeSampleFrames(
+            ResolvedBody body, Vector3 forward)
+        {
+            if (body.SamplePositions == null || body.SamplePositions.Length == 0)
             {
-                BodySample s = samples[k];
-                if (s == null)
-                {
-                    throw new DomainException(
-                        "Body spline contains a null sample; validation should have rejected it.");
-                }
-                positions[k] = s.Position;
-                radii[k] = s.Radius;
+                return new BodyFrame[0];
             }
 
-            return TransportFrames(positions, radii, forward);
+            return TransportFrames(body.SamplePositions, body.SampleRadii, forward);
         }
 
         // ---- frame transport -----------------------------------------------------

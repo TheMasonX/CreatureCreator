@@ -57,17 +57,42 @@ namespace ProceduralCreature.Definition
         {
             if (HasStructuralParentIssue(issues)) return;
 
-            if (definition.Body != null && definition.Body.Samples != null)
+            if (definition.Body != null && definition.Body.Samples != null
+                && definition.Body.Samples.Count > 0)
             {
-                foreach (BodySample sample in definition.Body.Samples)
+                // CC-056A increment 3: consume the shared ResolvedBody derivation
+                // instead of iterating authored samples here. A broken spline (a
+                // null sample) is already reported by ValidateBody as
+                // InvalidBodySample; the resolved envelope is undefined for it, so
+                // skip it — the same rule the limb envelope uses.
+                ResolvedBody bodyResolved;
+                bool bodyResolvedOk;
+                try
                 {
-                    if (sample == null) continue;
-                    if (!IsFinite(sample.Position.x) || !IsFinite(sample.Position.y) || !IsFinite(sample.Position.z)) continue;
-                    if (!definition.Bounds.Contains(sample.Position))
+                    bodyResolved = ResolvedBody.Resolve(definition.Body);
+                    bodyResolvedOk = true;
+                }
+                catch (DomainException)
+                {
+                    bodyResolved = default;
+                    bodyResolvedOk = false;
+                }
+
+                if (bodyResolvedOk)
+                {
+                    for (int i = 0; i < bodyResolved.SamplePositions.Length; i++)
                     {
-                        issues.Add(new ValidationIssue(
-                            ValidationSeverity.Error, ValidationCode.ResolvedBodySampleOutOfBounds,
-                            $"Body sample '{sample.Id}' lies outside the creature bounds."));
+                        Vector3 position = bodyResolved.SamplePositions[i];
+                        if (!IsFinite(position.x) || !IsFinite(position.y) || !IsFinite(position.z)) continue;
+                        if (!definition.Bounds.Contains(position))
+                        {
+                            // The position comes from the resolved model; the
+                            // authored sample Id is read only for a stable
+                            // diagnostic message.
+                            issues.Add(new ValidationIssue(
+                                ValidationSeverity.Error, ValidationCode.ResolvedBodySampleOutOfBounds,
+                                $"Body sample '{definition.Body.Samples[i].Id}' lies outside the creature bounds."));
+                        }
                     }
                 }
             }

@@ -296,14 +296,29 @@ namespace ProceduralCreature.Skeleton
                 return;
             }
 
-            BodyFrame[] frames = BodyFrameResolver.ComputeSampleFrames(
-                definition.Body.Samples, definition.Forward);
-            for (int i = 0; i < definition.Body.Samples.Count; i++)
+            // CC-056A increment 3: the Body is consumed through the shared
+            // ResolvedBody derivation — the same sample positions the SDF field
+            // and envelope validation use, never re-derived here. A structurally
+            // broken spline (a null sample) resolves to no bones; the validator
+            // rejects those before inference, so this only guards direct calls.
+            ResolvedBody resolved;
+            try
             {
-                Vector3 position = definition.Body.Samples[i].Position;
-                bool hasSegment = i < definition.Body.Samples.Count - 1;
+                resolved = ResolvedBody.Resolve(definition.Body);
+            }
+            catch (DomainException)
+            {
+                return;
+            }
+
+            BodyFrame[] frames = BodyFrameResolver.ComputeSampleFrames(
+                resolved, definition.Forward);
+            for (int i = 0; i < resolved.SamplePositions.Length; i++)
+            {
+                Vector3 position = resolved.SamplePositions[i];
+                bool hasSegment = i < resolved.SamplePositions.Length - 1;
                 Vector3 endPosition = hasSegment
-                    ? definition.Body.Samples[i + 1].Position
+                    ? resolved.SamplePositions[i + 1]
                     : position;
                 string boneId = CreatureDefinition.BodyId + LimbJointBoneSeparator
                     + definition.Body.Samples[i].Id;
