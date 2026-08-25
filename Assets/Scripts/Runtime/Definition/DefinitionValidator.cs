@@ -2,6 +2,7 @@ using System;
 using System.Collections.Generic;
 using UnityEngine;
 using ProceduralCreature.Common;
+using ProceduralCreature.Morphology;
 
 namespace ProceduralCreature.Definition
 {
@@ -44,10 +45,13 @@ namespace ProceduralCreature.Definition
         /// position falls outside the generation bounds — the voxel domain that
         /// would crop it. This stage re-resolves every geometry source through the
         /// shared world-frame resolver and reports any origin that lands outside
-        /// <see cref="BoundsDefinition"/>. Report-only; a Body sample's radius may
-        /// extend past the box by design (cropping). Skips when the definition has
-        /// unresolved parent/cycle errors, because resolution is undefined for a
-        /// broken chain.
+        /// <see cref="BoundsDefinition"/>. Limb chains are consumed through the
+        /// shared <see cref="ResolvedLimb"/> derivation (CC-056A) so this stage
+        /// checks exactly the joint positions the metaball sampler and skeleton
+        /// inferrer use, never re-derived here. Report-only; a Body sample's
+        /// radius may extend past the box by design (cropping). Skips when the
+        /// definition has unresolved parent/cycle errors, because resolution is
+        /// undefined for a broken chain.
         /// </summary>
         private static void ValidateResolvedEnvelope(CreatureDefinition definition, List<ValidationIssue> issues)
         {
@@ -85,15 +89,31 @@ namespace ProceduralCreature.Definition
 
                 if (part.Limb != null && part.Limb.Joints != null && part.Limb.Joints.Count > 0)
                 {
-                    foreach (LimbJoint joint in part.Limb.Joints)
+                    // CC-056A increment 2: resolve the chain once through the shared
+                    // ResolvedLimb derivation instead of iterating LimbChain here.
+                    // Structural errors (a null joint) are already reported by
+                    // ValidateLimbChains; the resolved envelope is undefined for a
+                    // broken chain, so skip it.
+                    ResolvedLimb resolved;
+                    try
                     {
-                        if (joint == null) continue;
-                        Vector3 resolved = world.MultiplyPoint3x4(joint.Position);
-                        if (!definition.Bounds.Contains(resolved))
+                        resolved = ResolvedLimb.Resolve(part.Limb);
+                    }
+                    catch (DomainException)
+                    {
+                        continue;
+                    }
+
+                    for (int i = 0; i < resolved.JointPositions.Length; i++)
+                    {
+                        Vector3 resolvedWorld = world.MultiplyPoint3x4(resolved.JointPositions[i]);
+                        if (!definition.Bounds.Contains(resolvedWorld))
                         {
+                            // The position comes from the resolved model; the authored
+                            // joint Id is read only for a stable diagnostic message.
                             issues.Add(new ValidationIssue(
                                 ValidationSeverity.Error, ValidationCode.ResolvedLimbJointOutOfBounds,
-                                $"Part '{part.Id}' limb joint '{joint.Id}' lies outside the creature bounds.", part.Id));
+                                $"Part '{part.Id}' limb joint '{part.Limb.Joints[i].Id}' lies outside the creature bounds.", part.Id));
                         }
                     }
                     continue;

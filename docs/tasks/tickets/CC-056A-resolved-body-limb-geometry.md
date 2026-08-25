@@ -109,8 +109,41 @@ Evidence (real editor, Unity 6000.5.9f1):
   round-trip). No regressions.
 - Console clean, 0 compile errors.
 
-Residual: `SkeletonInferrer.AppendLimbBones` and
-`DefinitionValidator.ValidateResolvedEnvelope` still iterate `LimbChain`
-directly. Migrate them onto `ResolvedLimb` in the next increments so all three
-consumers share one derivation.
+## 2026-08-24 implementation - increment 2 (skeleton + validator envelope)
+
+Second increment landed: the two remaining limb consumers now share the
+`ResolvedLimb` derivation.
+
+- `SkeletonInferrer.AppendLimbBones` resolves the chain through
+  `ResolvedLimb.Resolve` and iterates `resolved.JointPositions`; the
+  terminal-bone index comes from `JointPositions.Length - 2`. Defensive
+  contract preserved: a null/empty/null-joint chain resolves to no bones
+  (no throw). Identical output for valid DNA — the existing SkeletonInferrerLimb
+  tests (bone count, positions, rotations, parents, mirrors) pass unchanged.
+- `DefinitionValidator.ValidateResolvedEnvelope` resolves the limb once and
+  checks `resolved.JointPositions` in creature space. The validator stays total:
+  a null-joint chain (already reported as InvalidLimbChain by ValidateLimbChains)
+  is caught and skipped rather than throwing. The joint Id in the diagnostic is
+  read from the authored chain; the position and envelope come from the resolved
+  model.
+- Tests: `Infer_LimbWithNullJoint_DoesNotThrowAndEmitsNoBones` and
+  `Validate_ResolvedEnvelope_LimbWithNullJoint_DoesNotThrow` pin the defensive
+  contract.
+
+Evidence (real editor, Unity 6000.5.9f1):
+- Focused (ResolvedLimbTests + LimbMetaballSamplerTests + SkeletonInferrerLimbTests
+  + DefinitionValidatorTests): 61 total, 57 passed; the 4 failures are exactly
+  the documented pre-existing ones (validator ToDictionary dup-id x3 + NoParent),
+  none from the migrated paths.
+- Limb regression (SdfProgramBuilderLimbTests + DefinitionValidatorLimbTests):
+  30/30 — SDF managed<->portable parity and validator limb behavior unchanged.
+- Full PlayMode suite: 395 total, 390 passed, 5 failed = exactly the documented
+  pre-existing failures (validator ToDictionary dup-id x3, NoParent, DisplayName
+  round-trip). No regressions.
+- Compile / console: 0 errors, 0 warnings.
+
+Residual: `ResolveParentBoneId` / `ResolveBodyParentBoneId` still read the
+authored chain (terminal-bone index, root joint position); those are attachment
+semantics that belong to CC-056B / CC-076, not this increment. Remaining CC-056A
+work is ResolvedBody + BodyFrameResolver consolidation, then CC-056B.
 

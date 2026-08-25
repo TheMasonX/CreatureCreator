@@ -3,6 +3,7 @@ using System.Linq;
 using UnityEngine;
 using ProceduralCreature.Common;
 using ProceduralCreature.Definition;
+using ProceduralCreature.Morphology;
 
 namespace ProceduralCreature.Skeleton
 {
@@ -152,14 +153,39 @@ namespace ProceduralCreature.Skeleton
         /// Rotations look along each segment with the part's (reflected) world up
         /// as the up hint, with a fallback for the vertical-segment case where a
         /// look rotation would otherwise degenerate.
+        ///
+        /// CC-056A increment 2: the chain is consumed through the shared
+        /// <see cref="ResolvedLimb"/> derivation — the same joint positions and
+        /// structure the metaball sampler uses — never re-derived here. A
+        /// structurally broken chain (empty, or containing a null joint) resolves
+        /// to no bones; the validator rejects those before inference, so this only
+        /// guards direct calls.
         /// </summary>
         private static void AppendLimbBones(Skeleton skeleton, CreatureDefinition definition, CreaturePart part, bool mirrored)
         {
             LimbChain limb = part.Limb;
-            if (limb == null || limb.Joints == null || limb.Joints.Count < 2)
+            if (limb == null)
             {
-                // Defensive: the validator enforces MinLimbJointCount, so valid
-                // definitions never reach here.
+                // Defensive: no chain, no bones.
+                return;
+            }
+
+            ResolvedLimb resolved;
+            try
+            {
+                resolved = ResolvedLimb.Resolve(limb);
+            }
+            catch (DomainException)
+            {
+                // Defensive: an empty or null-joint chain resolves to nothing.
+                // The validator enforces MinLimbJointCount and rejects null
+                // joints, so valid definitions never reach here.
+                return;
+            }
+
+            if (resolved.JointPositions.Length < 2)
+            {
+                // Defensive: a single-joint chain emits no bones.
                 return;
             }
 
@@ -175,14 +201,13 @@ namespace ProceduralCreature.Skeleton
             string rootParentBoneId = ResolveParentBoneId(definition, part, mirrored);
             string previousBoneId = null;
 
-            for (int i = 0; i < limb.Joints.Count - 1; i++)
+            for (int i = 0; i < resolved.JointPositions.Length - 1; i++)
             {
-                LimbJoint from = limb.Joints[i];
-                LimbJoint to = limb.Joints[i + 1];
-                if (from == null || to == null) continue;
+                Vector3 from = resolved.JointPositions[i];
+                Vector3 to = resolved.JointPositions[i + 1];
 
-                Vector3 fromWorld = partMatrix.MultiplyPoint3x4(from.Position);
-                Vector3 toWorld = partMatrix.MultiplyPoint3x4(to.Position);
+                Vector3 fromWorld = partMatrix.MultiplyPoint3x4(from);
+                Vector3 toWorld = partMatrix.MultiplyPoint3x4(to);
                 Vector3 segmentDir = toWorld - fromWorld;
                 Quaternion rotation = LimbBoneRotation(segmentDir, upHint);
 
@@ -197,7 +222,7 @@ namespace ProceduralCreature.Skeleton
                     Position = fromWorld,
                     HasSegment = true,
                     EndPosition = toWorld,
-                    HasChildAttachmentPosition = i == limb.Joints.Count - 2,
+                    HasChildAttachmentPosition = i == resolved.JointPositions.Length - 2,
                     ChildAttachmentPosition = toWorld,
                     Rotation = rotation,
                 });

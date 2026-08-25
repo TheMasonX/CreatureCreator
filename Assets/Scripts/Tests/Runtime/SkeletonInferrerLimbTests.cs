@@ -336,6 +336,26 @@ namespace ProceduralCreature.Tests.Runtime
             Assert.IsNull(skeleton.FindBone("part_leg_j0"), "A non-limb part must not emit joint bones.");
         }
 
+        [Test]
+        public void Infer_LimbWithNullJoint_DoesNotThrowAndEmitsNoBones()
+        {
+            // CC-056A increment 2: the limb is consumed through ResolvedLimb, so a
+            // structurally broken chain (a null joint) resolves to nothing instead
+            // of emitting partial bones. Inference stays total for direct calls.
+            LimbChain chain = Chain(new Vector3(0f, 0f, 0f), new Vector3(0f, -1f, 0f));
+            chain.Joints.Add(null);
+
+            var definition = DefinitionWith(
+                MakePlainPart("part_body", PartType.Body, Vector3.zero),
+                MakeLimbPart("part_leg", PartType.Leg, chain, parentId: "part_body"));
+
+            Skeleton.Skeleton skeleton = SkeletonInferrer.Infer(definition);
+
+            Assert.AreEqual(1, skeleton.Bones.Count,
+                "The broken limb resolves to nothing; only the body bone remains.");
+            Assert.IsNull(skeleton.FindBone("part_leg_j0"));
+        }
+
         private static bool IsFinite(Quaternion q)
         {
             return !float.IsNaN(q.x) && !float.IsNaN(q.y) && !float.IsNaN(q.z) && !float.IsNaN(q.w)

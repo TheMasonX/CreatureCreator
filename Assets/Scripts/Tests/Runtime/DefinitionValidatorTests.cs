@@ -522,6 +522,30 @@ namespace ProceduralCreature.Tests.Runtime
             Assert.IsFalse(HasCode(result, ValidationCode.ResolvedLimbJointOutOfBounds));
         }
 
+        [Test]
+        public void Validate_ResolvedEnvelope_LimbWithNullJoint_DoesNotThrow()
+        {
+            // CC-056A increment 2: the envelope stage resolves the chain through
+            // ResolvedLimb, which throws on a null joint. The validator must stay
+            // total (never throw): the broken chain is reported by the local limb
+            // checks and the envelope stage skips it.
+            var definition = CreatureDefinition.CreateEmpty();
+            definition.Forward = Vector3.forward;
+            definition.Body.Samples.Add(new BodySample { Id = 1, Position = Vector3.zero, Radius = 0.75f });
+            CreaturePart leg = ValidPart("part_leg");
+            leg.Limb = new LimbChain();
+            leg.Limb.Joints.Add(new LimbJoint { Id = 1, Position = Vector3.zero });
+            leg.Limb.Joints.Add(null);
+            definition.AddPart(leg);
+
+            ValidationResult result = DefinitionValidator.Validate(definition);
+
+            Assert.IsTrue(HasCode(result, ValidationCode.InvalidLimbChain),
+                "the broken chain is reported by the local limb checks");
+            Assert.IsFalse(HasCode(result, ValidationCode.ResolvedLimbJointOutOfBounds),
+                "the resolved-envelope stage must skip a broken chain without throwing");
+        }
+
         private static bool HasCode(ValidationResult result, ValidationCode code)
         {
             foreach (ValidationIssue issue in result.Issues)
