@@ -32,13 +32,13 @@ namespace ProceduralCreature.Morphology
     public readonly struct ResolvedBody
     {
         /// <summary>Sample positions in creature space.</summary>
-        public readonly Vector3[] SamplePositions;
+        public readonly IReadOnlyList<Vector3> SamplePositions;
 
         /// <summary>Local body thickness at each sample.</summary>
-        public readonly float[] SampleRadii;
+        public readonly IReadOnlyList<float> SampleRadii;
 
         /// <summary>Length of each segment Samples[i] → Samples[i+1].</summary>
-        public readonly float[] SegmentLengths;
+        public readonly IReadOnlyList<float> SegmentLengths;
 
         /// <summary>Total polyline length (sum of <see cref="SegmentLengths"/>).</summary>
         public readonly float TotalLength;
@@ -47,10 +47,10 @@ namespace ProceduralCreature.Morphology
         /// Normalized cumulative arc length at each sample (0 = root, 1 = tip).
         /// A degenerate (zero-length) spline resolves every entry to 0.
         /// </summary>
-        public readonly float[] NormalizedArcLengthAtSample;
+        public readonly IReadOnlyList<float> NormalizedArcLengthAtSample;
 
-        public ResolvedBody(Vector3[] samplePositions, float[] sampleRadii,
-            float[] segmentLengths, float totalLength, float[] normalizedArcLengthAtSample)
+        private ResolvedBody(IReadOnlyList<Vector3> samplePositions, IReadOnlyList<float> sampleRadii,
+            IReadOnlyList<float> segmentLengths, float totalLength, IReadOnlyList<float> normalizedArcLengthAtSample)
         {
             SamplePositions = samplePositions;
             SampleRadii = sampleRadii;
@@ -60,13 +60,13 @@ namespace ProceduralCreature.Morphology
         }
 
         /// <summary>The sample polyline (v1 centerline). Same values as <see cref="SamplePositions"/>.</summary>
-        public Vector3[] Centerline => SamplePositions;
+        public IReadOnlyList<Vector3> Centerline => SamplePositions;
 
         /// <summary>The spline root socket: the first sample's creature-space position.</summary>
         public Vector3 RootSocket => SamplePositions[0];
 
         /// <summary>The spline terminal socket: the last sample's creature-space position.</summary>
-        public Vector3 TerminalSocket => SamplePositions[SamplePositions.Length - 1];
+        public Vector3 TerminalSocket => SamplePositions[SamplePositions.Count - 1];
 
         /// <summary>
         /// Resolves the authoritative <see cref="BodySpline"/> into a stable
@@ -148,7 +148,12 @@ namespace ProceduralCreature.Morphology
                 normalizedArcLength[count - 1] = 1f;
             }
 
-            return new ResolvedBody(positions, radii, segmentLengths, totalLength, normalizedArcLength);
+            return new ResolvedBody(
+                Array.AsReadOnly(positions),
+                Array.AsReadOnly(radii),
+                Array.AsReadOnly(segmentLengths),
+                totalLength,
+                Array.AsReadOnly(normalizedArcLength));
         }
     }
 }

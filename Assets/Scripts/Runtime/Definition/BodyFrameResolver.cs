@@ -92,12 +92,12 @@ namespace ProceduralCreature.Definition
         public static BodyFrame ResolveSampleFrame(
             ResolvedBody body, int index, Vector3 forward)
         {
-            if (body.SamplePositions == null || body.SamplePositions.Length == 0)
+            if (body.SamplePositions == null || body.SamplePositions.Count == 0)
             {
                 return BodyFrame.Default;
             }
 
-            int i = Mathf.Clamp(index, 0, body.SamplePositions.Length - 1);
+            int i = Mathf.Clamp(index, 0, body.SamplePositions.Count - 1);
             BodyFrame[] frames = TransportFrames(body.SamplePositions, body.SampleRadii, forward);
             return frames[i];
         }
@@ -127,12 +127,12 @@ namespace ProceduralCreature.Definition
         public static BodyFrame ResolveFrame(
             ResolvedBody body, float t, Vector3 forward)
         {
-            if (body.SamplePositions == null || body.SamplePositions.Length == 0)
+            if (body.SamplePositions == null || body.SamplePositions.Count == 0)
             {
                 return BodyFrame.Default;
             }
 
-            int count = body.SamplePositions.Length;
+            int count = body.SamplePositions.Count;
             if (count == 1) return ResolveSampleFrame(body, 0, forward);
 
             float clamped = Mathf.Clamp(t, 0f, count - 1f);
@@ -168,12 +168,12 @@ namespace ProceduralCreature.Definition
         public static BodyFrame ResolveSegmentFrame(
             ResolvedBody body, int segmentIndex, float segmentT, Vector3 forward)
         {
-            if (body.SamplePositions == null || body.SamplePositions.Length == 0)
+            if (body.SamplePositions == null || body.SamplePositions.Count == 0)
             {
                 return BodyFrame.Default;
             }
 
-            int count = body.SamplePositions.Length;
+            int count = body.SamplePositions.Count;
             if (count == 1) return ResolveSampleFrame(body, 0, forward);
 
             int seg = Mathf.Clamp(segmentIndex, 0, count - 2);
@@ -203,7 +203,7 @@ namespace ProceduralCreature.Definition
         public static BodyFrame[] ComputeSampleFrames(
             ResolvedBody body, Vector3 forward)
         {
-            if (body.SamplePositions == null || body.SamplePositions.Length == 0)
+            if (body.SamplePositions == null || body.SamplePositions.Count == 0)
             {
                 return new BodyFrame[0];
             }
@@ -223,9 +223,9 @@ namespace ProceduralCreature.Definition
         /// one, and re-orthonormalized.
         /// </summary>
         private static BodyFrame[] TransportFrames(
-            Vector3[] positions, float[] radii, Vector3 forward)
+            IReadOnlyList<Vector3> positions, IReadOnlyList<float> radii, Vector3 forward)
         {
-            int count = positions.Length;
+            int count = positions.Count;
             var frames = new BodyFrame[count];
 
             Vector3 tangent0 = TangentAt(positions, 0, forward);
@@ -281,9 +281,9 @@ namespace ProceduralCreature.Definition
         /// neighbor tangent, then to <paramref name="forward"/>, then to a
         /// deterministic axis.
         /// </summary>
-        private static Vector3 TangentAt(Vector3[] positions, int i, Vector3 forward)
+        private static Vector3 TangentAt(IReadOnlyList<Vector3> positions, int i, Vector3 forward)
         {
-            int count = positions.Length;
+            int count = positions.Count;
             if (count == 1)
             {
                 Vector3 fallback = NormalizeOr(forward, Vector3.forward);

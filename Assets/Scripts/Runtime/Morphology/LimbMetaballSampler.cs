@@ -65,7 +65,7 @@ namespace ProceduralCreature.Morphology
         /// </summary>
         public static List<LimbMetaball> Sample(ResolvedLimb limb)
         {
-            if (limb.JointPositions == null || limb.JointPositions.Length == 0)
+            if (limb.JointPositions == null || limb.JointPositions.Count == 0)
             {
                 throw new DomainException("Cannot sample a ResolvedLimb with no joints.");
             }
@@ -84,7 +84,7 @@ namespace ProceduralCreature.Morphology
             float totalLength = limb.TotalLength;
             float cumulative = 0f;
 
-            for (int i = 0; i < limb.JointPositions.Length - 1; i++)
+            for (int i = 0; i < limb.JointPositions.Count - 1; i++)
             {
                 Vector3 start = limb.JointPositions[i];
                 Vector3 end = limb.JointPositions[i + 1];

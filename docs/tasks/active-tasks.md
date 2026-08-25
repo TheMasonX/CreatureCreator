@@ -57,9 +57,9 @@
 | CC-053 | Complete multi-geometry editor selection and visibility | Backlog | P1 |
 | CC-054 | Reject thickness-profile quantization time collisions | Backlog | P2 |
 | CC-055 | Decide limb centerline and generation-aware sampling fidelity | Backlog | P2 |
-| CC-056 | Establish the canonical resolved morphology layer (umbrella; split into 056A/B) | Backlog | P1 |
-| CC-056A | Resolved Body/limb geometry (canonical derived morphology, part A) | In Progress | P1 |
-| CC-056B | Semantic attachment resolution (canonical derived morphology, part B) | Backlog | P1 |
+| CC-056 | Establish the canonical resolved morphology layer (umbrella; split into 056A/B) | In Progress | P1 |
+| CC-056A | Resolved Body/limb geometry (canonical derived morphology, part A) | Done | P1 |
+| CC-056B | Semantic attachment resolution (canonical derived morphology, part B) | In Progress | P1 |
 | CC-057 | Add a responsive interactive morphology preview proxy | Backlog | P1 |
 | CC-058 | Route editor interaction ownership by semantic mode | Backlog | P2 |
 | CC-059 | Define symmetry placement and center-merge semantics | Backlog | P2 |

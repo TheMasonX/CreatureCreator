@@ -2,7 +2,7 @@
 id: creature-task-056b
 key: CC-056B
 title: Semantic attachment resolution (canonical resolved morphology, part B)
-status: Backlog
+status: In Progress
 type: Architecture
 authority: BeastMaster
 priority: P1
@@ -63,3 +63,23 @@ anchors bind to.
 
 Design the anchor schema and frame contract in an ADR (extend ADR-001/002), then
 implement the resolver methods against CC-056A.
+
+## 2026-08-24 implementation - first slice
+
+CC-056A is complete and supplies the read-only `ResolvedBody` and
+`ResolvedLimb` snapshots required by this task. The first CC-056B slice now
+rejects a `BodySurfaceAnchor` whose `SegmentStartSampleId` does not exist in the
+authoritative Body spline. This prevents a future projector from silently
+falling back to the wrong segment.
+
+Validation: runtime and runtime-test assemblies build with zero errors. Unity
+PlayMode focused slice (the anchor-ID regression plus ResolvedBody,
+ResolvedLimb, BodyFrameResolver, and DefinitionValidator tests) passes 34/34
+in Unity 6000.5.9f1; console has 0 errors and 0 warnings.
+
+## Next Step
+
+Record the units and frame convention for `RadialAngle`, `SurfaceOffset`, and
+`Roll` in an ADR, then implement `BodySurfaceProjector` over `ResolvedBody`
+without changing the existing Transform-only behavior for anchors that are
+still null.

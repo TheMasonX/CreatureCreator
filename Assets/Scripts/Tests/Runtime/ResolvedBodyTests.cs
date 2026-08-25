@@ -1,3 +1,4 @@
+using System.Collections.Generic;
 using NUnit.Framework;
 using UnityEngine;
 using ProceduralCreature.Common;
@@ -38,9 +39,9 @@ namespace ProceduralCreature.Tests.Runtime
         {
             ResolvedBody resolved = ResolvedBody.Resolve(StraightSpline());
 
-            Assert.AreEqual(3, resolved.SamplePositions.Length);
-            Assert.AreEqual(3, resolved.SampleRadii.Length);
-            Assert.AreEqual(2, resolved.SegmentLengths.Length);
+            Assert.AreEqual(3, resolved.SamplePositions.Count);
+            Assert.AreEqual(3, resolved.SampleRadii.Count);
+            Assert.AreEqual(2, resolved.SegmentLengths.Count);
             Assert.AreEqual(1f, resolved.SegmentLengths[0], 1e-6f);
             Assert.AreEqual(1f, resolved.SegmentLengths[1], 1e-6f);
             Assert.AreEqual(2f, resolved.TotalLength, 1e-6f);
@@ -60,8 +61,8 @@ namespace ProceduralCreature.Tests.Runtime
             ResolvedBody resolved = ResolvedBody.Resolve(BentSpline());
 
             float total = 1f + Mathf.Sqrt(4.25f);
-            Assert.AreEqual(3, resolved.SamplePositions.Length);
-            Assert.AreEqual(2, resolved.SegmentLengths.Length);
+            Assert.AreEqual(3, resolved.SamplePositions.Count);
+            Assert.AreEqual(2, resolved.SegmentLengths.Count);
             Assert.AreEqual(1f, resolved.SegmentLengths[0], 1e-6f);
             Assert.AreEqual(Mathf.Sqrt(4.25f), resolved.SegmentLengths[1], 1e-6f);
             Assert.AreEqual(total, resolved.TotalLength, 1e-6f);
@@ -78,7 +79,7 @@ namespace ProceduralCreature.Tests.Runtime
             ResolvedBody second = ResolvedBody.Resolve(spline);
 
             Assert.AreEqual(first.TotalLength, second.TotalLength, 1e-6f);
-            for (int i = 0; i < first.SamplePositions.Length; i++)
+            for (int i = 0; i < first.SamplePositions.Count; i++)
             {
                 Assert.AreEqual(first.SamplePositions[i], second.SamplePositions[i],
                     $"sample {i} position is deterministic");
@@ -109,6 +110,22 @@ namespace ProceduralCreature.Tests.Runtime
                 "Snapshot radius is immune to later source mutation.");
             Assert.AreEqual(0.5f, resolved.NormalizedArcLengthAtSample[1], 1e-6f,
                 "Snapshot arc length is immune to later source mutation.");
+        }
+
+        [Test]
+        public void Resolve_ExposesReadOnlyCollections()
+        {
+            ResolvedBody resolved = ResolvedBody.Resolve(StraightSpline());
+
+            IList<Vector3> positions = resolved.SamplePositions as IList<Vector3>;
+            IList<float> radii = resolved.SampleRadii as IList<float>;
+
+            Assert.IsNotNull(positions);
+            Assert.IsNotNull(radii);
+            Assert.IsTrue(positions.IsReadOnly);
+            Assert.IsTrue(radii.IsReadOnly);
+            Assert.Throws<System.NotSupportedException>(() => positions[0] = Vector3.one);
+            Assert.Throws<System.NotSupportedException>(() => radii[0] = 99f);
         }
 
         [Test]
@@ -150,10 +167,10 @@ namespace ProceduralCreature.Tests.Runtime
             ResolvedBody resolved = ResolvedBody.Resolve(spline);
 
             Assert.AreEqual(0f, resolved.TotalLength, 1e-6f);
-            Assert.AreEqual(2, resolved.SegmentLengths.Length);
+            Assert.AreEqual(2, resolved.SegmentLengths.Count);
             Assert.AreEqual(0f, resolved.SegmentLengths[0], 1e-6f);
             Assert.AreEqual(0f, resolved.SegmentLengths[1], 1e-6f);
-            for (int i = 0; i < resolved.NormalizedArcLengthAtSample.Length; i++)
+            for (int i = 0; i < resolved.NormalizedArcLengthAtSample.Count; i++)
             {
                 Assert.AreEqual(0f, resolved.NormalizedArcLengthAtSample[i], 1e-6f,
                     $"sample {i} arc length is 0 on a degenerate spline");
@@ -168,8 +185,8 @@ namespace ProceduralCreature.Tests.Runtime
 
             ResolvedBody resolved = ResolvedBody.Resolve(spline);
 
-            Assert.AreEqual(1, resolved.SamplePositions.Length);
-            Assert.AreEqual(0, resolved.SegmentLengths.Length);
+            Assert.AreEqual(1, resolved.SamplePositions.Count);
+            Assert.AreEqual(0, resolved.SegmentLengths.Count);
             Assert.AreEqual(0f, resolved.TotalLength, 1e-6f);
             Assert.AreEqual(0f, resolved.NormalizedArcLengthAtSample[0], 1e-6f);
             Assert.AreEqual(Vector3.one, resolved.RootSocket);
@@ -184,9 +201,9 @@ namespace ProceduralCreature.Tests.Runtime
             ResolvedBody viaSpline = ResolvedBody.Resolve(spline);
             ResolvedBody viaList = ResolvedBody.Resolve(spline.Samples);
 
-            Assert.AreEqual(viaSpline.SamplePositions.Length, viaList.SamplePositions.Length);
+            Assert.AreEqual(viaSpline.SamplePositions.Count, viaList.SamplePositions.Count);
             Assert.AreEqual(viaSpline.TotalLength, viaList.TotalLength, 1e-6f);
-            for (int i = 0; i < viaSpline.SamplePositions.Length; i++)
+            for (int i = 0; i < viaSpline.SamplePositions.Count; i++)
             {
                 Assert.AreEqual(viaSpline.SamplePositions[i], viaList.SamplePositions[i],
                     $"sample {i} position matches between overloads");

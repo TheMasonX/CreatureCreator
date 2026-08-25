@@ -183,7 +183,7 @@ namespace ProceduralCreature.Skeleton
                 return;
             }
 
-            if (resolved.JointPositions.Length < 2)
+            if (resolved.JointPositions.Count < 2)
             {
                 // Defensive: a single-joint chain emits no bones.
                 return;
@@ -201,7 +201,7 @@ namespace ProceduralCreature.Skeleton
             string rootParentBoneId = ResolveParentBoneId(definition, part, mirrored);
             string previousBoneId = null;
 
-            for (int i = 0; i < resolved.JointPositions.Length - 1; i++)
+            for (int i = 0; i < resolved.JointPositions.Count - 1; i++)
             {
                 Vector3 from = resolved.JointPositions[i];
                 Vector3 to = resolved.JointPositions[i + 1];
@@ -222,7 +222,7 @@ namespace ProceduralCreature.Skeleton
                     Position = fromWorld,
                     HasSegment = true,
                     EndPosition = toWorld,
-                    HasChildAttachmentPosition = i == resolved.JointPositions.Length - 2,
+                    HasChildAttachmentPosition = i == resolved.JointPositions.Count - 2,
                     ChildAttachmentPosition = toWorld,
                     Rotation = rotation,
                 });
@@ -313,10 +313,10 @@ namespace ProceduralCreature.Skeleton
 
             BodyFrame[] frames = BodyFrameResolver.ComputeSampleFrames(
                 resolved, definition.Forward);
-            for (int i = 0; i < resolved.SamplePositions.Length; i++)
+            for (int i = 0; i < resolved.SamplePositions.Count; i++)
             {
                 Vector3 position = resolved.SamplePositions[i];
-                bool hasSegment = i < resolved.SamplePositions.Length - 1;
+                bool hasSegment = i < resolved.SamplePositions.Count - 1;
                 Vector3 endPosition = hasSegment
                     ? resolved.SamplePositions[i + 1]
                     : position;

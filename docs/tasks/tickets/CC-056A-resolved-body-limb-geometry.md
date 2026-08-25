@@ -2,7 +2,7 @@
 id: creature-task-056a
 key: CC-056A
 title: Resolved Body/limb geometry (canonical derived morphology, part A)
-status: In Progress
+status: Done
 type: Architecture
 authority: BeastMaster
 priority: P1
@@ -74,9 +74,8 @@ closes (that part is CC-056B).
 
 ## Next Step
 
-Record the resolved data contract in an ADR, then migrate limb sampling first,
-then skeleton joint resolution and envelope validation. Land 056B before CC-007
-authoring work.
+Continue with CC-056B: resolve semantic attachment frames against the completed
+Body and limb snapshots before CC-007 authoring work.
 
 ## 2026-08-24 implementation - increment 1 (ResolvedLimb + limb sampling)
 
@@ -204,6 +203,27 @@ Residual: the appearance consumers (`BodyVerticalGradientSampler`,
 `PartAppearanceSampler`) still iterate authored samples for vertical-gradient
 color — appearance, not geometry, so intentionally out of this increment's
 scope. `ResolveParentBoneId` / `ResolveBodyParentBoneId` (nearest-sample
-attachment) and the surface-anchor contract remain CC-056B / CC-076. Remaining
-CC-056A work is done; next is CC-056B.
+attachment) and the surface-anchor contract remain CC-056B / CC-076. CC-056A is
+complete; next is CC-056B.
+
+## 2026-08-24 review hardening
+
+Peer review identified that public array fields did not provide the documented
+immutable snapshot contract. `ResolvedBody` and `ResolvedLimb` now expose
+read-only collections backed by private read-only wrappers, and their
+constructors are private so callers cannot inject mutable arrays. `ResolvedLimb`
+also clones the nested `ThicknessProfile`; later mutation of the source profile
+cannot change the resolved snapshot. Existing consumers use `Count` without
+changing the derived values.
+
+Added direct regression coverage for collection mutation rejection, thickness
+profile mutation rejection, and all four `BodyFrameResolver(ResolvedBody, ...)`
+overloads against the historical sample-list overloads.
+
+Validation: `dotnet build ProceduralCreature.Runtime.csproj --no-restore` and
+`dotnet build ProceduralCreature.Tests.Runtime.csproj --no-restore` both pass
+with zero errors (the runtime build retains five existing CS0649 warnings).
+Unity PlayMode focused slice (ResolvedBodyTests, ResolvedLimbTests,
+BodyFrameResolverTests) passes 34/34 in Unity 6000.5.9f1; console has 0 errors
+and 0 warnings.
 

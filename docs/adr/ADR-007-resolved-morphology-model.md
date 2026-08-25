@@ -16,9 +16,12 @@ follows with the same contract for Body samples and frames.
 Resolved state is derived, never serialized, and never written back into DNA
 (ADR-001 §5). Joints and samples stay in the owning part's local morphology
 frame; creature-space placement is a separate concern owned by
-`CreaturePartWorldTransformResolver`. `Resolve` is pure and deterministic and
-copies its input arrays, so later mutation of the source cannot change the
-snapshot. Consumers that receive structurally invalid input (null joint, empty
+`CreaturePartWorldTransformResolver`. `Resolve` is pure and deterministic,
+copies its input values, and exposes the derived collections only through
+read-only interfaces backed by private read-only wrappers, so neither later
+source mutation nor consumer mutation can change the snapshot. The limb
+thickness profile is also cloned at this boundary. Consumers that receive
+structurally invalid input (null joint, empty
 chain) must stay total: they catch the resolve failure and skip, because the
 validator reports structural errors before generation.
 

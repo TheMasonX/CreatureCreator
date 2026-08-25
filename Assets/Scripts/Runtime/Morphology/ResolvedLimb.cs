@@ -32,10 +32,10 @@ namespace ProceduralCreature.Morphology
     public readonly struct ResolvedLimb
     {
         /// <summary>Joint positions in the part-local morphology frame.</summary>
-        public readonly Vector3[] JointPositions;
+        public readonly IReadOnlyList<Vector3> JointPositions;
 
         /// <summary>Length of each segment Joints[i] → Joints[i+1].</summary>
-        public readonly float[] SegmentLengths;
+        public readonly IReadOnlyList<float> SegmentLengths;
 
         /// <summary>Total polyline length (sum of <see cref="SegmentLengths"/>).</summary>
         public readonly float TotalLength;
@@ -44,7 +44,7 @@ namespace ProceduralCreature.Morphology
         /// Normalized cumulative arc length at each joint (0 = root, 1 = tip).
         /// A degenerate (zero-length) chain resolves every entry to 0.
         /// </summary>
-        public readonly float[] NormalizedArcLengthAtJoint;
+        public readonly IReadOnlyList<float> NormalizedArcLengthAtJoint;
 
         /// <summary>
         /// The authored 1D thickness profile over normalized arc length.
@@ -53,8 +53,8 @@ namespace ProceduralCreature.Morphology
         /// </summary>
         public readonly ThicknessProfile Thickness;
 
-        public ResolvedLimb(Vector3[] jointPositions, float[] segmentLengths, float totalLength,
-            float[] normalizedArcLengthAtJoint, ThicknessProfile thickness)
+        private ResolvedLimb(IReadOnlyList<Vector3> jointPositions, IReadOnlyList<float> segmentLengths, float totalLength,
+            IReadOnlyList<float> normalizedArcLengthAtJoint, ThicknessProfile thickness)
         {
             JointPositions = jointPositions;
             SegmentLengths = segmentLengths;
@@ -64,13 +64,13 @@ namespace ProceduralCreature.Morphology
         }
 
         /// <summary>The joint polyline (v1 centerline). Same values as <see cref="JointPositions"/>.</summary>
-        public Vector3[] Centerline => JointPositions;
+        public IReadOnlyList<Vector3> Centerline => JointPositions;
 
         /// <summary>The chain root socket: the first joint's local position (≈ the part origin).</summary>
         public Vector3 RootSocket => JointPositions[0];
 
         /// <summary>The chain terminal socket: the last joint's local position (children attach here).</summary>
-        public Vector3 TerminalSocket => JointPositions[JointPositions.Length - 1];
+        public Vector3 TerminalSocket => JointPositions[JointPositions.Count - 1];
 
         /// <summary>
         /// Resolves the authored <see cref="LimbChain"/> into a stable derived
@@ -131,9 +131,16 @@ namespace ProceduralCreature.Morphology
                 normalizedArcLength[count - 1] = 1f;
             }
 
-            ThicknessProfile thickness = chain.Thickness ?? ThicknessProfile.CreateDefault();
+            ThicknessProfile thickness = chain.Thickness == null
+                ? ThicknessProfile.CreateDefault()
+                : chain.Thickness.Clone();
 
-            return new ResolvedLimb(positions, segmentLengths, totalLength, normalizedArcLength, thickness);
+            return new ResolvedLimb(
+                Array.AsReadOnly(positions),
+                Array.AsReadOnly(segmentLengths),
+                totalLength,
+                Array.AsReadOnly(normalizedArcLength),
+                thickness);
         }
     }
 }

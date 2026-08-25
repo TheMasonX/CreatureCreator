@@ -80,7 +80,7 @@ namespace ProceduralCreature.Definition
 
                 if (bodyResolvedOk)
                 {
-                    for (int i = 0; i < bodyResolved.SamplePositions.Length; i++)
+                    for (int i = 0; i < bodyResolved.SamplePositions.Count; i++)
                     {
                         Vector3 position = bodyResolved.SamplePositions[i];
                         if (!IsFinite(position.x) || !IsFinite(position.y) || !IsFinite(position.z)) continue;
@@ -129,7 +129,7 @@ namespace ProceduralCreature.Definition
                         continue;
                     }
 
-                    for (int i = 0; i < resolved.JointPositions.Length; i++)
+                    for (int i = 0; i < resolved.JointPositions.Count; i++)
                     {
                         Vector3 resolvedWorld = world.MultiplyPoint3x4(resolved.JointPositions[i]);
                         if (!definition.Bounds.Contains(resolvedWorld))
@@ -558,7 +558,26 @@ namespace ProceduralCreature.Definition
                         ValidationSeverity.Error, ValidationCode.InvalidAttachmentAnchor,
                         $"Part '{part.Id}' has an invalid semantic attachment anchor.", part.Id));
                 }
+
+                if (part.ParentAttachment != null &&
+                    (definition.Body == null || definition.Body.Samples == null ||
+                     !ContainsBodySampleId(definition.Body.Samples, part.ParentAttachment.SegmentStartSampleId)))
+                {
+                    issues.Add(new ValidationIssue(
+                        ValidationSeverity.Error, ValidationCode.InvalidAttachmentAnchor,
+                        $"Part '{part.Id}' references missing Body sample " +
+                        $"'{part.ParentAttachment.SegmentStartSampleId}' in its semantic attachment anchor.", part.Id));
+                }
             }
+        }
+
+        private static bool ContainsBodySampleId(IReadOnlyList<BodySample> samples, uint id)
+        {
+            for (int i = 0; i < samples.Count; i++)
+            {
+                if (samples[i] != null && samples[i].Id == id) return true;
+            }
+            return false;
         }
 
         /// <summary>

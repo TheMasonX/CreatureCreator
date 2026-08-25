@@ -207,6 +207,26 @@ namespace ProceduralCreature.Tests.Runtime
         }
 
         [Test]
+        public void Validate_DetectsAttachmentAnchorWithMissingBodySample()
+        {
+            CreatureDefinition definition = ValidDefinitionWithBody();
+            CreaturePart part = ValidPart("part_anchor");
+            part.ParentAttachment = new BodySurfaceAnchor
+            {
+                SegmentStartSampleId = 999u,
+                SegmentT = 0.5f,
+                RadialAngle = 0f,
+                SurfaceOffset = 0f,
+                Roll = 0f,
+            };
+            definition.AddPart(part);
+
+            ValidationResult result = DefinitionValidator.Validate(definition);
+
+            Assert.IsTrue(HasCode(result, ValidationCode.InvalidAttachmentAnchor));
+        }
+
+        [Test]
         public void Validate_DetectsMissingParent()
         {
             var definition = CreatureDefinition.CreateEmpty();

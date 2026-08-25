@@ -1,6 +1,7 @@
 using NUnit.Framework;
 using UnityEngine;
 using ProceduralCreature.Definition;
+using ProceduralCreature.Morphology;
 
 namespace ProceduralCreature.Tests.Runtime
 {
@@ -258,6 +259,50 @@ namespace ProceduralCreature.Tests.Runtime
             Assert.That(Mathf.Abs(Vector3.Dot(first.Normal, Vector3.forward)), Is.GreaterThan(0.9f),
                 "Initial normal should be seeded from Forward (projected off the +X tangent).");
             AssertOrthonormal(first, "forward-seeded");
+        }
+
+        [Test]
+        public void ResolvedBodyOverloads_MatchSampleListOverloads()
+        {
+            BodySpline spline = BentSpline();
+            ResolvedBody resolved = ResolvedBody.Resolve(spline);
+            Vector3 forward = Vector3.forward;
+
+            BodyFrame listSample = BodyFrameResolver.ResolveSampleFrame(spline.Samples, 2, forward);
+            BodyFrame resolvedSample = BodyFrameResolver.ResolveSampleFrame(resolved, 2, forward);
+            Assert.AreEqual(listSample.Position, resolvedSample.Position);
+            Assert.AreEqual(listSample.Tangent, resolvedSample.Tangent);
+            Assert.AreEqual(listSample.Normal, resolvedSample.Normal);
+            Assert.AreEqual(listSample.Binormal, resolvedSample.Binormal);
+            Assert.AreEqual(listSample.Radius, resolvedSample.Radius, Tolerance);
+
+            BodyFrame listFrame = BodyFrameResolver.ResolveFrame(spline.Samples, 1.35f, forward);
+            BodyFrame resolvedFrame = BodyFrameResolver.ResolveFrame(resolved, 1.35f, forward);
+            Assert.AreEqual(listFrame.Position, resolvedFrame.Position);
+            Assert.AreEqual(listFrame.Tangent, resolvedFrame.Tangent);
+            Assert.AreEqual(listFrame.Normal, resolvedFrame.Normal);
+            Assert.AreEqual(listFrame.Binormal, resolvedFrame.Binormal);
+            Assert.AreEqual(listFrame.Radius, resolvedFrame.Radius, Tolerance);
+
+            BodyFrame listSegment = BodyFrameResolver.ResolveSegmentFrame(spline.Samples, 1, 0.35f, forward);
+            BodyFrame resolvedSegment = BodyFrameResolver.ResolveSegmentFrame(resolved, 1, 0.35f, forward);
+            Assert.AreEqual(listSegment.Position, resolvedSegment.Position);
+            Assert.AreEqual(listSegment.Tangent, resolvedSegment.Tangent);
+            Assert.AreEqual(listSegment.Normal, resolvedSegment.Normal);
+            Assert.AreEqual(listSegment.Binormal, resolvedSegment.Binormal);
+            Assert.AreEqual(listSegment.Radius, resolvedSegment.Radius, Tolerance);
+
+            BodyFrame[] listFrames = BodyFrameResolver.ComputeSampleFrames(spline.Samples, forward);
+            BodyFrame[] resolvedFrames = BodyFrameResolver.ComputeSampleFrames(resolved, forward);
+            Assert.AreEqual(listFrames.Length, resolvedFrames.Length);
+            for (int i = 0; i < listFrames.Length; i++)
+            {
+                Assert.AreEqual(listFrames[i].Position, resolvedFrames[i].Position);
+                Assert.AreEqual(listFrames[i].Tangent, resolvedFrames[i].Tangent);
+                Assert.AreEqual(listFrames[i].Normal, resolvedFrames[i].Normal);
+                Assert.AreEqual(listFrames[i].Binormal, resolvedFrames[i].Binormal);
+                Assert.AreEqual(listFrames[i].Radius, resolvedFrames[i].Radius, Tolerance);
+            }
         }
     }
 }

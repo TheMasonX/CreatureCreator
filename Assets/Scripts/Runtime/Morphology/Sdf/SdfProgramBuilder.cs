@@ -229,7 +229,7 @@ namespace ProceduralCreature.Morphology.Sdf
                 // CC-056A increment 3: consume the shared ResolvedBody derivation
                 // (positions/radii) instead of reading authored samples here.
                 ResolvedBody body = ResolvedBody.Resolve(definition.Body);
-                for (int i = 0; i < body.SamplePositions.Length; i++)
+                for (int i = 0; i < body.SamplePositions.Count; i++)
                 {
                     Vector3 position = body.SamplePositions[i];
                     float radius = body.SampleRadii[i];
@@ -418,7 +418,7 @@ namespace ProceduralCreature.Morphology.Sdf
             // CC-056A increment 3: consume the shared ResolvedBody derivation.
             ResolvedBody body = ResolvedBody.Resolve(definition.Body);
             int root = -1;
-            for (int i = 0; i < body.SamplePositions.Length; i++)
+            for (int i = 0; i < body.SamplePositions.Count; i++)
             {
                 Vector3 position = body.SamplePositions[i];
                 float radius = body.SampleRadii[i];
@@ -584,7 +584,7 @@ namespace ProceduralCreature.Morphology.Sdf
             // CC-056A increment 3: consume the shared ResolvedBody derivation.
             ResolvedBody body = ResolvedBody.Resolve(definition.Body);
             ISdfNode accumulated = null;
-            for (int i = 0; i < body.SamplePositions.Length; i++)
+            for (int i = 0; i < body.SamplePositions.Count; i++)
             {
                 Vector3 position = body.SamplePositions[i];
                 float radius = body.SampleRadii[i];

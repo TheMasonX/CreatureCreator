@@ -37,8 +37,8 @@ namespace ProceduralCreature.Tests.Runtime
         {
             ResolvedLimb resolved = ResolvedLimb.Resolve(StraightChain());
 
-            Assert.AreEqual(2, resolved.JointPositions.Length);
-            Assert.AreEqual(1, resolved.SegmentLengths.Length);
+            Assert.AreEqual(2, resolved.JointPositions.Count);
+            Assert.AreEqual(1, resolved.SegmentLengths.Count);
             Assert.AreEqual(1f, resolved.SegmentLengths[0], 1e-6f);
             Assert.AreEqual(1f, resolved.TotalLength, 1e-6f);
             Assert.AreEqual(0f, resolved.NormalizedArcLengthAtJoint[0], 1e-6f);
@@ -55,8 +55,8 @@ namespace ProceduralCreature.Tests.Runtime
         {
             ResolvedLimb resolved = ResolvedLimb.Resolve(BentChain()); // two 1.0 segments
 
-            Assert.AreEqual(3, resolved.JointPositions.Length);
-            Assert.AreEqual(2, resolved.SegmentLengths.Length);
+            Assert.AreEqual(3, resolved.JointPositions.Count);
+            Assert.AreEqual(2, resolved.SegmentLengths.Count);
             Assert.AreEqual(1f, resolved.SegmentLengths[0], 1e-6f);
             Assert.AreEqual(1f, resolved.SegmentLengths[1], 1e-6f);
             Assert.AreEqual(2f, resolved.TotalLength, 1e-6f);
@@ -75,12 +75,12 @@ namespace ProceduralCreature.Tests.Runtime
             ResolvedLimb second = ResolvedLimb.Resolve(chain);
 
             Assert.AreEqual(first.TotalLength, second.TotalLength, 1e-6f);
-            for (int i = 0; i < first.JointPositions.Length; i++)
+            for (int i = 0; i < first.JointPositions.Count; i++)
             {
                 Assert.AreEqual(first.JointPositions[i], second.JointPositions[i]);
                 Assert.AreEqual(first.NormalizedArcLengthAtJoint[i], second.NormalizedArcLengthAtJoint[i], 1e-6f);
             }
-            Assert.AreEqual(first.SegmentLengths.Length, second.SegmentLengths.Length);
+            Assert.AreEqual(first.SegmentLengths.Count, second.SegmentLengths.Count);
 
             Assert.AreEqual(3, chain.Joints.Count, "Resolution must never write back to the chain.");
             Assert.AreEqual(Vector3.zero, chain.Joints[0].Position);
@@ -102,14 +102,43 @@ namespace ProceduralCreature.Tests.Runtime
         }
 
         [Test]
+        public void Resolve_ImmutableSnapshot_IgnoresLaterThicknessMutation()
+        {
+            LimbChain chain = StraightChain();
+            chain.Thickness = ThicknessProfile.CreateDefault();
+            ResolvedLimb resolved = ResolvedLimb.Resolve(chain);
+
+            chain.Thickness.Keys[0].Value = 99f;
+
+            Assert.AreEqual(0.30f, resolved.Thickness.Evaluate(0f), 1e-4f,
+                "Snapshot thickness is immune to later source mutation.");
+        }
+
+        [Test]
+        public void Resolve_ExposesReadOnlyCollections()
+        {
+            ResolvedLimb resolved = ResolvedLimb.Resolve(StraightChain());
+
+            IList<Vector3> positions = resolved.JointPositions as IList<Vector3>;
+            IList<float> lengths = resolved.SegmentLengths as IList<float>;
+
+            Assert.IsNotNull(positions);
+            Assert.IsNotNull(lengths);
+            Assert.IsTrue(positions.IsReadOnly);
+            Assert.IsTrue(lengths.IsReadOnly);
+            Assert.Throws<System.NotSupportedException>(() => positions[0] = Vector3.one);
+            Assert.Throws<System.NotSupportedException>(() => lengths[0] = 99f);
+        }
+
+        [Test]
         public void Resolve_SingleJointAndCoincidentJoints_HandleDegenerate()
         {
             var single = new LimbChain();
             single.Joints.Add(new LimbJoint { Id = 1, Position = Vector3.zero });
 
             ResolvedLimb resolvedSingle = ResolvedLimb.Resolve(single);
-            Assert.AreEqual(1, resolvedSingle.JointPositions.Length);
-            Assert.AreEqual(0, resolvedSingle.SegmentLengths.Length);
+            Assert.AreEqual(1, resolvedSingle.JointPositions.Count);
+            Assert.AreEqual(0, resolvedSingle.SegmentLengths.Count);
             Assert.AreEqual(0f, resolvedSingle.TotalLength, 1e-6f);
             Assert.AreEqual(0f, resolvedSingle.NormalizedArcLengthAtJoint[0], 1e-6f);
             Assert.AreEqual(Vector3.zero, resolvedSingle.RootSocket);
