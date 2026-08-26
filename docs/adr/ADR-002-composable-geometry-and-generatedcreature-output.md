@@ -121,13 +121,28 @@ fields.
 | Mesh geometry          | GeometryAttachment     | geometry local transform  |
 | Rig binding            | Skeleton socket/bone   | rig binding frame         |
 
-Interim contract (until CC-007's body-surface projector lands): a Body child's
-`ParentAttachment` (`BodySurfaceAnchor`) is RESERVED-but-inert. It is validated
-and serialized but is NOT a placement source; placement comes from `Transform`
-+ parent chain + limb child-at-tip through the single resolver. No code reads
-anchor fields for placement except through the resolver. CC-007 extends
-`ResolvePartFrameToCreatureSpace` — the one seam — to project the anchor for
-Body children.
+The body-surface projector is active (CC-056B): a direct Body child that
+carries a `ParentAttachment` (`BodySurfaceAnchor`) is placed by projecting the
+anchor onto the resolved Body surface. The projected `SurfaceFrame` is the
+placement root; the part's local `Transform` is a fine adjustment in that
+frame's local space. Anchors are inert for non-Body children. No code reads
+anchor fields for placement except through the resolver;
+`ResolvePartFrameToCreatureSpace` is the one seam that applies the anchor.
+
+CC-007 body-surface coordinates use one explicit unit convention:
+
+- `SegmentT` is unitless and clamped to [0, 1] along the identified sample
+  segment.
+- `RadialAngle` and `Roll` are radians. Angle zero points along the resolved
+  body frame `Normal`; positive angle turns toward `Binormal`.
+- `SurfaceOffset` is a creature-space distance added outside the interpolated
+  body radius. The projected position is the interpolated centerline position
+  plus the radial direction multiplied by radius + offset.
+- Roll rotates the projected surface frame around the body `Tangent`; it does
+  not change the projected position.
+
+`BodySurfaceProjector` consumes `ResolvedBody`, including its copied sample IDs,
+so anchor resolution does not re-read mutable Body DNA.
 
 ## Consequences
 

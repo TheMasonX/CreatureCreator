@@ -561,19 +561,25 @@ namespace ProceduralCreature.Definition
 
                 if (part.ParentAttachment != null &&
                     (definition.Body == null || definition.Body.Samples == null ||
-                     !ContainsBodySampleId(definition.Body.Samples, part.ParentAttachment.SegmentStartSampleId)))
+                     !ContainsBodySegmentStartId(definition.Body.Samples, part.ParentAttachment.SegmentStartSampleId)))
                 {
                     issues.Add(new ValidationIssue(
                         ValidationSeverity.Error, ValidationCode.InvalidAttachmentAnchor,
-                        $"Part '{part.Id}' references missing Body sample " +
-                        $"'{part.ParentAttachment.SegmentStartSampleId}' in its semantic attachment anchor.", part.Id));
+                        $"Part '{part.Id}' references a Body sample that is not a " +
+                        $"segment start ('{part.ParentAttachment.SegmentStartSampleId}') in its semantic attachment anchor.", part.Id));
                 }
             }
         }
 
-        private static bool ContainsBodySampleId(IReadOnlyList<BodySample> samples, uint id)
+        /// <summary>
+        /// True when <paramref name="id"/> identifies a segment START sample — any
+        /// sample except the terminal one. A BodySurfaceAnchor's
+        /// SegmentStartSampleId must be a segment start; the terminal sample has no
+        /// outgoing segment and the projector rejects it (CC-056B).
+        /// </summary>
+        private static bool ContainsBodySegmentStartId(IReadOnlyList<BodySample> samples, uint id)
         {
-            for (int i = 0; i < samples.Count; i++)
+            for (int i = 0; i < samples.Count - 1; i++)
             {
                 if (samples[i] != null && samples[i].Id == id) return true;
             }

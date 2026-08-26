@@ -349,42 +349,299 @@ namespace ProceduralCreature.Tests.Runtime
                 "A child of a limb sits at the limb's terminal joint through the canonical path.");
         }
 
-        /// <summary>
-        /// CC-051 / ADR-002 §7 interim contract: a Body child's ParentAttachment
-        /// (BodySurfaceAnchor) is RESERVED-but-inert until CC-007 projects it.
-        /// Placement must come from the Transform path through the single
-        /// resolver, so an authored anchor must NOT silently change placement
-        /// today. When CC-007 lands, this resolver is the one seam that applies
-        /// the anchor, and this test will be updated then.
-        /// </summary>
-        [Test]
-        public void ResolvePartFrame_BodyChildWithParentAttachment_AnchorIsInertUntilCC007()
+        // ---- CC-056B body-surface anchor projection --------------------------------
+        // A direct Body child with a ParentAttachment is placed by projecting the
+        // anchor onto the resolved Body surface (ADR-002 §7 precedence table:
+        // "Body child | BodySurfaceAnchor"). The projected SurfaceFrame is the
+        // placement root; the part's local transform is a fine adjustment in that
+        // frame's local space.
+
+        private static BodySpline ProjectionBody()
         {
-            var definition = CreatureDefinition.CreateEmpty();
-            definition.Body.Samples.Add(new BodySample { Id = 1, Position = new Vector3(0f, 0f, 0f), Radius = 1f });
-            var part = new CreaturePart
+            var body = new BodySpline();
+            body.Samples.Add(new BodySample { Id = 10, Position = new Vector3(0f, 0f, 0f), Radius = 1f });
+            body.Samples.Add(new BodySample { Id = 20, Position = new Vector3(0f, 0f, 2f), Radius = 2f });
+            return body;
+        }
+
+        private static CreaturePart BodyChildWithAnchor(uint segmentId, float segmentT,
+            float radialAngle = 0f, float surfaceOffset = 0f, float roll = 0f,
+            Vector3? localPosition = null, Quaternion? localRotation = null)
+        {
+            return new CreaturePart
             {
                 Id = "part_leg",
                 ParentId = CreatureDefinition.BodyId,
+                Transform = new TransformData
+                {
+                    Position = localPosition ?? Vector3.zero,
+                    Rotation = localRotation ?? Quaternion.identity,
+                    Scale = Vector3.one,
+                },
+                Shape = ShapeDefinition.DefaultSphere,
+                Appearance = AppearanceDefinition.Default,
+                ParentAttachment = new BodySurfaceAnchor
+                {
+                    SegmentStartSampleId = segmentId,
+                    SegmentT = segmentT,
+                    RadialAngle = radialAngle,
+                    SurfaceOffset = surfaceOffset,
+                    Roll = roll,
+                },
+            };
+        }
+
+        [Test]
+        public void ResolvePartFrame_BodyChildWithParentAttachment_ProjectsPositionToSurface()
+        {
+            var definition = CreatureDefinition.CreateEmpty();
+            definition.Body = ProjectionBody();
+            definition.AddPart(BodyChildWithAnchor(10, 0.5f));
+
+            Vector3 position = CreaturePartWorldTransformResolver
+                .ResolvePartFrameToCreatureSpace(definition, definition.FindPart("part_leg")).GetColumn(3);
+
+            // Segment 10->20 at T=0.5: centerline (0,0,1), interpolated radius 1.5,
+            // RadialAngle 0 -> Normal (up). Surface point = (0, 1.5, 1).
+            Assert.That(position, Is.EqualTo(new Vector3(0f, 1.5f, 1f)).Within(1e-5f),
+                "The anchor is the position authority for a Body child.");
+        }
+
+        [Test]
+        public void ResolvePartFrame_BodyChildWithParentAttachment_AppliesLocalOffsetInSurfaceFrame()
+        {
+            var definition = CreatureDefinition.CreateEmpty();
+            definition.Body = ProjectionBody();
+            definition.AddPart(BodyChildWithAnchor(10, 0.5f, localPosition: new Vector3(0f, -0.3f, 0f)));
+
+            Vector3 position = CreaturePartWorldTransformResolver
+                .ResolvePartFrameToCreatureSpace(definition, definition.FindPart("part_leg")).GetColumn(3);
+
+            Assert.That(position, Is.EqualTo(new Vector3(0f, 1.2f, 1f)).Within(1e-5f),
+                "The part's local position is a fine adjustment in the surface frame's local space.");
+        }
+
+        [Test]
+        public void ResolvePartFrame_BodyChildWithParentAttachment_RadialAngleDrivesPosition()
+        {
+            var definition = CreatureDefinition.CreateEmpty();
+            definition.Body = ProjectionBody();
+            // RadialAngle pi/2 points toward Binormal (left for a z-forward spline).
+            definition.AddPart(BodyChildWithAnchor(10, 0f, radialAngle: Mathf.PI * 0.5f));
+
+            Vector3 position = CreaturePartWorldTransformResolver
+                .ResolvePartFrameToCreatureSpace(definition, definition.FindPart("part_leg")).GetColumn(3);
+
+            Assert.That(Vector3.Distance(position, new Vector3(-1f, 0f, 0f)), Is.LessThan(1e-5f),
+                $"Positive RadialAngle turns the projected point from Normal toward Binormal (got {position.ToString("R")}).");
+        }
+
+        [Test]
+        public void ResolvePartFrame_BodyChildWithParentAttachment_RollRotatesFrameAroundTangent()
+        {
+            var definition = CreatureDefinition.CreateEmpty();
+            definition.Body = ProjectionBody();
+            definition.AddPart(BodyChildWithAnchor(10, 0f, roll: Mathf.PI * 0.5f));
+
+            Matrix4x4 frame = CreaturePartWorldTransformResolver
+                .ResolvePartFrameToCreatureSpace(definition, definition.FindPart("part_leg"));
+            Quaternion rotation = frame.rotation;
+
+            // Roll pi/2 around the tangent (z) maps the frame's up (Normal) -> left.
+            Assert.That(Vector3.Distance(rotation * Vector3.up, Vector3.left), Is.LessThan(1e-5f),
+                $"Roll rotates the surface frame around the body tangent (up -> {(rotation * Vector3.up).ToString("R")}).");
+            Assert.That(Vector3.Distance(rotation * Vector3.forward, Vector3.forward), Is.LessThan(1e-5f),
+                "The along-spline tangent is unchanged by roll.");
+        }
+
+        [Test]
+        public void ResolvePartFrame_ChildOfAnchoredBodyChild_ChainsThroughProjectedFrame()
+        {
+            var definition = CreatureDefinition.CreateEmpty();
+            definition.Body = ProjectionBody();
+            definition.AddPart(BodyChildWithAnchor(10, 0.5f)); // anchored leg at (0,1.5,1)
+            definition.FindPart("part_leg").Limb = LimbChainWith(Vector3.zero, new Vector3(0f, -1f, 0f));
+            definition.AddPart(new CreaturePart
+            {
+                Id = "part_foot",
+                ParentId = "part_leg",
+                Transform = TransformData.Identity,
+                Shape = ShapeDefinition.DefaultSphere,
+                Appearance = AppearanceDefinition.Default,
+            });
+
+            Vector3 footPosition = CreaturePartWorldTransformResolver
+                .ResolvePartFrameToCreatureSpace(definition, definition.FindPart("part_foot")).GetColumn(3);
+
+            // Leg surface frame (0,1.5,1) -> leg terminal joint (0,-1,0) -> foot identity.
+            Assert.That(footPosition, Is.EqualTo(new Vector3(0f, 0.5f, 1f)).Within(1e-5f),
+                "A child of an anchored Body child rides the projected frame and the limb tip.");
+        }
+
+        [Test]
+        public void ResolvePartFrame_NonBodyChildWithParentAttachment_AnchorStaysInert()
+        {
+            var definition = CreatureDefinition.CreateEmpty();
+            definition.Body = ProjectionBody();
+            definition.AddPart(new CreaturePart
+            {
+                Id = "part_leg",
+                ParentId = CreatureDefinition.BodyId,
+                Transform = TransformData.Identity,
+                Shape = ShapeDefinition.DefaultSphere,
+                Appearance = AppearanceDefinition.Default,
+            });
+            definition.AddPart(new CreaturePart
+            {
+                Id = "part_foot",
+                ParentId = "part_leg",
                 Transform = new TransformData { Position = new Vector3(0f, -0.5f, 0.4f), Rotation = Quaternion.identity, Scale = Vector3.one },
                 Shape = ShapeDefinition.DefaultSphere,
                 Appearance = AppearanceDefinition.Default,
                 ParentAttachment = new BodySurfaceAnchor
                 {
-                    SegmentStartSampleId = 1u,
+                    SegmentStartSampleId = 10u,
                     SegmentT = 0.5f,
-                    RadialAngle = 1.2f,
-                    SurfaceOffset = 0.1f,
-                    Roll = 0.3f,
+                    RadialAngle = 0f,
+                    SurfaceOffset = 0f,
+                    Roll = 0f,
                 },
-            };
-            definition.AddPart(part);
+            });
 
-            Matrix4x4 frame = CreaturePartWorldTransformResolver.ResolvePartFrameToCreatureSpace(definition, part);
-            Vector3 framePosition = frame.GetColumn(3);
+            Vector3 footPosition = CreaturePartWorldTransformResolver
+                .ResolvePartFrameToCreatureSpace(definition, definition.FindPart("part_foot")).GetColumn(3);
 
-            Assert.AreEqual(new Vector3(0f, -0.5f, 0.4f), framePosition,
-                "Until CC-007, placement is the authored Transform; the anchor is reserved-but-inert and must not change the frame.");
+            Assert.That(footPosition, Is.EqualTo(new Vector3(0f, -0.5f, 0.4f)).Within(1e-5f),
+                "ParentAttachment only has placement authority for direct Body children.");
+        }
+
+        // ---- CC-056B parity: five attachment kinds, one resolver seam --------------
+        // ADR-002 §7: every attachment kind resolves through
+        // ResolvePartFrameToCreatureSpace with its documented authority. These
+        // tests pin the precedence contract so no kind can drift onto a second
+        // placement path.
+
+        [Test]
+        public void ResolvePartFrame_Parity_BodySurfaceAnchorIsPositionAuthority()
+        {
+            var definition = CreatureDefinition.CreateEmpty();
+            definition.Body = ProjectionBody();
+            definition.AddPart(BodyChildWithAnchor(10, 0.5f));
+
+            Vector3 position = CreaturePartWorldTransformResolver
+                .ResolvePartFrameToCreatureSpace(definition, definition.FindPart("part_leg")).GetColumn(3);
+
+            Assert.That(position, Is.EqualTo(new Vector3(0f, 1.5f, 1f)).Within(1e-5f),
+                "BodySurface: the anchor is the position authority for a Body child.");
+        }
+
+        [Test]
+        public void ResolvePartFrame_Parity_PartFrameIsAuthoredLocalTransform()
+        {
+            var definition = CreatureDefinition.CreateEmpty();
+            definition.Body = ProjectionBody();
+            definition.AddPart(new CreaturePart
+            {
+                Id = "part_head",
+                ParentId = CreatureDefinition.BodyId,
+                Transform = new TransformData { Position = new Vector3(0f, 0.5f, 1.2f), Rotation = Quaternion.identity, Scale = Vector3.one },
+                Shape = ShapeDefinition.DefaultSphere,
+                Appearance = AppearanceDefinition.Default,
+            });
+
+            Vector3 position = CreaturePartWorldTransformResolver
+                .ResolvePartFrameToCreatureSpace(definition, definition.FindPart("part_head")).GetColumn(3);
+
+            Assert.That(position, Is.EqualTo(new Vector3(0f, 0.5f, 1.2f)).Within(1e-5f),
+                "PartFrame: an unanchored Body child's local transform IS creature-space.");
+        }
+
+        [Test]
+        public void ResolvePartFrame_Parity_LimbRootIsPlacementFrame()
+        {
+            var definition = CreatureDefinition.CreateEmpty();
+            definition.Body = ProjectionBody();
+            definition.AddPart(new CreaturePart
+            {
+                Id = "part_arm",
+                ParentId = CreatureDefinition.BodyId,
+                Transform = new TransformData { Position = new Vector3(1f, 0f, 0f), Rotation = Quaternion.identity, Scale = Vector3.one },
+                Shape = ShapeDefinition.DefaultSphere,
+                Appearance = AppearanceDefinition.Default,
+                Limb = LimbChainWith(Vector3.zero, new Vector3(0f, -1f, 0f), new Vector3(0f, -2f, 0f)),
+            });
+
+            Vector3 position = CreaturePartWorldTransformResolver
+                .ResolvePartFrameToCreatureSpace(definition, definition.FindPart("part_arm")).GetColumn(3);
+
+            Assert.That(position, Is.EqualTo(new Vector3(1f, 0f, 0f)).Within(1e-5f),
+                "LimbRoot: a limb's own frame is its placement frame, not its terminal joint.");
+        }
+
+        [Test]
+        public void ResolvePartFrame_Parity_LimbTerminalIsChildSocket()
+        {
+            var definition = CreatureDefinition.CreateEmpty();
+            definition.Body = ProjectionBody();
+            definition.AddPart(new CreaturePart
+            {
+                Id = "part_arm",
+                ParentId = CreatureDefinition.BodyId,
+                Transform = TransformData.Identity,
+                Shape = ShapeDefinition.DefaultSphere,
+                Appearance = AppearanceDefinition.Default,
+                Limb = LimbChainWith(Vector3.zero, new Vector3(0f, -1f, 0f)),
+            });
+            definition.AddPart(new CreaturePart
+            {
+                Id = "part_hand",
+                ParentId = "part_arm",
+                Transform = TransformData.Identity,
+                Shape = ShapeDefinition.DefaultSphere,
+                Appearance = AppearanceDefinition.Default,
+            });
+
+            Vector3 position = CreaturePartWorldTransformResolver
+                .ResolvePartFrameToCreatureSpace(definition, definition.FindPart("part_hand")).GetColumn(3);
+
+            Assert.That(position, Is.EqualTo(new Vector3(0f, -1f, 0f)).Within(1e-5f),
+                "LimbTerminal: a limb child sits at the limb's terminal joint.");
+        }
+
+        [Test]
+        public void ResolvePartFrame_Parity_GeometryAttachmentComposesOnPartFrame()
+        {
+            var definition = CreatureDefinition.CreateEmpty();
+            definition.Body = ProjectionBody();
+            definition.AddPart(new CreaturePart
+            {
+                Id = "part_head",
+                ParentId = CreatureDefinition.BodyId,
+                Transform = new TransformData { Position = new Vector3(0f, 0.5f, 1.2f), Rotation = Quaternion.identity, Scale = Vector3.one },
+                Shape = ShapeDefinition.DefaultSphere,
+                Appearance = AppearanceDefinition.Default,
+                MeshGeometry = new MeshGeometry
+                {
+                    MeshAssetKey = "eye",
+                    Attachment = new GeometryAttachment
+                    {
+                        Offset = new Vector3(0f, 0.1f, 0f),
+                        Orientation = Quaternion.identity,
+                        Scale = Vector3.one,
+                    },
+                },
+            });
+
+            // Mirrors CreatureMeshGenerator: placement = resolver part frame *
+            // the local attachment (offset/orientation/scale in the part's frame).
+            Matrix4x4 partFrame = CreaturePartWorldTransformResolver
+                .ResolvePartFrameToCreatureSpace(definition, definition.FindPart("part_head"));
+            GeometryAttachment attachment = definition.FindPart("part_head").MeshGeometry.Attachment;
+            Vector3 position = (partFrame * Matrix4x4.TRS(
+                attachment.Offset, attachment.Orientation.normalized, attachment.Scale)).GetColumn(3);
+
+            Assert.That(position, Is.EqualTo(new Vector3(0f, 0.6f, 1.2f)).Within(1e-5f),
+                "GeometryAttachment: mesh placement is the part frame plus the local offset.");
         }
     }
 }

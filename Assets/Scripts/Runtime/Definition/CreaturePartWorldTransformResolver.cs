@@ -1,6 +1,7 @@
 using System.Collections.Generic;
 using UnityEngine;
 using ProceduralCreature.Common;
+using ProceduralCreature.Morphology;
 
 namespace ProceduralCreature.Definition
 {
@@ -40,13 +41,15 @@ namespace ProceduralCreature.Definition
         /// placement from raw ParentId/Transform/Limb fields.
         ///
         /// PLACEMENT PRECEDENCE (ADR-002 §7): a part has exactly one resolved
-        /// morphology frame, from exactly one path. Today that path is Transform +
-        /// parent chain + limb child-at-tip. <see cref="BodySurfaceAnchor"/>
-        /// (ParentAttachment) is RESERVED-but-inert until CC-007's body-surface
-        /// projector lands: it is validated and serialized but is NOT a placement
-        /// source, and no code may read its fields for placement except through
-        /// this resolver. When CC-007 lands, this method is the single seam that
-        /// applies the anchor for Body children.
+        /// morphology frame, from exactly one path. The path is Transform +
+        /// parent chain + limb child-at-tip, with one addition: a direct Body
+        /// child that carries a <see cref="BodySurfaceAnchor"/> (ParentAttachment)
+        /// is placed by projecting the anchor onto the resolved Body surface
+        /// (CC-056B). The projected surface frame is the placement root; the
+        /// part's local transform is a fine adjustment in that frame's local
+        /// space. Anchors stay inert for non-Body children. No code reads anchor
+        /// fields for placement except through this resolver; this method is the
+        /// single seam that applies the anchor for Body children.
         ///
         /// Assumes the definition has already passed DefinitionValidator (no
         /// cycles, no missing parents). Given valid input this never fails; given
@@ -98,6 +101,17 @@ namespace ProceduralCreature.Definition
                 CreaturePart p = chain[i];
                 Quaternion normalizedRotation = p.Transform.Rotation.normalized;
                 Matrix4x4 local = Matrix4x4.TRS(p.Transform.Position, normalizedRotation, p.Transform.Scale);
+
+                // CC-056B: a direct Body child with a BodySurfaceAnchor is placed
+                // by projecting the anchor onto the body surface (ADR-002 §7
+                // precedence table: "Body child | BodySurfaceAnchor"). The surface
+                // frame is the placement root; the part's local transform is a
+                // fine adjustment in that frame's local space.
+                if (p.ParentId == CreatureDefinition.BodyId && p.ParentAttachment != null)
+                {
+                    world *= ResolveBodyChildSurfaceFrame(definition, p);
+                }
+
                 world *= local;
 
                 // CC-018 (child-at-tip frame): a limb's TERMINAL joint is the
@@ -116,6 +130,27 @@ namespace ProceduralCreature.Definition
             }
 
             return world;
+        }
+
+        /// <summary>
+        /// Projects a direct Body child's <see cref="BodySurfaceAnchor"/> onto the
+        /// resolved Body surface and returns the resulting placement frame
+        /// (CC-056B). The frame is the projected
+        /// <see cref="BodySurfaceProjection.SurfaceFrame"/>: position on the body
+        /// surface and orientation from the rolled body frame (local +Z ->
+        /// Tangent, local +Y -> Normal, matching <see cref="BodyFrameResolver"/>'s
+        /// frame convention). Throws <see cref="DomainException"/> for a degenerate
+        /// Body or an anchor whose SegmentStartSampleId is unknown or terminal;
+        /// DefinitionValidator rejects those before generation.
+        /// </summary>
+        private static Matrix4x4 ResolveBodyChildSurfaceFrame(CreatureDefinition definition, CreaturePart part)
+        {
+            ResolvedBody body = ResolvedBody.Resolve(definition.Body);
+            BodySurfaceProjection projection = BodySurfaceProjector.Project(
+                body, part.ParentAttachment, definition.Forward);
+            Quaternion surfaceRotation = Quaternion.LookRotation(
+                projection.SurfaceFrame.Tangent, projection.SurfaceFrame.Normal);
+            return Matrix4x4.TRS(projection.SurfaceFrame.Position, surfaceRotation, Vector3.one);
         }
 
         /// <summary>

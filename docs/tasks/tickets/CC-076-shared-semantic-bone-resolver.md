@@ -2,7 +2,7 @@
 id: creature-task-076
 key: CC-076
 title: Create one shared semantic bone resolver service
-status: Backlog
+status: Done
 type: Architecture
 priority: P1
 tags: [runtime, skeleton, animation, geometry, architecture]
@@ -58,5 +58,35 @@ canonical resolved layer, not nearest-sample search.
 
 ## Next Step
 
-Design the resolver API against the CC-056B attachment contract, then extract the
-skeleton's existing resolution logic into it behind the current tests.
+None (Done). CC-007 replaced the nearest-sample body socket for anchored direct
+Body children: `SemanticBoneResolver.ResolveBodyParentBoneId` now binds a part
+with a ParentAttachment to the socket of the anchor's segment-start sample.
+Nearest-sample remains the fallback for non-anchored and null-parent parts.
+
+## 2026-08-25 implementation - Done
+
+New `SemanticBoneResolver` (Assets/Scripts/Runtime/Skeleton/SemanticBoneResolver.cs)
+is the single source of part-to-bone mapping. It owns:
+- id builders: `ResolvePartRootBoneId`, `ResolveLimbSegmentBoneId`,
+  `ResolveLimbTerminalBoneId`, `ResolveBodySocketBoneId`, `ResolveMirroredBoneId`;
+- resolution: `ResolveParentBoneId` (Body-rooted -> body socket; limb child ->
+  parent terminal bone; mirrored parent -> mirrored copy) and
+  `ResolveBodyParentBoneId` (nearest Body sample, retained as the one seam until
+  CC-007's anchor-based binding);
+- the `MirrorSuffix` / `LimbJointBoneSeparator` constants and the creature-space
+  `ReflectAcrossX` point reflection.
+
+`SkeletonInferrer` now delegates to the resolver for every bone id it emits
+(`BuildBone`, `AppendLimbBones`, `AppendBodyBones`) and keeps `MirrorSuffix` /
+`LimbJointBoneSeparator` as aliases so existing references keep compiling.
+Behavior is byte-identical: the refactor is behind the existing skeleton tests.
+
+The service depends only on authoritative DNA and the resolved morphology
+contract (CC-056B); it never touches generated mesh state.
+
+Validation (real editor 6000.5.9f1): new `SemanticBoneResolverTests` (6) compare
+resolver-returned ids against the inferred skeleton for body-rooted, mirrored,
+limb-segment/terminal, child-of-limb, and mirrored-limb parts, plus list-order
+determinism; skeleton regressions (SkeletonInferrerTests +
+SkeletonInferrerLimbTests) pass unchanged. Full PlayMode 434/434 green, console
+0 errors / 0 warnings.

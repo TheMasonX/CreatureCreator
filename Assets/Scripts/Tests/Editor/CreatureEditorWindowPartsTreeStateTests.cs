@@ -50,6 +50,77 @@ namespace ProceduralCreature.Tests.Editor
             return definition;
         }
 
+        // ---- CC-007 step 5: placement staleness fingerprint ----------------------
+        // The preview's MeshCollider is built from the Body at the last successful
+        // regenerate. Placement must be blocked when that Body no longer matches
+        // the live definition. The fingerprint covers only what placement depends
+        // on (Body samples + Forward) so part edits never mark the preview stale.
+
+        private static CreatureDefinition FingerprintBody()
+        {
+            var definition = CreatureDefinition.CreateEmpty();
+            definition.Forward = Vector3.forward;
+            definition.Body.Samples.Add(new BodySample { Id = 1, Position = new Vector3(0f, 0f, -1f), Radius = 0.5f });
+            definition.Body.Samples.Add(new BodySample { Id = 2, Position = new Vector3(0f, 0f, 1f), Radius = 0.5f });
+            return definition;
+        }
+
+        [Test]
+        public void BuildPlacementFingerprint_ChangesWhenBodyGeometryChanges()
+        {
+            CreatureDefinition a = FingerprintBody();
+            CreatureDefinition b = FingerprintBody();
+            b.Body.Samples[1].Position = new Vector3(0f, 0f, 2f);
+
+            Assert.AreNotEqual(
+                CreatureEditorWindow.BuildPlacementFingerprint(a),
+                CreatureEditorWindow.BuildPlacementFingerprint(b),
+                "A Body sample position change must invalidate the placement fingerprint.");
+        }
+
+        [Test]
+        public void BuildPlacementFingerprint_ChangesWhenBodySampleIdOrForwardChanges()
+        {
+            CreatureDefinition a = FingerprintBody();
+            CreatureDefinition renumbered = FingerprintBody();
+            renumbered.Body.Samples[0].Id = 99u;
+            Assert.AreNotEqual(
+                CreatureEditorWindow.BuildPlacementFingerprint(a),
+                CreatureEditorWindow.BuildPlacementFingerprint(renumbered),
+                "A Body sample Id change must invalidate the placement fingerprint.");
+
+            CreatureDefinition rotatedForward = FingerprintBody();
+            rotatedForward.Forward = Vector3.up;
+            Assert.AreNotEqual(
+                CreatureEditorWindow.BuildPlacementFingerprint(a),
+                CreatureEditorWindow.BuildPlacementFingerprint(rotatedForward),
+                "A Forward change must invalidate the placement fingerprint.");
+        }
+
+        [Test]
+        public void BuildPlacementFingerprint_UnchangedByPartEdits()
+        {
+            CreatureDefinition a = FingerprintBody();
+            CreatureDefinition b = FingerprintBody();
+            b.AddPart(new CreaturePart
+            {
+                Id = "part_added",
+                ParentId = CreatureDefinition.BodyId,
+                PartType = PartType.Part,
+            });
+            b.FindPart("part_added").Transform = new TransformData
+            {
+                Position = new Vector3(1f, 2f, 3f),
+                Rotation = Quaternion.Euler(10f, 20f, 30f),
+                Scale = new Vector3(2f, 2f, 2f),
+            };
+
+            Assert.AreEqual(
+                CreatureEditorWindow.BuildPlacementFingerprint(a),
+                CreatureEditorWindow.BuildPlacementFingerprint(b),
+                "Part-only edits must not mark the placement preview stale.");
+        }
+
         [Test]
         public void AncestorsToReveal_DeepChain_ReturnsAncestorsRootMostFirst()
         {

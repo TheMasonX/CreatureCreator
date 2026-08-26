@@ -85,7 +85,16 @@ namespace ProceduralCreature.Definition
         public bool HasParentCycle(out List<string> partIdsInCycle)
         {
             partIdsInCycle = new List<string>();
-            var byId = Parts.ToDictionary(p => p.Id, p => p);
+
+            // Tolerant lookup: first-wins on duplicate Ids so this never throws
+            // (CC-082). Duplicate part Ids are reported separately by
+            // DefinitionValidator; cycle detection must stay total and report-only.
+            var byId = new Dictionary<string, CreaturePart>(StringComparer.Ordinal);
+            foreach (CreaturePart part in Parts)
+            {
+                if (part == null || part.Id == null) continue;
+                if (!byId.ContainsKey(part.Id)) byId[part.Id] = part;
+            }
 
             foreach (CreaturePart part in Parts)
             {

@@ -131,8 +131,19 @@ namespace ProceduralCreature.Tests.Runtime
         [Test]
         public void Validate_RejectsPartWithNoParent()
         {
+            // ValidPart coalesces a null parentId to the Body, so build the
+            // parentless part directly: a non-Body part with ParentId == null
+            // must be rejected in schema v2 (CC-083).
             CreatureDefinition definition = ValidDefinitionWithBody();
-            definition.AddPart(ValidPart("part_root", parentId: null));
+            definition.AddPart(new CreaturePart
+            {
+                Id = "part_root",
+                ParentId = null,
+                PartType = PartType.Limb,
+                Transform = TransformData.Identity,
+                Shape = ShapeDefinition.DefaultSphere,
+                Appearance = AppearanceDefinition.Default,
+            });
 
             ValidationResult result = DefinitionValidator.Validate(definition);
 
@@ -214,6 +225,28 @@ namespace ProceduralCreature.Tests.Runtime
             part.ParentAttachment = new BodySurfaceAnchor
             {
                 SegmentStartSampleId = 999u,
+                SegmentT = 0.5f,
+                RadialAngle = 0f,
+                SurfaceOffset = 0f,
+                Roll = 0f,
+            };
+            definition.AddPart(part);
+
+            ValidationResult result = DefinitionValidator.Validate(definition);
+
+            Assert.IsTrue(HasCode(result, ValidationCode.InvalidAttachmentAnchor));
+        }
+
+        [Test]
+        public void Validate_DetectsAttachmentAnchorReferencingTerminalBodySample()
+        {
+            // ValidDefinitionWithBody has samples Id 1 and 2; Id 2 is the terminal
+            // sample and has no outgoing segment, so it is not a valid segment start.
+            CreatureDefinition definition = ValidDefinitionWithBody();
+            CreaturePart part = ValidPart("part_terminal");
+            part.ParentAttachment = new BodySurfaceAnchor
+            {
+                SegmentStartSampleId = 2u,
                 SegmentT = 0.5f,
                 RadialAngle = 0f,
                 SurfaceOffset = 0f,

@@ -8,7 +8,7 @@
 | CC-004 | Complete creature editor save and authoring controls | In Progress | P1 |
 | CC-005 | Add preview material and automatic regeneration settings | Done | P1 |
 | CC-006 | Define the Body spline and attachment tree model | In Progress | P1 |
-| CC-007 | Support surface attachment for limbs | Backlog | P1 |
+| CC-007 | Support surface attachment for limbs | Done | P1 |
 | CC-008 | Profile and optimize preview generation hotspots | In Progress | P1 |
 | CC-009 | Implement morphology compiler and semantic attachment model | Backlog | P1 |
 | CC-010 | Add semantic animation query and morphology-scaled motion model | Backlog | P1 |
@@ -59,7 +59,7 @@
 | CC-055 | Decide limb centerline and generation-aware sampling fidelity | Backlog | P2 |
 | CC-056 | Establish the canonical resolved morphology layer (umbrella; split into 056A/B) | In Progress | P1 |
 | CC-056A | Resolved Body/limb geometry (canonical derived morphology, part A) | Done | P1 |
-| CC-056B | Semantic attachment resolution (canonical derived morphology, part B) | In Progress | P1 |
+| CC-056B | Semantic attachment resolution (canonical derived morphology, part B) | Done | P1 |
 | CC-057 | Add a responsive interactive morphology preview proxy | Backlog | P1 |
 | CC-058 | Route editor interaction ownership by semantic mode | Backlog | P2 |
 | CC-059 | Define symmetry placement and center-merge semantics | Backlog | P2 |
@@ -79,12 +79,12 @@
 | CC-073 | Define and prototype animated geometry binding | Backlog | P1 |
 | CC-074 | Default surface material from the palette; remove editor preview material picker | Done | P1 |
 | CC-075 | Dispose TempJob samples array on the portable-sampling exception path | Done | P2 |
-| CC-076 | Create one shared semantic bone resolver service | Backlog | P1 |
+| CC-076 | Create one shared semantic bone resolver service | Done | P1 |
 | CC-077 | Add a PartType.Tail editor authoring path for child parts | Backlog | P3 |
 | CC-078 | Split the DuplicateBodySampleId validation code for duplicates vs out-of-order ids | Backlog | P3 |
 | CC-079 | Add a minimum absolute Body-spacing / degenerate-length validation | Backlog | P3 |
 | CC-080 | Resolve the dead ParentId-null guard in HasParentCycle | Backlog | P3 |
 | CC-081 | One canonical end-to-end morphology verification run | Backlog | P2 |
-| CC-082 | Fix the validator ToDictionary throw on duplicate part IDs | Backlog | P2 |
-| CC-083 | Reject a non-Body part with no parent (MissingParent gap) | Backlog | P2 |
-| CC-084 | Fix DisplayName round-trip mismatch after JSON round-trip | Backlog | P2 |
+| CC-082 | Fix the validator ToDictionary throw on duplicate part IDs | Done | P2 |
+| CC-083 | Reject a non-Body part with no parent (MissingParent gap) | Done | P2 |
+| CC-084 | Fix DisplayName round-trip mismatch after JSON round-trip | Done | P2 |

@@ -9,7 +9,7 @@ namespace ProceduralCreature.Morphology
     /// <summary>
     /// The derived, immutable geometry guide for the authoritative Body spline
     /// (CC-056A, increment B of the canonical resolved morphology layer).
-    /// Resolves the authored samples once into sample positions, radii, segment
+    /// Resolves the authored samples once into sample IDs, positions, radii, segment
     /// lengths, total length, and normalized arc lengths so every consumer — SDF
     /// body field, skeleton inference, resolved-envelope validation, and later
     /// animation — interprets the Body identically instead of re-deriving it
@@ -34,6 +34,9 @@ namespace ProceduralCreature.Morphology
         /// <summary>Sample positions in creature space.</summary>
         public readonly IReadOnlyList<Vector3> SamplePositions;
 
+        /// <summary>Stable authored IDs for the corresponding samples.</summary>
+        public readonly IReadOnlyList<uint> SampleIds;
+
         /// <summary>Local body thickness at each sample.</summary>
         public readonly IReadOnlyList<float> SampleRadii;
 
@@ -49,10 +52,12 @@ namespace ProceduralCreature.Morphology
         /// </summary>
         public readonly IReadOnlyList<float> NormalizedArcLengthAtSample;
 
-        private ResolvedBody(IReadOnlyList<Vector3> samplePositions, IReadOnlyList<float> sampleRadii,
+        private ResolvedBody(IReadOnlyList<Vector3> samplePositions, IReadOnlyList<uint> sampleIds,
+            IReadOnlyList<float> sampleRadii,
             IReadOnlyList<float> segmentLengths, float totalLength, IReadOnlyList<float> normalizedArcLengthAtSample)
         {
             SamplePositions = samplePositions;
+            SampleIds = sampleIds;
             SampleRadii = sampleRadii;
             SegmentLengths = segmentLengths;
             TotalLength = totalLength;
@@ -107,6 +112,7 @@ namespace ProceduralCreature.Morphology
 
             int count = samples.Count;
             var positions = new Vector3[count];
+            var ids = new uint[count];
             var radii = new float[count];
             for (int i = 0; i < count; i++)
             {
@@ -116,6 +122,7 @@ namespace ProceduralCreature.Morphology
                     throw new DomainException(
                         "Body spline contains a null sample; validation should have rejected it.");
                 }
+                ids[i] = sample.Id;
                 positions[i] = sample.Position;
                 radii[i] = sample.Radius;
             }
@@ -150,6 +157,7 @@ namespace ProceduralCreature.Morphology
 
             return new ResolvedBody(
                 Array.AsReadOnly(positions),
+                Array.AsReadOnly(ids),
                 Array.AsReadOnly(radii),
                 Array.AsReadOnly(segmentLengths),
                 totalLength,

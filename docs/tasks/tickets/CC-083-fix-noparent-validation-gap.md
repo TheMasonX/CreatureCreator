@@ -2,7 +2,7 @@
 id: creature-task-083
 key: CC-083
 title: Reject a non-Body part with no parent (MissingParent gap)
-status: Backlog
+status: Done
 type: Task
 priority: P2
 tags: [runtime, validation, definition]
@@ -44,5 +44,17 @@ None.
 
 ## Next Step
 
-Inspect `ValidateParentsAndCycles` for the null-ParentId path, then add the
-report and run the test.
+None (Done).
+
+## 2026-08-25 implementation - Done
+
+Root cause was a TEST helper masking the null parent: `ValidPart` coalesces a
+null `parentId` to `BodyId` (`parentId ?? CreatureDefinition.BodyId`), so the
+test's `ValidPart("part_root", parentId: null)` produced a valid Body child and
+the `InvalidBodyParent` check never fired. The validator's
+`ValidateParentsAndCycles` already reports `InvalidBodyParent` for
+`ParentId == null`; fixed the test to build the parentless part directly with an
+explicit `ParentId = null`.
+
+Validation (real editor 6000.5.9f1): `Validate_RejectsPartWithNoParent` passes.
+Full PlayMode 428/428 green (one of five pre-existing failures fixed).

@@ -228,7 +228,9 @@ namespace ProceduralCreature.Serialization
             var sb = new StringBuilder();
             sb.Append('{');
             WriteField(sb, "id", part.Id, first: true);
-            WriteField(sb, "displayName", string.IsNullOrWhiteSpace(part.DisplayName) ? part.Id : part.DisplayName);
+            // Preserve the authored DisplayName verbatim (null round-trips as null)
+            // instead of substituting the part Id (CC-084).
+            WriteNullableField(sb, "displayName", part.DisplayName);
             WriteNullableField(sb, "parentId", part.ParentId);
             WriteField(sb, "partType", part.PartType.ToString());
             WriteRawField(sb, "transform", WriteTransform(part.Transform));

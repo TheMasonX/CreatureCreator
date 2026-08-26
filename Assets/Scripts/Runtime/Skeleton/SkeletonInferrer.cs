@@ -57,21 +57,22 @@ namespace ProceduralCreature.Skeleton
     /// </summary>
     public static class SkeletonInferrer
     {
-        public const string MirrorSuffix = "_mirror";
+        /// <summary>Suffix on a mirrored bone id (owned by <see cref="SemanticBoneResolver"/>).</summary>
+        public const string MirrorSuffix = SemanticBoneResolver.MirrorSuffix;
 
         /// <summary>Bone-id separator for a limb's per-segment bones: part.Id + LimbJointBoneSeparator + i.</summary>
-        public const string LimbJointBoneSeparator = "_j";
+        public const string LimbJointBoneSeparator = SemanticBoneResolver.LimbJointBoneSeparator;
 
         /// <summary>
-        /// The creature-space reflection across the X = 0 plane. A mirrored limb
-        /// joint's position must be <c>S · (world · joint)</c>, i.e. the part
-        /// matrix LEFT-multiplied by this reflection — the same result the SDF
-        /// compiler's mirrored limb chain produces. (The conjugate
-        /// <see cref="MirrorUtility.MirrorAcrossXPlane"/> is correct for a
-        /// single bone sitting at the part origin, but not for a joint offset
-        /// from that origin.)
+        /// The creature-space reflection across the X = 0 plane (point form).
+        /// A mirrored limb joint's position must be <c>S · (world · joint)</c>,
+        /// i.e. the part matrix LEFT-multiplied by this reflection — the same
+        /// result the SDF compiler's mirrored limb chain produces. (The conjugate
+        /// <see cref="MirrorUtility.MirrorAcrossXPlane"/> is correct for a single
+        /// bone sitting at the part origin, but not for a joint offset from that
+        /// origin.) Owned by <see cref="SemanticBoneResolver"/>.
         /// </summary>
-        private static readonly Matrix4x4 ReflectAcrossX = Matrix4x4.Scale(new Vector3(-1f, 1f, 1f));
+        private static readonly Matrix4x4 ReflectAcrossX = SemanticBoneResolver.ReflectAcrossX;
 
         public static Skeleton Infer(CreatureDefinition definition)
         {
@@ -133,8 +134,8 @@ namespace ProceduralCreature.Skeleton
 
             return new Bone
             {
-                Id = mirrored ? part.Id + MirrorSuffix : part.Id,
-                ParentBoneId = ResolveParentBoneId(definition, part, mirrored),
+                Id = SemanticBoneResolver.ResolvePartRootBoneId(part, mirrored),
+                ParentBoneId = SemanticBoneResolver.ResolveParentBoneId(definition, part, mirrored),
                 SourcePartId = part.Id,
                 PartType = part.PartType,
                 IsMirrored = mirrored,
@@ -197,8 +198,7 @@ namespace ProceduralCreature.Skeleton
                 upHint = Vector3.Scale(upHint, new Vector3(-1f, 1f, 1f));
             }
 
-            string suffix = mirrored ? MirrorSuffix : string.Empty;
-            string rootParentBoneId = ResolveParentBoneId(definition, part, mirrored);
+            string rootParentBoneId = SemanticBoneResolver.ResolveParentBoneId(definition, part, mirrored);
             string previousBoneId = null;
 
             for (int i = 0; i < resolved.JointPositions.Count - 1; i++)
@@ -211,7 +211,7 @@ namespace ProceduralCreature.Skeleton
                 Vector3 segmentDir = toWorld - fromWorld;
                 Quaternion rotation = LimbBoneRotation(segmentDir, upHint);
 
-                string boneId = part.Id + LimbJointBoneSeparator + i + suffix;
+                string boneId = SemanticBoneResolver.ResolveLimbSegmentBoneId(part, i, mirrored);
                 skeleton.Bones.Add(new Bone
                 {
                     Id = boneId,
@@ -253,41 +253,6 @@ namespace ProceduralCreature.Skeleton
             return Quaternion.LookRotation(forward, up);
         }
 
-        private static string ResolveParentBoneId(CreatureDefinition definition, CreaturePart part, bool mirrored)
-        {
-            if (part.ParentId == null || part.ParentId == CreatureDefinition.BodyId)
-            {
-                return ResolveBodyParentBoneId(definition, part, mirrored);
-            }
-
-            CreaturePart parentPart = definition.FindPart(part.ParentId);
-            bool parentIsAlsoMirrored = parentPart != null
-                                         && parentPart.MirrorAcrossSymmetryPlane
-                                         && definition.SymmetryMode != SymmetryMode.None;
-
-            string parentBoneBaseId;
-            if (parentPart != null
-                && parentPart.Limb != null
-                && parentPart.Limb.Joints != null
-                && parentPart.Limb.Joints.Count >= 2)
-            {
-                // The child of a limb attaches to the limb's TERMINAL bone (N
-                // joints -> N-1 bones, so the last bone is index N-2). The
-                // terminal joint is the stable child-attachment point.
-                parentBoneBaseId = parentPart.Id + LimbJointBoneSeparator + (parentPart.Limb.Joints.Count - 2);
-            }
-            else
-            {
-                // Existing rule: an unmirrored part's bone id is exactly the
-                // source part id.
-                parentBoneBaseId = part.ParentId;
-            }
-
-            return mirrored && parentIsAlsoMirrored
-                ? parentBoneBaseId + MirrorSuffix
-                : parentBoneBaseId;
-        }
-
         private static void AppendBodyBones(Skeleton skeleton, CreatureDefinition definition)
         {
             if (definition.Body == null || definition.Body.Samples == null
@@ -320,12 +285,12 @@ namespace ProceduralCreature.Skeleton
                 Vector3 endPosition = hasSegment
                     ? resolved.SamplePositions[i + 1]
                     : position;
-                string boneId = CreatureDefinition.BodyId + LimbJointBoneSeparator
-                    + definition.Body.Samples[i].Id;
+                string boneId = SemanticBoneResolver.ResolveBodySocketBoneId(
+                    definition.Body.Samples[i].Id);
                 string parentBoneId = i == 0
                     ? null
-                    : CreatureDefinition.BodyId + LimbJointBoneSeparator
-                        + definition.Body.Samples[i - 1].Id;
+                    : SemanticBoneResolver.ResolveBodySocketBoneId(
+                        definition.Body.Samples[i - 1].Id);
 
                 skeleton.Bones.Add(new Bone
                 {
@@ -339,39 +304,6 @@ namespace ProceduralCreature.Skeleton
                     Rotation = Quaternion.LookRotation(frames[i].Tangent, frames[i].Normal),
                 });
             }
-        }
-
-        private static string ResolveBodyParentBoneId(
-            CreatureDefinition definition, CreaturePart part, bool mirrored)
-        {
-            if (definition.Body == null || definition.Body.Samples == null
-                || definition.Body.Samples.Count == 0)
-            {
-                return null;
-            }
-
-            Matrix4x4 world = CreaturePartWorldTransformResolver.ResolveLocalToCreatureSpace(
-                definition, part);
-            Vector3 position = part.Limb != null && part.Limb.Joints != null
-                && part.Limb.Joints.Count > 0
-                ? world.MultiplyPoint3x4(part.Limb.Joints[0].Position)
-                : world.GetColumn(3);
-            if (mirrored) position = ReflectAcrossX.MultiplyPoint3x4(position);
-
-            int nearestIndex = 0;
-            float nearestDistance = float.PositiveInfinity;
-            for (int i = 0; i < definition.Body.Samples.Count; i++)
-            {
-                float distance = (definition.Body.Samples[i].Position - position).sqrMagnitude;
-                if (distance < nearestDistance)
-                {
-                    nearestDistance = distance;
-                    nearestIndex = i;
-                }
-            }
-
-            return CreatureDefinition.BodyId + LimbJointBoneSeparator
-                + definition.Body.Samples[nearestIndex].Id;
         }
     }
 }

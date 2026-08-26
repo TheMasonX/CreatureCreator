@@ -141,6 +141,29 @@ namespace ProceduralCreature.Editor
         private readonly List<GameObject> _previewGeometryObjects = new List<GameObject>();
         private CreatureUndoState _undoState;
         private bool _placementModeActive;
+        // CC-007: transient placement result shown under the Place Part Mode
+        // HelpBox (clear editor result on miss/failure; editor state, never DNA).
+        private string _placementFeedback;
+        // CC-007 step 5: the Body fingerprint the last successful preview was
+        // generated from (Body samples + Forward). Placement raycasts hit the
+        // preview's MeshCollider, so when this no longer matches the live
+        // definition the collider is stale and placement is blocked until the
+        // user regenerates. Part edits do NOT change it — only the Body geometry
+        // the placement anchor depends on.
+        private string _previewBodyFingerprint;
+        // CC-007 step 6: new-part placement DRAG gesture. Mouse-down on the Body
+        // surface starts it (no part selected); a transient ghost follows the
+        // cursor, projected onto the surface each frame through
+        // TryProjectToAnchor + TryResolveSurfaceFrame (definition untouched);
+        // release commits exactly ONE MutateDefinition through the same
+        // button-driven placement path; Esc cancels with no mutation (the CC-016
+        // gesture discipline). A plain click still places: down starts the
+        // gesture, up commits at the same point.
+        private int _placementDragControlId = -1;
+        private bool _placementDragActive;
+        private bool _placementDragHasValidFrame;
+        private Vector3 _placementDragSurfacePosition;
+        private Quaternion _placementDragSurfaceRotation;
         private bool _autoRegenerate;
         private bool _showEditorSettings;
         private float _autoRegenerationDelaySeconds = 1f;
@@ -340,9 +363,20 @@ namespace ProceduralCreature.Editor
                 EditorGUILayout.HelpBox(
                     "Place Part Mode: click the preview mesh in the Scene view. With a part selected, the " +
                     "part snaps to the clicked position. With no part selected, a new part is created there. " +
-                    "This raycasts against the mesh from the last 'Regenerate Preview' click, which may be " +
-                    "stale if you've edited the creature since then — regenerate first if placement looks off.",
+                    "Placement raycasts against the mesh from the last 'Regenerate Preview', so it is blocked " +
+                    "when the Body has changed since then — regenerate first.",
                     MessageType.Info);
+                if (IsPreviewStale())
+                {
+                    EditorGUILayout.HelpBox(
+                        "Preview is stale: the Body changed since the last 'Regenerate Preview'. " +
+                        "Regenerate before placing parts.",
+                        MessageType.Warning);
+                }
+                if (!string.IsNullOrEmpty(_placementFeedback))
+                {
+                    EditorGUILayout.HelpBox(_placementFeedback, MessageType.None);
+                }
             }
 
             EditorGUILayout.BeginHorizontal();
@@ -413,6 +447,8 @@ namespace ProceduralCreature.Editor
             if (newPlacementMode != _placementModeActive)
             {
                 _placementModeActive = newPlacementMode;
+                _placementFeedback = null;
+                if (!newPlacementMode) CancelPlacementDrag(); // leave a mid-drag gesture cleanly
                 SceneView.RepaintAll();
             }
             GUI.enabled = true;
@@ -1816,6 +1852,9 @@ namespace ProceduralCreature.Editor
                 DrawSelectedPartHandle();
             }
 
+            // CC-007 step 6: the transient new-part ghost draws behind the
+            // placement click handling (Repaint only, gesture active).
+            DrawPlacementDragGhost();
             HandlePlacementClick();
         }
 
@@ -2466,11 +2505,24 @@ namespace ProceduralCreature.Editor
         private void ApplyViewportMove(CreaturePart selected, Vector3 newWorldPosition)
         {
             string partId = selected.Id;
-            Vector3 newLocalPosition = WorldToLocalPosition(newWorldPosition, selected.ParentId);
-            Vector3 clampedLocalPosition = ClampToBounds(newLocalPosition, _definition.Bounds);
+            // CC-007: the part is passed so an ANCHORED Body child converts the
+            // dragged world position into the anchor surface frame's local space
+            // (the frame the resolver reads Transform.Position in) instead of
+            // creature space — without this a drag on an anchored part explodes
+            // along the frame's +Y (gizmo drag fix).
+            Vector3 newLocalPosition = WorldToLocalPosition(newWorldPosition, selected.ParentId, selected);
+            // CC-007: an anchored Body child's local position is surface-frame-
+            // local, not creature-space, so creature-bounds clamping does not
+            // apply to it (a large local offset along the frame's +Y is a
+            // legitimate fine adjustment, not an out-of-bounds position).
+            bool anchoredBodyChild = (selected.ParentId == null || selected.ParentId == CreatureDefinition.BodyId)
+                && selected.ParentAttachment != null;
+            Vector3 storedLocalPosition = anchoredBodyChild
+                ? newLocalPosition
+                : ClampToBounds(newLocalPosition, _definition.Bounds);
 
             TransformData newTransform = selected.Transform;
-            newTransform.Position = clampedLocalPosition;
+            newTransform.Position = storedLocalPosition;
 
             // Same known granularity limitation as continuous inspector-field
             // drags (see class doc comment): this fires once per GUI frame the
@@ -2481,52 +2533,315 @@ namespace ProceduralCreature.Editor
             Repaint(); // the main window doesn't auto-repaint from a SceneView-driven change
         }
 
+        /// <summary>
+        /// A placement-scoped fingerprint of the definition: Body sample
+        /// identity/positions/radii plus Forward. Placement depends only on the
+        /// Body surface — the raycast hits the preview's Body collider and the
+        /// anchor projects onto the resolved Body — so part edits never mark the
+        /// preview stale (CC-007 step 5). Internal so EditMode tests can pin the
+        /// granularity.
+        /// </summary>
+        internal static string BuildPlacementFingerprint(CreatureDefinition definition)
+        {
+            if (definition == null || definition.Body == null || definition.Body.Samples == null)
+            {
+                return string.Empty;
+            }
+
+            var sb = new System.Text.StringBuilder();
+            sb.Append(definition.Forward.ToString("G6")).Append('|');
+            foreach (BodySample sample in definition.Body.Samples)
+            {
+                if (sample == null) continue;
+                sb.Append(sample.Id).Append(',')
+                  .Append(sample.Position.x.ToString("G6")).Append(',')
+                  .Append(sample.Position.y.ToString("G6")).Append(',')
+                  .Append(sample.Position.z.ToString("G6")).Append(',')
+                  .Append(sample.Radius.ToString("G6")).Append(';');
+            }
+            return sb.ToString();
+        }
+
+        /// <summary>
+        /// True when the preview's MeshCollider was generated from a different
+        /// Body than the live definition (CC-007 step 5). A null fingerprint (a
+        /// preview carried across a domain reload with no recorded generate) is
+        /// treated as fresh so a recompile does not force a regenerate.
+        /// </summary>
+        private bool IsPreviewStale()
+        {
+            return _previewBodyFingerprint != null
+                && BuildPlacementFingerprint(_definition) != _previewBodyFingerprint;
+        }
+
         private void HandlePlacementClick()
         {
             if (!_placementModeActive) return;
-            if (_previewGameObject == null) return;
 
             Event e = Event.current;
+
+            // CC-007 step 6: an in-flight new-part placement drag first checks for
+            // release (commit) and Esc (cancel) so the very last drag target is
+            // captured — the same shape as the CC-016/CC-018 viewport gestures.
+            // hotControl returning to 0 also means the drag ended.
+            if (_placementDragActive)
+            {
+                if (e.type == EventType.KeyDown && e.keyCode == KeyCode.Escape)
+                {
+                    CancelPlacementDrag();
+                    e.Use();
+                    return;
+                }
+                if (e.type == EventType.MouseUp || GUIUtility.hotControl == 0)
+                {
+                    CommitPlacementDrag(e);
+                    return; // CommitPlacementDrag consumes the event
+                }
+                if (e.type == EventType.MouseDrag || e.type == EventType.MouseMove)
+                {
+                    UpdatePlacementDrag(e);
+                    e.Use();
+                    return;
+                }
+                return; // Repaint and other event types leave the gesture alone
+            }
+
             if (e.type != EventType.MouseDown || e.button != 0) return;
             if (e.alt) return; // let Alt+Click camera orbit pass through untouched
 
+            if (_previewGameObject == null)
+            {
+                _placementFeedback = "No preview object — regenerate a preview before placing parts.";
+                return;
+            }
+
             MeshCollider collider = _previewGameObject.GetComponent<MeshCollider>();
-            if (collider == null) return;
+            if (collider == null)
+            {
+                _placementFeedback = "Preview has no collider — regenerate a preview before placing parts.";
+                return;
+            }
+
+            // CC-007 step 5: the collider is from the last successful regenerate.
+            // A Body change since then makes the raycast geometry stale (a hit no
+            // longer lies on the current Body surface), so block placement until
+            // the user regenerates. Part-only edits do not trip this gate.
+            if (IsPreviewStale())
+            {
+                _placementFeedback = "Preview is stale — the Body changed since the last 'Regenerate Preview'. Regenerate first, then place.";
+                return;
+            }
 
             Ray ray = HandleUtility.GUIPointToWorldRay(e.mousePosition);
-            if (!collider.Raycast(ray, out RaycastHit hit, 1000f)) return;
+            if (!collider.Raycast(ray, out RaycastHit hit, 1000f))
+            {
+                _placementFeedback = "Placement missed the preview mesh; the definition was unchanged.";
+                return;
+            }
 
             // Place Part Mode snaps the selected part to the hit point (CC-015).
-            // With no part selected it falls back to creating a new part there.
+            // A direct Body child is placed through a semantic BodySurfaceAnchor
+            // (CC-007): the hit's position + outward normal are input only, and
+            // the anchor becomes the authoritative DNA. With no part selected, a
+            // new part is created at the hit — but the placement is deferred to
+            // the mouse-up so a DRAG can pick the drop point with a ghost (CC-007
+            // step 6). A plain click places at once: down starts the gesture, up
+            // commits at the same point, so click-to-place still works.
             CreaturePart selected = _selectedPartId != null && _selectedPartId != CreatureDefinition.BodyId
                 ? _definition.FindPart(_selectedPartId)
                 : null;
             if (selected != null)
             {
-                ApplyViewportMove(selected, hit.point);
-            }
-            else
-            {
-                PlaceNewPartAtWorldPosition(hit.point);
+                if (selected.ParentId == CreatureDefinition.BodyId)
+                {
+                    PlaceSelectedBodyChildOnSurface(selected, hit.point, hit.normal);
+                }
+                else
+                {
+                    ApplyViewportMove(selected, hit.point);
+                }
+
+                e.Use(); // consume the click so it doesn't also (de)select scene objects
+                return;
             }
 
-            e.Use(); // consume the click so it doesn't also (de)select scene objects
+            // New-part placement drag: capture the hot control and project the
+            // initial ghost from this first hit. The definition is not mutated
+            // here; CommitPlacementDrag on release owns the single mutation.
+            _placementDragControlId = GUIUtility.GetControlID(FocusType.Passive);
+            _placementDragActive = true;
+            _placementDragHasValidFrame = false;
+            GUIUtility.hotControl = _placementDragControlId;
+            UpdatePlacementDrag(e);
+            e.Use();
         }
 
-        private void PlaceNewPartAtWorldPosition(Vector3 worldPosition)
+        /// <summary>
+        /// Re-projects the drag's current cursor position onto the Body surface
+        /// and stores the ghost frame. Pure preview state — the definition is
+        /// never touched here (CC-007 step 6). A frame is only recorded when the
+        /// raycast hits the preview collider AND the hit projects to a valid
+        /// anchor, so the ghost simply freezes at its last valid position when the
+        /// cursor leaves the body mid-drag.
+        /// </summary>
+        private void UpdatePlacementDrag(Event e)
+        {
+            _placementDragHasValidFrame = false;
+
+            MeshCollider collider = _previewGameObject != null
+                ? _previewGameObject.GetComponent<MeshCollider>()
+                : null;
+            if (collider == null) return;
+
+            Ray ray = HandleUtility.GUIPointToWorldRay(e.mousePosition);
+            if (!collider.Raycast(ray, out RaycastHit hit, 1000f)) return;
+
+            if (BodyPlacementAuthoring.TryProjectToAnchor(
+                    _definition, hit.point, hit.normal, out BodySurfaceAnchor anchor)
+                && BodyPlacementAuthoring.TryResolveSurfaceFrame(
+                    _definition, anchor, out _placementDragSurfacePosition, out _placementDragSurfaceRotation))
+            {
+                _placementDragHasValidFrame = true;
+            }
+        }
+
+        /// <summary>
+        /// Ends the placement drag by committing through the SAME button-driven
+        /// placement path (<see cref="PlaceNewPartAtWorldPosition"/>): the release
+        /// point is re-raycast and the hit (position + outward normal, input only)
+        /// projects to the semantic anchor inside the mutation, so one drag = one
+        /// MutateDefinition = one Undo (CC-007 step 6). A release off the mesh
+        /// leaves the definition unchanged, matching the click-path invariant.
+        /// </summary>
+        private void CommitPlacementDrag(Event e)
+        {
+            int controlId = _placementDragControlId;
+            _placementDragActive = false;
+            _placementDragControlId = -1;
+            _placementDragHasValidFrame = false;
+            if (GUIUtility.hotControl == controlId) GUIUtility.hotControl = 0;
+
+            MeshCollider collider = _previewGameObject != null
+                ? _previewGameObject.GetComponent<MeshCollider>()
+                : null;
+            if (collider == null)
+            {
+                _placementFeedback = "Preview has no collider — regenerate a preview before placing parts.";
+                e.Use();
+                return;
+            }
+
+            Ray ray = HandleUtility.GUIPointToWorldRay(e.mousePosition);
+            if (!collider.Raycast(ray, out RaycastHit hit, 1000f))
+            {
+                _placementFeedback = "Placement missed the preview mesh; the definition was unchanged.";
+                e.Use();
+                return;
+            }
+
+            PlaceNewPartAtWorldPosition(hit.point, hit.normal);
+            e.Use();
+        }
+
+        /// <summary>
+        /// Esc during a placement drag: the definition was never mutated, so
+        /// nothing to undo — the gesture state is simply dropped (CC-007 step 6).
+        /// </summary>
+        private void CancelPlacementDrag()
+        {
+            if (GUIUtility.hotControl == _placementDragControlId) GUIUtility.hotControl = 0;
+            _placementDragActive = false;
+            _placementDragControlId = -1;
+            _placementDragHasValidFrame = false;
+            _placementFeedback = "Placement drag cancelled; the definition was unchanged.";
+        }
+
+        /// <summary>
+        /// Draws the transient new-part ghost during a placement drag (CC-007
+        /// step 6): a small screen-relative sphere at the surface frame with a
+        /// short line along the surface +Y (outward normal). It is a placement
+        /// CURSOR, not a full-size part preview — a fixed DefaultSphere-sized
+        /// ball read as a huge volume on a large creature and did not shrink
+        /// with zoom, so the ghost follows the project's Scene-view handle
+        /// convention (HandleUtility.GetHandleSize * factor, the same rule as
+        /// the body-sample/limb/skeleton handles). Repaint only; editor state,
+        /// never DNA.
+        /// </summary>
+        private void DrawPlacementDragGhost()
+        {
+            if (!_placementDragActive || !_placementDragHasValidFrame) return;
+            if (Event.current.type != EventType.Repaint) return;
+
+            float handleSize = HandleUtility.GetHandleSize(_placementDragSurfacePosition);
+            Handles.color = new Color(0.35f, 0.75f, 1f, 0.6f);
+            Handles.SphereHandleCap(0, _placementDragSurfacePosition, _placementDragSurfaceRotation,
+                handleSize * 0.28f, EventType.Repaint);
+            Handles.color = new Color(0.35f, 0.75f, 1f, 0.9f);
+            Handles.DrawLine(
+                _placementDragSurfacePosition,
+                _placementDragSurfacePosition + _placementDragSurfaceRotation * Vector3.up * handleSize * 0.6f);
+            Handles.color = Color.white;
+        }
+
+        private void PlaceNewPartAtWorldPosition(Vector3 worldPosition, Vector3 worldNormal)
         {
             string parentId = _selectedPartId != null && _selectedPartId != CreatureDefinition.BodyId
                 ? _selectedPartId
                 : CreatureDefinition.BodyId;
-            Vector3 localPosition = WorldToLocalPosition(worldPosition, parentId, out bool parentResolvedSuccessfully);
-            if (!parentResolvedSuccessfully) parentId = CreatureDefinition.BodyId; // fall back to the Body root rather than dropping the click
+            string newId = PartIdGenerator.CreateNew();
+
+            // CC-007: a direct Body child is placed through a semantic
+            // BodySurfaceAnchor — the hit (position + outward normal) is input
+            // only, and the anchor becomes the authoritative DNA. The part sits
+            // exactly on the body surface at the hit and survives mesh resolution
+            // changes. Falls back to the raw creature-space position when the
+            // Body has no surface to project onto.
+            if (parentId == CreatureDefinition.BodyId
+                && BodyPlacementAuthoring.TryProjectToAnchor(
+                    _definition, worldPosition, worldNormal, out BodySurfaceAnchor anchor))
+            {
+                MutateDefinition("Place Part on Body Surface (Viewport)", definition => definition.AddPart(new CreaturePart
+                {
+                    Id = newId,
+                    ParentId = CreatureDefinition.BodyId,
+                    PartType = PartType.Part,
+                    DisplayName = DefaultPartNameFor(PartType.Part),
+                    Transform = TransformData.Identity,
+                    Shape = ShapeDefinition.DefaultSphere,
+                    Appearance = AppearanceDefinition.Default,
+                    MirrorAcrossSymmetryPlane = true,
+                    ParentAttachment = anchor,
+                }));
+                _placementFeedback = $"Placed '{newId}' on the Body surface.";
+                SelectPart(newId);
+                Repaint();
+                return;
+            }
+
+            // Non-Body parent (a selected limb or other part): the child is
+            // authored in the parent's local frame (CC-018 child-at-tip for a
+            // limb parent). Also the fallback when the Body has no surface to
+            // anchor onto.
+            // CC-007: the part being created does not exist yet, so it cannot
+            // carry an anchor; a new part on the raw-position fallback path is a
+            // NON-anchored Body child (local == creature space), which is the
+            // correct conversion here.
+            Vector3 localPosition = WorldToLocalPosition(worldPosition, parentId, null, out bool parentResolvedSuccessfully);
+            if (!parentResolvedSuccessfully)
+            {
+                parentId = CreatureDefinition.BodyId; // fall back to the Body root rather than dropping the click
+                _placementFeedback = "Placement fell back to the Body root because the intended parent could not be resolved.";
+            }
+            else if (parentId == CreatureDefinition.BodyId)
+            {
+                _placementFeedback = "Body has no surface to anchor to; placed at the raw creature-space position.";
+            }
 
             // CC-018 (child-at-tip frame): a limb parent's terminal joint is the
             // origin of a child's local space, and WorldToLocalPosition already
             // converts the clicked point into that tip-relative frame — a drop at
             // identity lands on the tip and any click offsets from the tip.
             Vector3 clampedPosition = ClampToBounds(localPosition, _definition.Bounds);
-            string newId = PartIdGenerator.CreateNew();
             string finalParentId = parentId;
 
             MutateDefinition("Place Part (Viewport)", definition => definition.AddPart(new CreaturePart
@@ -2546,24 +2861,101 @@ namespace ProceduralCreature.Editor
         }
 
         /// <summary>
+        /// Snaps an existing direct Body child to a preview-mesh hit by
+        /// re-projecting the semantic BodySurfaceAnchor (CC-007). The anchor
+        /// becomes the placement authority: the part's local position resets to
+        /// zero so it sits exactly on the surface frame at the hit (scale, a size
+        /// property, is preserved). A LIMB keeps its current world orientation
+        /// (expressed in the surface frame's local space) so its chain keeps
+        /// pointing outward/down instead of into the body — the surface frame's
+        /// +Y is the outward normal, so a bare identity rotation would point a
+        /// -Y-authored limb chain INTO the creature (CC-007 review fix). A
+        /// non-limb Body child aligns to the surface frame. Falls back to a raw
+        /// viewport move when the Body has no surface to project onto.
+        /// </summary>
+        private void PlaceSelectedBodyChildOnSurface(CreaturePart selected, Vector3 hitPosition, Vector3 hitNormal)
+        {
+            if (!BodyPlacementAuthoring.TryProjectToAnchor(
+                    _definition, hitPosition, hitNormal, out BodySurfaceAnchor anchor))
+            {
+                ApplyViewportMove(selected, hitPosition);
+                return;
+            }
+
+            string partId = selected.Id;
+            bool isLimb = selected.Limb != null && selected.Limb.Joints != null && selected.Limb.Joints.Count > 0;
+
+            // The rotation stored is the part's world orientation expressed in the
+            // new anchor frame's local space: composed with the anchor surface
+            // frame it reproduces the limb's authored world orientation at the new
+            // surface position. A non-limb part keeps the surface-frame alignment
+            // (identity local rotation, +Y outward) used for new parts.
+            Quaternion localRotation = Quaternion.identity;
+            if (isLimb)
+            {
+                try
+                {
+                    Quaternion currentWorld = CreaturePartWorldTransformResolver
+                        .ResolvePartFrameToCreatureSpace(_definition, selected).rotation;
+                    Quaternion surfaceFrame = BodyPlacementAuthoring.ResolveSurfaceFrameRotation(_definition, anchor);
+                    localRotation = Quaternion.Inverse(surfaceFrame) * currentWorld;
+                }
+                catch (DomainException)
+                {
+                    localRotation = Quaternion.identity; // degenerate definition; never throw from the SceneView
+                }
+            }
+
+            MutateDefinition("Place Part on Body Surface (Viewport)", definition =>
+            {
+                CreaturePart part = definition.FindPart(partId);
+                part.ParentAttachment = anchor;
+                TransformData transform = part.Transform;
+                transform.Position = Vector3.zero;
+                transform.Rotation = localRotation;
+                part.Transform = transform;
+            });
+            _placementFeedback = isLimb
+                ? $"Snapped '{partId}' to the Body surface (limb orientation preserved)."
+                : $"Snapped '{partId}' to the Body surface.";
+            Repaint();
+        }
+
+        /// <summary>
         /// Converts a creature-space (world) position into the parent-relative
         /// local position CreaturePart.Transform.Position actually stores, by
         /// inverting the parent's resolved world matrix — see the class doc
         /// comment's note on why this conversion exists at all (viewport
         /// interaction is world-space; DNA storage is parent-local).
         /// </summary>
-        private Vector3 WorldToLocalPosition(Vector3 worldPosition, string parentId)
+        private Vector3 WorldToLocalPosition(Vector3 worldPosition, string parentId, CreaturePart part)
         {
-            return WorldToLocalPosition(worldPosition, parentId, out _);
+            return WorldToLocalPosition(worldPosition, parentId, part, out _);
         }
 
-        private Vector3 WorldToLocalPosition(Vector3 worldPosition, string parentId, out bool succeeded)
+        private Vector3 WorldToLocalPosition(Vector3 worldPosition, string parentId, CreaturePart part, out bool succeeded)
         {
             succeeded = true;
 
-            // The Body owns the creature frame; a Body-child's local position is
-            // already creature-space (the Body spline itself defines the origin).
-            if (parentId == null || parentId == CreatureDefinition.BodyId) return worldPosition;
+            // The Body owns the creature frame. A NON-anchored Body child's local
+            // position is already creature-space (the Body spline defines the
+            // origin), but an ANCHORED Body child (ParentAttachment) is placed by
+            // the resolver in the anchor SURFACE FRAME's local space (ADR-002 §7
+            // fine adjustment), so the world->local conversion must invert that
+            // surface frame — otherwise a gizmo drag writes a creature-space
+            // offset that the resolver misreads as a surface-frame-local offset
+            // and the part explodes along the frame's +Y (CC-007 gizmo-drag fix).
+            if (parentId == null || parentId == CreatureDefinition.BodyId)
+            {
+                if (part != null && part.ParentAttachment != null
+                    && BodyPlacementAuthoring.TryResolveSurfaceFrame(
+                        _definition, part.ParentAttachment,
+                        out Vector3 surfacePosition, out Quaternion surfaceRotation))
+                {
+                    return Quaternion.Inverse(surfaceRotation) * (worldPosition - surfacePosition);
+                }
+                return worldPosition;
+            }
 
             CreaturePart parentPart = _definition.FindPart(parentId);
             if (parentPart == null)
@@ -2629,6 +3021,9 @@ namespace ProceduralCreature.Editor
                 Mesh unityMesh = generated.MainMesh;
                 ApplyPreviewGeometry(generated);
                 _autoRegenerateAt = -1d;
+                // CC-007 step 5: record the Body the collider was built from so
+                // placement can detect a stale preview before raycasting it.
+                _previewBodyFingerprint = BuildPlacementFingerprint(_definition);
 
                 if (!topologyReport.IsWatertight)
                 {

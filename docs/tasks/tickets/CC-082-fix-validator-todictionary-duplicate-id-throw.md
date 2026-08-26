@@ -2,7 +2,7 @@
 id: creature-task-082
 key: CC-082
 title: Fix the validator ToDictionary throw on duplicate part IDs
-status: Backlog
+status: Done
 type: Task
 priority: P2
 tags: [runtime, validation, definition]
@@ -51,5 +51,18 @@ None.
 
 ## Next Step
 
-Inspect the duplicate-id lookup path and make it report-only, then run the
-three tests.
+None (Done). The three duplicate-id validator tests now pass.
+
+## 2026-08-25 implementation - Done
+
+`CreatureDefinition.HasParentCycle` built `Parts.ToDictionary(p => p.Id, p => p)`,
+which threw `ArgumentException` on duplicate part Ids. The validator is
+contractually report-only and never throws, but `ValidateParentsAndCycles` called
+this and surfaced the throw. Replaced the dictionary build with a tolerant
+first-wins lookup that skips null parts/Ids, so cycle detection stays total and
+reports through the normal issue list; `ValidateDuplicateIds` reports the
+`DuplicatePartId` issue separately.
+
+Validation (real editor 6000.5.9f1): `Validate_DetectsDuplicateIds`,
+`Validate_DetectsInvalidAttachmentAnchor`, and `Validate_IsOrderIndependent` all
+pass. Full PlayMode 428/428 green (one of five pre-existing failures fixed).

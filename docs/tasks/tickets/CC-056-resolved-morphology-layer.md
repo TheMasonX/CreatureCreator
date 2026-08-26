@@ -2,7 +2,7 @@
 id: creature-task-056
 key: CC-056
 title: Establish the canonical resolved morphology layer
-status: Backlog
+status: In Progress
 type: Architecture
 authority: BeastMaster
 priority: P1

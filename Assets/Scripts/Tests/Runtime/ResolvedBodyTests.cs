@@ -40,6 +40,8 @@ namespace ProceduralCreature.Tests.Runtime
             ResolvedBody resolved = ResolvedBody.Resolve(StraightSpline());
 
             Assert.AreEqual(3, resolved.SamplePositions.Count);
+            Assert.AreEqual(1u, resolved.SampleIds[0]);
+            Assert.AreEqual(3u, resolved.SampleIds[2]);
             Assert.AreEqual(3, resolved.SampleRadii.Count);
             Assert.AreEqual(2, resolved.SegmentLengths.Count);
             Assert.AreEqual(1f, resolved.SegmentLengths[0], 1e-6f);
