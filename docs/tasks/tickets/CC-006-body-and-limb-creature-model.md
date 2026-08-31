@@ -2,7 +2,7 @@
 id: creature-task-006
 key: CC-006
 title: Define the Body and Limb creature model
-status: In Progress
+status: Superseded
 type: Task
 priority: P1
 tags: [runtime, definition, schema, body, limbs]
@@ -24,6 +24,13 @@ links:
   - docs/audits/sporelike-creature-model-and-editor-audit-26-08-22-15-34-00.md
   - docs/tasks/handoffs/CC-006-v2-authoring-and-editor-handoff.md
 ---
+
+## Disposition
+
+The schema and authoring portions are historical. Remaining resolved morphology
+and ownership work is tracked by CC-087. See the 2026-08-30 audit synthesis and
+the task archive record.
+
 
 ## Summary
 Represent each creature as one primary Body spline built from evenly spaced metaballs. Store limbs and other attachments as descendants of the Body, with attachments allowed below limbs. Show the same hierarchy as a tree in the editor.

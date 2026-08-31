@@ -7,7 +7,7 @@ type: Decision
 priority: P2
 tags: [runtime, limbs, sdf, generation, architecture]
 dependsOn: [CC-018, CC-008]
-related: [CC-039]
+related: [CC-039, CC-087]
 links:
   - Assets/Scripts/Runtime/Morphology/LimbMetaballSampler.cs
   - Assets/Scripts/Runtime/Morphology/Sdf/SdfProgramBuilder.cs

@@ -12,6 +12,7 @@ links:
   - Assets/Scripts/Runtime/Definition/DefinitionValidator.cs
   - Assets/Scripts/Runtime/Definition/PartType.cs
   - Assets/Scripts/Editor/CreatureEditorWindow.cs
+  - docs/audits/creaturecreator-code-audit-2026-08-25.md
 ---
 
 ## Summary
@@ -30,6 +31,10 @@ match the terminal part's meaning).
 
 - New `ValidationCode`(s) for the two mismatches (or one shared code with a
   message carrying the expected parent type).
+- Extend the same validation pass to define the reverse invariant: `Limb`,
+  `Leg`, and `Arm` parts must either carry a `LimbChain` or use an explicitly
+  documented supported fallback. Retype the demo head fixture if it is a
+  primitive rather than a joint chain.
 - Report-only (no silent repair), matching every other `DefinitionValidator`
   rule.
 - Decide the rule's edge cases:
@@ -51,6 +56,8 @@ match the terminal part's meaning).
   (or non-limb) reports the new issue.
 - A Foot whose direct parent is a Leg validates; a Foot whose parent is an Arm
   (or non-limb) reports the new issue.
+- The supported contract for limb-like parts without a `LimbChain` is explicit,
+  and validation tests cover the chosen behavior.
 - The rule is report-only and does not change existing valid creatures.
 
 ## Validation

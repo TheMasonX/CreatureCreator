@@ -7,7 +7,7 @@ type: Task
 priority: P1
 tags: [definition, schema, sdf, editor, serialization]
 dependsOn: [CC-018]
-related: [CC-008, CC-031, CC-014]
+related: [CC-008, CC-031, CC-014, CC-088]
 links:
   - Assets/Scripts/Runtime/Definition/ShapeDefinition.cs
   - Assets/Scripts/Runtime/Morphology/Sdf/PrimitiveNodes.cs
@@ -35,6 +35,8 @@ shape type its own size parameters so the DNA says what the shape is.
   - Box: three half-extents.
   - Sphere: radius (unchanged).
 - Keep `PrimarySize` for backward compatibility or migrate it exactly.
+- Define the legacy-default rule once at the schema/migration boundary. The
+  canonicalizer and editor must not maintain separate per-field fallbacks.
 - Replace the non-uniform-scale faked SDF paths:
   - `EllipsoidSdfNode` currently delegates to `SphereSdfNode`; give it real
     per-axis radii.
@@ -52,6 +54,8 @@ shape type its own size parameters so the DNA says what the shape is.
   depends on `Transform.Scale` for length.
 - Ellipsoid DNA can express three axis lengths.
 - Legacy single-scalar definitions load to identical geometry after migration.
+- Changing `PrimarySize` does not affect a current-schema shape with valid
+  explicit parameters.
 - Canonical JSON round-trips byte-stable for the new schema.
 - Managed and portable SDF paths agree for every shape and shape parameter set.
 - The finger-capsule artifact (crystalline projection at preview quality 12-16)

@@ -7,7 +7,7 @@ type: Task
 priority: P1
 tags: [runtime, sdf, performance, burst, jobs, cleanup]
 dependsOn: [CC-014]
-related: [CC-008, CC-018, CC-025, CC-031]
+related: [CC-008, CC-018, CC-025, CC-031, CC-088]
 links:
   - Assets/Scripts/Runtime/Morphology/Sdf/SdfProgramBuilder.cs
   - Assets/Scripts/Runtime/Morphology/Sdf/SdfProgram.cs

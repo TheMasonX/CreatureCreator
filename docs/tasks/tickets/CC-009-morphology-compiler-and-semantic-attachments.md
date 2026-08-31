@@ -2,7 +2,7 @@
 id: creature-task-009
 key: CC-009
 title: Implement morphology compiler and semantic attachment model
-status: Backlog
+status: Superseded
 type: Task
 priority: P1
 tags: [runtime, morphology, body, attachments, authoring]
@@ -15,6 +15,12 @@ links:
   - Assets/Scripts/Runtime/Definition/DefinitionValidator.cs
   - Assets/Scripts/Runtime/Skeleton/SkeletonInferrer.cs
 ---
+
+## Disposition
+
+This broad compiler scope is replaced by the concrete resolved-creature
+snapshot in CC-087. Keep this record for historical schema and design evidence.
+
 
 ## Summary
 Create a deterministic `CreatureMorphology` compiler that converts the validated Body spline tree into normalized body, limb, and attachment data without depending on mesh topology.

@@ -2,7 +2,7 @@
 id: creature-task-056
 key: CC-056
 title: Establish the canonical resolved morphology layer
-status: In Progress
+status: Superseded
 type: Architecture
 authority: BeastMaster
 priority: P1
@@ -16,6 +16,11 @@ links:
   - Assets/Scripts/Runtime/Morphology/LimbMetaballSampler.cs
   - Assets/Scripts/Runtime/Skeleton/SkeletonInferrer.cs
   - docs/adr/ADR-002-composable-geometry-and-generatedcreature-output.md
+
+## Disposition
+
+CC-056A and CC-056B are completed increments. The remaining ownership and
+consumer migration work is consolidated in CC-087.
 
 ## Summary
 Create one deterministic derived morphology model from authoritative Body, limb, and attachment DNA.

@@ -7,10 +7,10 @@
 | CC-003 | Document Unity MCP workflow for BeastMaster | Done | P2 |
 | CC-004 | Complete creature editor save and authoring controls | In Progress | P1 |
 | CC-005 | Add preview material and automatic regeneration settings | Done | P1 |
-| CC-006 | Define the Body spline and attachment tree model | In Progress | P1 |
+| CC-006 | Define the Body spline and attachment tree model | Superseded | P1 |
 | CC-007 | Support surface attachment for limbs | Done | P1 |
 | CC-008 | Profile and optimize preview generation hotspots | In Progress | P1 |
-| CC-009 | Implement morphology compiler and semantic attachment model | Backlog | P1 |
+| CC-009 | Implement morphology compiler and semantic attachment model | Superseded | P1 |
 | CC-010 | Add semantic animation query and morphology-scaled motion model | Backlog | P1 |
 | CC-011 | Implement locomotion controller, gait, terrain contact, and foot placement | Backlog | P1 |
 | CC-012 | Add secondary motion and body stabilization architecture | Backlog | P2 |
@@ -57,7 +57,7 @@
 | CC-053 | Complete multi-geometry editor selection and visibility | Backlog | P1 |
 | CC-054 | Reject thickness-profile quantization time collisions | Backlog | P2 |
 | CC-055 | Decide limb centerline and generation-aware sampling fidelity | Backlog | P2 |
-| CC-056 | Establish the canonical resolved morphology layer (umbrella; split into 056A/B) | In Progress | P1 |
+| CC-056 | Establish the canonical resolved morphology layer (umbrella; split into 056A/B) | Superseded | P1 |
 | CC-056A | Resolved Body/limb geometry (canonical derived morphology, part A) | Done | P1 |
 | CC-056B | Semantic attachment resolution (canonical derived morphology, part B) | Done | P1 |
 | CC-057 | Add a responsive interactive morphology preview proxy | Backlog | P1 |
@@ -88,3 +88,10 @@
 | CC-082 | Fix the validator ToDictionary throw on duplicate part IDs | Done | P2 |
 | CC-083 | Reject a non-Body part with no parent (MissingParent gap) | Done | P2 |
 | CC-084 | Fix DisplayName round-trip mismatch after JSON round-trip | Done | P2 |
+| CC-085 | Route the selected-part viewport move through the anchor-aware one-gesture drag | Backlog | P1 |
+| CC-086 | Support placement on the rounded ends (caps) of the Body | Backlog | P1 |
+| CC-087 | Canonical resolved-creature snapshot and ownership boundary | Backlog | P1 |
+| CC-088 | SDF backend and legacy shape semantics exit | Backlog | P1 |
+| CC-089 | Make malformed-definition validation and cloning total | Backlog | P1 |
+| CC-090 | Consolidate shared runtime utilities and tolerances | Backlog | P2 |
+| CC-091 | Establish concrete generation pipeline stage boundaries | Backlog | P2 |

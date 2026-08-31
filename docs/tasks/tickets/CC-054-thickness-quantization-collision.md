@@ -7,7 +7,7 @@ type: Bug Fix
 priority: P2
 tags: [runtime, definition, canonicalization, limbs]
 dependsOn: [CC-018]
-related: []
+related: [CC-087, CC-090]
 links:
   - Assets/Scripts/Runtime/Definition/ThicknessProfile.cs
   - Assets/Scripts/Runtime/Definition/DefinitionCanonicalizer.cs

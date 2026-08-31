@@ -7,7 +7,7 @@ type: Task
 priority: P1
 tags: [runtime, body-spline, frame, definition, attachment, shared-math]
 dependsOn: [CC-006]
-related: [CC-007, CC-009, CC-016, CC-017]
+related: [CC-007, CC-009, CC-016, CC-017, CC-087]
 links:
   - Assets/Scripts/Runtime/Definition/BodyFrameResolver.cs
   - Assets/Scripts/Runtime/Definition/BodySpline.cs
