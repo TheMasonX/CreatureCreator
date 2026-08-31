@@ -64,7 +64,7 @@ namespace ProceduralCreature.Tests.Runtime
             var diagnostics = new GenerationDiagnostics(collectTimings: false);
             MeshTopologyReport report;
             GeneratedCreature generated = CreatureMeshGenerator.Generate(
-                definition, out report, diagnostics, true, null, SdfCullingMode.Fast);
+                definition, out report, diagnostics, null, SdfCullingMode.Fast);
 
             Vector3[] vertices = generated.MainMesh.vertices;
             for (int i = 0; i < vertices.Length; i++)
@@ -84,7 +84,7 @@ namespace ProceduralCreature.Tests.Runtime
             var diagnostics = new GenerationDiagnostics(collectTimings: false);
             MeshTopologyReport report;
             GeneratedCreature generated = CreatureMeshGenerator.Generate(
-                definition, out report, diagnostics, true, null, SdfCullingMode.Fast);
+                definition, out report, diagnostics, null, SdfCullingMode.Fast);
 
             Color[] colors = generated.MainMesh.colors;
             Assert.AreEqual(generated.MainMesh.vertexCount, colors.Length);
@@ -104,9 +104,9 @@ namespace ProceduralCreature.Tests.Runtime
             var diagnostics = new GenerationDiagnostics(collectTimings: false);
             MeshTopologyReport report;
             GeneratedCreature a = CreatureMeshGenerator.Generate(
-                definition, out report, diagnostics, true, null, SdfCullingMode.Fast);
+                definition, out report, diagnostics, null, SdfCullingMode.Fast);
             GeneratedCreature b = CreatureMeshGenerator.Generate(
-                definition, out report, diagnostics, true, null, SdfCullingMode.Fast);
+                definition, out report, diagnostics, null, SdfCullingMode.Fast);
             Assert.AreEqual(a.MainMesh.triangles.Length, b.MainMesh.triangles.Length);
             Assert.AreEqual(a.MainMesh.vertexCount, b.MainMesh.vertexCount);
         }

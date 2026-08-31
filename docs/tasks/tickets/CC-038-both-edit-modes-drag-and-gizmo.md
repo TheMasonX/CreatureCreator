@@ -64,3 +64,15 @@ loosely in screenspace or switch to the gizmo for exact positioning.
   screenspace joint drag ("that is nice too to drag in screenspace") but wants
   the editing to feel "more like the body" — i.e., both modes should carry both
   interaction styles.
+
+## Findings
+
+(empty)
+
+## Blockers
+
+(empty)
+
+## Next Step
+
+(empty)

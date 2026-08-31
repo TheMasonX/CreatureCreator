@@ -26,7 +26,7 @@ namespace ProceduralCreature.Tests.Runtime
         public void Sample_StraightChain_ProducesExpectedCountAndEndpoints()
         {
             // Segment length 1.0 at 0.1 spacing -> 10 samples + 1 terminal = 11.
-            List<LimbMetaball> balls = LimbMetaballSampler.Sample(StraightChain());
+            List<LimbMetaball> balls = LimbMetaballSampler.Sample(ResolvedLimb.Resolve(StraightChain()));
 
             Assert.AreEqual(11, balls.Count);
             Assert.AreEqual(Vector3.zero, balls[0].Position);
@@ -38,8 +38,8 @@ namespace ProceduralCreature.Tests.Runtime
         [Test]
         public void Sample_IsDeterministic()
         {
-            List<LimbMetaball> first = LimbMetaballSampler.Sample(StraightChain());
-            List<LimbMetaball> second = LimbMetaballSampler.Sample(StraightChain());
+            List<LimbMetaball> first = LimbMetaballSampler.Sample(ResolvedLimb.Resolve(StraightChain()));
+            List<LimbMetaball> second = LimbMetaballSampler.Sample(ResolvedLimb.Resolve(StraightChain()));
 
             Assert.AreEqual(first.Count, second.Count);
             for (int i = 0; i < first.Count; i++)
@@ -53,7 +53,7 @@ namespace ProceduralCreature.Tests.Runtime
         public void Sample_DoesNotMutateChain()
         {
             LimbChain chain = StraightChain();
-            List<LimbMetaball> ignored = LimbMetaballSampler.Sample(chain);
+            List<LimbMetaball> ignored = LimbMetaballSampler.Sample(ResolvedLimb.Resolve(chain));
 
             Assert.AreEqual(2, chain.Joints.Count);
             Assert.AreEqual(Vector3.zero, chain.Joints[0].Position);
@@ -70,7 +70,7 @@ namespace ProceduralCreature.Tests.Runtime
             chain.Joints.Add(new LimbJoint { Id = 3, Position = new Vector3(1f, -1f, 0f) });
             // total length 2.0 (two 1.0 segments); each segment samples 10 + the terminal.
 
-            List<LimbMetaball> balls = LimbMetaballSampler.Sample(chain);
+            List<LimbMetaball> balls = LimbMetaballSampler.Sample(ResolvedLimb.Resolve(chain));
 
             Assert.AreEqual(21, balls.Count, "10 per segment + 1 terminal.");
             Assert.AreEqual(new Vector3(0f, -1f, 0f), balls[10].Position,
@@ -89,7 +89,7 @@ namespace ProceduralCreature.Tests.Runtime
             profile.Keys.Add(new ThicknessKey { T = 1f, Value = 0.1f });
             chain.Thickness = profile;
 
-            List<LimbMetaball> balls = LimbMetaballSampler.Sample(chain);
+            List<LimbMetaball> balls = LimbMetaballSampler.Sample(ResolvedLimb.Resolve(chain));
 
             // k=5 of 10 on the single segment is at frac 0.5 -> t = 0.5.
             Assert.AreEqual(0.2f, balls[5].Radius, 1e-4f);
@@ -108,22 +108,22 @@ namespace ProceduralCreature.Tests.Runtime
             longChain.Joints.Add(new LimbJoint { Id = 1, Position = Vector3.zero });
             longChain.Joints.Add(new LimbJoint { Id = 2, Position = new Vector3(0f, -2f, 0f) });
 
-            Assert.Greater(LimbMetaballSampler.Sample(longChain).Count,
-                LimbMetaballSampler.Sample(shortChain).Count,
+            Assert.Greater(LimbMetaballSampler.Sample(ResolvedLimb.Resolve(longChain)).Count,
+                LimbMetaballSampler.Sample(ResolvedLimb.Resolve(shortChain)).Count,
                 "Longer limbs must sample more metaballs without any DNA change.");
         }
 
         [Test]
         public void Sample_NullChain_ThrowsDomainException()
         {
-            Assert.Throws<DomainException>(() => LimbMetaballSampler.Sample(null));
+            Assert.Throws<DomainException>(() => LimbMetaballSampler.Sample(ResolvedLimb.Resolve(null)));
         }
 
         [Test]
         public void Sample_EmptyChain_ThrowsDomainException()
         {
             var chain = new LimbChain();
-            Assert.Throws<DomainException>(() => LimbMetaballSampler.Sample(chain));
+            Assert.Throws<DomainException>(() => LimbMetaballSampler.Sample(ResolvedLimb.Resolve(chain)));
         }
     }
 }

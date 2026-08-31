@@ -70,6 +70,14 @@ reads "slightly off" near the caps — same root cause.
 - Related: CC-085 (existing-part drag) can proceed independently; both touch
   `CreatureEditorWindow` placement code, so sequence to avoid merge friction.
 
+## Findings
+
+(empty)
+
+## Blockers
+
+(empty)
+
 ## Next Step
 
 Design the cap representation first (a short ADR or a section in this ticket)

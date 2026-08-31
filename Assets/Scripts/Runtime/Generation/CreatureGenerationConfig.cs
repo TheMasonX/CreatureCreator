@@ -12,13 +12,11 @@ namespace ProceduralCreature.Generation
     public sealed class CreatureGenerationConfig : ScriptableObject
     {
         [SerializeField] private float defaultVoxelsPerUnit = 16f;
-        [SerializeField] private bool usePortableSampling = true;
         [SerializeField] private SdfCullingMode cullingMode = SdfCullingMode.Exact;
         [SerializeField] private CreatureMeshPalette meshPalette;
         [SerializeField] private CreatureMaterialPalette materialPalette;
 
         public float DefaultVoxelsPerUnit => Mathf.Max(1f, defaultVoxelsPerUnit);
-        public bool UsePortableSampling => usePortableSampling;
         public SdfCullingMode CullingMode => cullingMode;
         public CreatureMeshPalette MeshPalette => meshPalette;
         public CreatureMaterialPalette MaterialPalette => materialPalette;

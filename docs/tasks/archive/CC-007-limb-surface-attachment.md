@@ -2,7 +2,7 @@
 id: creature-task-007
 key: CC-007
 title: Support surface attachment for limbs
-status: In Progress
+status: Done
 type: Task
 priority: P1
 tags: [editor, authoring, placement, raycast, limbs]

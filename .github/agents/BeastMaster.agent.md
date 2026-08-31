@@ -154,9 +154,12 @@ alone. Record unavailable Unity execution as a blocker or residual risk.
 
 Use the [task-tracker](../skills/task-tracker/SKILL.md) skill for every piece of
 work, including a one-file fix. Keep `docs/tasks/active-tasks.md` as the live
-checklist. Create a ticket under `docs/tasks/tickets/` for non-trivial work.
-Record status, summary, scope, validation command or manual check, findings,
-blockers, and next step. Link relevant source files and tests.
+checklist. Create a ticket with `docs/tasks/tools/task_new.py` for non-trivial
+work. Archive completed, superseded, or cancelled tickets with
+`docs/tasks/tools/task_archive.py`. Run `docs/tasks/tools/task_validate.py`
+after any manual edit; it must report zero errors. Record status, summary,
+scope, validation command or manual check, findings, blockers, and next step.
+Link relevant source files and tests.
 
 Capture user requirements immediately. Add an ADR only when the change alters a
 system boundary, authoritative data model, generation algorithm, or other

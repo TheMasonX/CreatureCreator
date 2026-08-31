@@ -5,7 +5,7 @@
 
 ## Superseded Architecture Records
 
-The following records remain in `docs/tasks/tickets/` as historical evidence, but their unfinished architecture scope is closed by CC-087:
+The following records remain in `docs/tasks/archive/` as historical evidence, but their unfinished architecture scope is closed by CC-087:
 
 - **CC-006** Body and Limb creature model. Schema work is historical; remaining resolved-model work moves to CC-087.
 - **CC-009** Morphology compiler and semantic attachment model. Its broad compiler scope is replaced by the concrete snapshot boundary in CC-087.
@@ -28,12 +28,30 @@ Mirrored mesh winding, limb blend-source ownership, generated bounds, semantic a
 
 ## Peer-Review Record Corrections
 
-- `docs/tasks/tickets/CC-034-fastnoise2-dllimport-restore.md` was renamed to
-	`docs/tasks/tickets/CC-047-fastnoise2-dllimport-restore.md`. Its frontmatter
-	already declared `key: CC-047`.
-- `docs/tasks/tickets/CC-036-warning-and-imGUI-cleanup.md` was renamed to
-	`docs/tasks/tickets/CC-048-editor-warning-cleanup.md`. Its frontmatter already
-	declared `key: CC-048`.
+- The ticket originally filed as `CC-034-fastnoise2-dllimport-restore.md` was
+	renamed to `docs/tasks/archive/CC-047-fastnoise2-dllimport-restore.md`. Its
+	frontmatter already declared `key: CC-047`.
+- The ticket originally filed as `CC-036-warning-and-imGUI-cleanup.md` was
+	renamed to `docs/tasks/archive/CC-048-editor-warning-cleanup.md`. Its
+	frontmatter already declared `key: CC-048`.
 - The peer review extended CC-036, CC-043, CC-088, CC-089, and CC-090 without
 	creating new keys. The active index remains unchanged because every accepted
 	mechanism has an existing owner.
+
+## 2026-08-31 Archival via Task Tools
+
+On 2026-08-31 the task system moved to an explicit archive folder
+(`docs/tasks/archive/`) with tooling under `docs/tasks/tools/`. Every ticket
+with an archived status (`Done`, `Superseded`, `Cancelled`, `Archived`) moved
+from `docs/tasks/tickets/` to `docs/tasks/archive/` so the active board stays
+focused on current work. `docs/tasks/active-tasks.md` now lists only active
+tickets; `docs/tasks/archive/README.md` indexes the archived records.
+
+- 36 `Done` tickets archived, including CC-007, CC-022, and CC-087 whose
+  frontmatter status was corrected to `Done` from stale `In Progress` values
+  (the active index and handoff evidence already marked them complete).
+- 3 `Superseded` tickets archived (CC-006, CC-009, CC-056).
+- To locate any archived record, run
+  `python docs/tasks/tools/task_search.py --include-archive --key <key>`.
+- Historical audits may still reference the old `docs/tasks/tickets/` path for
+  archived keys; the archive index and search tool keep those records findable.

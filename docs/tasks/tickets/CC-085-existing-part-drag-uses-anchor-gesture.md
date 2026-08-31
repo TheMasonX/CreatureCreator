@@ -76,6 +76,14 @@ placement drag.
   and a gizmo) or CC-058 (gesture ownership routing); this task is specifically
   the selected-part MOVE path adopting the CC-007 anchor gesture.
 
+## Findings
+
+(empty)
+
+## Blockers
+
+(empty)
+
 ## Next Step
 
 Implement after CC-007 step 6 lands (it is committed). Start from the step 6

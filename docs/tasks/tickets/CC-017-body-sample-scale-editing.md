@@ -65,6 +65,10 @@ stays visually offset from the body path rather than overlapping the X-axis.
 The regression test covers the clamp math and the re-normalization case. Static
 editor diagnostics are clean for the touched files.
 
+## Blockers
+
+(empty)
+
 ## Next Step
 
 Validate the SceneView radius gesture and the warning-free generation path in an

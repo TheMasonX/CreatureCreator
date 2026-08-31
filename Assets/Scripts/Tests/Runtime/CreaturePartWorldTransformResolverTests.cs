@@ -2,6 +2,7 @@ using NUnit.Framework;
 using UnityEngine;
 using ProceduralCreature.Common;
 using ProceduralCreature.Definition;
+using ProceduralCreature.Morphology;
 
 namespace ProceduralCreature.Tests.Runtime
 {
@@ -248,6 +249,59 @@ namespace ProceduralCreature.Tests.Runtime
 
             Assert.AreEqual(partFrame.GetColumn(3), childFrame.GetColumn(3),
                 "Non-limb parents have no child-frame offset.");
+        }
+
+        [Test]
+        public void ResolvedCreatureSnapshot_ProvidesDeterministicPartLookup()
+        {
+            var definition = CreatureDefinition.CreateEmpty();
+            definition.AddPart(new CreaturePart
+            {
+                Id = "part_b",
+                Transform = TransformData.Identity,
+                Shape = ShapeDefinition.DefaultSphere,
+                Appearance = AppearanceDefinition.Default,
+            });
+            definition.AddPart(new CreaturePart
+            {
+                Id = "part_a",
+                Transform = TransformData.Identity,
+                Shape = ShapeDefinition.DefaultSphere,
+                Appearance = AppearanceDefinition.Default,
+            });
+
+            ResolvedCreatureSnapshot first = ResolvedCreatureSnapshot.Resolve(definition);
+            ResolvedCreatureSnapshot second = ResolvedCreatureSnapshot.Resolve(definition);
+
+            Assert.AreEqual(2, first.PartsById.Count);
+            Assert.IsTrue(first.TryGetPart("part_a", out ResolvedPartSnapshot firstPart));
+            Assert.IsTrue(second.TryGetPart("part_a", out ResolvedPartSnapshot secondPart));
+            Assert.AreEqual(firstPart.Id, secondPart.Id);
+            Assert.AreEqual(firstPart.PartFrameToCreatureSpace, secondPart.PartFrameToCreatureSpace);
+            Assert.IsFalse(first.TryGetPart("missing", out _));
+        }
+
+        [Test]
+        public void ResolvedCreatureSnapshot_UsesResolvedLimbTerminalForChildFrame()
+        {
+            var definition = CreatureDefinition.CreateEmpty();
+            var arm = new CreaturePart
+            {
+                Id = "part_arm",
+                Transform = TransformData.Identity,
+                Shape = ShapeDefinition.DefaultSphere,
+                Appearance = AppearanceDefinition.Default,
+                Limb = LimbChainWith(Vector3.zero, new Vector3(0f, -1f, 0f)),
+            };
+            definition.AddPart(arm);
+
+            ResolvedCreatureSnapshot snapshot = ResolvedCreatureSnapshot.Resolve(definition);
+
+            Assert.IsTrue(snapshot.TryGetPart("part_arm", out ResolvedPartSnapshot resolvedArm));
+            Assert.IsTrue(resolvedArm.HasLimb);
+            Assert.AreEqual(new Vector3(0f, -1f, 0f), resolvedArm.Limb.TerminalSocket);
+            Assert.AreEqual(new Vector3(0f, -1f, 0f),
+                (Vector3)resolvedArm.ChildFrameToCreatureSpace.GetColumn(3));
         }
 
         [Test]

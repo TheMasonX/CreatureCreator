@@ -38,7 +38,6 @@ namespace ProceduralCreature.Generation
             MeshTopologyReport topology;
             GeneratedCreature generated = CreatureMeshGenerator.Generate(
                 definition, out topology, diagnostics,
-                usePortableSampling: generationConfig == null || generationConfig.UsePortableSampling,
                 meshResolver: ResolveMeshAsset,
                 cullingMode: generationConfig != null ? generationConfig.CullingMode : SdfCullingMode.Exact);
 

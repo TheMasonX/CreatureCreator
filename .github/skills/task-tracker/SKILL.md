@@ -1,6 +1,6 @@
 ---
 name: task-tracker
-description: "Create and maintain markdown task records for CreatureCreator. Use for backlog work, creature-generation features, editor fixes, validation follow-up, status updates, and task searchability."
+description: "Create and maintain markdown task records for CreatureCreator. Use for backlog work, creature-generation features, editor fixes, validation follow-up, status updates, task search, and archival."
 argument-hint: "Describe the creature task, scope, status, validation, and related files"
 ---
 
@@ -8,29 +8,75 @@ argument-hint: "Describe the creature task, scope, status, validation, and relat
 
 ## Outcome
 
-Create one durable, readable record for each piece of work. Store active work
-in `docs/tasks/active-tasks.md`. Store non-trivial work in a ticket under
-`docs/tasks/tickets/`.
+Create one durable, readable record for each piece of work. Active work lives
+in `docs/tasks/tickets/` and is indexed in `docs/tasks/active-tasks.md`.
+Completed, superseded, and cancelled records move to `docs/tasks/archive/`.
+The tools in `docs/tasks/tools/` keep the system consistent.
 
 ## When to use
 
 Use this skill when the user reports a bug, requests a feature, asks for a
-refactor, identifies a validation gap, or gives a follow-up requirement.
+refactor, identifies a validation gap, gives a follow-up requirement, or asks
+to search or archive task records.
+
+## Layout
+
+- `docs/tasks/active-tasks.md` — live index of active tickets.
+- `docs/tasks/tickets/` — active ticket files.
+- `docs/tasks/archive/` — archived tickets plus `archive/README.md` (index and
+  changelog).
+- `docs/tasks/tools/` — tooling; see `docs/tasks/tools/README.md`.
+- `docs/tasks/handoffs/` — session handoff notes.
 
 ## Procedure
 
-1. Inspect `docs/tasks/` and preserve its existing format.
-2. Create the task directory and tracker if they do not exist.
-3. Choose a stable key such as `CC-001`.
-4. Record status, type, priority, tags, summary, scope, and acceptance criteria.
-5. Link the relevant runtime, editor, test, README, and ADR files.
-6. Record the focused validation command or manual Unity check.
-7. Record findings, blockers, residual risk, and the next step.
-8. Update the record after implementation and validation.
+1. Read `docs/tasks/README.md` and `docs/tasks/tools/README.md` once to learn
+   the conventions and tool usage.
+2. Create a ticket with `task_new.py`. It picks the next unused `CC-###`, writes
+   the canonical frontmatter and headings, and adds a row to `active-tasks.md`.
+
+   ```text
+   python docs/tasks/tools/task_new.py --title "..." --priority P2 --tags runtime,sdf --depends-on CC-043
+   ```
+
+3. Fill in summary, scope, acceptance criteria, validation, findings,
+   blockers, and next step. Link the relevant runtime, editor, test, README,
+   and ADR files.
+4. Record the focused validation command or manual Unity check.
+5. Update the record after implementation and validation.
+6. When the work is complete, superseded, or cancelled, archive the ticket with
+   `task_archive.py`.
+
+   ```text
+   python docs/tasks/tools/task_archive.py CC-091 --status Done --reason "Unity tests passed"
+   ```
+
+7. Run `task_validate.py` after any manual edit or batch move. It must report
+   zero errors.
+
+## Statuses and location
+
+Active statuses stay in `tickets/`: `Backlog`, `In Progress`, `Blocked`,
+`Review`.
+
+Archived statuses move to `archive/`: `Done`, `Superseded`, `Cancelled`,
+`Archived`.
+
+Use `Done` only when the requested behavior has validation evidence. Mark
+`Superseded` when a newer task replaces unfinished scope, and name the
+replacement in a `## Disposition` section.
+
+## Searching
+
+```text
+python docs/tasks/tools/task_search.py --status "In Progress"
+python docs/tasks/tools/task_search.py --include-archive --status Done
+python docs/tasks/tools/task_search.py --key CC-087 --include-archive
+```
 
 ## Required fields
 
-Use YAML frontmatter when the repository has no established schema:
+`task_new.py` generates this frontmatter:
 
 ```yaml
 id: creature-task-001
@@ -58,4 +104,4 @@ Use these body headings in this order:
 ```
 
 Keep one canonical task record. Do not duplicate the same task across several
-trackers. Use `Done` only when the requested behavior has validation evidence.
+trackers.

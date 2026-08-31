@@ -336,7 +336,7 @@ namespace ProceduralCreature.Tests.Runtime
 
         private static GeneratedCreature GenerateWithResolver(CreatureDefinition definition, System.Func<string, Mesh> resolver)
         {
-            return CreatureMeshGenerator.Generate(definition, out _, null, true, resolver);
+            return CreatureMeshGenerator.Generate(definition, out _, null, resolver);
         }
 
         private static void AssertVectorClose(Vector3 expected, Vector3 actual, float tolerance, string message)

@@ -180,21 +180,5 @@ namespace ProceduralCreature.Tests.Runtime
             Assert.AreEqual(0.12f, resolved.Thickness.Evaluate(1f), 1e-4f, "Default profile tip.");
         }
 
-        [Test]
-        public void Sample_ChainOverload_MatchesResolvedOverload()
-        {
-            LimbChain chain = BentChain();
-            chain.Thickness = null; // exercises the fallback through both paths
-
-            List<LimbMetaball> viaChain = LimbMetaballSampler.Sample(chain);
-            List<LimbMetaball> viaResolved = LimbMetaballSampler.Sample(ResolvedLimb.Resolve(chain));
-
-            Assert.AreEqual(viaChain.Count, viaResolved.Count);
-            for (int i = 0; i < viaChain.Count; i++)
-            {
-                Assert.AreEqual(viaChain[i].Position, viaResolved[i].Position);
-                Assert.AreEqual(viaChain[i].Radius, viaResolved[i].Radius, 1e-6f);
-            }
-        }
     }
 }

@@ -72,7 +72,7 @@ samples and repair/normalize only as needed. Deciding whether authored control
 points should later be split from evenly spaced metaball evaluation samples is
 a separate future decision, not part of this task.
 
-## Acceptance Criteria (behavioral)
+## Acceptance Criteria
 
 - Test A — straighten a kink: drag the kink toward its neighbors -> body
   straightens; the selected point does most of the movement; immediate
@@ -153,6 +153,10 @@ external design evidence and this ticket as the implementation contract.
   (smooth bend, neighbors participate), endpoint stretch, endpoint shorten,
   does-not-enforce-exact-lengths, strong-bend-survives (no snap-straight),
   snapshot no-drift, input immutability, ±3 neighborhood scope, empty input.
+
+## Blockers
+
+(empty)
 
 ## Next Step
 

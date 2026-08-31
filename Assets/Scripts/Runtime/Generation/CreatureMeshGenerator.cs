@@ -34,7 +34,7 @@ namespace ProceduralCreature.Generation
 
         public static GeneratedCreature Generate(CreatureDefinition definition, out MeshTopologyReport topologyReport, GenerationDiagnostics diagnostics = null)
         {
-            return Generate(definition, out topologyReport, diagnostics, usePortableSampling: true, meshResolver: null,
+            return Generate(definition, out topologyReport, diagnostics, meshResolver: null,
                 cullingMode: SdfCullingMode.Exact);
         }
 
@@ -42,7 +42,6 @@ namespace ProceduralCreature.Generation
             CreatureDefinition definition,
             out MeshTopologyReport topologyReport,
             GenerationDiagnostics diagnostics,
-            bool usePortableSampling,
             Func<string, Mesh> meshResolver = null,
             SdfCullingMode cullingMode = SdfCullingMode.Exact)
         {
@@ -56,39 +55,24 @@ namespace ProceduralCreature.Generation
                 throw new DomainException("CreatureDefinition is invalid and cannot be generated.");
             }
 
-            ISdfNode sdf = null;
             SdfProgram portableProgram = null;
             Time(diagnostics, GenerationStage.SdfCompile, () =>
             {
-                if (usePortableSampling)
-                {
-                    portableProgram = SdfProgramBuilder.CompilePortable(definition);
-                }
-                else
-                {
-                    sdf = SdfProgramBuilder.Compile(definition);
-                }
+                portableProgram = SdfProgramBuilder.CompilePortable(definition);
             });
 
             DensityGrid grid = null;
             Time(diagnostics, GenerationStage.FieldSampling,
                 () =>
                 {
-                    if (usePortableSampling)
+                    try
                     {
-                        try
-                        {
-                            grid = DensityGrid.SamplePortable(portableProgram, definition.Bounds, definition.Generation, cullingMode);
-                        }
-                        finally
-                        {
-                            portableProgram.Dispose();
-                            portableProgram = null;
-                        }
+                        grid = DensityGrid.SamplePortable(portableProgram, definition.Bounds, definition.Generation, cullingMode);
                     }
-                    else
+                    finally
                     {
-                        grid = DensityGrid.Sample(sdf, definition.Bounds, definition.Generation);
+                        portableProgram.Dispose();
+                        portableProgram = null;
                     }
                 });
             diagnostics?.RecordGridDimensions(grid.CellsX, grid.CellsY, grid.CellsZ, grid.SampleCount);

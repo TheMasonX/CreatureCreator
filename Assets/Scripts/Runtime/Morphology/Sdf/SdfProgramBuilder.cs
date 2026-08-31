@@ -201,9 +201,16 @@ namespace ProceduralCreature.Morphology.Sdf
             return part.Limb != null ? part.Limb.BlendRadius : part.Shape.SmoothBlendRadius;
         }
 
+        private static float PartUnionBlendRadius(ResolvedPartSnapshot part)
+        {
+            return part.HasLimb ? part.Limb.BlendRadius : part.Shape.SmoothBlendRadius;
+        }
+
         public static SdfProgram CompilePortable(CreatureDefinition definition)
         {
             if (definition == null) throw new DomainException("Cannot compile a null CreatureDefinition.");
+
+            ResolvedCreatureSnapshot snapshot = ResolvedCreatureSnapshot.Resolve(definition);
 
             var operations = new List<SdfOperation>();
             List<CreaturePart> orderedParts = definition.Parts
@@ -213,9 +220,7 @@ namespace ProceduralCreature.Morphology.Sdf
             // The Body spline is the primary field, composed before any child
             // attachment. Body samples are ordered by their authoritative spline
             // order (list index), not by ID — sample order IS the spline.
-            bool hasBodySamples = definition.Body != null
-                && definition.Body.Samples != null
-                && definition.Body.Samples.Count > 0;
+            bool hasBodySamples = snapshot.HasBody;
 
             if (orderedParts.Count == 0 && !hasBodySamples)
             {
@@ -228,7 +233,7 @@ namespace ProceduralCreature.Morphology.Sdf
             {
                 // CC-056A increment 3: consume the shared ResolvedBody derivation
                 // (positions/radii) instead of reading authored samples here.
-                ResolvedBody body = ResolvedBody.Resolve(definition.Body);
+                ResolvedBody body = snapshot.Body;
                 for (int i = 0; i < body.SamplePositions.Count; i++)
                 {
                     Vector3 position = body.SamplePositions[i];
@@ -280,7 +285,8 @@ namespace ProceduralCreature.Morphology.Sdf
                 if (part.MeshGeometry != null) continue;
 
                 int previousRoot = root;
-                Matrix4x4 localToCreature = CreaturePartWorldTransformResolver.ResolveLocalToCreatureSpace(definition, part);
+                snapshot.TryGetPart(part.Id, out ResolvedPartSnapshot resolvedPart);
+                Matrix4x4 localToCreature = resolvedPart.PartFrameToCreatureSpace;
                 Vector3 scale = localToCreature.lossyScale;
                 float distanceScale = Mathf.Min(Mathf.Abs(scale.x), Mathf.Min(Mathf.Abs(scale.y), Mathf.Abs(scale.z)));
                 bool shouldMirror = part.MirrorAcrossSymmetryPlane && definition.SymmetryMode != SymmetryMode.None;
@@ -297,7 +303,7 @@ namespace ProceduralCreature.Morphology.Sdf
                     // limb bakes a mirrored copy of the chain in instead of using
                     // a Symmetry op — the hard union of the two sides equals
                     // SymmetryNode(chain) = min(chain(x), chain(-x)) exactly.
-                    primitive = CompileLimbChainPortable(operations, part.Limb, localToCreature, distanceScale, shouldMirror);
+                    primitive = CompileLimbChainPortable(operations, resolvedPart.Limb, localToCreature, distanceScale, shouldMirror);
                 }
                 else
                 {
@@ -320,18 +326,16 @@ namespace ProceduralCreature.Morphology.Sdf
                             throw new DomainException($"No portable SDF primitive mapping exists for ShapeType.{part.Shape.Type}.");
                     }
 
-                    float legacySize = part.Shape.PrimarySize;
-                    float radius = part.Shape.Radius > 0f ? part.Shape.Radius : legacySize;
-                    float height = part.Shape.CapsuleHeight > 0f ? part.Shape.CapsuleHeight : 1f;
-                    float3 boxHalfExtents = part.Shape.BoxHalfExtents.x > 0f
-                        ? new float3(part.Shape.BoxHalfExtents.x, part.Shape.BoxHalfExtents.y, part.Shape.BoxHalfExtents.z)
-                        : new float3(legacySize);
+                    ResolvedShape shape = resolvedPart.Shape;
+                    float radius = shape.Radius;
+                    float height = shape.CapsuleHeight;
+                    float3 boxHalfExtents = new float3(shape.BoxHalfExtents.x, shape.BoxHalfExtents.y, shape.BoxHalfExtents.z);
                     float3 parameters = primitiveType == SdfOperationType.Box
                         ? boxHalfExtents
                         : primitiveType == SdfOperationType.Capsule
-                            ? new float3(radius, height, (int)part.Shape.CapsuleAxis)
+                            ? new float3(radius, height, (int)shape.CapsuleAxis)
                             : primitiveType == SdfOperationType.Ellipsoid
-                                ? (part.Shape.EllipsoidRadii.x > 0f ? new float3(part.Shape.EllipsoidRadii.x, part.Shape.EllipsoidRadii.y, part.Shape.EllipsoidRadii.z) : new float3(legacySize))
+                                ? new float3(shape.EllipsoidRadii.x, shape.EllipsoidRadii.y, shape.EllipsoidRadii.z)
                                 : new float3(radius, 0f, 0f);
                     primitive = operations.Count;
                     operations.Add(SdfOperation.Primitive(primitiveType, parameters));
@@ -370,7 +374,7 @@ namespace ProceduralCreature.Morphology.Sdf
                         Type = SdfOperationType.SmoothUnion,
                         A = previousRoot,
                         B = root,
-                        Parameters = new float3(PartUnionBlendRadius(part), 0f, 0f),
+                        Parameters = new float3(PartUnionBlendRadius(resolvedPart), 0f, 0f),
                     });
                     SetWorldAabb(operations, unionIndex, Aabb.Union(ReadAabb(operations, previousRoot), ReadAabb(operations, root)));
                     SetCullable(operations, unionIndex, ReadCullable(operations, previousRoot) && ReadCullable(operations, root));
@@ -386,8 +390,10 @@ namespace ProceduralCreature.Morphology.Sdf
         {
             if (definition == null) throw new DomainException("Cannot compile a null CreatureDefinition.");
 
+            ResolvedCreatureSnapshot snapshot = ResolvedCreatureSnapshot.Resolve(definition);
+
             var operations = new List<SdfOperation>();
-            int root = AppendPortableBodyField(operations, definition);
+            int root = AppendPortableBodyField(operations, snapshot);
             if (root < 0)
             {
                 operations.Add(SdfOperation.Primitive(SdfOperationType.Empty, float3.zero));
@@ -401,22 +407,28 @@ namespace ProceduralCreature.Morphology.Sdf
         {
             if (definition == null) throw new DomainException("Cannot compile a null CreatureDefinition.");
 
+            ResolvedCreatureSnapshot snapshot = ResolvedCreatureSnapshot.Resolve(definition);
             return definition.Parts
                 .OrderBy(p => p.Id, System.StringComparer.Ordinal)
                 .Where(part => part.MeshGeometry == null)
-                .Select(part => (part, CompilePortablePart(definition, part)))
+                .Select(part =>
+                {
+                    snapshot.TryGetPart(part.Id, out ResolvedPartSnapshot resolvedPart);
+                    return (part, CompilePortablePart(definition, part, resolvedPart));
+                })
                 .ToList();
         }
 
-        private static int AppendPortableBodyField(List<SdfOperation> operations, CreatureDefinition definition)
+        private static int AppendPortableBodyField(List<SdfOperation> operations,
+            ResolvedCreatureSnapshot snapshot)
         {
-            if (definition.Body == null || definition.Body.Samples == null || definition.Body.Samples.Count == 0)
+            if (!snapshot.HasBody)
             {
                 return -1;
             }
 
             // CC-056A increment 3: consume the shared ResolvedBody derivation.
-            ResolvedBody body = ResolvedBody.Resolve(definition.Body);
+            ResolvedBody body = snapshot.Body;
             int root = -1;
             for (int i = 0; i < body.SamplePositions.Count; i++)
             {
@@ -459,10 +471,11 @@ namespace ProceduralCreature.Morphology.Sdf
             return root;
         }
 
-        private static SdfProgram CompilePortablePart(CreatureDefinition definition, CreaturePart part)
+        private static SdfProgram CompilePortablePart(CreatureDefinition definition,
+            CreaturePart part, ResolvedPartSnapshot resolvedPart)
         {
             var operations = new List<SdfOperation>();
-            Matrix4x4 localToCreature = CreaturePartWorldTransformResolver.ResolveLocalToCreatureSpace(definition, part);
+            Matrix4x4 localToCreature = resolvedPart.PartFrameToCreatureSpace;
             Vector3 scale = localToCreature.lossyScale;
             float distanceScale = Mathf.Min(Mathf.Abs(scale.x), Mathf.Min(Mathf.Abs(scale.y), Mathf.Abs(scale.z)));
             bool shouldMirror = part.MirrorAcrossSymmetryPlane && definition.SymmetryMode != SymmetryMode.None;
@@ -470,7 +483,7 @@ namespace ProceduralCreature.Morphology.Sdf
 
             if (part.Limb != null)
             {
-                root = CompileLimbChainPortable(operations, part.Limb, localToCreature, distanceScale, shouldMirror);
+                root = CompileLimbChainPortable(operations, resolvedPart.Limb, localToCreature, distanceScale, shouldMirror);
             }
             else
             {
@@ -484,18 +497,16 @@ namespace ProceduralCreature.Morphology.Sdf
                     default: throw new DomainException($"No portable SDF primitive mapping exists for ShapeType.{part.Shape.Type}.");
                 }
 
-                float legacySize = part.Shape.PrimarySize;
-                float radius = part.Shape.Radius > 0f ? part.Shape.Radius : legacySize;
-                float height = part.Shape.CapsuleHeight > 0f ? part.Shape.CapsuleHeight : 1f;
-                float3 boxHalfExtents = part.Shape.BoxHalfExtents.x > 0f
-                    ? new float3(part.Shape.BoxHalfExtents.x, part.Shape.BoxHalfExtents.y, part.Shape.BoxHalfExtents.z)
-                    : new float3(legacySize);
+                ResolvedShape shape = resolvedPart.Shape;
+                float radius = shape.Radius;
+                float height = shape.CapsuleHeight;
+                float3 boxHalfExtents = new float3(shape.BoxHalfExtents.x, shape.BoxHalfExtents.y, shape.BoxHalfExtents.z);
                 float3 parameters = primitiveType == SdfOperationType.Box
                     ? boxHalfExtents
                     : primitiveType == SdfOperationType.Capsule
-                        ? new float3(radius, height, (int)part.Shape.CapsuleAxis)
+                        ? new float3(radius, height, (int)shape.CapsuleAxis)
                         : primitiveType == SdfOperationType.Ellipsoid
-                            ? (part.Shape.EllipsoidRadii.x > 0f ? new float3(part.Shape.EllipsoidRadii.x, part.Shape.EllipsoidRadii.y, part.Shape.EllipsoidRadii.z) : new float3(legacySize))
+                            ? new float3(shape.EllipsoidRadii.x, shape.EllipsoidRadii.y, shape.EllipsoidRadii.z)
                             : new float3(radius, 0f, 0f);
                 int primitive = operations.Count;
                 operations.Add(SdfOperation.Primitive(primitiveType, parameters));
@@ -671,7 +682,7 @@ namespace ProceduralCreature.Morphology.Sdf
         /// </summary>
         private static ISdfNode CompileLimbChain(LimbChain limb)
         {
-            List<LimbMetaball> metaballs = LimbMetaballSampler.Sample(limb);
+            List<LimbMetaball> metaballs = LimbMetaballSampler.Sample(ResolvedLimb.Resolve(limb));
             if (metaballs.Count == 1)
             {
                 return new TransformNode(
@@ -721,7 +732,7 @@ namespace ProceduralCreature.Morphology.Sdf
         /// ball's transform, so the returned root is ready for the outer creature
         /// union.
         /// </summary>
-        private static int CompileLimbChainPortable(List<SdfOperation> operations, LimbChain limb,
+        private static int CompileLimbChainPortable(List<SdfOperation> operations, ResolvedLimb limb,
             Matrix4x4 localToCreature, float distanceScale, bool includeMirror)
         {
             List<LimbMetaball> metaballs = LimbMetaballSampler.Sample(limb);

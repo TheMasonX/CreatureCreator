@@ -1,6 +1,7 @@
 using UnityEngine;
 using ProceduralCreature.Common;
 using ProceduralCreature.Definition;
+using ProceduralCreature.Morphology;
 
 namespace ProceduralCreature.Skeleton
 {
@@ -52,7 +53,15 @@ namespace ProceduralCreature.Skeleton
         /// </summary>
         public static string ResolveLimbTerminalBoneId(CreaturePart limb, bool mirrored)
         {
-            return ResolveLimbSegmentBoneId(limb, limb.Limb.Joints.Count - 2, mirrored);
+            return ResolveLimbTerminalBoneId(limb, ResolvedLimb.Resolve(limb.Limb), mirrored);
+        }
+
+        /// <summary>Resolves a limb terminal bone id from the canonical limb snapshot.</summary>
+        public static string ResolveLimbTerminalBoneId(
+            CreaturePart limb, ResolvedLimb resolvedLimb, bool mirrored)
+        {
+            return ResolveLimbSegmentBoneId(
+                limb, resolvedLimb.JointPositions.Count - 2, mirrored);
         }
 
         /// <summary>The Body bone id for a Body sample: body_j&lt;sampleId&gt;.</summary>
@@ -89,7 +98,8 @@ namespace ProceduralCreature.Skeleton
             {
                 // The child of a limb attaches to the limb's TERMINAL bone
                 // (N joints -> N-1 bones, so the last bone is index N-2).
-                parentBoneBaseId = ResolveLimbTerminalBoneId(parentPart, mirrored: false);
+                parentBoneBaseId = ResolveLimbTerminalBoneId(
+                    parentPart, ResolvedLimb.Resolve(parentPart.Limb), mirrored: false);
             }
             else
             {
@@ -120,6 +130,8 @@ namespace ProceduralCreature.Skeleton
                 return null;
             }
 
+            ResolvedBody resolvedBody = ResolvedBody.Resolve(definition.Body);
+
             // CC-007: anchor-based binding for direct Body children. The anchor
             // drives geometry placement only for ParentId == BodyId, so binding
             // follows the same rule. Falls back to nearest-sample when the anchor
@@ -128,9 +140,9 @@ namespace ProceduralCreature.Skeleton
             BodySurfaceAnchor anchor = part.ParentAttachment;
             if (part.ParentId == CreatureDefinition.BodyId && anchor != null)
             {
-                for (int i = 0; i < definition.Body.Samples.Count - 1; i++)
+                for (int i = 0; i < resolvedBody.SampleIds.Count - 1; i++)
                 {
-                    if (definition.Body.Samples[i].Id == anchor.SegmentStartSampleId)
+                    if (resolvedBody.SampleIds[i] == anchor.SegmentStartSampleId)
                     {
                         return ResolveBodySocketBoneId(anchor.SegmentStartSampleId);
                     }
@@ -139,17 +151,16 @@ namespace ProceduralCreature.Skeleton
 
             Matrix4x4 world = CreaturePartWorldTransformResolver.ResolveLocalToCreatureSpace(
                 definition, part);
-            Vector3 position = part.Limb != null && part.Limb.Joints != null
-                && part.Limb.Joints.Count > 0
-                ? world.MultiplyPoint3x4(part.Limb.Joints[0].Position)
+            Vector3 position = part.Limb != null
+                ? world.MultiplyPoint3x4(ResolvedLimb.Resolve(part.Limb).RootSocket)
                 : world.GetColumn(3);
             if (mirrored) position = ReflectAcrossX.MultiplyPoint3x4(position);
 
             int nearestIndex = 0;
             float nearestDistance = float.PositiveInfinity;
-            for (int i = 0; i < definition.Body.Samples.Count; i++)
+            for (int i = 0; i < resolvedBody.SamplePositions.Count; i++)
             {
-                float distance = (definition.Body.Samples[i].Position - position).sqrMagnitude;
+                float distance = (resolvedBody.SamplePositions[i] - position).sqrMagnitude;
                 if (distance < nearestDistance)
                 {
                     nearestDistance = distance;
@@ -157,7 +168,7 @@ namespace ProceduralCreature.Skeleton
                 }
             }
 
-            return ResolveBodySocketBoneId(definition.Body.Samples[nearestIndex].Id);
+            return ResolveBodySocketBoneId(resolvedBody.SampleIds[nearestIndex]);
         }
     }
 }

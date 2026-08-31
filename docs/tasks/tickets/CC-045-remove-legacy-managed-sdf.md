@@ -139,6 +139,15 @@ The normal `CreatureMeshGenerator` path now compiles only the portable program;
 the managed graph is created only when the explicit `usePortableSampling: false`
 fallback is requested.
 
+The explicit managed generation switch is now removed from the production API.
+`CreatureMeshGenerator`, `CreatureRuntimePreview`, `CreatureGenerationConfig`,
+and the editor window use portable/Burst sampling only. A complete source
+inventory found remaining `ISdfNode`, `DensityGrid.Sample`, and managed
+compiler calls only in reference tests and standalone reference APIs; no
+production caller requests the removed managed mode. Runtime and editor test
+assemblies both build with zero errors and warnings, and `git diff --check`
+passes.
+
 Portable program disposal is exception-safe during field sampling, so a failed
 native sampling operation does not leave the generated operation buffer alive.
 
@@ -168,16 +177,20 @@ MeshExtraction, and 1,197.3 ms for AppearanceBake, for 19,980.9 ms total.
 
 ## Blockers
 
-The runtime assembly is discoverable when selected explicitly. Six unrelated
-baseline failures remain in the full suite. Per-part appearance resolution and
-the extraction reference contract must be confirmed before deleting `ISdfNode`
-and its managed compiler.
+The runtime assembly is discoverable when selected explicitly. The full
+runtime PlayMode assembly executed 442 tests after the production-boundary
+change; one unrelated baseline failure remains in
+`SkeletonInferrerLimbTests.Infer_LimbWithNullJoint_DoesNotThrowAndEmitsNoBones`.
+Per-part appearance resolution and the extraction reference contract must be
+confirmed before deleting `ISdfNode` and its managed compiler.
 
-The appearance bake still evaluates managed nodes through the cached resolver.
-The production appearance resolver now evaluates portable programs instead. The
-managed compiler remains in the reference path used by parity tests and has not
-yet been deleted. The explicit managed generation fallback also remains for
-diagnostics and migration comparisons.
+The production appearance resolver now evaluates portable programs. The managed
+compiler remains in the reference path used by parity tests and has not yet
+been deleted. The normal generator, runtime preview, generation config, and
+editor controls no longer expose or invoke an explicit managed generation
+fallback. Focused source diagnostics are clean; runtime and editor test
+assemblies build with zero errors and warnings; task validation reports zero
+errors and warnings; and `git diff --check` passes.
 
 FastNoise2Bindings has local submodule history/build changes that are deliberately
 not part of this work. Treat the submodule as a future human-review gate before

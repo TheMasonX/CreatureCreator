@@ -69,3 +69,15 @@ control for how fused its chain reads.
   rest of the creature field). CC-049's part-to-field blend already has its
   editor control: `DrawLimbFields > Blend Radius` (added 2026-08-24, clamped
   to >= 0). This ticket remains open for the within-chain fusion value.
+
+## Findings
+
+(empty)
+
+## Blockers
+
+(empty)
+
+## Next Step
+
+(empty)

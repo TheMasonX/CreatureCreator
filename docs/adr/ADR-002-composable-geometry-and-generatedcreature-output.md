@@ -6,7 +6,7 @@
 - Deciders: BeastMaster mode (implementation), audits peer review
 - Replaces: none (new decision; extends ADR-001 "CreaturePart as a semantic container")
 - References:
-  - `docs/tasks/tickets/CC-031-composable-geometry-sources.md`
+  - `docs/tasks/archive/CC-031-composable-geometry-sources.md`
   - `docs/adr/ADR-001-limbchain-schema-and-creaturepart-as-semantic-container.md`
   - `docs/audits/creaturecreator-cc018-cc020-cc027-cc028-architecture-audit-26-08-23-14-30-00.md`
   - `Assets/Scripts/Runtime/Generation/CreatureMeshGenerator.cs`

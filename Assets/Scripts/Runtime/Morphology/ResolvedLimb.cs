@@ -53,14 +53,18 @@ namespace ProceduralCreature.Morphology
         /// </summary>
         public readonly ThicknessProfile Thickness;
 
+        /// <summary>The authored smooth-union radius used when this limb joins the creature field.</summary>
+        public readonly float BlendRadius;
+
         private ResolvedLimb(IReadOnlyList<Vector3> jointPositions, IReadOnlyList<float> segmentLengths, float totalLength,
-            IReadOnlyList<float> normalizedArcLengthAtJoint, ThicknessProfile thickness)
+            IReadOnlyList<float> normalizedArcLengthAtJoint, ThicknessProfile thickness, float blendRadius)
         {
             JointPositions = jointPositions;
             SegmentLengths = segmentLengths;
             TotalLength = totalLength;
             NormalizedArcLengthAtJoint = normalizedArcLengthAtJoint;
             Thickness = thickness;
+            BlendRadius = blendRadius;
         }
 
         /// <summary>The joint polyline (v1 centerline). Same values as <see cref="JointPositions"/>.</summary>
@@ -103,44 +107,19 @@ namespace ProceduralCreature.Morphology
                 positions[i] = joint.Position;
             }
 
-            int segmentCount = count - 1;
-            var segmentLengths = new float[Math.Max(segmentCount, 0)];
-            float totalLength = 0f;
-            for (int i = 0; i < segmentCount; i++)
-            {
-                segmentLengths[i] = Vector3.Distance(positions[i], positions[i + 1]);
-                totalLength += segmentLengths[i];
-            }
-
-            var normalizedArcLength = new float[count];
-            if (totalLength <= 1e-6f)
-            {
-                // Degenerate (coincident/zero-length) chain: every joint sits at t = 0.
-                for (int i = 0; i < count; i++) normalizedArcLength[i] = 0f;
-            }
-            else
-            {
-                float cumulative = 0f;
-                normalizedArcLength[0] = 0f;
-                for (int i = 0; i < segmentCount; i++)
-                {
-                    cumulative += segmentLengths[i];
-                    normalizedArcLength[i + 1] = cumulative / totalLength;
-                }
-                // Pin the terminal to exactly 1 (defensive against float accumulation).
-                normalizedArcLength[count - 1] = 1f;
-            }
+            ResolvedPolyline polyline = ResolvedPolyline.Resolve(positions);
 
             ThicknessProfile thickness = chain.Thickness == null
                 ? ThicknessProfile.CreateDefault()
                 : chain.Thickness.Clone();
 
             return new ResolvedLimb(
-                Array.AsReadOnly(positions),
-                Array.AsReadOnly(segmentLengths),
-                totalLength,
-                Array.AsReadOnly(normalizedArcLength),
-                thickness);
+                polyline.Positions,
+                polyline.SegmentLengths,
+                polyline.TotalLength,
+                polyline.NormalizedArcLengthAtPosition,
+                thickness,
+                chain.BlendRadius);
         }
     }
 }

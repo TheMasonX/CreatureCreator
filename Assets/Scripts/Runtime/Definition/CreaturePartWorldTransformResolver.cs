@@ -1,3 +1,4 @@
+using System;
 using System.Collections.Generic;
 using UnityEngine;
 using ProceduralCreature.Common;
@@ -5,6 +6,151 @@ using ProceduralCreature.Morphology;
 
 namespace ProceduralCreature.Definition
 {
+    public readonly struct ResolvedShape
+    {
+        public readonly ShapeType Type;
+        public readonly float Radius;
+        public readonly ShapeAxis CapsuleAxis;
+        public readonly float CapsuleHeight;
+        public readonly Vector3 EllipsoidRadii;
+        public readonly Vector3 BoxHalfExtents;
+        public readonly float SmoothBlendRadius;
+
+        private ResolvedShape(ShapeDefinition shape)
+        {
+            float legacySize = shape.PrimarySize;
+            Type = shape.Type;
+            Radius = shape.Radius > 0f ? shape.Radius : legacySize;
+            CapsuleAxis = shape.CapsuleAxis;
+            CapsuleHeight = shape.CapsuleHeight > 0f ? shape.CapsuleHeight : 1f;
+            EllipsoidRadii = shape.EllipsoidRadii.x > 0f
+                ? shape.EllipsoidRadii
+                : new Vector3(legacySize, legacySize, legacySize);
+            BoxHalfExtents = shape.BoxHalfExtents.x > 0f
+                ? shape.BoxHalfExtents
+                : new Vector3(legacySize, legacySize, legacySize);
+            SmoothBlendRadius = shape.SmoothBlendRadius;
+        }
+
+        public static ResolvedShape Resolve(ShapeDefinition shape)
+        {
+            return new ResolvedShape(shape);
+        }
+    }
+
+    /// <summary>
+    /// Immutable-by-convention resolved values for one authored part. The
+    /// source part remains authoritative; this record contains only derived
+    /// hierarchy, morphology, and frame values needed by runtime consumers.
+    /// </summary>
+    public readonly struct ResolvedPartSnapshot
+    {
+        public readonly string Id;
+        public readonly string ParentId;
+        public readonly PartType PartType;
+        public readonly TransformData Transform;
+        public readonly ResolvedShape Shape;
+        public readonly bool HasLimb;
+        public readonly ResolvedLimb Limb;
+        public readonly Matrix4x4 PartFrameToCreatureSpace;
+        public readonly Matrix4x4 ChildFrameToCreatureSpace;
+
+        internal ResolvedPartSnapshot(CreaturePart part, ResolvedLimb limb,
+            Matrix4x4 partFrameToCreatureSpace, Matrix4x4 childFrameToCreatureSpace)
+        {
+            Id = part.Id;
+            ParentId = part.ParentId;
+            PartType = part.PartType;
+            Transform = part.Transform;
+            Shape = ResolvedShape.Resolve(part.Shape);
+            HasLimb = part.Limb != null;
+            Limb = limb;
+            PartFrameToCreatureSpace = partFrameToCreatureSpace;
+            ChildFrameToCreatureSpace = childFrameToCreatureSpace;
+        }
+    }
+
+    /// <summary>
+    /// A resolved, read-only view of a validated CreatureDefinition. Construction
+    /// is the only place that walks authored hierarchy and resolves frames;
+    /// consumers use the cached values and O(1) part lookup.
+    /// </summary>
+    public sealed class ResolvedCreatureSnapshot
+    {
+        private readonly IReadOnlyDictionary<string, ResolvedPartSnapshot> partsById;
+
+        public readonly bool HasBody;
+        public readonly ResolvedBody Body;
+        public IReadOnlyDictionary<string, ResolvedPartSnapshot> PartsById => partsById;
+
+        private ResolvedCreatureSnapshot(bool hasBody, ResolvedBody body,
+            IReadOnlyDictionary<string, ResolvedPartSnapshot> partsById)
+        {
+            HasBody = hasBody;
+            Body = body;
+            this.partsById = partsById;
+        }
+
+        public static ResolvedCreatureSnapshot Resolve(CreatureDefinition definition)
+        {
+            if (definition == null)
+            {
+                throw new DomainException("Cannot resolve a null CreatureDefinition.");
+            }
+            if (definition.Parts == null)
+            {
+                throw new DomainException("Cannot resolve a CreatureDefinition with null Parts.");
+            }
+
+            bool hasBody = definition.Body != null
+                && definition.Body.Samples != null
+                && definition.Body.Samples.Count > 0;
+            ResolvedBody body = default;
+            if (hasBody) body = ResolvedBody.Resolve(definition.Body);
+
+            var resolvedParts = new Dictionary<string, ResolvedPartSnapshot>(
+                StringComparer.Ordinal);
+            var orderedParts = new List<CreaturePart>(definition.Parts);
+            orderedParts.Sort((left, right) => string.CompareOrdinal(left?.Id, right?.Id));
+            for (int i = 0; i < orderedParts.Count; i++)
+            {
+                CreaturePart part = orderedParts[i];
+                if (part == null || string.IsNullOrEmpty(part.Id))
+                {
+                    throw new DomainException("Cannot resolve a null or unidentified CreaturePart.");
+                }
+                if (resolvedParts.ContainsKey(part.Id))
+                {
+                    throw new DomainException($"Cannot resolve duplicate CreaturePart ID '{part.Id}'.");
+                }
+
+                ResolvedLimb limb = default;
+                if (part.Limb != null) limb = ResolvedLimb.Resolve(part.Limb);
+
+                Matrix4x4 partFrame = CreaturePartWorldTransformResolver
+                    .ResolvePartFrameToCreatureSpace(definition, part);
+                Matrix4x4 childFrame = partFrame;
+                if (part.Limb != null)
+                {
+                    childFrame *= Matrix4x4.Translate(limb.TerminalSocket);
+                }
+
+                resolvedParts.Add(part.Id, new ResolvedPartSnapshot(
+                    part, limb, partFrame, childFrame));
+            }
+
+            return new ResolvedCreatureSnapshot(
+                hasBody,
+                body,
+                new System.Collections.ObjectModel.ReadOnlyDictionary<string, ResolvedPartSnapshot>(resolvedParts));
+        }
+
+        public bool TryGetPart(string id, out ResolvedPartSnapshot part)
+        {
+            return partsById.TryGetValue(id, out part);
+        }
+    }
+
     /// <summary>
     /// CreaturePart.Transform is stored relative to the part's parent (see
     /// CreaturePart.cs). Anything that needs a part's position/rotation/scale in
@@ -120,12 +266,9 @@ namespace ProceduralCreature.Definition
                 // Applied only when this part is an ANCESTOR of the resolved part:
                 // the resolved part itself keeps its own frame (a limb's joints
                 // stay authored root-at-origin per the Joints[0] ≈ zero invariant).
-                if (i < chain.Count - 1
-                    && p.Limb != null
-                    && p.Limb.Joints != null
-                    && p.Limb.Joints.Count > 0)
+                if (i < chain.Count - 1 && p.Limb != null)
                 {
-                    world *= Matrix4x4.Translate(p.Limb.Joints[p.Limb.Joints.Count - 1].Position);
+                    world *= Matrix4x4.Translate(ResolvedLimb.Resolve(p.Limb).TerminalSocket);
                 }
             }
 
@@ -176,9 +319,9 @@ namespace ProceduralCreature.Definition
         public static Matrix4x4 ResolveChildFrameToCreatureSpace(CreatureDefinition definition, CreaturePart part)
         {
             Matrix4x4 m = ResolveLocalToCreatureSpace(definition, part);
-            if (part.Limb != null && part.Limb.Joints != null && part.Limb.Joints.Count > 0)
+            if (part.Limb != null)
             {
-                m *= Matrix4x4.Translate(part.Limb.Joints[part.Limb.Joints.Count - 1].Position);
+                m *= Matrix4x4.Translate(ResolvedLimb.Resolve(part.Limb).TerminalSocket);
             }
             return m;
         }

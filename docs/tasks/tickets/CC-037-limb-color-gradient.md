@@ -23,6 +23,10 @@ surface point would be sampled by the limb's normalized arc length `t`
 `BodyVerticalGradientAppearance` / `BodyVerticalGradientSampler`, but keyed by
 chain length instead of vertical height).
 
+## Scope
+
+(empty)
+
 ## Motivation
 
 Captured during the CC-018 Phase 7 review (2026-08-23): "The color should be a
@@ -61,3 +65,15 @@ limb is flat-colored like any other part.
 - Runtime appearance-sampler tests + canonical JSON round-trip (via
   `execute_code`; the MCP runner does not discover the Runtime assembly).
 - Editor authoring tests for the gradient field (EditMode).
+
+## Findings
+
+(empty)
+
+## Blockers
+
+(empty)
+
+## Next Step
+
+(empty)

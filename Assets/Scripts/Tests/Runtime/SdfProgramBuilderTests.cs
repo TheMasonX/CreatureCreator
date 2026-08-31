@@ -241,5 +241,60 @@ namespace ProceduralCreature.Tests.Runtime
                 Assert.IsTrue(float.IsPositiveInfinity(SdfProgramEvaluator.Evaluate(portable, float3.zero)));
             }
         }
+
+        [Test]
+        public void CompilePortable_CurrentSchemaSphere_IgnoresLegacyPrimarySize()
+        {
+            var authoredShape = new ShapeDefinition
+            {
+                Type = ShapeType.Sphere,
+                PrimarySize = 0.25f,
+                Radius = 1.5f,
+                CapsuleHeight = 1f,
+                EllipsoidRadii = Vector3.one,
+                BoxHalfExtents = Vector3.one,
+                SmoothBlendRadius = 0f,
+            };
+            var changedLegacyShape = authoredShape;
+            changedLegacyShape.PrimarySize = 4f;
+
+            CreatureDefinition authored = CreatureDefinition.CreateEmpty();
+            authored.AddPart(new CreaturePart
+            {
+                Id = "authored_sphere",
+                PartType = PartType.Body,
+                Transform = TransformData.Identity,
+                Shape = authoredShape,
+                Appearance = AppearanceDefinition.Default,
+            });
+            CreatureDefinition changedLegacy = CreatureDefinition.CreateEmpty();
+            changedLegacy.AddPart(new CreaturePart
+            {
+                Id = "authored_sphere",
+                PartType = PartType.Body,
+                Transform = TransformData.Identity,
+                Shape = changedLegacyShape,
+                Appearance = AppearanceDefinition.Default,
+            });
+
+            using (SdfProgram authoredProgram = SdfProgramBuilder.CompilePortable(authored))
+            using (SdfProgram changedLegacyProgram = SdfProgramBuilder.CompilePortable(changedLegacy))
+            {
+                foreach (Vector3 point in new[]
+                {
+                    Vector3.zero,
+                    new Vector3(1f, 0f, 0f),
+                    new Vector3(2f, 0.25f, -0.5f),
+                })
+                {
+                    float authoredValue = SdfProgramEvaluator.Evaluate(authoredProgram,
+                        new float3(point.x, point.y, point.z));
+                    float changedLegacyValue = SdfProgramEvaluator.Evaluate(changedLegacyProgram,
+                        new float3(point.x, point.y, point.z));
+                    Assert.AreEqual(authoredValue, changedLegacyValue, 1e-4f,
+                        $"Changing legacy PrimarySize must not change authored shape output at {point}.");
+                }
+            }
+        }
     }
 }

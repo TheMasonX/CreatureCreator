@@ -175,7 +175,6 @@ namespace ProceduralCreature.Editor
         private bool _showSkeleton;
         private CreatureGenerationConfig _generationConfig;
         private bool _logGenerationDiagnostics = true;
-        private bool _usePortableSampling;
         private double _autoRegenerateAt = -1d;
         private string _currentFilePath;
 
@@ -190,7 +189,6 @@ namespace ProceduralCreature.Editor
         private const string SkeletonDisplayKey = "ProceduralCreature.ShowSkeleton";
         private const string GenerationConfigKey = "ProceduralCreature.GenerationConfig";
         private const string LogGenerationDiagnosticsKey = "ProceduralCreature.LogGenerationDiagnostics";
-        private const string UsePortableSamplingKey = "ProceduralCreature.UsePortableSampling";
         private const string CurrentFilePathKey = "ProceduralCreature.CurrentFilePath";
         private const string ExpandedPartIdsKey = "ProceduralCreature.ExpandedPartIds";
         // CC-020 rev 2: tree rows use a fixed-width arrow slot so every level
@@ -286,7 +284,6 @@ namespace ProceduralCreature.Editor
                 _generationConfig = AssetDatabase.LoadAssetAtPath<CreatureGenerationConfig>(generationConfigPath);
             }
             _logGenerationDiagnostics = EditorPrefs.GetBool(LogGenerationDiagnosticsKey, true);
-            _usePortableSampling = EditorPrefs.GetBool(UsePortableSamplingKey, true);
             _currentFilePath = SessionState.GetString(CurrentFilePathKey, string.Empty);
             LoadExpandedPartIds();
 
@@ -560,14 +557,6 @@ namespace ProceduralCreature.Editor
                 EditorPrefs.SetBool(LogGenerationDiagnosticsKey, _logGenerationDiagnostics);
             }
 
-            bool newUsePortableSampling = EditorGUILayout.Toggle(
-                "Use Burst SDF Sampling", _usePortableSampling);
-            if (newUsePortableSampling != _usePortableSampling)
-            {
-                _usePortableSampling = newUsePortableSampling;
-                EditorPrefs.SetBool(UsePortableSamplingKey, _usePortableSampling);
-                ScheduleAutoRegeneration();
-            }
         }
 
         [MenuItem("Window/Procedural Creature/Save Creature %s")]
@@ -3016,7 +3005,7 @@ namespace ProceduralCreature.Editor
                 generationDefinition.Generation.VoxelsPerUnit = _previewVoxelsPerUnit;
                 MeshTopologyReport topologyReport = null;
                 GeneratedCreature generated = CreatureMeshGenerator.Generate(
-                    generationDefinition, out topologyReport, diagnostics, _usePortableSampling,
+                    generationDefinition, out topologyReport, diagnostics,
                     ResolveMeshAsset, _fastPreviewCulling ? SdfCullingMode.Fast : SdfCullingMode.Exact);
                 Mesh unityMesh = generated.MainMesh;
                 ApplyPreviewGeometry(generated);
@@ -3042,7 +3031,7 @@ namespace ProceduralCreature.Editor
                         $"[CreatureCreator] Preview regenerated — " +
                         $"{unityMesh.triangles.Length / 3} triangles, " +
                         $"{unityMesh.vertexCount} vertices, " +
-                        $"SDF Sampling: {(_usePortableSampling ? "Burst" : "Managed")}, " +
+                        "SDF Sampling: Burst, " +
                         $"Culling: {(_fastPreviewCulling ? "Fast" : "Exact")}, " +
                         $"grid {diagnostics.GridCellsX}x{diagnostics.GridCellsY}x{diagnostics.GridCellsZ} " +
                         $"({diagnostics.GridSampleCount:N0} samples), " +

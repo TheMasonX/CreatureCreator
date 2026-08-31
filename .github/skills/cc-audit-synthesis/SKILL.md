@@ -45,7 +45,9 @@ Read these before changing records:
 - `.github/skills/unity-validation/SKILL.md` when the synthesis changes or
   proposes runtime, editor, serialized-data, generation, or test behavior.
 - `docs/tasks/active-tasks.md` for the live CC index.
-- `docs/tasks/tickets/CC-*.md` for existing task coverage.
+- `docs/tasks/tickets/CC-*.md` and `docs/tasks/archive/CC-*.md` for existing
+  and archived task coverage.
+- `docs/tasks/tools/` for task search, validation, creation, and archival.
 - `docs/audits/` for prior audits and synthesis records.
 - `docs/adr/` when a claim changes an architecture boundary or data contract.
 
@@ -143,10 +145,12 @@ Typical consolidation patterns in this repository:
 
 ### 5. Reconcile CC Tasks
 
-Before creating a task, query the complete local task set:
+Before creating a task, query the complete local task set with
+`task_search.py --include-archive`:
 
 - one row in `docs/tasks/active-tasks.md` per active CC key;
-- one canonical ticket in `docs/tasks/tickets/CC-*.md` per key;
+- one canonical ticket per key: active in `docs/tasks/tickets/CC-*.md`,
+  archived in `docs/tasks/archive/CC-*.md`;
 - no duplicate keys;
 - existing status and validation evidence read directly from the ticket.
 
@@ -169,7 +173,8 @@ For superseded tasks:
 - keep the original ticket and its evidence;
 - mark its status `Superseded` in both the ticket and active index;
 - add a short `## Disposition` section naming the replacement task;
-- create or update an archive record under `docs/tasks/`;
+- move the ticket with `task_archive.py` and create or update an archive
+  record under `docs/tasks/`;
 - preserve links from the replacement task to the historical records.
 
 For every new task, include YAML frontmatter with `id`, `key`, `title`, `status`,
@@ -213,6 +218,7 @@ State explicitly when Unity execution was not required or unavailable.
 
 Run focused read-only checks after edits:
 
+- `task_validate.py` reports zero errors;
 - all active CC rows map to one unique ticket;
 - no duplicate ticket keys exist;
 - new tickets have valid frontmatter and required headings;

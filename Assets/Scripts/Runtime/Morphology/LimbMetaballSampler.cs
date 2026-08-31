@@ -47,15 +47,6 @@ namespace ProceduralCreature.Morphology
         /// </summary>
         public const float DesiredSampleSpacing = 0.1f;
 
-        public static List<LimbMetaball> Sample(LimbChain chain)
-        {
-            if (chain == null)
-            {
-                throw new DomainException("Cannot sample a null LimbChain.");
-            }
-            return Sample(ResolvedLimb.Resolve(chain));
-        }
-
         /// <summary>
         /// Samples a derived <see cref="ResolvedLimb"/> (CC-056A). Segment
         /// lengths, total length, and arc length come from the resolved model

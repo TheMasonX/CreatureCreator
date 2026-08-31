@@ -7,6 +7,79 @@ using ProceduralCreature.Definition;
 namespace ProceduralCreature.Morphology
 {
     /// <summary>
+    /// Immutable metrics for a resolved centerline polyline. Body and limb
+    /// snapshots use the same geometry calculation while retaining their own
+    /// domain-specific metadata.
+    /// </summary>
+    public readonly struct ResolvedPolyline
+    {
+        public readonly IReadOnlyList<Vector3> Positions;
+        public readonly IReadOnlyList<float> SegmentLengths;
+        public readonly float TotalLength;
+        public readonly IReadOnlyList<float> NormalizedArcLengthAtPosition;
+
+        private ResolvedPolyline(IReadOnlyList<Vector3> positions,
+            IReadOnlyList<float> segmentLengths, float totalLength,
+            IReadOnlyList<float> normalizedArcLengthAtPosition)
+        {
+            Positions = positions;
+            SegmentLengths = segmentLengths;
+            TotalLength = totalLength;
+            NormalizedArcLengthAtPosition = normalizedArcLengthAtPosition;
+        }
+
+        public static ResolvedPolyline Resolve(IReadOnlyList<Vector3> positions)
+        {
+            if (positions == null)
+            {
+                throw new DomainException("Cannot resolve a null polyline.");
+            }
+            if (positions.Count == 0)
+            {
+                throw new DomainException("Cannot resolve a polyline with no positions.");
+            }
+
+            int positionCount = positions.Count;
+            var positionCopy = new Vector3[positionCount];
+            for (int i = 0; i < positionCount; i++)
+            {
+                positionCopy[i] = positions[i];
+            }
+
+            int segmentCount = positionCount - 1;
+            var segmentLengths = new float[Math.Max(segmentCount, 0)];
+            float totalLength = 0f;
+            for (int i = 0; i < segmentCount; i++)
+            {
+                segmentLengths[i] = Vector3.Distance(positionCopy[i], positionCopy[i + 1]);
+                totalLength += segmentLengths[i];
+            }
+
+            var normalizedArcLength = new float[positionCount];
+            if (totalLength <= 1e-6f)
+            {
+                for (int i = 0; i < positionCount; i++) normalizedArcLength[i] = 0f;
+            }
+            else
+            {
+                float cumulative = 0f;
+                for (int i = 0; i < segmentCount; i++)
+                {
+                    cumulative += segmentLengths[i];
+                    normalizedArcLength[i + 1] = cumulative / totalLength;
+                }
+                normalizedArcLength[positionCount - 1] = 1f;
+            }
+
+            return new ResolvedPolyline(
+                Array.AsReadOnly(positionCopy),
+                Array.AsReadOnly(segmentLengths),
+                totalLength,
+                Array.AsReadOnly(normalizedArcLength));
+        }
+    }
+
+    /// <summary>
     /// The derived, immutable geometry guide for the authoritative Body spline
     /// (CC-056A, increment B of the canonical resolved morphology layer).
     /// Resolves the authored samples once into sample IDs, positions, radii, segment
@@ -127,41 +200,15 @@ namespace ProceduralCreature.Morphology
                 radii[i] = sample.Radius;
             }
 
-            int segmentCount = count - 1;
-            var segmentLengths = new float[Math.Max(segmentCount, 0)];
-            float totalLength = 0f;
-            for (int i = 0; i < segmentCount; i++)
-            {
-                segmentLengths[i] = Vector3.Distance(positions[i], positions[i + 1]);
-                totalLength += segmentLengths[i];
-            }
-
-            var normalizedArcLength = new float[count];
-            if (totalLength <= 1e-6f)
-            {
-                // Degenerate (coincident/zero-length) spline: every sample sits at t = 0.
-                for (int i = 0; i < count; i++) normalizedArcLength[i] = 0f;
-            }
-            else
-            {
-                float cumulative = 0f;
-                normalizedArcLength[0] = 0f;
-                for (int i = 0; i < segmentCount; i++)
-                {
-                    cumulative += segmentLengths[i];
-                    normalizedArcLength[i + 1] = cumulative / totalLength;
-                }
-                // Pin the terminal to exactly 1 (defensive against float accumulation).
-                normalizedArcLength[count - 1] = 1f;
-            }
+            ResolvedPolyline polyline = ResolvedPolyline.Resolve(positions);
 
             return new ResolvedBody(
-                Array.AsReadOnly(positions),
+                polyline.Positions,
                 Array.AsReadOnly(ids),
                 Array.AsReadOnly(radii),
-                Array.AsReadOnly(segmentLengths),
-                totalLength,
-                Array.AsReadOnly(normalizedArcLength));
+                polyline.SegmentLengths,
+                polyline.TotalLength,
+                polyline.NormalizedArcLengthAtPosition);
         }
     }
 }

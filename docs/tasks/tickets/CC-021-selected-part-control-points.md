@@ -39,6 +39,10 @@ CC-018 exists), instead of only the generic single position handle.
 
 (empty)
 
+## Blockers
+
+(empty)
+
 ## Next Step
 
 Reuse the `BodyEditSolver` gesture pattern and the part transform resolution to

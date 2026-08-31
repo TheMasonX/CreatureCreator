@@ -2,7 +2,7 @@
 id: creature-task-087
 key: CC-087
 title: Canonical resolved-creature snapshot and ownership boundary
-status: In Progress
+status: Done
 type: Architecture
 authority: BeastMaster
 priority: P1

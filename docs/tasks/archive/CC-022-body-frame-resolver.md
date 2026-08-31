@@ -2,7 +2,7 @@
 id: creature-task-022
 key: CC-022
 title: Shared BodyFrameResolver (parallel-transport body frames)
-status: In Progress
+status: Done
 type: Task
 priority: P1
 tags: [runtime, body-spline, frame, definition, attachment, shared-math]

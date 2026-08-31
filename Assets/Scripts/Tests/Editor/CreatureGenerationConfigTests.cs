@@ -51,7 +51,6 @@ namespace ProceduralCreature.Tests.Editor
             Assert.IsNotNull(config.MeshPalette, "Shared config mesh palette must be assigned.");
             Assert.IsNotNull(config.MaterialPalette, "Shared config material palette must be assigned.");
             Assert.Greater(config.DefaultVoxelsPerUnit, 0f);
-            Assert.IsTrue(config.UsePortableSampling);
         }
 
         [Test]
@@ -104,7 +103,7 @@ namespace ProceduralCreature.Tests.Editor
 
             MeshTopologyReport topology;
             GeneratedCreature first = CreatureMeshGenerator.Generate(
-                definition, out topology, diagnostics: null, usePortableSampling: true, meshResolver: resolver,
+                definition, out topology, diagnostics: null, meshResolver: resolver,
                 cullingMode: SdfCullingMode.Exact);
 
             Assert.IsTrue(topology.IsWatertight, "Implicit surface must stay watertight with a mesh part present.");
@@ -120,7 +119,7 @@ namespace ProceduralCreature.Tests.Editor
 
             MeshTopologyReport secondTopology;
             GeneratedCreature second = CreatureMeshGenerator.Generate(
-                definition, out secondTopology, diagnostics: null, usePortableSampling: true, meshResolver: resolver,
+                definition, out secondTopology, diagnostics: null, meshResolver: resolver,
                 cullingMode: SdfCullingMode.Exact);
 
             Assert.AreEqual(first.Count, second.Count);

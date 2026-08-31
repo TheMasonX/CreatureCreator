@@ -82,8 +82,9 @@ namespace ProceduralCreature.Skeleton
             }
 
             var skeleton = new Skeleton();
+            ResolvedCreatureSnapshot snapshot = ResolvedCreatureSnapshot.Resolve(definition);
 
-            AppendBodyBones(skeleton, definition);
+            AppendBodyBones(skeleton, definition, snapshot.Body, snapshot.HasBody);
 
             List<CreaturePart> orderedParts = definition.Parts
                 .OrderBy(p => p.Id, System.StringComparer.Ordinal)
@@ -91,6 +92,7 @@ namespace ProceduralCreature.Skeleton
 
             foreach (CreaturePart part in orderedParts)
             {
+                snapshot.TryGetPart(part.Id, out ResolvedPartSnapshot resolvedPart);
                 bool shouldMirror = part.MirrorAcrossSymmetryPlane
                                      && definition.SymmetryMode != SymmetryMode.None;
 
@@ -98,18 +100,18 @@ namespace ProceduralCreature.Skeleton
                 {
                     // A limb emits one bone per consecutive joint pair, plus a
                     // full mirrored chain when flagged.
-                    AppendLimbBones(skeleton, definition, part, mirrored: false);
+                    AppendLimbBones(skeleton, definition, part, resolvedPart, mirrored: false);
                     if (shouldMirror)
                     {
-                        AppendLimbBones(skeleton, definition, part, mirrored: true);
+                        AppendLimbBones(skeleton, definition, part, resolvedPart, mirrored: true);
                     }
                 }
                 else
                 {
-                    skeleton.Bones.Add(BuildBone(definition, part, mirrored: false));
+                    skeleton.Bones.Add(BuildBone(definition, part, resolvedPart, mirrored: false));
                     if (shouldMirror)
                     {
-                        skeleton.Bones.Add(BuildBone(definition, part, mirrored: true));
+                        skeleton.Bones.Add(BuildBone(definition, part, resolvedPart, mirrored: true));
                     }
                 }
             }
@@ -124,9 +126,10 @@ namespace ProceduralCreature.Skeleton
         /// the part origin, and it reflects the part's rotation so the mirrored
         /// bone points the right way.
         /// </summary>
-        private static Bone BuildBone(CreatureDefinition definition, CreaturePart part, bool mirrored)
+        private static Bone BuildBone(CreatureDefinition definition, CreaturePart part,
+            ResolvedPartSnapshot resolvedPart, bool mirrored)
         {
-            Matrix4x4 world = CreaturePartWorldTransformResolver.ResolveLocalToCreatureSpace(definition, part);
+            Matrix4x4 world = resolvedPart.PartFrameToCreatureSpace;
             if (mirrored)
             {
                 world = MirrorUtility.MirrorAcrossXPlane(world);
@@ -162,7 +165,8 @@ namespace ProceduralCreature.Skeleton
         /// to no bones; the validator rejects those before inference, so this only
         /// guards direct calls.
         /// </summary>
-        private static void AppendLimbBones(Skeleton skeleton, CreatureDefinition definition, CreaturePart part, bool mirrored)
+        private static void AppendLimbBones(Skeleton skeleton, CreatureDefinition definition,
+            CreaturePart part, ResolvedPartSnapshot resolvedPart, bool mirrored)
         {
             LimbChain limb = part.Limb;
             if (limb == null)
@@ -171,18 +175,7 @@ namespace ProceduralCreature.Skeleton
                 return;
             }
 
-            ResolvedLimb resolved;
-            try
-            {
-                resolved = ResolvedLimb.Resolve(limb);
-            }
-            catch (DomainException)
-            {
-                // Defensive: an empty or null-joint chain resolves to nothing.
-                // The validator enforces MinLimbJointCount and rejects null
-                // joints, so valid definitions never reach here.
-                return;
-            }
+            ResolvedLimb resolved = resolvedPart.Limb;
 
             if (resolved.JointPositions.Count < 2)
             {
@@ -190,7 +183,7 @@ namespace ProceduralCreature.Skeleton
                 return;
             }
 
-            Matrix4x4 partMatrix = CreaturePartWorldTransformResolver.ResolveLocalToCreatureSpace(definition, part);
+            Matrix4x4 partMatrix = resolvedPart.PartFrameToCreatureSpace;
             Vector3 upHint = partMatrix.rotation * Vector3.up;
             if (mirrored)
             {
@@ -253,25 +246,10 @@ namespace ProceduralCreature.Skeleton
             return Quaternion.LookRotation(forward, up);
         }
 
-        private static void AppendBodyBones(Skeleton skeleton, CreatureDefinition definition)
+        private static void AppendBodyBones(Skeleton skeleton, CreatureDefinition definition,
+            ResolvedBody resolved, bool hasBody)
         {
-            if (definition.Body == null || definition.Body.Samples == null
-                || definition.Body.Samples.Count == 0)
-            {
-                return;
-            }
-
-            // CC-056A increment 3: the Body is consumed through the shared
-            // ResolvedBody derivation — the same sample positions the SDF field
-            // and envelope validation use, never re-derived here. A structurally
-            // broken spline (a null sample) resolves to no bones; the validator
-            // rejects those before inference, so this only guards direct calls.
-            ResolvedBody resolved;
-            try
-            {
-                resolved = ResolvedBody.Resolve(definition.Body);
-            }
-            catch (DomainException)
+            if (!hasBody)
             {
                 return;
             }
@@ -286,11 +264,11 @@ namespace ProceduralCreature.Skeleton
                     ? resolved.SamplePositions[i + 1]
                     : position;
                 string boneId = SemanticBoneResolver.ResolveBodySocketBoneId(
-                    definition.Body.Samples[i].Id);
+                    resolved.SampleIds[i]);
                 string parentBoneId = i == 0
                     ? null
                     : SemanticBoneResolver.ResolveBodySocketBoneId(
-                        definition.Body.Samples[i - 1].Id);
+                        resolved.SampleIds[i - 1]);
 
                 skeleton.Bones.Add(new Bone
                 {
