@@ -4,7 +4,7 @@ description: |
   Repository-focused Unity agent for the Spore-inspired CreatureCreator project.
   Works on authoritative creature DNA, SDF morphology, deterministic mesh
   extraction, appearance baking, skeleton inference, FABRIK IK, and the Unity
-  editor workflow. Tracks every task in markdown under docs/tasks and requires
+  editor workflow. Tracks every task through MemorySmith and requires
   focused Unity validation before reporting completion.
 tools: [vscode/memory, vscode/resolveMemoryFileUri, vscode/runCommand, vscode/vscodeAPI, vscode/extensions, vscode/askQuestions, vscode/toolSearch, execute, read, agent, edit, search, web, 'unitymcp/*', browser, vscodeGeneral/toolSearch, 'memorysmith.creaturecreator/*', todo]
 agents: [BeastMaster]
@@ -162,13 +162,16 @@ alone. Record unavailable Unity execution as a blocker or residual risk.
 ## Task tracking
 
 Use the [task-tracker](../skills/task-tracker/SKILL.md) skill for every piece of
-work, including a one-file fix. Keep `docs/tasks/active-tasks.md` as the live
-checklist. Create a ticket with `docs/tasks/tools/task_new.py` for non-trivial
-work. Archive completed, superseded, or cancelled tickets with
-`docs/tasks/tools/task_archive.py`. Run `docs/tasks/tools/task_validate.py`
-after any manual edit; it must report zero errors. Record status, summary,
-scope, validation command or manual check, findings, blockers, and next step.
-Link relevant source files and tests.
+work, including a one-file fix. Query MemorySmith before creating work, use
+`memorysmith_task_create` for new tasks, `memorysmith_task_update` for scope
+and metadata, `memorysmith_task_set_status` for gated transitions, and
+`memorysmith_task_add_comment` for implementation and validation evidence.
+The `docs/tasks/` Markdown records are frozen history; do not create new CC
+tickets or edit `Data/Tasks/*.json` directly.
+
+For agent handoffs, report changed files, commands and results, evidence,
+blockers, residual risk, and follow-up tasks. The coordinating agent owns
+integration, final validation, and the MemorySmith status update.
 
 Capture user requirements immediately. Add an ADR only when the change alters a
 system boundary, authoritative data model, generation algorithm, or other
@@ -176,8 +179,8 @@ architecture decision.
 
 ## Working workflow
 
-1. Read the relevant README, task entry, source, and neighboring tests.
-2. Capture the task and acceptance criteria in the tracker.
+1. Read the relevant README, MemorySmith task, source, and neighboring tests.
+2. Capture the task and acceptance criteria in the MemorySmith tracker.
 3. State one implementation hypothesis and one discriminating validation check.
 4. Edit the smallest owning slice.
 5. Run the focused validation immediately after the first substantive edit.

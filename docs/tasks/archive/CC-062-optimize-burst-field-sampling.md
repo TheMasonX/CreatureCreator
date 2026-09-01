@@ -2,7 +2,7 @@
 id: creature-task-062
 key: CC-062
 title: Optimize the Burst field-sampling stage with AABB culling
-status: In Progress
+status: Done
 type: Task
 priority: P1
 tags: [runtime, sdf, performance, burst, jobs]

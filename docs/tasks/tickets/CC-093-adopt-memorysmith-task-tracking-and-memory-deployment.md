@@ -7,7 +7,7 @@ type: Architecture
 priority: P1
 tags: [workflow, tooling, memorysmith]
 dependsOn: []
-related: []
+related: [CC-097]
 links: []
 ---
 
@@ -127,14 +127,12 @@ Out of scope:
 - Service deploy/verify requires an elevated PowerShell session and local
   access to `D:\@Repos\MemorySmith`; I will not run the deploy from this
   session unless the user requests it.
-- Mass import must wait for the user to verify the service is working.
+- Mass import is tracked by CC-097 and must use the authenticated MCP task tools.
 - The live service is running and `/api/health/ready` returned HTTP 200 with
   `{"status":"Ready"}` after deployment. First-admin setup remains pending;
   wait for the setup rate-limit window before retrying the form.
 
 ## Next Step
 
-Run `task_validate.py` and `Test-TaskRecords.ps1` to confirm the markdown
-system and the new JSON validator both pass. The deployment script now also
-checks `/api/health/ready`; after the setup rate-limit window clears, complete
-first-admin setup at `/admin/setup`, then begin the migration phase.
+Use CC-097 to run the authenticated MCP migration. Keep the Markdown tracker
+as the source record until the imported task count and source labels reconcile.

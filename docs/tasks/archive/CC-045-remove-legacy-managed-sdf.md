@@ -2,7 +2,7 @@
 id: creature-task-045
 key: CC-045
 title: Remove the legacy managed SDF from production generation
-status: Review
+status: Done
 type: Task
 priority: P1
 tags: [runtime, sdf, performance, burst, jobs, cleanup]

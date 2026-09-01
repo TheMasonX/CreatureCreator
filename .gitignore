@@ -131,6 +131,7 @@ Data/Events/
 .service/*.log
 .service/*.err.log
 .service/*.pid
+.service/memorysmith-import-state.json
 
 # Published MemorySmith engine output
 artifacts/

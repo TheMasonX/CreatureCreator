@@ -28,7 +28,6 @@
 | CC-042 | Update ClonePartAsChild XML doc comment to list Limb as copied | Backlog | P3 |
 | CC-043 | Per-shape parameters (capsule axis + radius/height, ellipsoid 3-axis lengths, box dimensions) | In Progress | P1 |
 | CC-044 | Export the generated mesh as an asset | Backlog | P2 |
-| CC-045 | Remove the legacy managed SDF from production generation | Review | P1 |
 | CC-046 | Investigate recurring broken-ankle mesh artifacts | Backlog | P1 |
 | CC-052 | Preserve mesh rest transforms and mirrored binding identity | In Progress | P1 |
 | CC-053 | Complete multi-geometry editor selection and visibility | Backlog | P1 |
@@ -39,7 +38,6 @@
 | CC-059 | Define symmetry placement and center-merge semantics | Backlog | P2 |
 | CC-060 | Move material ownership to geometry components | Backlog | P2 |
 | CC-061 | Harden the final mesh pipeline independently of editor interaction | Backlog | P2 |
-| CC-062 | Optimize the Burst field-sampling stage with AABB culling | In Progress | P1 |
 | CC-067 | Show the SDF bounds for primitive shapes in the editor | Backlog | P2 |
 | CC-068 | Make the base limb point moveable (selection + move gizmo, no scale) | Backlog | P1 |
 | CC-069 | Runtime bone rig and pose application (drive bone Transforms from a PosedSkeleton) | In Progress | P1 |
@@ -59,3 +57,4 @@
 | CC-094 | Decompose CreatureEditorWindow responsibilities | Backlog | P2 |
 | CC-095 | Click the preview mesh in the viewport to select the owning part | Backlog | P1 |
 | CC-096 | Edit any skeleton node with composable move/scale/rotation gizmos (including limb attachment points) | Backlog | P2 |
+| CC-097 | Import all Markdown tasks through the MemorySmith MCP bridge | Backlog | P1 |

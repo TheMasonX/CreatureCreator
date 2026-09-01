@@ -27,6 +27,7 @@ tools in `docs/tasks/tools/`.
 | CC-034 | Body appearance vertical blend remap as an AnimationCurve | Done | P2 |
 | CC-040 | Clear the limb chain when switching a part away from a limb type | Done | P2 |
 | CC-041 | Rotated-transform parity test for mirrored limb chains (managed vs portable) | Done | P2 |
+| CC-045 | Remove the legacy managed SDF from production generation | Done | P1 |
 | CC-047 | Resolve FastNoise2Bindings compile failure (restore DllImport P/Invoke) | Done | P1 |
 | CC-048 | Fix obsolete Keyframe.tangentMode warnings and DrawPartList GetLastRect error | Done | P2 |
 | CC-049 | Remove limb geometry dependence on inert Shape blend state | Done | P1 |
@@ -35,6 +36,7 @@ tools in `docs/tasks/tools/`.
 | CC-056 | Establish the canonical resolved morphology layer | Superseded | P1 |
 | CC-056A | Resolved Body/limb geometry (canonical derived morphology, part A) | Done | P1 |
 | CC-056B | Semantic attachment resolution (canonical resolved morphology, part B) | Done | P1 |
+| CC-062 | Optimize the Burst field-sampling stage with AABB culling | Done | P1 |
 | CC-063 | Restore the Fast preview culling mode (naive AABB + non-finite interpolation guard) | Done | P1 |
 | CC-064 | Fast-mode non-finite field contract (+inf = outside/culled) | Done | P1 |
 | CC-065 | FastNoise2 binary / submodule repository review gate | Done | P1 |
@@ -50,6 +52,7 @@ tools in `docs/tasks/tools/`.
 | CC-087 | Canonical resolved-creature snapshot and ownership boundary | Done | P1 |
 | CC-088 | SDF backend and legacy shape semantics exit | Done | P1 |
 | CC-092 | Adapt council and subagent swarm skills for CreatureCreator | Done | P2 |
+| CC-098 | Reconcile recent changes and in-progress tasks | Done | P1 |
 
 ## Changelog
 
@@ -96,3 +99,6 @@ tools in `docs/tasks/tools/`.
 - 2026-08-31: Archived CC-001 (Configure creature creator test scene) as Done. (status Backlog -> Done) Round-trip test complete
 - 2026-08-31: Archived CC-088 (SDF backend and legacy shape semantics exit) as Done. Resolved snapshot-owned portable SDF compilation, legacy PrimarySize regression passed, raw limb sampler removed, and Unity PlayMode validation passed
 - 2026-08-31: Archived CC-092 (Adapt council and subagent swarm skills for CreatureCreator) as Done. (status Backlog -> Done) Adapted council and subagent-swarm skills added and focused metadata/link checks passed; repository validator retains unrelated CC-087/CC-088 errors.
+- 2026-08-31: Archived CC-045 (Remove the legacy managed SDF from production generation) as Done. (status Review -> Done) Recent implementation is validated: Unity EditMode 107/107, runtime PlayMode 417/417, project builds pass, and documented benchmarks/topology evidence are present.
+- 2026-08-31: Archived CC-062 (Optimize the Burst field-sampling stage with AABB culling) as Done. (status In Progress -> Done) Recent implementation is validated: Unity EditMode 107/107, runtime PlayMode 417/417, project builds pass, and documented benchmarks/topology evidence are present.
+- 2026-08-31: Archived CC-098 (Reconcile recent changes and in-progress tasks) as Done. (status In Progress -> Done) Reviewed all 14 In Progress tickets, fixed the recent SDF scalar/fast regression, validated Unity EditMode 107/107 and PlayMode 417/417, and archived only CC-045 and CC-062 as complete.

@@ -17,7 +17,7 @@ namespace ProceduralCreature.Tests.Runtime
                     CapsuleHeight = parameters.y, CapsuleAxis = ShapeAxis.Y, EllipsoidRadii = parameters,
                     BoxHalfExtents = parameters }, Appearance = AppearanceDefinition.Default });
             using (SdfProgram program = SdfProgramBuilder.CompilePortable(definition))
-                return SdfProgramEvaluator.Evaluate(program, new float3(point.x, point.y, point.z));
+                return SdfProgramEvaluator.EvaluateReference(program, new float3(point.x, point.y, point.z));
         }
 
         [Test]

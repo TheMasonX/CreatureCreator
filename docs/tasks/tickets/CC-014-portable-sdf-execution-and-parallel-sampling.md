@@ -44,7 +44,7 @@ Keep definition compilation and editor integration in their current ownership bo
 - Scalar and Burst sampling produce matching topology inputs within the accepted tolerance.
 - Centered sphere, overlapping spheres, and `first_creature.json` remain watertight.
 - Mixed-cell counts, triangle counts, welded vertex counts, and deterministic mesh output remain stable within documented numeric tolerances.
-- The current scalar sampler remains available as a fallback until parity validation completes.
+- The portable fast sampler is the only production path; the scalar portable evaluator remains available as a reference API for parity diagnostics.
 - `Unity.Mathematics`, `Unity.Collections`, and `Unity.Burst` are declared as direct package dependencies if runtime code references them directly.
 
 ## Validation

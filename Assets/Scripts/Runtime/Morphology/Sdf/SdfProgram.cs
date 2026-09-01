@@ -118,7 +118,13 @@ namespace ProceduralCreature.Morphology.Sdf
         public static float Evaluate(SdfProgram program, float3 point)
         {
             if (program == null) throw new DomainException("program must not be null.");
-            return Evaluate(program.Operations, program.RootIndex, point, program.InfluenceRadius);
+            return Evaluate(program.Operations, program.RootIndex, point, program.InfluenceRadius, allowCulling: true);
+        }
+
+        public static float EvaluateReference(SdfProgram program, float3 point)
+        {
+            if (program == null) throw new DomainException("program must not be null.");
+            return Evaluate(program.Operations, program.RootIndex, point, program.InfluenceRadius, allowCulling: false);
         }
 
         public static float Evaluate(
@@ -129,11 +135,24 @@ namespace ProceduralCreature.Morphology.Sdf
             {
                 throw new DomainException("scratchValues must contain one entry per operation.");
             }
-            return EvaluateInto(program.Operations, program.RootIndex, point, scratchValues, 0, program.InfluenceRadius);
+            return EvaluateInto(program.Operations, program.RootIndex, point, scratchValues, 0,
+                program.InfluenceRadius, allowCulling: true);
+        }
+
+        public static float EvaluateReference(
+            SdfProgram program, float3 point, NativeArray<float> scratchValues)
+        {
+            if (program == null) throw new DomainException("program must not be null.");
+            if (!scratchValues.IsCreated || scratchValues.Length < program.Operations.Length)
+            {
+                throw new DomainException("scratchValues must contain one entry per operation.");
+            }
+            return EvaluateInto(program.Operations, program.RootIndex, point, scratchValues, 0, program.InfluenceRadius, allowCulling: false);
         }
 
         public static float Evaluate(
-            NativeArray<SdfOperation> operations, int rootIndex, float3 point, float influenceRadius)
+            NativeArray<SdfOperation> operations, int rootIndex, float3 point, float influenceRadius,
+            bool allowCulling = false)
         {
             if (!operations.IsCreated) throw new DomainException("operations must be created.");
             if (rootIndex < 0 || rootIndex >= operations.Length)
@@ -142,33 +161,35 @@ namespace ProceduralCreature.Morphology.Sdf
             }
 
             var values = new NativeArray<float>(operations.Length, Allocator.Temp);
-            float result = EvaluateInto(operations, rootIndex, point, values, 0, influenceRadius);
+            float result = EvaluateInto(operations, rootIndex, point, values, 0, influenceRadius, allowCulling);
             values.Dispose();
             return result;
         }
 
+        public static float EvaluateReference(
+            NativeArray<SdfOperation> operations, int rootIndex, float3 point, float influenceRadius)
+        {
+            return Evaluate(operations, rootIndex, point, influenceRadius, allowCulling: false);
+        }
+
         internal static float EvaluateInto(
             NativeArray<SdfOperation> operations, int rootIndex, float3 point,
-            NativeArray<float> values, int valueOffset, float influenceRadius)
+            NativeArray<float> values, int valueOffset, float influenceRadius, bool allowCulling)
         {
             for (int i = 0; i <= rootIndex; i++)
             {
                 SdfOperation operation = operations[i];
-                // Dead primitive slots carry an empty AABB and are never read; cull
-                // them without evaluating (their wrapping Transform re-evaluates the
-                // primitive inline).
-                if (operation.MinBound.x > operation.MaxBound.x)
-                {
-                    values[valueOffset + i] = float.PositiveInfinity;
-                    continue;
-                }
-
                 // Fast culling (CC-063): skip any operation whose world AABB,
                 // inflated by the program's max blend radius, does not contain the
-                // sample, writing +inf for the absent operation.
-                if (point.x < operation.MinBound.x - influenceRadius || point.x > operation.MaxBound.x + influenceRadius ||
+                // sample, writing +inf for the absent operation. Operations without
+                // compiled bounds must still evaluate: a standalone primitive
+                // program legitimately uses its primitive as the root operation.
+                bool hasBounds = operation.MinBound.x <= operation.MaxBound.x
+                    && operation.MinBound.y <= operation.MaxBound.y
+                    && operation.MinBound.z <= operation.MaxBound.z;
+                if (allowCulling && hasBounds && (point.x < operation.MinBound.x - influenceRadius || point.x > operation.MaxBound.x + influenceRadius ||
                      point.y < operation.MinBound.y - influenceRadius || point.y > operation.MaxBound.y + influenceRadius ||
-                    point.z < operation.MinBound.z - influenceRadius || point.z > operation.MaxBound.z + influenceRadius)
+                    point.z < operation.MinBound.z - influenceRadius || point.z > operation.MaxBound.z + influenceRadius))
                 {
                     values[valueOffset + i] = float.PositiveInfinity;
                     continue;
@@ -277,7 +298,7 @@ namespace ProceduralCreature.Morphology.Sdf
             float3 point = Origin + new float3(x, y, z) * CellSize;
             int valueOffset = index * Operations.Length;
             Samples[sampleIndex] = SdfProgramEvaluator.EvaluateInto(
-                Operations, RootIndex, point, ScratchValues, valueOffset, InfluenceRadius);
+                Operations, RootIndex, point, ScratchValues, valueOffset, InfluenceRadius, allowCulling: true);
         }
     }
 }

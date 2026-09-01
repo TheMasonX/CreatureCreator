@@ -52,8 +52,7 @@ namespace ProceduralCreature.Tests.Runtime
                 // must read exactly +inf in Fast mode — the "outside/culled" sentinel,
                 // never a large finite distance and never NaN.
                 float far = SdfProgramEvaluator.Evaluate(
-                    program.Operations, program.RootIndex, new float3(5f, 5f, 5f),
-                    program.InfluenceRadius);
+                    program, new float3(5f, 5f, 5f));
 
                 Assert.AreEqual(float.PositiveInfinity, far,
                     "A far Fast-mode sample must read exactly +inf (the culled sentinel).");

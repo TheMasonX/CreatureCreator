@@ -40,10 +40,10 @@ representation. Adopt three tiers:
 ```text
 Tier 0  Interactive semantic proxy        <16 ms
 Tier 1  Fast SDF refinement               ~100s ms
-Tier 2  Exact final geometry              high quality / slower
+Tier 2  Final fast-SDF geometry            high quality / slower
 ```
 Editor state machine: Editing -> Proxy -> idle ~100-250 ms -> Fast SDF refinement ->
-MouseUp/finalize -> Exact generation. The proxy is a fast consumer of ResolvedMorphology,
+MouseUp/finalize -> final fast-SDF generation. The proxy is a fast consumer of ResolvedMorphology,
 never authoritative.
 
 ## Blockers

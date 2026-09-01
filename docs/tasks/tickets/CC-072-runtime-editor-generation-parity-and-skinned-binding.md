@@ -64,7 +64,7 @@ PlayMode preview smoke test remains open.
 The editor already passes `ResolveMeshAsset` into the shared generator. Runtime
 preview previously called the convenience overload with no resolver. A runtime
 palette closes that asymmetry without putting UnityEditor references in Runtime.
-Both previews now select portable exact sampling and the same generator overload.
+Both previews now select the same portable fast sampling path and generator overload.
 
 The first audit missed that the generated config asset had null palette
 references. The existing assets live under `Assets/Prefabs`, not

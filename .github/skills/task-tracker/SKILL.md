@@ -1,6 +1,6 @@
 ---
 name: task-tracker
-description: "Create and maintain markdown task records for CreatureCreator. Use for backlog work, creature-generation features, editor fixes, validation follow-up, status updates, task search, and archival."
+description: "Track CreatureCreator work through MemorySmith MCP task tools. Use Markdown tickets only as frozen historical source and migration evidence."
 argument-hint: "Describe the creature task, scope, status, validation, and related files"
 ---
 
@@ -8,10 +8,10 @@ argument-hint: "Describe the creature task, scope, status, validation, and relat
 
 ## Outcome
 
-Create one durable, readable record for each piece of work. Active work lives
-in `docs/tasks/tickets/` and is indexed in `docs/tasks/active-tasks.md`.
-Completed, superseded, and cancelled records move to `docs/tasks/archive/`.
-The tools in `docs/tasks/tools/` keep the system consistent.
+Create one durable MemorySmith task for each piece of work. The imported
+`TSK-####` records in `Data/Tasks/` are authoritative for active task state.
+The `CC-###` Markdown records under `docs/tasks/` are frozen historical source
+and migration evidence. Do not create new Markdown tickets.
 
 ## When to use
 
@@ -21,51 +21,39 @@ to search or archive task records.
 
 ## Layout
 
-- `docs/tasks/active-tasks.md` — live index of active tickets.
-- `docs/tasks/tickets/` — active ticket files.
-- `docs/tasks/archive/` — archived tickets plus `archive/README.md` (index and
-  changelog).
-- `docs/tasks/tools/` — tooling; see `docs/tasks/tools/README.md`.
-- `docs/tasks/handoffs/` — session handoff notes.
+- `Data/Tasks/` — active MemorySmith task records; never edit JSON directly.
+- `Data/Memories/` and `Data/Pages/` — durable MemorySmith context and handoffs.
+- `docs/tasks/` — frozen CC source records and compatibility tooling.
 
 ## Procedure
 
-1. Read `docs/tasks/README.md` and `docs/tasks/tools/README.md` once to learn
-   the conventions and tool usage.
-2. Create a ticket with `task_new.py`. It picks the next unused `CC-###`, writes
-   the canonical frontmatter and headings, and adds a row to `active-tasks.md`.
-
-   ```text
-   python docs/tasks/tools/task_new.py --title "..." --priority P2 --tags runtime,sdf --depends-on CC-043
-   ```
-
-3. Fill in summary, scope, acceptance criteria, validation, findings,
-   blockers, and next step. Link the relevant runtime, editor, test, README,
-   and ADR files.
-4. Record the focused validation command or manual Unity check.
-5. Update the record after implementation and validation.
-6. When the work is complete, superseded, or cancelled, archive the ticket with
-   `task_archive.py`.
-
-   ```text
-   python docs/tasks/tools/task_archive.py CC-091 --status Done --reason "Unity tests passed"
-   ```
-
-7. Run `task_validate.py` after any manual edit or batch move. It must report
-   zero errors.
+1. Query existing tasks with `memorysmith_task_list` or `memorysmith_task_get`.
+   Create only when no matching task exists.
+2. Create work with `memorysmith_task_create`, including scope, acceptance
+   criteria, priority, labels, and relevant source paths.
+3. Update scope and metadata with `memorysmith_task_update`; preserve existing
+   labels because updates replace the complete label array.
+4. Transition status with `memorysmith_task_set_status` only after the related
+   gate passes. Include a concise note with the current decision or blocker.
+5. Add implementation and validation evidence with
+   `memorysmith_task_add_comment`.
+6. Create and link a follow-up task for deferred or out-of-scope work.
+7. Use `task_validate.py` only for historical Markdown edits or migration
+   checks. Use `Test-TaskRecords.ps1` to validate imported JSON records.
 
 ## User mandates
 
 When a user states a requirement directly in conversation, record it verbatim
-so a later agent cannot silently shift the goal. Add a `## User Mandate`
-section immediately after `## Summary`:
+in the MemorySmith task description or a task comment so a later agent cannot
+silently shift the goal. Preserve the `User Mandate` section when maintaining
+the historical Markdown record:
 
 - Quote the user's words verbatim in a blockquote.
 - Mark the requirement STRICT.
 - List the binding constraints. They frame the acceptance criteria and must not
   be relaxed or re-scoped without explicit user confirmation.
-- Add the `user-mandated` tag so the ticket is searchable
-  (`task_search.py --tag user-mandated`).
+- Add the `user-mandated` label so the task is searchable with
+   `memorysmith_task_list`.
 
 If a later agent proposes to reduce, defer, or re-scope a mandate, surface the
 proposal to the user; do not apply it silently. Archived mandate records are
@@ -73,39 +61,22 @@ frozen with the rest of the ticket history.
 
 ## Statuses and location
 
-Active statuses stay in `tickets/`: `Backlog`, `In Progress`, `Blocked`,
-`Review`.
-
-Archived statuses move to `archive/`: `Done`, `Superseded`, `Cancelled`,
-`Archived`.
-
-Use `Done` only when the requested behavior has validation evidence. Mark
-`Superseded` when a newer task replaces unfinished scope, and name the
-replacement in a `## Disposition` section.
+MemorySmith statuses are `Backlog`, `Ready`, `InProgress`, `Blocked`,
+`Rejected`, `Done`, and `Archived`. Use `Done` only when the requested
+behavior has validation evidence. Use `Archived` for historical or superseded
+work and name the replacement or disposition in a task note.
 
 ## Searching
 
-```text
-python docs/tasks/tools/task_search.py --status "In Progress"
-python docs/tasks/tools/task_search.py --include-archive --status Done
-python docs/tasks/tools/task_search.py --key CC-087 --include-archive
-```
+Use `memorysmith_task_list` with `query`, `status`, and `limit`. Fetch one task
+with `memorysmith_task_get` using its `TSK-####` key or stable id.
 
 ## Required fields
 
-`task_new.py` generates this frontmatter:
+MemorySmith task creation requires this contract:
 
-```yaml
-id: creature-task-001
-key: CC-001
-title: Short task title
-status: In Progress
-type: Task
-priority: P2
-tags: [runtime, sdf]
-dependsOn: []
-related: []
-links: []
+```text
+title, description, type, status, priority, labels, and source paths
 ```
 
 Use these body headings in this order:
@@ -120,5 +91,6 @@ Use these body headings in this order:
 ## Next Step
 ```
 
-Keep one canonical task record. Do not duplicate the same task across several
-trackers.
+Keep one canonical MemorySmith task. Preserve its source `CC-###` in labels
+and descriptions when it came from Markdown. The Markdown tools remain
+read-only compatibility tooling; do not use `task_new.py` for current work.

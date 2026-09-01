@@ -37,10 +37,21 @@ pwsh ./Scripts/Uninstall-CreatureWikiService.ps1
 | `Test-TaskRecords.ps1` | Validate `Data/Tasks/*.json` contract (ids, keys, statuses, priorities, duplicates, control characters). |
 | `Normalize-TaskRecords.ps1` | Repair id/key/format drift and strip priority labels. |
 | `Import-OpenTasksFromWorkbench.ps1` | Seed canonical records from `Open` rows in `Data/Pages/workbench/tasks.md`. |
+| `Import-CreatureTasksToMemorySmith.ps1` | Import active and archived `docs/tasks` tickets through the MemorySmith MCP task tools. |
 
-The mass-import phase (CC-093 follow-on) will add a script that pipes the
-existing `docs/tasks/tickets/*.md` records into the running service through
-its MCP/bridge task tools.
+Migration usage:
+
+```powershell
+pwsh ./Scripts/Import-CreatureTasksToMemorySmith.ps1 -DryRun
+$env:MEMORYSMITH_AUTH_COOKIE = '<authenticated browser Cookie header>'
+pwsh ./Scripts/Import-CreatureTasksToMemorySmith.ps1
+```
+
+The importer creates tasks through `memorysmith_task_create`. It preserves the
+CC key, source path, original status, priority, tags, and complete ticket body.
+MemorySmith allocates the `TSK-####` key. The importer stores the returned task
+ids in `.service/memorysmith-import-state.json` so interrupted runs can resume.
+The cookie is read from the environment and is never written to the repository.
 
 ## Conventions
 
