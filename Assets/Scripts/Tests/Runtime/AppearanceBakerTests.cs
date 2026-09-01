@@ -322,6 +322,65 @@ namespace ProceduralCreature.Tests.Runtime
         }
 
         [Test]
+        public void Bake_BurstResolve_MatchesManagedResolveExactly()
+        {
+            // A Body tube with a vertical-gradient appearance plus a sphere bump
+            // part that sticks out of the side, so the bake exercises BOTH the
+            // Body-gradient branch (body-surface vertices) and the part branch
+            // (bump vertices). The Burst resolve must produce bit-identical
+            // colors to the managed Resolver path.
+            var bounds = new BoundsDefinition { MaxX = 2f, MaxY = 2f, MaxZ = 2f };
+            var settings = new GenerationSettings { VoxelsPerUnit = 8f };
+            var definition = CreatureDefinition.CreateEmpty();
+            definition.Bounds = bounds;
+            definition.Generation = settings;
+            definition.Body.Samples.Add(new BodySample { Id = 1, Position = new Vector3(0f, 0f, -0.8f), Radius = 0.5f });
+            definition.Body.Samples.Add(new BodySample { Id = 2, Position = new Vector3(0f, 0f, 0f), Radius = 0.6f });
+            definition.Body.Samples.Add(new BodySample { Id = 3, Position = new Vector3(0f, 0f, 0.8f), Radius = 0.5f });
+            definition.Body.Appearance = BodyVerticalGradientAppearance.CreateDefault();
+            definition.Body.Appearance.TopGradient = GradientAdapter.Solid(Color.red);
+            definition.Body.Appearance.BottomGradient = GradientAdapter.Solid(Color.blue);
+            definition.AddPart(new CreaturePart
+            {
+                Id = "part_bump",
+                PartType = PartType.Part,
+                ParentId = CreatureDefinition.BodyId,
+                Transform = new TransformData { Position = new Vector3(0.8f, 0f, 0f), Rotation = Quaternion.identity, Scale = Vector3.one },
+                Shape = new ShapeDefinition { Type = ShapeType.Sphere, PrimarySize = 0.5f, SmoothBlendRadius = 0.2f },
+                Appearance = new AppearanceDefinition { BaseColor = Color.green, NoiseSeed = 3, NoiseScale = 2f },
+            });
+
+            MeshExtractionResult mesh;
+            using (SdfProgram program = SdfProgramBuilder.CompilePortable(definition))
+            using (DensityGrid grid = DensityGrid.SamplePortable(program, bounds, settings))
+            {
+                mesh = MarchingCubesExtractor.Extract(grid);
+            }
+
+            bool previous = AppearanceBaker.UseBurstResolve;
+            try
+            {
+                AppearanceBaker.UseBurstResolve = false;
+                Color[] managed = AppearanceBaker.Bake(definition, mesh);
+                AppearanceBaker.UseBurstResolve = true;
+                Color[] burst = AppearanceBaker.Bake(definition, mesh);
+
+                Assert.AreEqual(managed.Length, burst.Length);
+                for (int i = 0; i < managed.Length; i++)
+                {
+                    Assert.AreEqual(managed[i].r, burst[i].r, 0f, $"r at vertex {i}");
+                    Assert.AreEqual(managed[i].g, burst[i].g, 0f, $"g at vertex {i}");
+                    Assert.AreEqual(managed[i].b, burst[i].b, 0f, $"b at vertex {i}");
+                    Assert.AreEqual(managed[i].a, burst[i].a, 0f, $"a at vertex {i}");
+                }
+            }
+            finally
+            {
+                AppearanceBaker.UseBurstResolve = previous;
+            }
+        }
+
+        [Test]
         public void Bake_NullArguments_ThrowDomainException()
         {
             var mesh = new MeshExtractionResult();

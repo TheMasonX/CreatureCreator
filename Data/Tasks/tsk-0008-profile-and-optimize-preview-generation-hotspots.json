@@ -46,15 +46,21 @@
       "author": "anonymous",
       "body": "Slice B (region-aware FieldSampling root-AABB early exit) \u2014 VALIDATED 2026-09-01.\n\nChange: SdfSamplingJob now pre-fills \u002Binf for any corner outside the root op\u0027s inflated world AABB (RootHasBounds/RootMinBound/RootMaxBound passed from DensityGrid) and returns before the per-op loop. The containment test mirrors the evaluator\u0027s per-op culling test exactly, so outside-root corners (which the evaluator already culls to \u002Binf) are bit-identical; in-bounds corners run the normal path. RootHasBounds=false (standalone-primitive programs) never early-exits.\n\nRationale measured first: the dino has 252 ops and only 13.3% of grid corners lie inside the root\u0027s inflated AABB (86.7% outside), so the dominant per-corner O(ops) AABB scan is skipped for most of the grid.\n\nValidation:\n- dotnet build Runtime \u002B Tests.Runtime: 0 errors.\n- Unity compile: 0 errors / 0 warnings.\n- PlayMode (ProceduralCreature.Tests.Runtime): 421/421 passed (\u002B1 new SamplePortable_RegionAwareEarlyExit_MatchesReferenceEvaluator asserting every corner equals SdfProgramEvaluator.Evaluate bit-for-bit and \u003E50% of corners are \u002Binf).\n- get_errors clean; git diff --check clean; diff = \u002B85 insertions / 0 deletions (3 files).\n\nTiming (in-editor, dino_creature.json, avg of 3 runs after Burst warmup, new SamplePortable vs recorded editor baselines):\n- 96^3: 107.5 ms avg vs 507 ms baseline = ~4.7x faster\n- 112^3: 231.3 ms avg (best 185.5) vs 832.8 ms baseline = ~3.6x faster\nFieldSampling was 66-76% of TotalGeneration; this removes most of the empty-space cost.\n\nResidual: inside-root corners still pay the full op loop (per-op culling remains); a coarse occupancy grid or op-bucketing could cut further but adds complexity. Next largest target after this: AppearanceBake\u0027s always-evaluated Body program (per-vertex bottleneck) or precomputing the Body field into a coarse grid.",
       "createdAtUtc": "2026-09-01T19:45:06.0888315Z"
+    },
+    {
+      "id": "c-b9a129a8440f481bab9bae30ba915e57",
+      "author": "anonymous",
+      "body": "Slice D (Burst per-vertex appearance resolution) \u2014 VALIDATED 2026-09-01.\n\nChange: new AppearanceResolveBurst (Runtime/Appearance/AppearanceResolveBurst.cs) with two Burst jobs. PartSdfDistanceJob evaluates one compiled SDF program at every vertex (Fast culling, mirrors SdfSamplingJob batching/scratch) writing Abs(distance) into a per-program column (parts 0..N-1, Body column N, \u002Binf pre-filled = absent per CC-064). AppearanceMergeJob picks the nearest finite surface per vertex (strict \u003C for parts, non-strict \u003C= for Body, same as Resolver.Resolve) and outputs baseColor/seed/scale/bodyWins. AppearanceBaker.Bake routes through it by default (internal UseBurstResolve toggle, default true) and keeps the Body vertical gradient (Unity AnimationCurve/Gradient, must render authored data exactly) \u002B triplanar noise (~1%) in a managed tail.\n\nMeasured first: of a 107.5 ms bake @96^3 dino, SDF resolution = 104.6 ms (97%), triplanar noise = 1.0 ms (1%).\n\nValidation:\n- dotnet build Runtime \u002B Tests.Runtime: 0 errors.\n- Unity compile: 0 errors / 0 warnings.\n- PlayMode (ProceduralCreature.Tests.Runtime): 422/422 (\u002B1 Bake_BurstResolve_MatchesManagedResolveExactly asserting bit-for-bit color equality between Burst and managed paths on a body-with-gradient \u002B protruding-bump-part fixture, exercising both branches).\n- get_errors clean; git diff --check clean.\n\nTiming (in-editor, dino 96^3, 5,155 verts, avg of 5 after warmup):\n- Managed resolver bake: ~107.5 ms baseline\n- Burst resolve bake: 33.6 ms avg (best 33.1) = ~3.2x faster\nResidual: the Body vertical gradient still runs managed per vertex (~10 ms of the 33.6 ms); Burst-ing it would need replacing Unity AnimationCurve/Gradient evaluation (changes authored rendering, deliberately not done). Also N\u002B1 job dispatches (one per program \u002B merge) \u2014 fine for typical part counts, a flattened single-job variant could scale to many-part creatures.",
+      "createdAtUtc": "2026-09-01T19:55:11.2246608Z"
     }
   ],
   "epicId": null,
   "parentId": null,
   "dueDateUtc": null,
   "createdAtUtc": "2026-09-01T03:16:25.5654277Z",
-  "updatedAtUtc": "2026-09-01T19:45:06.0888315Z",
+  "updatedAtUtc": "2026-09-01T19:55:11.2246608Z",
   "completedAtUtc": null,
-  "revision": 5,
+  "revision": 6,
   "isArchived": false,
   "hasLoadError": false,
   "loadError": null,

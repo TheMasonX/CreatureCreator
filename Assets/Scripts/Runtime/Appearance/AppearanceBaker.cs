@@ -1,5 +1,7 @@
 using System.Collections.Generic;
 using UnityEngine;
+using Unity.Collections;
+using Unity.Mathematics;
 using ProceduralCreature.Common;
 using ProceduralCreature.Definition;
 using ProceduralCreature.Generation;
@@ -27,6 +29,15 @@ namespace ProceduralCreature.Appearance
         /// </summary>
         private const float BrightnessVariation = 0.15f;
 
+        /// <summary>
+        /// Slice D: route the per-vertex appearance resolution through the Burst
+        /// jobs in <see cref="AppearanceResolveBurst"/> (bit-identical to the
+        /// managed <see cref="PartAppearanceSampler.Resolver"/>; the Body
+        /// vertical gradient and triplanar noise still run managed). Internal so
+        /// parity tests can force the managed path and compare exactly.
+        /// </summary>
+        internal static bool UseBurstResolve = true;
+
         public static Color[] Bake(CreatureDefinition definition, MeshExtractionResult mesh)
         {
             return Bake(definition, mesh, null);
@@ -49,12 +60,19 @@ namespace ProceduralCreature.Appearance
                 }
 
                 colors = new Color[mesh.Positions.Count];
-                using (PartAppearanceSampler.Resolver resolver = PartAppearanceSampler.CreateResolver(definition))
+                if (UseBurstResolve)
                 {
-                    for (int i = 0; i < mesh.Positions.Count; i++)
+                    BakeBurst(definition, mesh, colors);
+                }
+                else
+                {
+                    using (PartAppearanceSampler.Resolver resolver = PartAppearanceSampler.CreateResolver(definition))
                     {
-                        ResolvedAppearance appearance = resolver.Resolve(mesh.Positions[i]);
-                        colors[i] = BakeVertexColor(mesh.Positions[i], mesh.Normals[i], appearance.BaseColor, appearance.NoiseSeed, appearance.NoiseScale);
+                        for (int i = 0; i < mesh.Positions.Count; i++)
+                        {
+                            ResolvedAppearance appearance = resolver.Resolve(mesh.Positions[i]);
+                            colors[i] = BakeVertexColor(mesh.Positions[i], mesh.Normals[i], appearance.BaseColor, appearance.NoiseSeed, appearance.NoiseScale);
+                        }
                     }
                 }
             }
@@ -69,6 +87,89 @@ namespace ProceduralCreature.Appearance
             }
 
             return colors;
+        }
+
+        /// <summary>
+        /// Slice D Burst path: evaluates the nearest-part/Body SDF decision for
+        /// every vertex in Burst, then applies the Body vertical gradient (only
+        /// for Body-owned vertices) and triplanar noise in managed code. The
+        /// final colors are bit-identical to the managed resolver path.
+        /// </summary>
+        private static void BakeBurst(CreatureDefinition definition, MeshExtractionResult mesh, Color[] colors)
+        {
+            var compiledParts = SdfProgramBuilder.CompileIndividualPartsPortable(definition);
+            SdfProgram bodyProgram = SdfProgramBuilder.CompilePortableBodyField(definition);
+            try
+            {
+                int programCount = compiledParts.Count + 1;
+                int maxOps = 1;
+                foreach ((CreaturePart part, SdfProgram program) in compiledParts)
+                {
+                    maxOps = Mathf.Max(maxOps, program.Operations.IsCreated ? program.Operations.Length : 1);
+                }
+                if (bodyProgram != null && bodyProgram.Operations.IsCreated)
+                {
+                    maxOps = Mathf.Max(maxOps, bodyProgram.Operations.Length);
+                }
+
+                int vertexCount = mesh.Positions.Count;
+                long distanceCount = (long)vertexCount * programCount;
+                if (distanceCount > int.MaxValue)
+                {
+                    throw new DomainException("Appearance bake distance matrix exceeds addressable array size.");
+                }
+                var vertices = new NativeArray<float3>(vertexCount, Allocator.TempJob);
+                var distances = new NativeArray<float>((int)distanceCount, Allocator.TempJob);
+                var outBase = new NativeArray<float4>(vertexCount, Allocator.TempJob);
+                var outSeed = new NativeArray<int>(vertexCount, Allocator.TempJob);
+                var outScale = new NativeArray<float>(vertexCount, Allocator.TempJob);
+                var outBody = new NativeArray<bool>(vertexCount, Allocator.TempJob);
+                try
+                {
+                    for (int i = 0; i < vertexCount; i++)
+                    {
+                        vertices[i] = new float3(mesh.Positions[i].x, mesh.Positions[i].y, mesh.Positions[i].z);
+                    }
+
+                    AppearanceResolveBurst.ResolveAll(
+                        compiledParts, bodyProgram, vertices, programCount, maxOps,
+                        distances, outBase, outSeed, outScale, outBody);
+
+                    for (int i = 0; i < vertexCount; i++)
+                    {
+                        if (outBody[i])
+                        {
+                            Color bodyColor = BodyVerticalGradientSampler.EvaluateColor(definition, mesh.Positions[i]);
+                            colors[i] = BakeVertexColor(mesh.Positions[i], mesh.Normals[i], bodyColor, 0, 1f);
+                        }
+                        else
+                        {
+                            var baseColor = new Color(outBase[i].x, outBase[i].y, outBase[i].z, outBase[i].w);
+                            colors[i] = BakeVertexColor(mesh.Positions[i], mesh.Normals[i], baseColor, outSeed[i], outScale[i]);
+                        }
+                    }
+                }
+                finally
+                {
+                    vertices.Dispose();
+                    distances.Dispose();
+                    outBase.Dispose();
+                    outSeed.Dispose();
+                    outScale.Dispose();
+                    outBody.Dispose();
+                }
+            }
+            finally
+            {
+                foreach ((CreaturePart part, SdfProgram program) in compiledParts)
+                {
+                    program.Dispose();
+                }
+                if (bodyProgram != null)
+                {
+                    bodyProgram.Dispose();
+                }
+            }
         }
 
         /// <summary>
