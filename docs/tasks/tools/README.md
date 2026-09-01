@@ -1,4 +1,8 @@
-# Task Tools
+# Historical Task Tools
+
+These scripts are compatibility tooling for the frozen Markdown task history.
+They are not the active task tracker. Create, update, transition, and archive
+current work through the `MemorySmith.CreatureCreator` MCP server.
 
 Scripts that keep the CreatureCreator task records consistent. They are
 stdlib-only Python 3 and run from any working directory. The task system
@@ -67,7 +71,7 @@ must be an archived status (`Done`, `Superseded`, `Cancelled`, `Archived`).
 Without `--status` the ticket must already carry an archived status. Use
 `--dry-run` first to review the plan.
 
-### New ticket
+### New ticket (deprecated)
 
 ```text
 python docs/tasks/tools/task_new.py --title "..." [--type Task] [--priority P2] [--status Backlog] [--tags a,b] [--depends-on CC-###] [--related CC-###] [--dry-run]
@@ -75,6 +79,9 @@ python docs/tasks/tools/task_new.py --title "..." [--type Task] [--priority P2] 
 
 Picks the next unused `CC-###`, writes a ticket with the canonical frontmatter
 and headings, and adds a row to `active-tasks.md`.
+
+Do not use this command for current work. It is retained for historical repair
+and migration maintenance only.
 
 ## PowerShell dispatcher
 
@@ -87,10 +94,10 @@ and headings, and adds a row to `active-tasks.md`.
 ./docs/tasks/tools/taskctl.ps1 archive CC-091 --status Done --reason "Unity tests passed"
 ```
 
-## Suggested workflow
+## Historical maintenance workflow
 
-1. Create a ticket with `task_new.py`.
-2. Work the ticket and record evidence under its body headings.
-3. When the work is complete, superseded, or cancelled, archive it with
+1. Search or validate the frozen Markdown history.
+2. If a historical correction is required, record why it is needed.
+3. When a historical record must be moved, archive it with
    `task_archive.py --status <archived-status> --reason "..."`.
 4. Run `task_validate.py` after any manual edit or batch move.

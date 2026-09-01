@@ -1,15 +1,19 @@
-# Task System
+# Historical Task System
 
-CreatureCreator tracks every piece of work in one durable markdown record
-per task (a "ticket"). Tickets have a stable `CC-###` key, YAML frontmatter,
-and a fixed body structure. This directory is the single source of truth for
-task state; the tools in `docs/tasks/tools/` keep it consistent.
+> Deprecated for new work. MemorySmith is the active task system. The records
+> in this directory are frozen CC history and migration source.
+
+CreatureCreator originally tracked every piece of work in one durable Markdown
+record per task. Tickets have a stable `CC-###` key, YAML frontmatter, and a
+fixed body structure. The records remain for history, provenance, and
+compatibility validation. Active task state now lives in MemorySmith as
+`TSK-####` records.
 
 ## Layout
 
 | Path | Contents |
 | --- | --- |
-| `active-tasks.md` | Live index of active tickets. |
+| `active-tasks.md` | Frozen index of the imported source tickets. |
 | `tickets/` | Active ticket files, one per `CC-###`. |
 | `archive/` | Archived ticket files plus `archive/README.md` (index + changelog). |
 | `handoffs/` | Handoff notes between work sessions. |
@@ -17,7 +21,7 @@ task state; the tools in `docs/tasks/tools/` keep it consistent.
 
 `docs/tasks/tools/README.md` documents the tools in full.
 
-## Status lifecycle
+## Historical Status Lifecycle
 
 Active statuses live in `tickets/`:
 
@@ -41,7 +45,7 @@ A ticket moves to the archive when its work is complete, replaced, or
 cancelled. Do this with `task_archive.py`, never by hand, so the active index
 and archive changelog stay consistent.
 
-## Tools
+## Compatibility Tools
 
 Quick reference (full usage in `docs/tasks/tools/README.md`):
 
@@ -54,7 +58,7 @@ python docs/tasks/tools/task_archive.py CC-091 --status Done --reason "..."
 ./docs/tasks/tools/taskctl.ps1 search --include-archive --key CC-087
 ```
 
-## Rules
+## Historical Rules
 
 - One ticket per key. Never reuse a `CC-###`.
 - Create tickets with `task_new.py` so keys, frontmatter, and headings stay
@@ -68,3 +72,7 @@ python docs/tasks/tools/task_archive.py CC-091 --status Done --reason "..."
 - Historical audits may reference the old `docs/tasks/tickets/` path for
   archived keys. Use `task_search.py --include-archive --key <key>` to find the
   current path.
+
+Do not create new Markdown tickets. For current work, use the
+`MemorySmith.CreatureCreator` MCP server and the `memorysmith_task_*` tools.
+Use the imported task's `CC-###` label when tracing historical evidence.

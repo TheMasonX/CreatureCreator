@@ -12,14 +12,14 @@ as a local Windows service that serves this repo's `Data/` folder as a live
 knowledge store. Deployment scripts are copied and adapted from `CMST-341`,
 `MemorySmith.Agent`, and `NuggetCo`, which deploy the same engine.
 
-Adoption is phased. Phase one (CC-093) prepares the infrastructure only:
+Adoption was phased. Phase one (CC-093) prepared the infrastructure:
 the `Data/` structure, the deployment and validation scripts, the service
 port file, CI validation, and this ADR. No `TSK-####` JSON task record is
 created until the user verifies the service works. Phase two (follow-on
 tickets) performs the mass import of the existing `docs/tasks/` markdown
-tickets (CC-###) into the service through its MCP/bridge task tools, then
-repoints the `task-tracker` skill and BeastMaster mode instructions at the
-JSON tracker.
+records into the service through its MCP/bridge task tools. The migration is
+complete. The `task-tracker` skill and BeastMaster mode instructions now point
+to MemorySmith, while Markdown records remain frozen history.
 
 ## Context
 
@@ -33,8 +33,9 @@ JSON tracker.
   serves its `Data/` as a wiki for architecture docs, plans, reviews, and
   tasks. Its `Deploy-CodebaseWiki.ps1` is the reference for the deploy
   lifecycle.
-- Until the service is verified, the markdown system remains the single
-  source of truth for task state.
+- Until the service was verified, the Markdown system remained the single
+  source of truth for task state. After migration, MemorySmith is authoritative
+  for active task state.
 
 ## Consequences
 
@@ -49,10 +50,8 @@ JSON tracker.
   engine repo.
 - CI validates both the markdown system and the JSON task records until the
   migration is complete.
-- Until the mass import runs, there are two task stores: `docs/tasks/`
-  (active, CC-###) and `Data/Tasks/` (empty, TSK-####). CC-093 explicitly
-  forbids creating JSON records before the service is verified.
-- The migration piping plan is captured in CC-093; a new script will read
-  `docs/tasks/tickets/*.md` and push records through the service's MCP/bridge
-  task tools, preserving key, title, status, priority, tags, and body
-  headings.
+- There are two stores with different roles: `Data/Tasks/` is the active
+  MemorySmith store, and `docs/tasks/` is frozen CC history.
+- The migration read active and archived Markdown tickets and pushed them
+  through the service's MCP task tools, preserving source keys, titles,
+  statuses, priorities, labels, and body headings.

@@ -13,10 +13,10 @@ workbench at `/tasks`.
 
 ## Status
 
-This directory is intentionally empty until the MemorySmith wiki service is
-deployed and verified (see `docs/tasks/tickets/CC-093*`). The existing
-markdown tickets under `docs/tasks/` remain the active tracker until the mass
-import phase is complete.
+This directory contains the imported MemorySmith task records. The local wiki
+service serves them through `/tasks`, and the workspace MCP server exposes the
+same records through `memorysmith_task_*` tools. The Markdown tickets under
+`docs/tasks/` are frozen historical source after the completed migration.
 
 ## Record contract
 
@@ -53,3 +53,11 @@ Rules:
 - `Scripts/Normalize-TaskRecords.ps1` — repair id/key/label drift.
 - `Scripts/Import-OpenTasksFromWorkbench.ps1` — seed records from
   `Data/Pages/workbench/tasks.md` open rows.
+- `Scripts/Import-CreatureTasksToMemorySmith.ps1` — migration bridge used to
+  import the Markdown source through the MemorySmith MCP task API.
+
+## Active Workflow
+
+Create and update tasks through MemorySmith MCP. Do not edit imported JSON
+records by hand while the service is running. Preserve source CC keys in
+labels and descriptions when adding related work.

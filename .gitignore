@@ -135,3 +135,6 @@ Data/Events/
 
 # Published MemorySmith engine output
 artifacts/
+
+# Local MCP client configuration may contain an access credential
+/.vscode/mcp.json

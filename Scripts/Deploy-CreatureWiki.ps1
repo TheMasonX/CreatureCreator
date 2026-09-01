@@ -55,6 +55,8 @@ param(
   [string]$Configuration = "Release",
   [string]$ServiceName = "MemorySmith - CreatureCreator Wiki",
   [string]$ServiceDisplayName = "MemorySmith - CreatureCreator Wiki",
+  [string]$InstanceName = "CreatureCreator Wiki",
+  [string]$ShortLabel = "Creature Wiki",
   [switch]$NoBuild
 )
 
@@ -219,6 +221,8 @@ Write-Host "Installing Windows service '$ServiceName' on port $chosenPort..."
   --memory-directory $memoryDir `
   --port $chosenPort `
   -- `
+  --MemorySmith:InstanceName $InstanceName `
+  --MemorySmith:Branding:ShortLabel $ShortLabel `
   --MemorySmith:DataProtectionKeysPath $keysPath `
   --MemorySmith:AllowedFileRoots:0 $repoRoot `
   --MemorySmith:AllowedFileRoots:1 $pagesPath `
