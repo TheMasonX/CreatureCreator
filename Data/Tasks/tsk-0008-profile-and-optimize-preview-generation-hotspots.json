@@ -40,15 +40,21 @@
       "author": "anonymous",
       "body": "Slice C (appearance Resolver AABB broad-phase) \u2014 VALIDATED 2026-09-01.\n\nChange: PartAppearanceSampler.Resolver now precomputes each part\u0027s world AABB \u002B Cullable flag from its compiled SdfProgram root op (data already produced by the CC-062 builder), and Resolve skips a part provably farther than the closest found so far (a Cullable part\u0027s SDF is bounded below by distance to its AABB, so skipping is bit-identical). Internal EnableBroadPhase test hook (default true) compares the broad-phase path against the unconditional reference. No pipeline or determinism changes; appearance output is unchanged.\n\nValidation:\n- dotnet build clean; Unity compile 0 errors/0 warnings.\n- PlayMode ProceduralCreature.Tests.Runtime 420/420 (was 417; \u002B3 new: far-part-skip, overlapping-AABB nearer-pick, and broad-phase-vs-reference across a point grid incl. active Body field).\n- get_errors clean; git diff --check clean.\n\nTiming (in-editor, dino_creature.json at 96^3 = 10,306 tris / 5,155 verts, the exact recorded-baseline fixture):\n- AppearanceBaker.Bake 5-run: min 111.9 / median 112.4 / avg 112.7 ms vs recorded baseline 111.9 ms -\u003E NEUTRAL (~0%).\n\nRoot cause of neutrality: the dino has 6 parts; per-vertex appearance cost is dominated by the always-evaluated Body program (62 ops) plus the two large limb programs (65 and 107 ops) whose AABBs contain body-surface vertices, so the broad phase skips only the small far parts. The broad phase helps creatures with many spatially-separated parts, not this fixture.\n\nResidual risk / next: the real appearance lever is Burst-ing the per-vertex bake or precomputing the Body field into a coarse grid; FieldSampling (region-aware sparse sampling) remains the biggest absolute target (~507 ms at 96^3).",
       "createdAtUtc": "2026-09-01T13:58:41.4882603Z"
+    },
+    {
+      "id": "c-fef372609f034337882f04cadba72c41",
+      "author": "anonymous",
+      "body": "Slice B (region-aware FieldSampling root-AABB early exit) \u2014 VALIDATED 2026-09-01.\n\nChange: SdfSamplingJob now pre-fills \u002Binf for any corner outside the root op\u0027s inflated world AABB (RootHasBounds/RootMinBound/RootMaxBound passed from DensityGrid) and returns before the per-op loop. The containment test mirrors the evaluator\u0027s per-op culling test exactly, so outside-root corners (which the evaluator already culls to \u002Binf) are bit-identical; in-bounds corners run the normal path. RootHasBounds=false (standalone-primitive programs) never early-exits.\n\nRationale measured first: the dino has 252 ops and only 13.3% of grid corners lie inside the root\u0027s inflated AABB (86.7% outside), so the dominant per-corner O(ops) AABB scan is skipped for most of the grid.\n\nValidation:\n- dotnet build Runtime \u002B Tests.Runtime: 0 errors.\n- Unity compile: 0 errors / 0 warnings.\n- PlayMode (ProceduralCreature.Tests.Runtime): 421/421 passed (\u002B1 new SamplePortable_RegionAwareEarlyExit_MatchesReferenceEvaluator asserting every corner equals SdfProgramEvaluator.Evaluate bit-for-bit and \u003E50% of corners are \u002Binf).\n- get_errors clean; git diff --check clean; diff = \u002B85 insertions / 0 deletions (3 files).\n\nTiming (in-editor, dino_creature.json, avg of 3 runs after Burst warmup, new SamplePortable vs recorded editor baselines):\n- 96^3: 107.5 ms avg vs 507 ms baseline = ~4.7x faster\n- 112^3: 231.3 ms avg (best 185.5) vs 832.8 ms baseline = ~3.6x faster\nFieldSampling was 66-76% of TotalGeneration; this removes most of the empty-space cost.\n\nResidual: inside-root corners still pay the full op loop (per-op culling remains); a coarse occupancy grid or op-bucketing could cut further but adds complexity. Next largest target after this: AppearanceBake\u0027s always-evaluated Body program (per-vertex bottleneck) or precomputing the Body field into a coarse grid.",
+      "createdAtUtc": "2026-09-01T19:45:06.0888315Z"
     }
   ],
   "epicId": null,
   "parentId": null,
   "dueDateUtc": null,
   "createdAtUtc": "2026-09-01T03:16:25.5654277Z",
-  "updatedAtUtc": "2026-09-01T13:58:41.4882603Z",
+  "updatedAtUtc": "2026-09-01T19:45:06.0888315Z",
   "completedAtUtc": null,
-  "revision": 4,
+  "revision": 5,
   "isArchived": false,
   "hasLoadError": false,
   "loadError": null,

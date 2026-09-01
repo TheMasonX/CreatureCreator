@@ -289,6 +289,20 @@ namespace ProceduralCreature.Morphology.Sdf
         public int SampleStartIndex;
         public float InfluenceRadius;
 
+        /// <summary>
+        /// Slice B region-aware early exit. The root op's world AABB (inflated by
+        /// <see cref="InfluenceRadius"/>) is the only region where the field can be
+        /// finite: a corner outside it makes the evaluator cull the root (CC-063),
+        /// so the result is always +inf. Pre-fill it and skip the whole per-op
+        /// loop. The containment test mirrors the evaluator's per-op test exactly,
+        /// so the field is bit-identical; in-bounds corners run the normal path.
+        /// <c>RootHasBounds</c> is false for standalone-primitive programs whose
+        /// root has no compiled AABB (they never early-exit).
+        /// </summary>
+        public bool RootHasBounds;
+        public float3 RootMinBound;
+        public float3 RootMaxBound;
+
         public void Execute(int index)
         {
             int sampleIndex = SampleStartIndex + index;
@@ -296,6 +310,16 @@ namespace ProceduralCreature.Morphology.Sdf
             int y = (sampleIndex / CornersX) % CornersY;
             int z = sampleIndex / (CornersX * CornersY);
             float3 point = Origin + new float3(x, y, z) * CellSize;
+
+            if (RootHasBounds &&
+                (point.x < RootMinBound.x - InfluenceRadius || point.x > RootMaxBound.x + InfluenceRadius ||
+                 point.y < RootMinBound.y - InfluenceRadius || point.y > RootMaxBound.y + InfluenceRadius ||
+                 point.z < RootMinBound.z - InfluenceRadius || point.z > RootMaxBound.z + InfluenceRadius))
+            {
+                Samples[sampleIndex] = float.PositiveInfinity;
+                return;
+            }
+
             int valueOffset = index * Operations.Length;
             Samples[sampleIndex] = SdfProgramEvaluator.EvaluateInto(
                 Operations, RootIndex, point, ScratchValues, valueOffset, InfluenceRadius, allowCulling: true);

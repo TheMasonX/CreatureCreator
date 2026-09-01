@@ -133,6 +133,18 @@ namespace ProceduralCreature.Morphology.Extraction
                     throw new DomainException("Portable program root index must identify an operation.");
                 }
 
+                // Slice B region-aware sampling: the root op's world AABB (inflated
+                // by InfluenceRadius inside the job) is the only region where the
+                // field can be finite. The job pre-fills +inf for corners outside it
+                // and skips the per-op loop, which is the bulk of the grid for a
+                // creature whose geometry is much smaller than its bounds.
+                SdfOperation rootOp = program.Operations[program.RootIndex];
+                bool rootHasBounds = rootOp.MinBound.x <= rootOp.MaxBound.x
+                    && rootOp.MinBound.y <= rootOp.MaxBound.y
+                    && rootOp.MinBound.z <= rootOp.MaxBound.z;
+                float3 rootMin = rootHasBounds ? rootOp.MinBound : new float3(0f);
+                float3 rootMax = rootHasBounds ? rootOp.MaxBound : new float3(0f);
+
                 for (int sampleStart = 0; sampleStart < (int)cornerCountLong; sampleStart += batchSize)
                 {
                     int sampleCount = Mathf.Min(batchSize, (int)cornerCountLong - sampleStart);
@@ -149,6 +161,9 @@ namespace ProceduralCreature.Morphology.Extraction
                         CellSize = cellSize,
                         SampleStartIndex = sampleStart,
                         InfluenceRadius = program.InfluenceRadius,
+                        RootHasBounds = rootHasBounds,
+                        RootMinBound = rootMin,
+                        RootMaxBound = rootMax,
                     };
                     JobHandle handle = job.Schedule(sampleCount, 64);
                     handle.Complete();

@@ -139,5 +139,51 @@ namespace ProceduralCreature.Tests.Runtime
                 }
             }
         }
+
+        [Test]
+        public void SamplePortable_RegionAwareEarlyExit_MatchesReferenceEvaluator()
+        {
+            // A small centered sphere in a large grid: most corners lie outside the
+            // root op's inflated AABB and must be pre-filled +inf; the rest must
+            // match the culling evaluator bit-for-bit (the Slice B early exit is
+            // transparent). Both paths are the same Fast (CC-063) semantics.
+            var definition = CreatureDefinition.CreateEmpty();
+            definition.Bounds = new BoundsDefinition { MaxX = 2f, MaxY = 2f, MaxZ = 2f };
+            definition.Generation = new GenerationSettings { VoxelsPerUnit = 8f };
+            definition.AddPart(new CreaturePart
+            {
+                Id = "sphere",
+                PartType = PartType.Body,
+                Transform = TransformData.Identity,
+                Shape = new ShapeDefinition { Type = ShapeType.Sphere, PrimarySize = 0.5f, SmoothBlendRadius = 0f },
+                Appearance = AppearanceDefinition.Default,
+            });
+
+            using (SdfProgram program = SdfProgramBuilder.CompilePortable(definition))
+            using (DensityGrid grid = DensityGrid.SamplePortable(program, definition.Bounds, definition.Generation))
+            {
+                var root = program.Operations[program.RootIndex];
+                Assert.IsTrue(
+                    root.MinBound.x <= root.MaxBound.x && root.MinBound.y <= root.MaxBound.y && root.MinBound.z <= root.MaxBound.z,
+                    "fixture root op must carry compiled world bounds");
+
+                int total = 0;
+                int outside = 0;
+                for (int z = 0; z <= grid.CellsZ; z++)
+                for (int y = 0; y <= grid.CellsY; y++)
+                for (int x = 0; x <= grid.CellsX; x++)
+                {
+                    total++;
+                    Vector3 point = grid.CornerPosition(x, y, z);
+                    float sample = grid.GetSample(x, y, z);
+                    float reference = SdfProgramEvaluator.Evaluate(
+                        program, new Unity.Mathematics.float3(point.x, point.y, point.z));
+                    Assert.AreEqual(reference, sample, 0f, $"sample mismatch at ({x},{y},{z}).");
+                    if (float.IsPositiveInfinity(sample)) outside++;
+                }
+
+                Assert.Greater(outside, total / 2, "most corners should be pre-filled +inf outside the root AABB.");
+            }
+        }
     }
 }
