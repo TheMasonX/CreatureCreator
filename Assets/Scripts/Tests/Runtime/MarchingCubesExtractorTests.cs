@@ -14,8 +14,11 @@ namespace ProceduralCreature.Tests.Runtime
             var bounds = new BoundsDefinition { MaxX = 1.5f, MaxY = 1.5f, MaxZ = 1.5f };
             var settings = new GenerationSettings { VoxelsPerUnit = 6f };
 
-            DensityGrid grid = DensityGrid.SamplePortable(SdfProgramBuilder.CompilePortable(SphereDefinition(1f)), bounds, settings);
-            MeshExtractionResult mesh = MarchingCubesExtractor.Extract(grid);
+            MeshExtractionResult mesh;
+            using (DensityGrid grid = DensityGrid.SamplePortable(SdfProgramBuilder.CompilePortable(SphereDefinition(1f)), bounds, settings))
+            {
+                mesh = MarchingCubesExtractor.Extract(grid);
+            }
 
             Assert.Greater(mesh.TriangleCount, 0, "Sphere should produce a non-empty mesh at this resolution.");
 
@@ -38,8 +41,11 @@ namespace ProceduralCreature.Tests.Runtime
             definition.AddPart(new CreaturePart { Id = "sphere_b", Transform = new TransformData { Position = UnityEngine.Vector3.right,
                 Rotation = UnityEngine.Quaternion.identity, Scale = UnityEngine.Vector3.one }, Shape = new ShapeDefinition { Type = ShapeType.Sphere,
                 PrimarySize = 1f, SmoothBlendRadius = 0.3f }, Appearance = AppearanceDefinition.Default });
-            DensityGrid grid = DensityGrid.SamplePortable(SdfProgramBuilder.CompilePortable(definition), bounds, settings);
-            MeshExtractionResult mesh = MarchingCubesExtractor.Extract(grid);
+            MeshExtractionResult mesh;
+            using (DensityGrid grid = DensityGrid.SamplePortable(SdfProgramBuilder.CompilePortable(definition), bounds, settings))
+            {
+                mesh = MarchingCubesExtractor.Extract(grid);
+            }
 
             MeshTopologyReport report = MeshTopologyValidator.Validate(mesh);
             Assert.IsTrue(report.IsWatertight,
@@ -56,8 +62,11 @@ namespace ProceduralCreature.Tests.Runtime
             // Sphere radius 0.1 centered at origin, sampled well within bounds --
             // The empty portable program produces zero triangles, which is the
             // true "nothing here" case.
-            DensityGrid grid = DensityGrid.SamplePortable(SdfProgramBuilder.CompilePortable(CreatureDefinition.CreateEmpty()), bounds, settings);
-            MeshExtractionResult mesh = MarchingCubesExtractor.Extract(grid);
+            MeshExtractionResult mesh;
+            using (DensityGrid grid = DensityGrid.SamplePortable(SdfProgramBuilder.CompilePortable(CreatureDefinition.CreateEmpty()), bounds, settings))
+            {
+                mesh = MarchingCubesExtractor.Extract(grid);
+            }
 
             Assert.AreEqual(0, mesh.TriangleCount);
         }
@@ -68,8 +77,11 @@ namespace ProceduralCreature.Tests.Runtime
             var bounds = new BoundsDefinition { MaxX = 1.5f, MaxY = 1.5f, MaxZ = 1.5f };
             var settings = new GenerationSettings { VoxelsPerUnit = 6f };
 
-            DensityGrid grid = DensityGrid.SamplePortable(SdfProgramBuilder.CompilePortable(SphereDefinition(1f)), bounds, settings);
-            MeshExtractionResult mesh = MarchingCubesExtractor.Extract(grid);
+            MeshExtractionResult mesh;
+            using (DensityGrid grid = DensityGrid.SamplePortable(SdfProgramBuilder.CompilePortable(SphereDefinition(1f)), bounds, settings))
+            {
+                mesh = MarchingCubesExtractor.Extract(grid);
+            }
 
             // A welded 2-manifold closed mesh satisfies Euler's formula
             // V - E + F = 2 (genus 0). Cross-check vertex count against triangle

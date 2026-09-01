@@ -76,16 +76,31 @@ namespace ProceduralCreature.Generation
             diagnostics?.RecordGridDimensions(grid.CellsX, grid.CellsY, grid.CellsZ, grid.SampleCount);
 
             MeshExtractionResult meshResult = null;
-            Time(diagnostics, GenerationStage.MeshExtraction,
-                () => meshResult = MarchingCubesExtractor.Extract(
-                    grid, diagnostics?.CollectTimings == true));
-            diagnostics?.RecordExtractionStatistics(
-                meshResult.MixedCellCount, meshResult.GradientEvaluationCount);
-            diagnostics?.RecordExtractionTiming(
-                meshResult.ActiveCellConstructionTime,
-                meshResult.ContourResolutionTime,
-                meshResult.VertexWeldingTime,
-                meshResult.TriangleEmissionTime);
+            try
+            {
+                Time(diagnostics, GenerationStage.MeshExtraction,
+                    () => meshResult = MarchingCubesExtractor.Extract(
+                        grid, diagnostics?.CollectTimings == true));
+                diagnostics?.RecordExtractionStatistics(
+                    meshResult.MixedCellCount, meshResult.GradientEvaluationCount);
+                diagnostics?.RecordExtractionTiming(
+                    meshResult.ActiveCellConstructionTime,
+                    meshResult.ContourResolutionTime,
+                    meshResult.VertexWeldingTime,
+                    meshResult.TriangleEmissionTime);
+            }
+            finally
+            {
+                // The grid's native sample buffer is no longer needed after
+                // extraction (validation, appearance, and assembly consume the
+                // plain-data MeshExtractionResult). Release it even when
+                // extraction throws so the Persistent allocation cannot leak.
+                if (grid != null)
+                {
+                    grid.Dispose();
+                    grid = null;
+                }
+            }
 
             MeshTopologyReport generatedTopologyReport = null;
             Time(diagnostics, GenerationStage.MeshValidation,

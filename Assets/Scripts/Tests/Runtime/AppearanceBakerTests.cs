@@ -202,12 +202,12 @@ namespace ProceduralCreature.Tests.Runtime
             var samplingDefinition = CreatureDefinition.CreateEmpty();
             samplingDefinition.AddPart(new CreaturePart { Id = "sphere_geometry", PartType = PartType.Body, Transform = TransformData.Identity,
                 Shape = new ShapeDefinition { Type = ShapeType.Sphere, PrimarySize = 1f, SmoothBlendRadius = 0f }, Appearance = AppearanceDefinition.Default });
-            DensityGrid grid;
+            MeshExtractionResult mesh;
             using (SdfProgram program = SdfProgramBuilder.CompilePortable(samplingDefinition))
+            using (DensityGrid grid = DensityGrid.SamplePortable(program, bounds, settings))
             {
-                grid = DensityGrid.SamplePortable(program, bounds, settings);
+                mesh = MarchingCubesExtractor.Extract(grid);
             }
-            MeshExtractionResult mesh = MarchingCubesExtractor.Extract(grid);
 
             var definition = CreatureDefinition.CreateEmpty();
             definition.AddPart(new CreaturePart
@@ -231,12 +231,12 @@ namespace ProceduralCreature.Tests.Runtime
             var samplingDefinition = CreatureDefinition.CreateEmpty();
             samplingDefinition.AddPart(new CreaturePart { Id = "sphere_geometry", PartType = PartType.Body, Transform = TransformData.Identity,
                 Shape = new ShapeDefinition { Type = ShapeType.Sphere, PrimarySize = 1f, SmoothBlendRadius = 0f }, Appearance = AppearanceDefinition.Default });
-            DensityGrid grid;
+            MeshExtractionResult mesh;
             using (SdfProgram program = SdfProgramBuilder.CompilePortable(samplingDefinition))
+            using (DensityGrid grid = DensityGrid.SamplePortable(program, bounds, settings))
             {
-                grid = DensityGrid.SamplePortable(program, bounds, settings);
+                mesh = MarchingCubesExtractor.Extract(grid);
             }
-            MeshExtractionResult mesh = MarchingCubesExtractor.Extract(grid);
 
             var definition = CreatureDefinition.CreateEmpty();
             definition.AddPart(new CreaturePart

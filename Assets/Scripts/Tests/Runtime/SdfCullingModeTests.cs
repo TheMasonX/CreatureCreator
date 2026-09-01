@@ -41,9 +41,9 @@ namespace ProceduralCreature.Tests.Runtime
             var definition = DefinitionWithBodyAndPart();
             definition.Generation = new GenerationSettings { VoxelsPerUnit = 3f }; // coarse, prone to the old +inf NaN
             using (SdfProgram program = SdfProgramBuilder.CompilePortable(definition))
+            using (DensityGrid grid = DensityGrid.SamplePortable(
+                program, definition.Bounds, definition.Generation))
             {
-                DensityGrid grid = DensityGrid.SamplePortable(
-                    program, definition.Bounds, definition.Generation);
                 for (int z = 0; z <= grid.CellsZ; z++)
                 for (int y = 0; y <= grid.CellsY; y++)
                 for (int x = 0; x <= grid.CellsX; x++)

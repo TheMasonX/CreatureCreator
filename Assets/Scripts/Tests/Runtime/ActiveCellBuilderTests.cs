@@ -81,24 +81,26 @@ namespace ProceduralCreature.Tests.Runtime
         [Test]
         public void Build_Sphere_RetainsOnlyMixedCellsInIncreasingOrder()
         {
-            DensityGrid grid = SphereGrid();
-            ActiveCellEntry[] active = ActiveCellBuilder.Build(grid);
-
-            Assert.Greater(active.Length, 0, "A sphere must produce active cells at this resolution.");
-
-            for (int i = 0; i < active.Length; i++)
+            using (DensityGrid grid = SphereGrid())
             {
-                Assert.AreNotEqual(0, active[i].CaseIndex, "Active cell must not be all-inside.");
-                Assert.AreNotEqual(255, active[i].CaseIndex, "Active cell must not be all-outside.");
-                if (i > 0)
-                {
-                    Assert.Greater(active[i].CellIndex, active[i - 1].CellIndex,
-                        "Active cells must be in strictly increasing global index order.");
-                }
-            }
+                ActiveCellEntry[] active = ActiveCellBuilder.Build(grid);
 
-            // Independent mixed-cell count must match the retained active-cell count.
-            Assert.AreEqual(CountMixedCells(grid), active.Length);
+                Assert.Greater(active.Length, 0, "A sphere must produce active cells at this resolution.");
+
+                for (int i = 0; i < active.Length; i++)
+                {
+                    Assert.AreNotEqual(0, active[i].CaseIndex, "Active cell must not be all-inside.");
+                    Assert.AreNotEqual(255, active[i].CaseIndex, "Active cell must not be all-outside.");
+                    if (i > 0)
+                    {
+                        Assert.Greater(active[i].CellIndex, active[i - 1].CellIndex,
+                            "Active cells must be in strictly increasing global index order.");
+                    }
+                }
+
+                // Independent mixed-cell count must match the retained active-cell count.
+                Assert.AreEqual(CountMixedCells(grid), active.Length);
+            }
         }
 
         [Test]
@@ -107,9 +109,8 @@ namespace ProceduralCreature.Tests.Runtime
             var bounds = new BoundsDefinition { MaxX = 0.5f, MaxY = 0.5f, MaxZ = 0.5f };
             var settings = new GenerationSettings { VoxelsPerUnit = 4f };
             using (SdfProgram program = SdfProgramBuilder.CompilePortable(CreatureDefinition.CreateEmpty()))
+            using (DensityGrid grid = DensityGrid.SamplePortable(program, bounds, settings))
             {
-                DensityGrid grid = DensityGrid.SamplePortable(program, bounds, settings);
-
                 ActiveCellEntry[] active = ActiveCellBuilder.Build(grid);
 
                 Assert.AreEqual(0, active.Length);
@@ -119,16 +120,17 @@ namespace ProceduralCreature.Tests.Runtime
         [Test]
         public void Build_IsDeterministic()
         {
-            DensityGrid grid = SphereGrid();
-
-            ActiveCellEntry[] first = ActiveCellBuilder.Build(grid);
-            ActiveCellEntry[] second = ActiveCellBuilder.Build(grid);
-
-            Assert.AreEqual(first.Length, second.Length);
-            for (int i = 0; i < first.Length; i++)
+            using (DensityGrid grid = SphereGrid())
             {
-                Assert.AreEqual(first[i].CellIndex, second[i].CellIndex);
-                Assert.AreEqual(first[i].CaseIndex, second[i].CaseIndex);
+                ActiveCellEntry[] first = ActiveCellBuilder.Build(grid);
+                ActiveCellEntry[] second = ActiveCellBuilder.Build(grid);
+
+                Assert.AreEqual(first.Length, second.Length);
+                for (int i = 0; i < first.Length; i++)
+                {
+                    Assert.AreEqual(first[i].CellIndex, second[i].CellIndex);
+                    Assert.AreEqual(first[i].CaseIndex, second[i].CaseIndex);
+                }
             }
         }
 

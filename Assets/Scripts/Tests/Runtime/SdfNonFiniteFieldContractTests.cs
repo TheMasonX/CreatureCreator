@@ -136,10 +136,9 @@ namespace ProceduralCreature.Tests.Runtime
         {
             var definition = DefinitionWithBodyAndPart();
             using (SdfProgram program = SdfProgramBuilder.CompilePortable(definition))
+            using (DensityGrid grid = DensityGrid.SamplePortable(
+                program, definition.Bounds, definition.Generation))
             {
-                DensityGrid grid = DensityGrid.SamplePortable(
-                    program, definition.Bounds, definition.Generation);
-
                 bool sawInf = false;
                 float min = float.PositiveInfinity;
                 for (int z = 0; z <= grid.CellsZ; z++)

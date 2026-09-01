@@ -17,90 +17,112 @@ namespace ProceduralCreature.Tests.Runtime
         [Test]
         public void Extract_MatchesReference_Sphere()
         {
-            AssertExtractMatchesReference(SphereGrid(), "sphere");
+            using (DensityGrid grid = SphereGrid())
+            {
+                AssertExtractMatchesReference(grid, "sphere");
+            }
         }
 
         [Test]
         public void Extract_MatchesReference_TwoOverlappingSpheres()
         {
-            AssertExtractMatchesReference(OverlappingSpheresGrid(), "overlapping spheres");
+            using (DensityGrid grid = OverlappingSpheresGrid())
+            {
+                AssertExtractMatchesReference(grid, "overlapping spheres");
+            }
         }
 
         [Test]
         public void Extract_MatchesReference_EmptyField()
         {
-            AssertExtractMatchesReference(EmptyGrid(), "empty field");
+            using (DensityGrid grid = EmptyGrid())
+            {
+                AssertExtractMatchesReference(grid, "empty field");
+            }
         }
 
         [Test]
         public void Extract_MatchesReference_BodySplineWithLimb()
         {
-            AssertExtractMatchesReference(BodySplineGrid(), "BodySpline with limb");
+            using (DensityGrid grid = BodySplineGrid())
+            {
+                AssertExtractMatchesReference(grid, "BodySpline with limb");
+            }
         }
 
         [Test]
         public void Extract_IsDeterministic_Sphere()
         {
-            DensityGrid grid = SphereGrid();
+            using (DensityGrid grid = SphereGrid())
+            {
+                MeshExtractionResult first = MarchingCubesExtractor.Extract(grid);
+                MeshExtractionResult second = MarchingCubesExtractor.Extract(grid);
 
-            MeshExtractionResult first = MarchingCubesExtractor.Extract(grid);
-            MeshExtractionResult second = MarchingCubesExtractor.Extract(grid);
-
-            AssertSameGeometry(first, second, "determinism");
+                AssertSameGeometry(first, second, "determinism");
+            }
         }
 
         [Test]
         public void Extract_IsDeterministic_BodySplineWithLimb()
         {
-            DensityGrid grid = BodySplineGrid();
+            using (DensityGrid grid = BodySplineGrid())
+            {
+                MeshExtractionResult first = MarchingCubesExtractor.Extract(grid);
+                MeshExtractionResult second = MarchingCubesExtractor.Extract(grid);
 
-            MeshExtractionResult first = MarchingCubesExtractor.Extract(grid);
-            MeshExtractionResult second = MarchingCubesExtractor.Extract(grid);
-
-            AssertSameGeometry(first, second, "determinism");
+                AssertSameGeometry(first, second, "determinism");
+            }
         }
 
         [Test]
         public void Extract_ResolvesExactlyOneContourPerMixedCell()
         {
-            DensityGrid grid = SphereGrid();
-            MeshExtractionResult mesh = MarchingCubesExtractor.Extract(grid);
+            using (DensityGrid grid = SphereGrid())
+            {
+                MeshExtractionResult mesh = MarchingCubesExtractor.Extract(grid);
 
-            Assert.Greater(mesh.MixedCellCount, 0);
-            Assert.AreEqual(mesh.MixedCellCount, mesh.ContourResolutionCallCount,
-                "Homogeneous cells must never reach the contour resolver.");
+                Assert.Greater(mesh.MixedCellCount, 0);
+                Assert.AreEqual(mesh.MixedCellCount, mesh.ContourResolutionCallCount,
+                    "Homogeneous cells must never reach the contour resolver.");
+            }
         }
 
         [Test]
         public void Extract_EmptyField_NeverCallsContourResolver()
         {
-            DensityGrid grid = EmptyGrid();
-            MeshExtractionResult mesh = MarchingCubesExtractor.Extract(grid);
+            using (DensityGrid grid = EmptyGrid())
+            {
+                MeshExtractionResult mesh = MarchingCubesExtractor.Extract(grid);
 
-            Assert.AreEqual(0, mesh.MixedCellCount);
-            Assert.AreEqual(0, mesh.ContourResolutionCallCount);
+                Assert.AreEqual(0, mesh.MixedCellCount);
+                Assert.AreEqual(0, mesh.ContourResolutionCallCount);
+            }
         }
 
         [Test]
         public void Extract_CenteredSphere_HasNoBoundaryOrNonManifoldEdges()
         {
-            DensityGrid grid = SphereGrid();
-            MeshExtractionResult mesh = MarchingCubesExtractor.Extract(grid);
+            using (DensityGrid grid = SphereGrid())
+            {
+                MeshExtractionResult mesh = MarchingCubesExtractor.Extract(grid);
 
-            MeshTopologyReport report = MeshTopologyValidator.Validate(mesh);
-            Assert.AreEqual(0, report.BoundaryEdgeCount);
-            Assert.AreEqual(0, report.NonManifoldEdgeCount);
+                MeshTopologyReport report = MeshTopologyValidator.Validate(mesh);
+                Assert.AreEqual(0, report.BoundaryEdgeCount);
+                Assert.AreEqual(0, report.NonManifoldEdgeCount);
+            }
         }
 
         [Test]
         public void Extract_OverlappingSpheres_HasNoBoundaryOrNonManifoldEdges()
         {
-            DensityGrid grid = OverlappingSpheresGrid();
-            MeshExtractionResult mesh = MarchingCubesExtractor.Extract(grid);
+            using (DensityGrid grid = OverlappingSpheresGrid())
+            {
+                MeshExtractionResult mesh = MarchingCubesExtractor.Extract(grid);
 
-            MeshTopologyReport report = MeshTopologyValidator.Validate(mesh);
-            Assert.AreEqual(0, report.BoundaryEdgeCount);
-            Assert.AreEqual(0, report.NonManifoldEdgeCount);
+                MeshTopologyReport report = MeshTopologyValidator.Validate(mesh);
+                Assert.AreEqual(0, report.BoundaryEdgeCount);
+                Assert.AreEqual(0, report.NonManifoldEdgeCount);
+            }
         }
 
         private static void AssertExtractMatchesReference(DensityGrid grid, string label)

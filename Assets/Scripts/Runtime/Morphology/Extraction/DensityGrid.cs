@@ -1,3 +1,4 @@
+using System;
 using UnityEngine;
 using Unity.Collections;
 using Unity.Jobs;
@@ -21,10 +22,19 @@ namespace ProceduralCreature.Morphology.Extraction
     /// interpolation, normalization) must treat `+inf` as absent rather than a
     /// giant finite distance.
     /// </summary>
-    public sealed class DensityGrid
+    public sealed class DensityGrid : IDisposable
     {
         private const int PortableScratchValueBudget = 8 * 1024 * 1024;
-        private readonly float[] _samples;
+
+        /// <summary>
+        /// Owned native corner samples. Allocated by <see cref="SamplePortable"/>
+        /// (Persistent) and released by <see cref="Dispose"/>. The managed read
+        /// API (<see cref="GetSample"/>, <see cref="CopyCellCornerSamples"/>)
+        /// reads this buffer directly and Burst jobs (sampling, active-cell
+        /// classification) read the same storage, so the grid never round-trips
+        /// through a managed copy.
+        /// </summary>
+        private NativeArray<float> _samples;
 
         public int CellsX { get; }
         public int CellsY { get; }
@@ -33,20 +43,39 @@ namespace ProceduralCreature.Morphology.Extraction
         public float CellSize { get; }
         public int SampleCount => _samples.Length;
 
+        /// <summary>
+        /// The native corner-sample buffer, exposed for Burst consumers such as
+        /// <see cref="ActiveCellBuilder"/>'s scan job. Read-only for callers;
+        /// the grid owns the buffer's lifetime.
+        /// </summary>
+        public NativeArray<float> Samples => _samples;
+
         private int CornersX => CellsX + 1;
         private int CornersY => CellsY + 1;
         private int CornersZ => CellsZ + 1;
 
-        private DensityGrid(int cellsX, int cellsY, int cellsZ, Vector3 origin, float cellSize)
+        private DensityGrid(int cellsX, int cellsY, int cellsZ, Vector3 origin, float cellSize, NativeArray<float> samples)
         {
             CellsX = cellsX;
             CellsY = cellsY;
             CellsZ = cellsZ;
             Origin = origin;
             CellSize = cellSize;
-            _samples = new float[(long)(cellsX + 1) * (cellsY + 1) * (cellsZ + 1) <= int.MaxValue
-                ? (cellsX + 1) * (cellsY + 1) * (cellsZ + 1)
-                : throw new DomainException("Grid corner count exceeds addressable array size.")];
+            _samples = samples;
+        }
+
+        /// <summary>
+        /// Releases the native sample buffer. Every caller that creates a grid
+        /// via <see cref="SamplePortable"/> must dispose it when done: the
+        /// generator disposes after extraction and tests wrap grids in using.
+        /// </summary>
+        public void Dispose()
+        {
+            if (_samples.IsCreated)
+            {
+                _samples.Dispose();
+                _samples = default;
+            }
         }
 
         public static DensityGrid SamplePortable(SdfProgram program, BoundsDefinition bounds, GenerationSettings settings)
@@ -58,9 +87,20 @@ namespace ProceduralCreature.Morphology.Extraction
             int cellsX = Mathf.Max(Mathf.CeilToInt(bounds.MaxX * 2f * settings.VoxelsPerUnit), 1);
             int cellsY = Mathf.Max(Mathf.CeilToInt(bounds.MaxY * 2f * settings.VoxelsPerUnit), 1);
             int cellsZ = Mathf.Max(Mathf.CeilToInt(bounds.MaxZ * 2f * settings.VoxelsPerUnit), 1);
-            var grid = new DensityGrid(cellsX, cellsY, cellsZ,
-                new Vector3(-bounds.MaxX, -bounds.MaxY, -bounds.MaxZ), cellSize);
-            var samples = new NativeArray<float>(grid.SampleCount, Allocator.TempJob);
+            int cornersX = cellsX + 1;
+            int cornersY = cellsY + 1;
+            int cornersZ = cellsZ + 1;
+            long cornerCountLong = (long)cornersX * cornersY * cornersZ;
+            if (cornerCountLong > int.MaxValue)
+            {
+                throw new DomainException("Grid corner count exceeds addressable array size.");
+            }
+            var origin = new Vector3(-bounds.MaxX, -bounds.MaxY, -bounds.MaxZ);
+
+            // The grid owns this Persistent buffer: handed to the DensityGrid on
+            // success and disposed on every throw path, so a malformed program can
+            // never leak the native allocation (CC-075).
+            var samples = new NativeArray<float>((int)cornerCountLong, Allocator.Persistent);
             int operationCount = program.Operations.Length;
             if (operationCount <= 0)
             {
@@ -86,27 +126,27 @@ namespace ProceduralCreature.Morphology.Extraction
                 // this, an out-of-range RootIndex reads past Operations and either
                 // crashes (safety checks on) or silently produces garbage (Burst
                 // release). Mirrors the SdfProgramEvaluator.Evaluate guard. Throwing
-                // inside the try also proves both TempJob arrays are disposed on the
-                // exception path (CC-075).
+                // inside the try also proves the native allocations are disposed on
+                // the exception path (CC-075).
                 if (program.RootIndex < 0 || program.RootIndex >= program.Operations.Length)
                 {
                     throw new DomainException("Portable program root index must identify an operation.");
                 }
 
-                for (int sampleStart = 0; sampleStart < grid.SampleCount; sampleStart += batchSize)
+                for (int sampleStart = 0; sampleStart < (int)cornerCountLong; sampleStart += batchSize)
                 {
-                    int sampleCount = Mathf.Min(batchSize, grid.SampleCount - sampleStart);
+                    int sampleCount = Mathf.Min(batchSize, (int)cornerCountLong - sampleStart);
                     var job = new SdfSamplingJob
                     {
                         Operations = program.Operations,
                         ScratchValues = scratchValues,
                         Samples = samples,
                         RootIndex = program.RootIndex,
-                        CornersX = grid.CornersX,
-                        CornersY = grid.CornersY,
-                        CornersZ = grid.CornersZ,
-                        Origin = new float3(grid.Origin.x, grid.Origin.y, grid.Origin.z),
-                        CellSize = grid.CellSize,
+                        CornersX = cornersX,
+                        CornersY = cornersY,
+                        CornersZ = cornersZ,
+                        Origin = new float3(origin.x, origin.y, origin.z),
+                        CellSize = cellSize,
                         SampleStartIndex = sampleStart,
                         InfluenceRadius = program.InfluenceRadius,
                     };
@@ -114,17 +154,20 @@ namespace ProceduralCreature.Morphology.Extraction
                     handle.Complete();
                 }
 
-                // Copy only after every batch completes, then dispose both TempJob
-                // allocations in the finally so a throw mid-loop (an out-of-range
-                // job read surfaces at Complete) cannot leak `samples` (CC-075).
-                for (int i = 0; i < grid._samples.Length; i++) grid._samples[i] = samples[i];
+                // Ownership of the native buffer transfers to the grid; the finally
+                // below only disposes it on a throw path (CC-075).
+                var grid = new DensityGrid(cellsX, cellsY, cellsZ, origin, cellSize, samples);
+                samples = default;
+                return grid;
             }
             finally
             {
-                samples.Dispose();
                 scratchValues.Dispose();
+                if (samples.IsCreated)
+                {
+                    samples.Dispose();
+                }
             }
-            return grid;
         }
 
         private static void ValidateSamplingInputs(BoundsDefinition bounds, GenerationSettings settings)

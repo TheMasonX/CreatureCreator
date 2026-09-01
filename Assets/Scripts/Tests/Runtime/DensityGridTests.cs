@@ -19,9 +19,8 @@ namespace ProceduralCreature.Tests.Runtime
             var bounds = new BoundsDefinition { MaxX = 1f, MaxY = 1f, MaxZ = 1f };
             var settings = new GenerationSettings { VoxelsPerUnit = 4f };
             using (SdfProgram program = SdfProgramBuilder.CompilePortable(CreatureDefinition.CreateEmpty()))
+            using (DensityGrid grid = DensityGrid.SamplePortable(program, bounds, settings))
             {
-                DensityGrid grid = DensityGrid.SamplePortable(program, bounds, settings);
-
                 // 2 units of extent per axis * 4 voxels/unit = 8 cells per axis.
                 Assert.AreEqual(8, grid.CellsX);
                 Assert.AreEqual(8, grid.CellsY);
@@ -38,9 +37,8 @@ namespace ProceduralCreature.Tests.Runtime
             definition.AddPart(new CreaturePart { Id = "sphere", PartType = PartType.Body, Transform = TransformData.Identity,
                 Shape = new ShapeDefinition { Type = ShapeType.Sphere, PrimarySize = 0.5f, SmoothBlendRadius = 0f }, Appearance = AppearanceDefinition.Default });
             using (SdfProgram program = SdfProgramBuilder.CompilePortable(definition))
+            using (DensityGrid grid = DensityGrid.SamplePortable(program, bounds, settings))
             {
-                DensityGrid grid = DensityGrid.SamplePortable(program, bounds, settings);
-
                 Vector3 cornerWorldPos = grid.CornerPosition(0, 0, 0);
                 Assert.AreEqual(new Vector3(-1f, -1f, -1f), cornerWorldPos,
                     "Grid origin corner should sit at (-MaxX,-MaxY,-MaxZ).");
@@ -60,8 +58,8 @@ namespace ProceduralCreature.Tests.Runtime
             definition.AddPart(new CreaturePart { Id = "sphere", PartType = PartType.Body, Transform = TransformData.Identity,
                 Shape = new ShapeDefinition { Type = ShapeType.Sphere, PrimarySize = 1f, SmoothBlendRadius = 0f }, Appearance = AppearanceDefinition.Default });
             using (SdfProgram program = SdfProgramBuilder.CompilePortable(definition))
+            using (DensityGrid grid = DensityGrid.SamplePortable(program, bounds, settings))
             {
-                DensityGrid grid = DensityGrid.SamplePortable(program, bounds, settings);
                 Vector3 gradient = grid.EstimateGradient(new Vector3(1f, 0f, 0f));
 
                 Assert.Greater(gradient.x, 0f);
@@ -129,10 +127,10 @@ namespace ProceduralCreature.Tests.Runtime
 
             using (SdfProgram managedProgram = SdfProgramBuilder.CompilePortable(definition))
             using (SdfProgram portableProgram = SdfProgramBuilder.CompilePortable(definition))
+            using (DensityGrid managed = DensityGrid.SamplePortable(managedProgram, definition.Bounds, definition.Generation))
+            using (DensityGrid portable = DensityGrid.SamplePortable(
+                portableProgram, definition.Bounds, definition.Generation))
             {
-                DensityGrid managed = DensityGrid.SamplePortable(managedProgram, definition.Bounds, definition.Generation);
-                DensityGrid portable = DensityGrid.SamplePortable(
-                    portableProgram, definition.Bounds, definition.Generation);
                 for (int z = 0; z <= managed.CellsZ; z++)
                 for (int y = 0; y <= managed.CellsY; y++)
                 for (int x = 0; x <= managed.CellsX; x++)

@@ -22,16 +22,29 @@
   "attachments": [],
   "externalLinks": [],
   "linkedPages": [],
-  "comments": [],
+  "comments": [
+    {
+      "id": "c-dac21163648547cc9ea1aeb66e0d690d",
+      "author": "anonymous",
+      "body": "CC-008 baseline matrix captured from live editor (2026-08-31, Dino fixture, Burst \u002B Fast culling, SdfCullingMode single-path after f7aac24):\n\n| Grid | Samples | FieldSampling | ActiveCell | ContourRes | Welding | TriangleEmit | Appearance | Total | Tri/Vtx |\n|---|---|---|---|---|---|---|---|---|---|\n| 64^3 | 274,625 | 151.0 | 24.0 | 12.0 | 2.0 | 1.0 | 49.4 | 242.5 | 4,630 / 2,317 |\n| 80^3 | 531,441 | 279.5 | 46.0 | 18.0 | 3.0 | 2.0 | 78.2 | 432.5 | 7,286 / 3,645 |\n| 88^3 | 704,969 | 481.9 | 85.0 | 23.0 | 4.0 | 2.0 | 92.3 | 693.1 | 8,682 / 4,343 |\n| 112^3 | 1,442,897 | 832.8 | 149.0 | 50.0 | 11.0 | 5.0 | 172.3 | 1263.2 | 14,046 / 7,025 |\n| 128^3 | 2,146,689 | 1165.4 | 192.0 | 47.0 | 10.0 | 5.0 | 193.9 | 1623.9 | 18,240 / 9,122 |\n| 160^3 | 4,173,281 | 2556.7 | 398.0 | 78.0 | 15.0 | 8.0 | 304.5 | 3380.3 | 28,424 / 14,214 |\n\nFindings (code-grounded):\n1. FieldSampling = 66-76% of Total, ~linear in sample count. Whole grid sampled incl. empty space; op AABBs exist for culling (CC-062) -\u003E sparse/region-aware sampling is the biggest absolute lever (CC-061).\n2. MeshActiveCellConstruction = 66-78% of MeshExtraction and scales with cell volume (149ms@112^3, 398ms@160^3). Root cause: ActiveCellBuilder.Build does a serialized managed full-grid scan (1.4-4.1M cells), 8-corner copy \u002B 8x NormalizeSurfaceDensity per cell, List\u003CActiveCellEntry\u003E append. Only ~0.5% of cells are mixed.\n3. AppearanceBake = 172-304ms. Root cause: PartAppearanceSampler.Resolver.Resolve evaluates EVERY part\u0027s compiled SDF program \u002B Body program per vertex (managed evaluator), O(parts x vertices), plus 3x Mathf.PerlinNoise per vertex.\n4. Anomaly: 88^3 row is out of line (0.68 us/sample vs 0.53-0.58) - likely mid-edit state; re-capture before using as baseline.\n\nNext step (Slice A started): native-backed DensityGrid \u002B Burst-compiled single-threaded ActiveCellScanJob (deterministic, same ordering), dispose grid in generator \u002B tests. Hypothesis: ActiveCellConstruction 149ms -\u003E \u003C10ms at 112^3 with bit-identical active list.",
+      "createdAtUtc": "2026-09-01T04:42:03.7145504Z"
+    },
+    {
+      "id": "c-bd515166a2f04ebaac9e0c43734ad262",
+      "author": "anonymous",
+      "body": "Slice A (Burst active-cell scan \u002B native grid handoff) \u2014 VALIDATED 2026-09-01.\n\nChange: DensityGrid is now native-backed (IDisposable, Persistent NativeArray\u003Cfloat\u003E Samples); the managed float[] copy after sampling is gone. ActiveCellBuilder.Build replaced its serialized managed full-grid scan with a Burst-compiled single-threaded ActiveCellScanJob (IJob, same z/y/x iteration order, identical NormalizeSurfaceDensity semantics; \u002Binf/NaN preserved). CreatureMeshGenerator disposes the grid in a try/finally after extraction. All test call sites wrap grids in using.\n\nValidation:\n- dotnet build Runtime \u002B Tests.Runtime: 0 errors.\n- Unity compile after refresh: 0 errors / 0 warnings.\n- PlayMode (ProceduralCreature.Tests.Runtime, full assembly): 417/417 passed, 0 failed, 0 skipped.\n- get_errors clean on all 11 edited files; git diff --check clean.\n\nTiming evidence (in-editor, dino_creature.json, 112x112x112 cells = 1,442,897 samples, vpu 14.0, 7,408 mixed cells, Burst warmup done):\n- Managed-equivalent scan (old path replica): 219.3 ms\n- New Burst ActiveCellBuilder.Build: 25.2 ms\n- In-environment speedup: 8.7x; vs recorded editor baseline (149.0 ms at 112^3): ~5.9x\n- Output bit-identical: managed vs Burst cell index \u002B case index order matches exactly (orderMatches=True).\n\nResidual risk: ActiveCellScanJob is single-threaded by design (deterministic ordering); a later parallel prefix-sum scan could go further but would require a determinism/ordering change. AppearanceBake (O(parts x vertices) managed SDF evals, ~172 ms @112^3) and FieldSampling (region-aware sparse sampling) remain the larger absolute targets.",
+      "createdAtUtc": "2026-09-01T13:46:32.108762Z"
+    }
+  ],
   "epicId": null,
   "parentId": null,
   "dueDateUtc": null,
   "createdAtUtc": "2026-09-01T03:16:25.5654277Z",
-  "updatedAtUtc": "2026-09-01T03:16:25.5654277Z",
+  "updatedAtUtc": "2026-09-01T13:46:32.108762Z",
   "completedAtUtc": null,
-  "revision": 1,
+  "revision": 3,
   "isArchived": false,
   "hasLoadError": false,
   "loadError": null,
-  "sourceFilePath": null
+  "sourceFilePath": "tsk-0008-profile-and-optimize-preview-generation-hotspots.json"
 }

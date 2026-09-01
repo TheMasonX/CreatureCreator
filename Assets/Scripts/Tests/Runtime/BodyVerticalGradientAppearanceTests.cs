@@ -472,8 +472,11 @@ namespace ProceduralCreature.Tests.Runtime
 
             var bounds = new BoundsDefinition { MaxX = 1.5f, MaxY = 1.5f, MaxZ = 1.5f };
             var settings = new GenerationSettings { VoxelsPerUnit = 4f };
-            DensityGrid grid = DensityGrid.SamplePortable(SdfProgramBuilder.CompilePortable(definition), bounds, settings);
-            MeshExtractionResult mesh = MarchingCubesExtractor.Extract(grid);
+            MeshExtractionResult mesh;
+            using (DensityGrid grid = DensityGrid.SamplePortable(SdfProgramBuilder.CompilePortable(definition), bounds, settings))
+            {
+                mesh = MarchingCubesExtractor.Extract(grid);
+            }
 
             Color[] colors = AppearanceBaker.Bake(definition, mesh);
 
