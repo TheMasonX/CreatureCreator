@@ -55,21 +55,19 @@ namespace ProceduralCreature.Appearance
     /// </summary>
     public static class PartAppearanceSampler
     {
-        public static ResolvedAppearance Resolve(CreatureDefinition definition, Vector3 position,
-            SdfCullingMode cullingMode = SdfCullingMode.Exact)
+        public static ResolvedAppearance Resolve(CreatureDefinition definition, Vector3 position)
         {
-            using (Resolver resolver = CreateResolver(definition, cullingMode))
+            using (Resolver resolver = CreateResolver(definition))
             {
                 return resolver.Resolve(position);
             }
         }
 
-        public static Resolver CreateResolver(CreatureDefinition definition,
-            SdfCullingMode cullingMode = SdfCullingMode.Exact)
+        public static Resolver CreateResolver(CreatureDefinition definition)
         {
             if (definition == null) throw new DomainException("definition must not be null.");
 
-            return new Resolver(definition, cullingMode);
+            return new Resolver(definition);
         }
 
         public sealed class Resolver : System.IDisposable
@@ -78,12 +76,10 @@ namespace ProceduralCreature.Appearance
             private readonly System.Collections.Generic.List<(CreaturePart Part, SdfProgram Program)> _compiledParts;
             private readonly SdfProgram _bodyProgram;
             private readonly NativeArray<float> _scratchValues;
-            private readonly SdfCullingMode _cullingMode;
 
-            internal Resolver(CreatureDefinition definition, SdfCullingMode cullingMode)
+            internal Resolver(CreatureDefinition definition)
             {
                 _definition = definition;
-                _cullingMode = cullingMode;
                 _compiledParts = SdfProgramBuilder.CompileIndividualPartsPortable(definition);
                 _bodyProgram = SdfProgramBuilder.CompilePortableBodyField(definition);
                 int scratchLength = _bodyProgram.Operations.Length;
@@ -127,7 +123,7 @@ namespace ProceduralCreature.Appearance
                     // which means "no candidate here" — never a giant valid distance.
                     // Skip it so it cannot win (or poison) the nearest-part decision.
                     float rawDistance = SdfProgramEvaluator.Evaluate(program,
-                        new Unity.Mathematics.float3(position.x, position.y, position.z), _scratchValues, _cullingMode);
+                        new Unity.Mathematics.float3(position.x, position.y, position.z), _scratchValues);
                     if (float.IsPositiveInfinity(rawDistance)) continue;
                     float distance = Mathf.Abs(rawDistance);
                     if (distance < nearestAbsDistance)
@@ -140,7 +136,7 @@ namespace ProceduralCreature.Appearance
                 float bodyAbsDistance = !_bodyProgram.Operations.IsCreated
                     ? float.PositiveInfinity
                     : Mathf.Abs(SdfProgramEvaluator.Evaluate(_bodyProgram,
-                        new Unity.Mathematics.float3(position.x, position.y, position.z), _scratchValues, _cullingMode));
+                        new Unity.Mathematics.float3(position.x, position.y, position.z), _scratchValues));
 
                 // The Body owns this surface point only when it is a real (finite)
                 // candidate — +inf is "outside", not "the Body is nearest". Without

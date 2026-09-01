@@ -53,7 +53,7 @@ namespace ProceduralCreature.Tests.Runtime
                 // never a large finite distance and never NaN.
                 float far = SdfProgramEvaluator.Evaluate(
                     program.Operations, program.RootIndex, new float3(5f, 5f, 5f),
-                    program.InfluenceRadius, SdfCullingMode.Fast);
+                    program.InfluenceRadius);
 
                 Assert.AreEqual(float.PositiveInfinity, far,
                     "A far Fast-mode sample must read exactly +inf (the culled sentinel).");
@@ -79,7 +79,7 @@ namespace ProceduralCreature.Tests.Runtime
             definition.Body.Appearance.BottomGradient = GradientAdapter.Solid(Color.red);
 
             using (PartAppearanceSampler.Resolver resolver =
-                PartAppearanceSampler.CreateResolver(definition, SdfCullingMode.Fast))
+                PartAppearanceSampler.CreateResolver(definition))
             {
                 ResolvedAppearance result = resolver.Resolve(new Vector3(5f, 5f, 5f));
 
@@ -117,7 +117,7 @@ namespace ProceduralCreature.Tests.Runtime
             });
 
             using (PartAppearanceSampler.Resolver resolver =
-                PartAppearanceSampler.CreateResolver(definition, SdfCullingMode.Fast))
+                PartAppearanceSampler.CreateResolver(definition))
             {
                 // Near part_near: finite for it, culled (+inf) for part_far and the Body.
                 ResolvedAppearance result = resolver.Resolve(new Vector3(0.2f, 0f, 0f));
@@ -139,7 +139,7 @@ namespace ProceduralCreature.Tests.Runtime
             using (SdfProgram program = SdfProgramBuilder.CompilePortable(definition))
             {
                 DensityGrid grid = DensityGrid.SamplePortable(
-                    program, definition.Bounds, definition.Generation, SdfCullingMode.Fast);
+                    program, definition.Bounds, definition.Generation);
 
                 bool sawInf = false;
                 float min = float.PositiveInfinity;

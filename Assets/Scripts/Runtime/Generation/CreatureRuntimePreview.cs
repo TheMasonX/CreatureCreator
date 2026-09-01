@@ -3,7 +3,6 @@ using ProceduralCreature.Appearance;
 using ProceduralCreature.Common;
 using ProceduralCreature.Definition;
 using ProceduralCreature.Morphology.Extraction;
-using ProceduralCreature.Morphology.Sdf;
 using ProceduralCreature.Serialization;
 using UnityEngine;
 
@@ -38,8 +37,7 @@ namespace ProceduralCreature.Generation
             MeshTopologyReport topology;
             GeneratedCreature generated = CreatureMeshGenerator.Generate(
                 definition, out topology, diagnostics,
-                meshResolver: ResolveMeshAsset,
-                cullingMode: generationConfig != null ? generationConfig.CullingMode : SdfCullingMode.Exact);
+                meshResolver: ResolveMeshAsset);
 
             DestroyGeneratedGeometry();
 

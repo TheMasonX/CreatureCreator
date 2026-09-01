@@ -50,9 +50,9 @@ behavior, watertightness, and the explicit SDF sign convention.
   graph on the normal Burst path.
 - All remaining managed SDF uses are either removed or explicitly limited to
   reference tests and documented migration tooling.
-- Scalar portable, Burst, and any cached-grid consumer agree within the shared
-  numeric tolerance for primitives, transforms, symmetry, smooth unions, body
-  samples, limbs, and per-part appearance queries.
+- Scalar portable evaluation, fast Burst sampling, and cached-grid consumers
+  preserve the documented fast-field contract for primitives, transforms,
+  symmetry, smooth unions, body samples, limbs, and per-part appearance queries.
 - Centered sphere, overlapping spheres, `first_creature.json`, and a mirrored
   rotated limb remain watertight and deterministic.
 - Mixed-cell count, triangle count, welded vertex count, vertex colors, and
@@ -142,16 +142,14 @@ appearance resolver evaluates and disposes those native programs for the bake
 scope. A managed-versus-portable appearance selection parity fixture was added.
 
 The normal `CreatureMeshGenerator` path now compiles only the portable program;
-the managed graph is created only when the explicit `usePortableSampling: false`
-fallback is requested.
+the former managed fallback has been removed.
 
-The explicit managed generation switch is now removed from the production API.
-`CreatureMeshGenerator`, `CreatureRuntimePreview`, `CreatureGenerationConfig`,
-and the editor window use portable/Burst sampling only. A complete source
-inventory found remaining `ISdfNode`, `DensityGrid.Sample`, and managed
-compiler calls only in reference tests and standalone reference APIs; no
-production caller requests the removed managed mode. Runtime and editor test
-assemblies both build with zero errors and warnings, and `git diff --check`
+The explicit managed generation switch and the non-fast portable culling mode
+are removed from the production API. `CreatureMeshGenerator`,
+`CreatureRuntimePreview`, `CreatureGenerationConfig`, `AppearanceBaker`, and
+the editor window use portable fast sampling only. The editor no longer exposes
+an exact-preview toggle. Runtime and editor test assemblies build with zero
+errors; the runtime build retains five existing warnings. `git diff --check`
 passes.
 
 Portable program disposal is exception-safe during field sampling, so a failed

@@ -1,5 +1,4 @@
 using ProceduralCreature.Appearance;
-using ProceduralCreature.Morphology.Sdf;
 using UnityEngine;
 
 namespace ProceduralCreature.Generation
@@ -12,12 +11,10 @@ namespace ProceduralCreature.Generation
     public sealed class CreatureGenerationConfig : ScriptableObject
     {
         [SerializeField] private float defaultVoxelsPerUnit = 16f;
-        [SerializeField] private SdfCullingMode cullingMode = SdfCullingMode.Exact;
         [SerializeField] private CreatureMeshPalette meshPalette;
         [SerializeField] private CreatureMaterialPalette materialPalette;
 
         public float DefaultVoxelsPerUnit => Mathf.Max(1f, defaultVoxelsPerUnit);
-        public SdfCullingMode CullingMode => cullingMode;
         public CreatureMeshPalette MeshPalette => meshPalette;
         public CreatureMaterialPalette MaterialPalette => materialPalette;
     }

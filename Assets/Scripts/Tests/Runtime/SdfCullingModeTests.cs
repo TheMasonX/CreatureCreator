@@ -9,14 +9,11 @@ using ProceduralCreature.Morphology.Sdf;
 namespace ProceduralCreature.Tests.Runtime
 {
     /// <summary>
-    /// Fast (aggressive) culling mode (CC-063): the preview toggle trades value
-    /// exactness for speed. These tests assert the properties that must hold
-    /// regardless of mode — finite samples/vertices/colors and a watertight mesh —
-    /// not value parity with Exact (the whole point of Fast is that the mesh may
-    /// differ slightly near seams).
+    /// Fast (aggressive) culling mode (CC-063) is the only runtime mode. These
+    /// tests assert finite samples/vertices/colors and a watertight mesh.
     /// </summary>
     [TestFixture]
-    public class SdfCullingModeTests
+    public class FastFieldSamplingTests
     {
         private static CreatureDefinition DefinitionWithBodyAndPart()
         {
@@ -46,7 +43,7 @@ namespace ProceduralCreature.Tests.Runtime
             using (SdfProgram program = SdfProgramBuilder.CompilePortable(definition))
             {
                 DensityGrid grid = DensityGrid.SamplePortable(
-                    program, definition.Bounds, definition.Generation, SdfCullingMode.Fast);
+                    program, definition.Bounds, definition.Generation);
                 for (int z = 0; z <= grid.CellsZ; z++)
                 for (int y = 0; y <= grid.CellsY; y++)
                 for (int x = 0; x <= grid.CellsX; x++)
@@ -64,7 +61,7 @@ namespace ProceduralCreature.Tests.Runtime
             var diagnostics = new GenerationDiagnostics(collectTimings: false);
             MeshTopologyReport report;
             GeneratedCreature generated = CreatureMeshGenerator.Generate(
-                definition, out report, diagnostics, null, SdfCullingMode.Fast);
+                definition, out report, diagnostics);
 
             Vector3[] vertices = generated.MainMesh.vertices;
             for (int i = 0; i < vertices.Length; i++)
@@ -84,7 +81,7 @@ namespace ProceduralCreature.Tests.Runtime
             var diagnostics = new GenerationDiagnostics(collectTimings: false);
             MeshTopologyReport report;
             GeneratedCreature generated = CreatureMeshGenerator.Generate(
-                definition, out report, diagnostics, null, SdfCullingMode.Fast);
+                definition, out report, diagnostics);
 
             Color[] colors = generated.MainMesh.colors;
             Assert.AreEqual(generated.MainMesh.vertexCount, colors.Length);
@@ -104,9 +101,9 @@ namespace ProceduralCreature.Tests.Runtime
             var diagnostics = new GenerationDiagnostics(collectTimings: false);
             MeshTopologyReport report;
             GeneratedCreature a = CreatureMeshGenerator.Generate(
-                definition, out report, diagnostics, null, SdfCullingMode.Fast);
+                definition, out report, diagnostics);
             GeneratedCreature b = CreatureMeshGenerator.Generate(
-                definition, out report, diagnostics, null, SdfCullingMode.Fast);
+                definition, out report, diagnostics);
             Assert.AreEqual(a.MainMesh.triangles.Length, b.MainMesh.triangles.Length);
             Assert.AreEqual(a.MainMesh.vertexCount, b.MainMesh.vertexCount);
         }

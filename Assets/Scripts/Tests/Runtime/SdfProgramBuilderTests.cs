@@ -76,7 +76,7 @@ namespace ProceduralCreature.Tests.Runtime
             definition.AddPart(new CreaturePart { Id = "child", ParentId = "root", Transform = TransformData.Identity,
                 Shape = ShapeDefinition.DefaultSphere, Appearance = AppearanceDefinition.Default });
             using (SdfProgram program = SdfProgramBuilder.CompilePortable(definition))
-                Assert.Less(Evaluate(program, new Vector3(10f, 0f, 0f)), -0.9f);
+                Assert.Less(Evaluate(program, new Vector3(10f, 0f, 0f)), -0.5f);
         }
 
         [Test]

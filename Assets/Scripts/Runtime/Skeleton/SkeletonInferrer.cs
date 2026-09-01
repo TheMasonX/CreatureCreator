@@ -82,7 +82,49 @@ namespace ProceduralCreature.Skeleton
             }
 
             var skeleton = new Skeleton();
-            ResolvedCreatureSnapshot snapshot = ResolvedCreatureSnapshot.Resolve(definition);
+            ResolvedCreatureSnapshot snapshot;
+            try
+            {
+                snapshot = ResolvedCreatureSnapshot.Resolve(definition);
+            }
+            catch (DomainException)
+            {
+                // Direct inference calls can receive malformed DNA before validation.
+                // Preserve the independently resolvable Body rather than leaking a
+                // morphology exception from the defensive adapter.
+                bool hasBody = definition.Body != null
+                               && definition.Body.Samples != null
+                               && definition.Body.Samples.Count > 0;
+                AppendBodyBones(skeleton, definition,
+                    hasBody ? ResolvedBody.Resolve(definition.Body) : default,
+                    hasBody);
+                for (int i = 0; i < definition.Parts.Count; i++)
+                {
+                    CreaturePart part = definition.Parts[i];
+                    if (part == null || part.Limb != null) continue;
+
+                    try
+                    {
+                        Matrix4x4 world = CreaturePartWorldTransformResolver
+                            .ResolvePartFrameToCreatureSpace(definition, part);
+                        skeleton.Bones.Add(new Bone
+                        {
+                            Id = SemanticBoneResolver.ResolvePartRootBoneId(part, mirrored: false),
+                            ParentBoneId = SemanticBoneResolver.ResolveParentBoneId(
+                                definition, part, mirrored: false),
+                            SourcePartId = part.Id,
+                            PartType = part.PartType,
+                            Position = world.GetColumn(3),
+                            Rotation = world.rotation,
+                        });
+                    }
+                    catch (DomainException)
+                    {
+                        // Skip entries whose ancestor chain is also malformed.
+                    }
+                }
+                return skeleton;
+            }
 
             AppendBodyBones(skeleton, definition, snapshot.Body, snapshot.HasBody);
 
@@ -175,7 +217,15 @@ namespace ProceduralCreature.Skeleton
                 return;
             }
 
-            ResolvedLimb resolved = resolvedPart.Limb;
+            ResolvedLimb resolved;
+            try
+            {
+                resolved = resolvedPart.Limb;
+            }
+            catch (DomainException)
+            {
+                return;
+            }
 
             if (resolved.JointPositions.Count < 2)
             {

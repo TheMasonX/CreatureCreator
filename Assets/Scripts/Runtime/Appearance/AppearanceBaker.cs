@@ -29,12 +29,12 @@ namespace ProceduralCreature.Appearance
 
         public static Color[] Bake(CreatureDefinition definition, MeshExtractionResult mesh)
         {
-            return Bake(definition, mesh, null, SdfCullingMode.Exact);
+            return Bake(definition, mesh, null);
         }
 
         public static Color[] Bake(
             CreatureDefinition definition, MeshExtractionResult mesh,
-            GenerationDiagnostics diagnostics, SdfCullingMode cullingMode = SdfCullingMode.Exact)
+            GenerationDiagnostics diagnostics)
         {
             if (definition == null) throw new DomainException("definition must not be null.");
             if (mesh == null) throw new DomainException("mesh must not be null.");
@@ -49,7 +49,7 @@ namespace ProceduralCreature.Appearance
                 }
 
                 colors = new Color[mesh.Positions.Count];
-                using (PartAppearanceSampler.Resolver resolver = PartAppearanceSampler.CreateResolver(definition, cullingMode))
+                using (PartAppearanceSampler.Resolver resolver = PartAppearanceSampler.CreateResolver(definition))
                 {
                     for (int i = 0; i < mesh.Positions.Count; i++)
                     {

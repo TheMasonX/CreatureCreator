@@ -168,7 +168,6 @@ namespace ProceduralCreature.Editor
         private bool _showEditorSettings;
         private float _autoRegenerationDelaySeconds = 1f;
         private float _previewVoxelsPerUnit = 16f;
-        private bool _fastPreviewCulling = true;
         // CC-066: skeleton display mode — editor presentation state, persisted via
         // EditorPrefs, never DNA. Draws a read-only SceneView overlay of the
         // inferred rest Skeleton (bones as lines, joints as caps).
@@ -184,7 +183,6 @@ namespace ProceduralCreature.Editor
         private const float MinimumAutoRegenerationDelaySeconds = 1f;
         private const string AutoRegenerationDelayKey = "ProceduralCreature.AutoRegenerationDelay";
         private const string PreviewVoxelsPerUnitKey = "ProceduralCreature.PreviewVoxelsPerUnit";
-        private const string FastPreviewCullingKey = "ProceduralCreature.FastPreviewCulling";
         // CC-066: skeleton display mode persistence key.
         private const string SkeletonDisplayKey = "ProceduralCreature.ShowSkeleton";
         private const string GenerationConfigKey = "ProceduralCreature.GenerationConfig";
@@ -276,7 +274,6 @@ namespace ProceduralCreature.Editor
                 MinimumAutoRegenerationDelaySeconds,
                 EditorPrefs.GetFloat(AutoRegenerationDelayKey, MinimumAutoRegenerationDelaySeconds));
             _previewVoxelsPerUnit = Mathf.Max(1f, EditorPrefs.GetFloat(PreviewVoxelsPerUnitKey, 16f));
-            _fastPreviewCulling = EditorPrefs.GetBool(FastPreviewCullingKey, true);
             _showSkeleton = EditorPrefs.GetBool(SkeletonDisplayKey, false);
             string generationConfigPath = EditorPrefs.GetString(GenerationConfigKey, string.Empty);
             if (!string.IsNullOrEmpty(generationConfigPath))
@@ -501,21 +498,6 @@ namespace ProceduralCreature.Editor
                 _previewVoxelsPerUnit = newQuality;
                 EditorPrefs.SetFloat(PreviewVoxelsPerUnitKey, _previewVoxelsPerUnit);
                 ScheduleAutoRegeneration();
-            }
-
-            bool newFastCulling = EditorGUILayout.Toggle("Fast Field Sampling (preview)", _fastPreviewCulling);
-            if (newFastCulling != _fastPreviewCulling)
-            {
-                _fastPreviewCulling = newFastCulling;
-                EditorPrefs.SetBool(FastPreviewCullingKey, _fastPreviewCulling);
-                ScheduleAutoRegeneration();
-            }
-            if (_fastPreviewCulling)
-            {
-                EditorGUILayout.HelpBox(
-                    "Fast culling trades value exactness for speed: the preview mesh stays finite and " +
-                    "watertight but can differ slightly from the exact mesh near seams. Disable for an exact preview.",
-                    MessageType.Info);
             }
 
             // CC-066: skeleton display mode toggle (editor presentation state, persisted).
@@ -3006,7 +2988,7 @@ namespace ProceduralCreature.Editor
                 MeshTopologyReport topologyReport = null;
                 GeneratedCreature generated = CreatureMeshGenerator.Generate(
                     generationDefinition, out topologyReport, diagnostics,
-                    ResolveMeshAsset, _fastPreviewCulling ? SdfCullingMode.Fast : SdfCullingMode.Exact);
+                    ResolveMeshAsset);
                 Mesh unityMesh = generated.MainMesh;
                 ApplyPreviewGeometry(generated);
                 _autoRegenerateAt = -1d;
@@ -3032,7 +3014,7 @@ namespace ProceduralCreature.Editor
                         $"{unityMesh.triangles.Length / 3} triangles, " +
                         $"{unityMesh.vertexCount} vertices, " +
                         "SDF Sampling: Burst, " +
-                        $"Culling: {(_fastPreviewCulling ? "Fast" : "Exact")}, " +
+                        "Culling: Fast, " +
                         $"grid {diagnostics.GridCellsX}x{diagnostics.GridCellsY}x{diagnostics.GridCellsZ} " +
                         $"({diagnostics.GridSampleCount:N0} samples), " +
                         $"{diagnostics.MixedCellCount:N0} mixed cells, " +

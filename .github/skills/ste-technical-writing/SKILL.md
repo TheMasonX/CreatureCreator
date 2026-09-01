@@ -24,6 +24,13 @@ argument-hint: "Choose rewrite, generate, or lint, then provide the documentatio
 - State Unity version, prerequisites, validation evidence, and limitations.
 - Keep code identifiers and file paths exact.
 
+## Document scope
+
+Apply the strictest wording to durable project documentation, architecture
+decisions, and user-facing workflow instructions. Keep working notes concise,
+but preserve technical evidence, uncertainty, and ownership. Do not rewrite
+working notes only to remove a permitted punctuation style.
+
 ## Completion criteria
 
 The result is self-contained, factual, actionable, and consistent with the

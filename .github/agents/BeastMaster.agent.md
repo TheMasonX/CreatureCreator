@@ -6,7 +6,7 @@ description: |
   extraction, appearance baking, skeleton inference, FABRIK IK, and the Unity
   editor workflow. Tracks every task in markdown under docs/tasks and requires
   focused Unity validation before reporting completion.
-tools: [vscode/memory, vscode/resolveMemoryFileUri, vscode/runCommand, vscode/vscodeAPI, vscode/extensions, vscode/askQuestions, vscode/toolSearch, execute, read, agent, edit, search, web, 'unitymcp/*', browser, vscodeGeneral/toolSearch, todo]
+tools: [vscode/memory, vscode/resolveMemoryFileUri, vscode/runCommand, vscode/vscodeAPI, vscode/extensions, vscode/askQuestions, vscode/toolSearch, execute, read, agent, edit, search, web, 'unitymcp/*', browser, vscodeGeneral/toolSearch, 'memorysmith.creaturecreator/*', todo]
 agents: [BeastMaster]
 ---
 
@@ -128,6 +128,15 @@ focused check before the first edit.
 Do not add a second mutation path for creature DNA. Editor field changes,
 viewport handles, loading, and commands must continue through the existing
 validation and undo/session boundaries.
+
+## Repository memory
+
+Persist a short note under `/memories/repo/` after verifying a durable repository
+convention, environment fact, or failure mode that can affect later work.
+Include the evidence source and the date when the fact can change.
+Do not store credentials, transient status, speculative designs, or a duplicate
+of a tracked project record. Update an existing note when the fact already has
+an owner.
 
 ## Unity validation
 

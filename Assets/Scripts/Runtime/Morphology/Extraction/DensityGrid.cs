@@ -49,8 +49,7 @@ namespace ProceduralCreature.Morphology.Extraction
                 : throw new DomainException("Grid corner count exceeds addressable array size.")];
         }
 
-        public static DensityGrid SamplePortable(SdfProgram program, BoundsDefinition bounds, GenerationSettings settings,
-            SdfCullingMode cullingMode = SdfCullingMode.Exact)
+        public static DensityGrid SamplePortable(SdfProgram program, BoundsDefinition bounds, GenerationSettings settings)
         {
             if (program == null) throw new DomainException("program must not be null.");
             ValidateSamplingInputs(bounds, settings);
@@ -110,7 +109,6 @@ namespace ProceduralCreature.Morphology.Extraction
                         CellSize = grid.CellSize,
                         SampleStartIndex = sampleStart,
                         InfluenceRadius = program.InfluenceRadius,
-                        CullingMode = (int)cullingMode,
                     };
                     JobHandle handle = job.Schedule(sampleCount, 64);
                     handle.Complete();

@@ -103,8 +103,7 @@ namespace ProceduralCreature.Tests.Editor
 
             MeshTopologyReport topology;
             GeneratedCreature first = CreatureMeshGenerator.Generate(
-                definition, out topology, diagnostics: null, meshResolver: resolver,
-                cullingMode: SdfCullingMode.Exact);
+                definition, out topology, diagnostics: null, meshResolver: resolver);
 
             Assert.IsTrue(topology.IsWatertight, "Implicit surface must stay watertight with a mesh part present.");
             Assert.AreEqual(3, first.Count, "implicit + original + mirrored mesh item");
@@ -119,8 +118,7 @@ namespace ProceduralCreature.Tests.Editor
 
             MeshTopologyReport secondTopology;
             GeneratedCreature second = CreatureMeshGenerator.Generate(
-                definition, out secondTopology, diagnostics: null, meshResolver: resolver,
-                cullingMode: SdfCullingMode.Exact);
+                definition, out secondTopology, diagnostics: null, meshResolver: resolver);
 
             Assert.AreEqual(first.Count, second.Count);
             for (int i = 0; i < first.Count; i++)

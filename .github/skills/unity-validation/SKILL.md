@@ -37,6 +37,12 @@ editor and Unity Test Framework over source inspection.
    lengths, and non-mutation of input poses.
 9. Record the exact check, result, and environment in the task tracker.
 
+Before relying on an editor result, confirm that compilation has finished and
+inspect the Unity console for errors and warnings. Record the Unity version,
+test mode, selected test or manual action, and any unavailable validation.
+Treat a successful tool call as an operation result, not proof that the editor
+is ready or that the behavior is correct.
+
 ## When Unity is unavailable
 
 Do not invent a successful Unity result. State that Unity execution is

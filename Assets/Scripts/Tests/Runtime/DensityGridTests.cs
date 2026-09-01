@@ -104,7 +104,7 @@ namespace ProceduralCreature.Tests.Runtime
             using (var program = new SdfProgram(operations, rootIndex: 1, influenceRadius: 0f))
             {
                 Assert.Throws<DomainException>(() =>
-                    DensityGrid.SamplePortable(program, bounds, settings, SdfCullingMode.Exact));
+                    DensityGrid.SamplePortable(program, bounds, settings));
             }
 
             // Best-effort leak guard: fail if any unexpected message (for example
