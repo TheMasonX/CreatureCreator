@@ -12,10 +12,15 @@ namespace ProceduralCreature.Tests.Runtime
     {
         private static DensityGrid SphereGrid()
         {
-            var sphere = new SphereSdfNode(1f);
             var bounds = new BoundsDefinition { MaxX = 1.5f, MaxY = 1.5f, MaxZ = 1.5f };
             var settings = new GenerationSettings { VoxelsPerUnit = 6f };
-            return DensityGrid.Sample(sphere, bounds, settings);
+            var definition = CreatureDefinition.CreateEmpty();
+            definition.AddPart(new CreaturePart { Id = "sphere", PartType = PartType.Body, Transform = TransformData.Identity,
+                Shape = new ShapeDefinition { Type = ShapeType.Sphere, PrimarySize = 1f, SmoothBlendRadius = 0f }, Appearance = AppearanceDefinition.Default });
+            using (SdfProgram program = SdfProgramBuilder.CompilePortable(definition))
+            {
+                return DensityGrid.SamplePortable(program, bounds, settings);
+            }
         }
 
         [Test]
@@ -101,11 +106,14 @@ namespace ProceduralCreature.Tests.Runtime
         {
             var bounds = new BoundsDefinition { MaxX = 0.5f, MaxY = 0.5f, MaxZ = 0.5f };
             var settings = new GenerationSettings { VoxelsPerUnit = 4f };
-            DensityGrid grid = DensityGrid.Sample(new EmptySdfNode(), bounds, settings);
+            using (SdfProgram program = SdfProgramBuilder.CompilePortable(CreatureDefinition.CreateEmpty()))
+            {
+                DensityGrid grid = DensityGrid.SamplePortable(program, bounds, settings);
 
-            ActiveCellEntry[] active = ActiveCellBuilder.Build(grid);
+                ActiveCellEntry[] active = ActiveCellBuilder.Build(grid);
 
-            Assert.AreEqual(0, active.Length);
+                Assert.AreEqual(0, active.Length);
+            }
         }
 
         [Test]

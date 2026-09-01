@@ -4,7 +4,7 @@ namespace ProceduralCreature.Definition
 {
     /// <summary>
     /// DNA-level description of a part's shape. Interpreted by the Phase 2 SDF compiler
-    /// into concrete ISdfNode instances; this type itself has no SDF/mesh dependency
+    /// into portable SDF operations; this type itself has no SDF/mesh dependency
     /// (implementation guide §1.2).
     /// </summary>
     [Serializable]

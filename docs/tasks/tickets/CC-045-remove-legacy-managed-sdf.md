@@ -2,7 +2,7 @@
 id: creature-task-045
 key: CC-045
 title: Remove the legacy managed SDF from production generation
-status: In Progress
+status: Review
 type: Task
 priority: P1
 tags: [runtime, sdf, performance, burst, jobs, cleanup]
@@ -25,6 +25,12 @@ links:
 Make the Burst-compatible SDF execution program the only production generation
 path, then remove the obsolete managed SDF path when all consumers have parity
 evidence.
+
+## User Mandate
+
+> Implement the CC-045 managed SDF deletion in the repository. User explicitly approved deleting the old managed instances because fast field sampling and Burst compilation are working. Use apply_patch or repository editing tools, never destructive git reset/checkout. Scope: delete managed runtime graph files Assets/Scripts/Runtime/Morphology/Sdf/ISdfNode.cs, PrimitiveNodes.cs, TransformNode.cs, SmoothUnionNode.cs, SymmetryNode.cs, EmptySdfNode.cs; remove managed-only SdfProgramBuilder APIs Compile, CompileBodyField, CompileIndividualParts, CompilePart, CompilePartGeometry, CompileLimbChain, CompilePrimitive while preserving portable APIs; remove DensityGrid.Sample(ISdfNode,...). Migrate all runtime tests and docs that need it so the runtime/editor projects compile, replacing managed fixture sampling with portable scalar/program/grid APIs where possible. Do not delete tests wholesale unless they are strictly constructor implementation tests; replace them with DefinitionValidator or portable tests when practical. Update live Assets/Scripts/README.md and CC-045 ticket to describe portable-only SDF runtime and record deleted files/methods. Do not rewrite historical audit/archive records. Preserve PrimarySize compatibility at JSON/canonicalization boundaries. Run focused dotnet builds and git diff --check. If Unity is connected, refresh/compile and run the narrow SDF/runtime suite; otherwise report the blocker. Do not commit. Return a concise list of edits, validation results, remaining failures, and exact residual managed references (tests/docs only).
+
+STRICT: preserve portable APIs, preserve `PrimarySize` at JSON/canonicalization boundaries, leave historical audit/archive records unchanged, and do not commit.
 
 ## Scope
 
@@ -177,20 +183,13 @@ MeshExtraction, and 1,197.3 ms for AppearanceBake, for 19,980.9 ms total.
 
 ## Blockers
 
-The runtime assembly is discoverable when selected explicitly. The full
-runtime PlayMode assembly executed 442 tests after the production-boundary
-change; one unrelated baseline failure remains in
-`SkeletonInferrerLimbTests.Infer_LimbWithNullJoint_DoesNotThrowAndEmitsNoBones`.
-Per-part appearance resolution and the extraction reference contract must be
-confirmed before deleting `ISdfNode` and its managed compiler.
+The managed graph and compiler APIs are deleted. Runtime fixtures use portable
+programs and grids; the strictly constructor-oriented node fixtures were
+deleted. No managed SDF references remain under `Assets/Scripts`.
 
-The production appearance resolver now evaluates portable programs. The managed
-compiler remains in the reference path used by parity tests and has not yet
-been deleted. The normal generator, runtime preview, generation config, and
-editor controls no longer expose or invoke an explicit managed generation
-fallback. Focused source diagnostics are clean; runtime and editor test
-assemblies build with zero errors and warnings; task validation reports zero
-errors and warnings; and `git diff --check` passes.
+Unity validation is blocked because no Unity Editor instance is connected.
+Focused runtime and editor project builds pass; the runtime build reports only
+the existing CS0649 warnings. Unity test execution therefore remains pending.
 
 FastNoise2Bindings has local submodule history/build changes that are deliberately
 not part of this work. Treat the submodule as a future human-review gate before
@@ -204,12 +203,19 @@ it produces unrelated console warnings when Unity opens scripts.
 
 Run the repeated-generation benchmark at 96x96x96 and one additional supported
 quality, recording FieldSampling, AppearanceBake, mesh counts, and topology.
-Repeat the benchmark after scratch-buffer reuse and compare the measured
-AppearanceBake cost. Then reduce portable field-sampling scratch memory or add
-an explicit validated quality ceiling before treating very high preview quality
-as supported. Finally audit remaining managed SDF references and remove the compiler only after
-all reference fixtures have equivalent portable parity coverage. Do not commit
-or update the FastNoise2 submodule until a human reviews its local changes.
+Run the focused Unity SDF and generation suites after the managed-path deletion,
+then archive this ticket as Done if compilation, tests, and benchmark evidence
+pass. Do not commit or update the FastNoise2 submodule until a human reviews
+its local changes.
+
+The deletion record is complete: `ISdfNode.cs`, `PrimitiveNodes.cs`,
+`TransformNode.cs`, `SmoothUnionNode.cs`, `SymmetryNode.cs`, and
+`EmptySdfNode.cs` and their metadata were removed. `Compile`,
+`CompileBodyField`, `CompileIndividualParts`, `CompilePart`,
+`CompilePartGeometry`, `CompileLimbChain`, `CompilePrimitive`, and
+`DensityGrid.Sample(ISdfNode, ...)` were removed. `PrimarySize` remains at the
+DNA, JSON, and canonicalization boundaries. Historical audit and archive records
+were not changed.
 
 ## 2026-08-24 audit revision (11:48 delta audit) - complete via production/reference split
 The Burst path is mature enough to complete CC-045. Do an explicit split:

@@ -104,3 +104,33 @@ InitTestScene*.unity*
 
 # Auto-generated cache in Assets folder
 /[Aa]ssets/[Ss]ceneDependencyCache*
+
+# ── MemorySmith wiki (task tracking + memory) ─────────────────────────────
+# Source wiki content (Data/Pages/*.md, Data/Memories/*.json, Data/Tasks/*.json,
+# and Data/vars.json) is committed; runtime artifacts from the running service
+# are not. Ref: MemorySmith.Agent .gitignore convention.
+
+# SQLite databases created by the wiki service
+Data/memorysmith.db*
+
+# Data protection keys (auto-generated at first service start)
+Data/Keys/
+
+# Embedding/model artifacts (downloaded or built locally)
+Data/Models/
+*.onnx
+
+# Graph database artifacts (code-search index, etc.)
+Data/Graph/
+
+# Runtime event logs written by the wiki service
+Data/Events/
+
+# Per-process logs and PID files from Deploy-CreatureWiki.ps1
+# (.service/creature-wiki.port is committed as the configured default port)
+.service/*.log
+.service/*.err.log
+.service/*.pid
+
+# Published MemorySmith engine output
+artifacts/

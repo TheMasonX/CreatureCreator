@@ -151,28 +151,27 @@ namespace ProceduralCreature.Tests.Runtime
 
         private static DensityGrid SphereGrid()
         {
-            var sphere = new SphereSdfNode(1f);
             var bounds = new BoundsDefinition { MaxX = 1.5f, MaxY = 1.5f, MaxZ = 1.5f };
             var settings = new GenerationSettings { VoxelsPerUnit = 6f };
-            return DensityGrid.Sample(sphere, bounds, settings);
+            return DensityGrid.SamplePortable(SdfProgramBuilder.CompilePortable(SphereDefinition(1f)), bounds, settings);
         }
 
         private static DensityGrid OverlappingSpheresGrid()
         {
-            var a = new SphereSdfNode(1f);
-            var offset = UnityEngine.Matrix4x4.TRS(new Vector3(1f, 0f, 0f), Quaternion.identity, Vector3.one);
-            var b = new TransformNode(new SphereSdfNode(1f), offset);
-            var union = new SmoothUnionNode(a, b, 0.3f);
             var bounds = new BoundsDefinition { MaxX = 2.5f, MaxY = 1.5f, MaxZ = 1.5f };
             var settings = new GenerationSettings { VoxelsPerUnit = 5f };
-            return DensityGrid.Sample(union, bounds, settings);
+            CreatureDefinition definition = SphereDefinition(1f);
+            definition.AddPart(new CreaturePart { Id = "sphere_b", Transform = new TransformData { Position = Vector3.right,
+                Rotation = Quaternion.identity, Scale = Vector3.one }, Shape = new ShapeDefinition { Type = ShapeType.Sphere,
+                PrimarySize = 1f, SmoothBlendRadius = 0.3f }, Appearance = AppearanceDefinition.Default });
+            return DensityGrid.SamplePortable(SdfProgramBuilder.CompilePortable(definition), bounds, settings);
         }
 
         private static DensityGrid EmptyGrid()
         {
             var bounds = new BoundsDefinition { MaxX = 0.5f, MaxY = 0.5f, MaxZ = 0.5f };
             var settings = new GenerationSettings { VoxelsPerUnit = 4f };
-            return DensityGrid.Sample(new EmptySdfNode(), bounds, settings);
+            return DensityGrid.SamplePortable(SdfProgramBuilder.CompilePortable(CreatureDefinition.CreateEmpty()), bounds, settings);
         }
 
         private static DensityGrid BodySplineGrid()
@@ -190,10 +189,18 @@ namespace ProceduralCreature.Tests.Runtime
                 Appearance = AppearanceDefinition.Default,
             });
 
-            ISdfNode node = SdfProgramBuilder.Compile(definition);
             var bounds = new BoundsDefinition { MaxX = 2.5f, MaxY = 2.5f, MaxZ = 2.5f };
             var settings = new GenerationSettings { VoxelsPerUnit = 8f };
-            return DensityGrid.Sample(node, bounds, settings);
+            return DensityGrid.SamplePortable(SdfProgramBuilder.CompilePortable(definition), bounds, settings);
+        }
+
+        private static CreatureDefinition SphereDefinition(float radius)
+        {
+            var definition = CreatureDefinition.CreateEmpty();
+            definition.AddPart(new CreaturePart { Id = "sphere_a", PartType = PartType.Body,
+                Transform = TransformData.Identity, Shape = new ShapeDefinition { Type = ShapeType.Sphere,
+                PrimarySize = radius, SmoothBlendRadius = 0f }, Appearance = AppearanceDefinition.Default });
+            return definition;
         }
     }
 }

@@ -4,8 +4,8 @@ namespace ProceduralCreature.Skeleton
 {
     /// <summary>
     /// Mirrors a full rigid (or near-rigid) transform across the creature-space
-    /// X = 0 plane, matching the convention SymmetryNode uses at the SDF layer
-    /// (Morphology/Sdf/SymmetryNode.cs) — both must agree on which plane "mirror"
+    /// X = 0 plane, matching the convention used by portable SDF symmetry —
+    /// geometry and skeleton consumers must agree on which plane "mirror" means.
     /// means, or geometry and skeleton would disagree about where the mirrored
     /// side is.
     ///

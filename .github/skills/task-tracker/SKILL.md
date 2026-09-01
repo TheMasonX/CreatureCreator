@@ -54,6 +54,23 @@ to search or archive task records.
 7. Run `task_validate.py` after any manual edit or batch move. It must report
    zero errors.
 
+## User mandates
+
+When a user states a requirement directly in conversation, record it verbatim
+so a later agent cannot silently shift the goal. Add a `## User Mandate`
+section immediately after `## Summary`:
+
+- Quote the user's words verbatim in a blockquote.
+- Mark the requirement STRICT.
+- List the binding constraints. They frame the acceptance criteria and must not
+  be relaxed or re-scoped without explicit user confirmation.
+- Add the `user-mandated` tag so the ticket is searchable
+  (`task_search.py --tag user-mandated`).
+
+If a later agent proposes to reduce, defer, or re-scope a mandate, surface the
+proposal to the user; do not apply it silently. Archived mandate records are
+frozen with the rest of the ticket history.
+
 ## Statuses and location
 
 Active statuses stay in `tickets/`: `Backlog`, `In Progress`, `Blocked`,

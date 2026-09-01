@@ -470,10 +470,9 @@ namespace ProceduralCreature.Tests.Runtime
             definition.Body.Appearance.TopGradient = GradientAdapter.Solid(Color.red);
             definition.Body.Appearance.BottomGradient = GradientAdapter.Solid(Color.blue);
 
-            ISdfNode sdf = SdfProgramBuilder.Compile(definition);
             var bounds = new BoundsDefinition { MaxX = 1.5f, MaxY = 1.5f, MaxZ = 1.5f };
             var settings = new GenerationSettings { VoxelsPerUnit = 4f };
-            DensityGrid grid = DensityGrid.Sample(sdf, bounds, settings);
+            DensityGrid grid = DensityGrid.SamplePortable(SdfProgramBuilder.CompilePortable(definition), bounds, settings);
             MeshExtractionResult mesh = MarchingCubesExtractor.Extract(grid);
 
             Color[] colors = AppearanceBaker.Bake(definition, mesh);

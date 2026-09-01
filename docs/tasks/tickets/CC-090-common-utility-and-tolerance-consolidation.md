@@ -31,7 +31,9 @@ Extract repeated mechanics into small concrete Common utilities while keeping do
 - Move shared `PartType` classification, including `IsLimbChainType`, into the
   Runtime-owned contract so Editor authoring and Runtime validation cannot drift.
 - Provide one concrete hierarchy-index utility for repeated ID mechanics.
-- Decide whether the unused sibling-order strategy is deleted or made production-configurable.
+- Make the unused sibling-order strategy production-configurable through the
+  existing authoring control, or delete it only if the control decision is
+  explicitly withdrawn; do not leave the behavior as an undocumented choice.
 - Do not add adapter base classes, generic service interfaces, or speculative frameworks.
 
 ## Acceptance Criteria

@@ -9,7 +9,7 @@ using ProceduralCreature.Definition;
 namespace ProceduralCreature.Morphology.Sdf
 {
     /// <summary>
-    /// Compiles a validated CreatureDefinition into a single composed ISdfNode
+    /// Compiles a validated CreatureDefinition into a portable SDF operation program
     /// (implementation guide §11 "Definition-to-SDF compiler"). Read-only over its
     /// input — never mutates or writes back to the definition (§16 "the compiler
     /// never modifies DNA").
@@ -49,7 +49,7 @@ namespace ProceduralCreature.Morphology.Sdf
 
         /// <summary>
         /// The creature-space reflection across the X = 0 plane, matching the
-        /// convention SymmetryNode uses at the SDF layer. Used to mirror a limb
+        /// convention used by the portable symmetry operation. Used to mirror a limb
         /// chain in the portable path by LEFT-multiplying the part's creature-space
         /// matrix (the mirror of a composed transform), so the mirrored side lands
         /// across the creature's X plane regardless of where the part is placed.
@@ -302,7 +302,7 @@ namespace ProceduralCreature.Morphology.Sdf
                     // values computed for the unmirrored point), so a mirrored
                     // limb bakes a mirrored copy of the chain in instead of using
                     // a Symmetry op — the hard union of the two sides equals
-                    // SymmetryNode(chain) = min(chain(x), chain(-x)) exactly.
+                    // Portable symmetry evaluates the original and reflected roots.
                     primitive = CompileLimbChainPortable(operations, resolvedPart.Limb, localToCreature, distanceScale, shouldMirror);
                 }
                 else
@@ -547,178 +547,14 @@ namespace ProceduralCreature.Morphology.Sdf
                 new float4(matrix.m03, matrix.m13, matrix.m23, matrix.m33));
         }
 
-        public static ISdfNode Compile(CreatureDefinition definition)
-        {
-            if (definition == null)
-            {
-                throw new DomainException("Cannot compile a null CreatureDefinition.");
-            }
-
-            bool hasBodySamples = definition.Body != null
-                && definition.Body.Samples != null
-                && definition.Body.Samples.Count > 0;
-
-            List<(CreaturePart Part, ISdfNode Node)> compiled = CompileIndividualParts(definition);
-            if (compiled.Count == 0 && !hasBodySamples)
-            {
-                return new EmptySdfNode();
-            }
-
-            ISdfNode accumulated = CompileBodyField(definition);
-            for (int i = 0; i < compiled.Count; i++)
-            {
-                float blendRadius = PartUnionBlendRadius(compiled[i].Part);
-                accumulated = accumulated == null
-                    ? compiled[i].Node
-                    : new SmoothUnionNode(accumulated, compiled[i].Node, blendRadius);
-            }
-
-            return accumulated;
-        }
-
-        /// <summary>
-        /// Compiles the Body spline into the primary implicit surface: one sphere
-        /// per sample at its authoritative position/radius, smooth-united in spline
-        /// order. Returns null when the definition has no Body samples. Exposed
-        /// publicly for consumers that need to reason about the Body field on its
-        /// own — Phase 4's appearance resolver uses it to decide whether a surface
-        /// point belongs to the Body (and therefore takes the Body's vertical-
-        /// gradient appearance) rather than to a part.
-        /// </summary>
-        public static ISdfNode CompileBodyField(CreatureDefinition definition)
-        {
-            if (definition.Body == null || definition.Body.Samples == null || definition.Body.Samples.Count == 0)
-            {
-                return null;
-            }
-
-            // CC-056A increment 3: consume the shared ResolvedBody derivation.
-            ResolvedBody body = ResolvedBody.Resolve(definition.Body);
-            ISdfNode accumulated = null;
-            for (int i = 0; i < body.SamplePositions.Count; i++)
-            {
-                Vector3 position = body.SamplePositions[i];
-                float radius = body.SampleRadii[i];
-                ISdfNode sphere = new TransformNode(
-                    new SphereSdfNode(radius),
-                    Matrix4x4.TRS(position, Quaternion.identity, Vector3.one));
-
-                if (accumulated == null)
-                {
-                    accumulated = sphere;
-                    continue;
-                }
-
-                float blend = Mathf.Min(body.SampleRadii[i - 1], radius) * BodySampleBlendFactor;
-                accumulated = new SmoothUnionNode(accumulated, sphere, blend);
-            }
-
-            return accumulated;
-        }
-
-        /// <summary>
-        /// Compiles each part into its own standalone ISdfNode (including its own
-        /// transform and, if flagged, its own symmetry mirror) WITHOUT folding them
-        /// into a single unioned body. Exposed for consumers that need to reason
-        /// about individual parts rather than the composed whole — Phase 4's
-        /// appearance baker uses this to determine which part's appearance
-        /// parameters apply at a given surface point (see
-        /// Appearance/PartAppearanceSampler.cs), and Phase 6's skeleton inferer
-        /// will have the same need for per-part identity. Ordered the same way
-        /// Compile's fold order is (ascending Id), though callers needing per-part
-        /// data generally don't care about fold order — it's just a stable,
-        /// deterministic order to hand back.
-        /// </summary>
-        public static List<(CreaturePart Part, ISdfNode Node)> CompileIndividualParts(CreatureDefinition definition)
-        {
-            if (definition == null)
-            {
-                throw new DomainException("Cannot compile a null CreatureDefinition.");
-            }
-
-            List<CreaturePart> orderedParts = definition.Parts
-                .OrderBy(p => p.Id, System.StringComparer.Ordinal)
-                .ToList();
-
-            return orderedParts
-                .Where(part => part.MeshGeometry == null)
-                .Select(part => (part, CompilePart(definition, part)))
-                .ToList();
-        }
-
-        private static ISdfNode CompilePart(CreatureDefinition definition, CreaturePart part)
-        {
-            ISdfNode primitive = CompilePartGeometry(part);
-
-            Matrix4x4 localToCreatureSpace =
-                CreaturePartWorldTransformResolver.ResolveLocalToCreatureSpace(definition, part);
-            ISdfNode transformed = new TransformNode(primitive, localToCreatureSpace);
-
-            bool shouldMirror = part.MirrorAcrossSymmetryPlane
-                                 && definition.SymmetryMode != SymmetryMode.None;
-
-            return shouldMirror ? new SymmetryNode(transformed) : transformed;
-        }
-
-        /// <summary>
-        /// The geometry source for a part in its local frame. A limb part compiles
-        /// to its derived metaball chain (CC-018); a mesh-asset part (CC-031) has no
-        /// implicit surface and compiles to empty — its geometry comes from the
-        /// resolved mesh asset, not the SDF field; any other part compiles to its
-        /// single Shape primitive. <see cref="Shape"/> is inert for limb and mesh
-        /// parts (ADR-001 §2, ADR-002 §2).
-        /// </summary>
-        private static ISdfNode CompilePartGeometry(CreaturePart part)
-        {
-            if (part.MeshGeometry != null) return new EmptySdfNode();
-            return part.Limb != null ? CompileLimbChain(part.Limb) : CompilePrimitive(part.Shape);
-        }
-
-        /// <summary>
-        /// Compiles a limb chain (CC-018 Phase 5) into a smooth-union of sphere
-        /// nodes, one per derived metaball, in the limb's local frame. Metaball
-        /// positions and radii come from <see cref="LimbMetaballSampler"/> —
-        /// derived geometry that is never serialized.
-        /// </summary>
-        private static ISdfNode CompileLimbChain(LimbChain limb)
-        {
-            List<LimbMetaball> metaballs = LimbMetaballSampler.Sample(ResolvedLimb.Resolve(limb));
-            if (metaballs.Count == 1)
-            {
-                return new TransformNode(
-                    new SphereSdfNode(metaballs[0].Radius),
-                    Matrix4x4.TRS(metaballs[0].Position, Quaternion.identity, Vector3.one));
-            }
-
-            ISdfNode accumulated = null;
-            for (int i = 0; i < metaballs.Count; i++)
-            {
-                ISdfNode ball = new TransformNode(
-                    new SphereSdfNode(metaballs[i].Radius),
-                    Matrix4x4.TRS(metaballs[i].Position, Quaternion.identity, Vector3.one));
-
-                if (accumulated == null)
-                {
-                    accumulated = ball;
-                    continue;
-                }
-
-                LimbMetaball previous = metaballs[i - 1];
-                float blend = Mathf.Min(previous.Radius, metaballs[i].Radius) * LimbSampleBlendFactor;
-                accumulated = new SmoothUnionNode(accumulated, ball, blend);
-            }
-
-            return accumulated;
-        }
-
         /// <summary>
         /// Appends the portable operations for a limb chain: one sphere primitive
         /// plus a baked local-space transform per derived metaball, smooth-united
         /// in chain order. When <paramref name="includeMirror"/> is true, a second
         /// copy of the chain is emitted under the creature-space X mirror and the
         /// two sides are hard-unioned (blend 0). This reproduces
-        /// <c>SymmetryNode(chain) = min(chain(x), chain(-x))</c> exactly without a
-        /// portable Symmetry op, which cannot wrap a composite subtree.
+        /// <c>min(chain(x), chain(-x))</c> exactly without a separate symmetry
+        /// operation wrapping a composite subtree.
         ///
         /// The mirror is a CREATURE-SPACE reflection of the composed transform,
         /// not a per-ball local-X negation: the mirrored ball position must be
@@ -742,7 +578,7 @@ namespace ProceduralCreature.Morphology.Sdf
             // The creature-space mirror of the part's transform: S · localToCreature.
             // Each mirrored ball keeps its ORIGINAL local position and is placed by
             // this mirrored matrix, so its world position equals S · (original world
-            // position) — the same result SymmetryNode produces for the managed path.
+            // position) — the same result as reflecting the composite field.
             Matrix4x4 mirroredPartMatrix = CreatureMirrorAcrossX * localToCreature;
 
             for (int i = 0; i < metaballs.Count; i++)
@@ -812,34 +648,5 @@ namespace ProceduralCreature.Morphology.Sdf
             return unionIndex;
         }
 
-        private static ISdfNode CompilePrimitive(ShapeDefinition shape)
-        {
-            switch (shape.Type)
-            {
-                case ShapeType.Sphere:
-                    return new SphereSdfNode(shape.Radius > 0f ? shape.Radius : shape.PrimarySize);
-                case ShapeType.Box:
-                    Vector3 halfExtents = shape.BoxHalfExtents.x > 0f
-                        ? shape.BoxHalfExtents
-                        : new Vector3(shape.PrimarySize, shape.PrimarySize, shape.PrimarySize);
-                    return new BoxSdfNode(halfExtents);
-                case ShapeType.Capsule:
-                    return new CapsuleSdfNode(
-                        shape.Radius > 0f ? shape.Radius : shape.PrimarySize,
-                        shape.CapsuleHeight > 0f ? shape.CapsuleHeight : 1f,
-                        shape.CapsuleAxis);
-                case ShapeType.Ellipsoid:
-                    return new EllipsoidSdfNode(shape.EllipsoidRadii.x > 0f
-                        ? shape.EllipsoidRadii
-                        : new Vector3(shape.PrimarySize, shape.PrimarySize, shape.PrimarySize));
-                default:
-                    // Validated definitions never reach here (DefinitionValidator's
-                    // UnsupportedPartType-adjacent checks run on PartType, and
-                    // ShapeType is a closed enum with no "unknown" value today) —
-                    // this is a genuine future-proofing guard for whoever adds a
-                    // ShapeType case without adding it here too.
-                    throw new DomainException($"No SDF primitive mapping exists for ShapeType.{shape.Type}.");
-            }
-        }
     }
 }

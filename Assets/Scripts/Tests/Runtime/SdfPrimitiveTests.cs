@@ -1,6 +1,7 @@
 using NUnit.Framework;
+using Unity.Mathematics;
 using UnityEngine;
-using ProceduralCreature.Common;
+using ProceduralCreature.Definition;
 using ProceduralCreature.Morphology.Sdf;
 
 namespace ProceduralCreature.Tests.Runtime
@@ -8,88 +9,48 @@ namespace ProceduralCreature.Tests.Runtime
     [TestFixture]
     public class SdfPrimitiveTests
     {
-        private const float Epsilon = 1e-4f;
-
-        [Test]
-        public void Sphere_CenterIsInside()
+        private static float Evaluate(ShapeType type, Vector3 point, Vector3 parameters)
         {
-            var sphere = new SphereSdfNode(1f);
-            Assert.AreEqual(-1f, sphere.Evaluate(Vector3.zero), Epsilon);
+            CreatureDefinition definition = CreatureDefinition.CreateEmpty();
+            definition.AddPart(new CreaturePart { Id = "primitive", Transform = TransformData.Identity,
+                Shape = new ShapeDefinition { Type = type, PrimarySize = parameters.x, Radius = parameters.x,
+                    CapsuleHeight = parameters.y, CapsuleAxis = ShapeAxis.Y, EllipsoidRadii = parameters,
+                    BoxHalfExtents = parameters }, Appearance = AppearanceDefinition.Default });
+            using (SdfProgram program = SdfProgramBuilder.CompilePortable(definition))
+                return SdfProgramEvaluator.Evaluate(program, new float3(point.x, point.y, point.z));
         }
 
         [Test]
-        public void Sphere_SurfacePointIsZero()
+        public void Sphere_HasExpectedSignedDistance()
         {
-            var sphere = new SphereSdfNode(2f);
-            Assert.AreEqual(0f, sphere.Evaluate(new Vector3(2f, 0f, 0f)), Epsilon);
+            Assert.AreEqual(-1f, Evaluate(ShapeType.Sphere, Vector3.zero, Vector3.one), 1e-4f);
+            Assert.AreEqual(0f, Evaluate(ShapeType.Sphere, Vector3.right * 2f, Vector3.one * 2f), 1e-4f);
+            Assert.AreEqual(4f, Evaluate(ShapeType.Sphere, Vector3.right * 5f, Vector3.one), 1e-4f);
         }
 
         [Test]
-        public void Sphere_OutsidePointIsPositive()
+        public void Box_HasExpectedSignedDistance()
         {
-            var sphere = new SphereSdfNode(1f);
-            Assert.AreEqual(4f, sphere.Evaluate(new Vector3(5f, 0f, 0f)), Epsilon);
+            Assert.Less(Evaluate(ShapeType.Box, Vector3.zero, Vector3.one), 0f);
+            Assert.AreEqual(0f, Evaluate(ShapeType.Box, Vector3.right, Vector3.one), 1e-4f);
+            Assert.AreEqual(Mathf.Sqrt(3f), Evaluate(ShapeType.Box, Vector3.one * 2f, Vector3.one), 1e-4f);
         }
 
         [Test]
-        public void Sphere_RejectsNonPositiveRadius()
+        public void Capsule_HasExpectedSignedDistance()
         {
-            Assert.Throws<DomainException>(() => new SphereSdfNode(0f));
-            Assert.Throws<DomainException>(() => new SphereSdfNode(-1f));
-        }
-
-        [Test]
-        public void Box_CenterIsInside()
-        {
-            var box = new BoxSdfNode(new Vector3(1f, 1f, 1f));
-            Assert.Less(box.Evaluate(Vector3.zero), 0f);
-        }
-
-        [Test]
-        public void Box_FaceCenterIsZero()
-        {
-            var box = new BoxSdfNode(new Vector3(1f, 2f, 3f));
-            Assert.AreEqual(0f, box.Evaluate(new Vector3(1f, 0f, 0f)), Epsilon);
-        }
-
-        [Test]
-        public void Box_CornerDistanceIsCorrect()
-        {
-            var box = new BoxSdfNode(new Vector3(1f, 1f, 1f));
-            // Point straight out from a corner along the diagonal.
-            float distance = box.Evaluate(new Vector3(2f, 2f, 2f));
-            Assert.AreEqual(Mathf.Sqrt(3f), distance, Epsilon);
-        }
-
-        [Test]
-        public void Capsule_MidpointIsInside()
-        {
-            var capsule = new CapsuleSdfNode(0.5f);
-            Assert.AreEqual(-0.5f, capsule.Evaluate(Vector3.zero), Epsilon);
-        }
-
-        [Test]
-        public void Capsule_EndpointCapSurfaceIsZero()
-        {
-            var capsule = new CapsuleSdfNode(0.5f);
-            // Endpoint is at (0, 0.5, 0); the cap surface extends 0.5 further along Y.
-            Assert.AreEqual(0f, capsule.Evaluate(new Vector3(0f, 1f, 0f)), Epsilon);
-        }
-
-        [Test]
-        public void Capsule_SideSurfaceIsZero()
-        {
-            var capsule = new CapsuleSdfNode(0.5f);
-            Assert.AreEqual(0f, capsule.Evaluate(new Vector3(0.5f, 0f, 0f)), Epsilon);
+            Assert.AreEqual(-0.5f, Evaluate(ShapeType.Capsule, Vector3.zero, new Vector3(0.5f, 1f, 0f)), 1e-4f);
+            Assert.AreEqual(0f, Evaluate(ShapeType.Capsule, Vector3.up, new Vector3(0.5f, 1f, 0f)), 1e-4f);
+            Assert.AreEqual(0f, Evaluate(ShapeType.Capsule, Vector3.right * 0.5f, new Vector3(0.5f, 1f, 0f)), 1e-4f);
         }
 
         [Test]
         public void Ellipsoid_UsesAllThreeRadii()
         {
-            var ellipsoid = new EllipsoidSdfNode(new Vector3(2f, 1f, 0.5f));
-            Assert.AreEqual(0f, ellipsoid.Evaluate(new Vector3(0f, 1f, 0f)), Epsilon);
-            Assert.AreEqual(0f, ellipsoid.Evaluate(new Vector3(0f, 0f, 0.5f)), Epsilon);
-            Assert.Greater(ellipsoid.Evaluate(new Vector3(0f, 0f, 0.6f)), 0f);
+            Vector3 radii = new Vector3(2f, 1f, 0.5f);
+            Assert.AreEqual(0f, Evaluate(ShapeType.Ellipsoid, Vector3.up, radii), 1e-4f);
+            Assert.AreEqual(0f, Evaluate(ShapeType.Ellipsoid, Vector3.forward * 0.5f, radii), 1e-4f);
+            Assert.Greater(Evaluate(ShapeType.Ellipsoid, Vector3.forward * 0.6f, radii), 0f);
         }
     }
 }

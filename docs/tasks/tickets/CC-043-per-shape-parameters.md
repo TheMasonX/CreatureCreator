@@ -117,6 +117,11 @@ shape type its own size parameters so the DNA says what the shape is.
 - `SdfProgramBuilderTests` covers managed and portable parity for explicit
   capsule and ellipsoid parameters.
 
+The SDF primitive contract also requires every authored dimension to be finite
+and positive. `BoxSdfNode` currently checks positivity but does not reject NaN
+or Infinity like the other primitive nodes; this residual belongs to the shape
+parameter contract and requires focused constructor regression tests.
+
 ## Blockers
 
 - No known implementation blocker. Unity visual confirmation of authored

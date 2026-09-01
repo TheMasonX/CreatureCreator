@@ -27,18 +27,12 @@ ProceduralCreature/
       CreatureMeshPalette.cs    — runtime MeshAssetKey resolver for Play Mode generation
     Morphology/
       Sdf/
-        ISdfNode.cs              — sign convention fixed here: negative=inside, positive=outside
-        PrimitiveNodes.cs        — Sphere, Box, Capsule, Ellipsoid (documented MVP simplification)
-        TransformNode.cs         — exact for isometries + uniform scale; documented approximation for non-uniform
         SmoothMinMath.cs         — polynomial smooth-min as a standalone, unit-testable operation
-        SmoothUnionNode.cs       — binary composition wrapping SmoothMinMath
-        SymmetryNode.cs          — the SDF-layer half of the symmetry decision (delta-audit #2)
-        EmptySdfNode.cs          — handles the zero-part creature edge case explicitly
-        SdfProgramBuilder.cs     — the definition-to-SDF compiler (deterministic Id-ordered fold)
+        SdfProgramBuilder.cs     — the portable definition-to-SDF compiler (deterministic Id-ordered fold)
       Extraction/
         CubeTopology.cs          — self-derived corner/edge/face constants (no external table dependency)
         AsymptoticDecider.cs     — the Nielson-Hamann bilinear saddle test, derived in comments
-        DensityGrid.cs           — samples an ISdfNode over the fixed grid (Sprint 3.1)
+        DensityGrid.cs           — samples a portable SdfProgram over the fixed grid (Sprint 3.1)
         CubeContourResolver.cs   — per-cube contour via face segments + closed-loop tracing (replaces the classic 256-row table)
         MeshExtractionResult.cs  — plain positions/triangles output + Unity Mesh conversion
         MarchingCubesExtractor.cs — extraction loop: vertex welding across cells + gradient-based winding correction
@@ -79,7 +73,6 @@ Tests/Editor/
     JsonDnaSerializerTests.cs
     SdfPrimitiveTests.cs
     SmoothMinMathTests.cs
-    TransformNodeTests.cs
     CreaturePartWorldTransformResolverTests.cs
     SdfProgramBuilderTests.cs
     CubeTopologyTests.cs
@@ -112,23 +105,17 @@ editor concerns; flagging again here so they don't get lost between documents.
 
 ## Phase 2 — what's here and what it deliberately simplifies
 
-`SdfProgramBuilder.Compile(definition)` turns a validated `CreatureDefinition` into
-a single composed `ISdfNode` tree, ready for Phase 3's Marching Cubes sampler to
-call `.Evaluate(point)` against on a grid. Nothing in Phase 3's contract requires
-anything here to change.
+`SdfProgramBuilder.CompilePortable(definition)` turns a validated
+`CreatureDefinition` into a blittable `SdfProgram`. `SdfProgramEvaluator` and
+`DensityGrid.SamplePortable` are the only SDF execution APIs; the runtime no
+longer contains the former managed node graph. Negative values mean inside and
+positive values mean outside.
 
 Two things are worth knowing before Phase 3 leans on this:
 
-- **`TransformNode`'s non-uniform-scale handling is an approximation** (scales the
-  child's local distance by the *minimum* absolute scale component, which never
-  overestimates distance — safe for a surface-crossing test, but not a true
-  distance field far from the surface). Documented in the class itself. If Phase 3
-  hardening finds this insufficient, this is the file to revisit.
-- **`EllipsoidSdfNode` is currently just `SphereSdfNode` under a different name.**
-  `ShapeDefinition` only carries one size parameter (`PrimarySize`), matching every
-  other primitive; true per-axis ellipsoids need a schema change (extra radius
-  fields) that wasn't part of the Phase 1 contract. Flagged in the class doc
-  comment rather than silently shipped as "ellipsoid" that isn't one.
+- Non-uniform transform distance handling remains the documented approximation in
+  the portable `Transform` operation. Ellipsoid evaluation remains an approximate
+  distance field; authored per-axis radii are preserved in the DNA schema.
 
 ## Phase 3 — delta-audit item #1, resolved: Marching Cubes + Asymptotic Decider
 
@@ -174,7 +161,7 @@ production — see "Test coverage" table below for what's already checked):
 - **Winding is corrected per-triangle via SDF gradient estimation** (central
   difference), not by solving global loop-traversal-direction consistency
   analytically. Cheap, safe, and local, but adds one gradient evaluation (6 extra
-  `ISdfNode.Evaluate` calls) per emitted triangle — worth profiling at production
+  scalar evaluator calls) per emitted triangle — worth profiling at production
   grid resolutions (Phase 10 hardening).
 
 ## Phase 4 — appearance baking
@@ -182,7 +169,7 @@ production — see "Test coverage" table below for what's already checked):
 `AppearanceBaker.Bake(definition, mesh)` produces one `Color` per mesh vertex:
 `PartAppearanceSampler` resolves which part's `AppearanceDefinition` applies at
 that point (nearest-part, by evaluating every part's individually-compiled SDF
-node — see `SdfProgramBuilder.CompileIndividualParts`, added specifically for
+  portable program — see `SdfProgramBuilder.CompileIndividualPartsPortable`, added specifically for
 this), then `TriplanarNoise` modulates that part's `BaseColor` for surface
 variation, projected via the standard triplanar technique (blend of 3 axis-plane
 samples weighted by normal direction) to avoid stretching artifacts on blobby
@@ -523,7 +510,7 @@ real Unity session before relying on it.
 | 1.3 | Save → load → canonical-save is byte-stable | `JsonDnaSerializerTests.SaveLoadSave_ProducesByteStableJson` |
 | 1.3 | Canonical output independent of authoring order | `JsonDnaSerializerTests.Serialize_IsStableAcrossPartInsertionOrder` |
 | 2.1 | Primitive nodes produce correct signed distance at known points | `SdfPrimitiveTests` (sphere/box/capsule center, surface, exterior) |
-| 2.1 | Transform handling exact for isometries/uniform scale | `TransformNodeTests` (translation, rotation, uniform scale) |
+| 2.1 | Transform handling exact for isometries/uniform scale | portable SDF transform coverage |
 | 2.2 | Smooth-min is continuous, symmetric, and bounded | `SmoothMinMathTests` |
 | 2.2 | Extreme/zero smoothing parameters handled deterministically | `SmoothMinMathTests.SmoothMin_ZeroBlendRadius...` / `_NegativeBlendRadius...` |
 | 2.3 | Definition-order independence in compiled SDF output | `SdfProgramBuilderTests.Compile_IsDeterministicRegardlessOfPartsInsertionOrder` |

@@ -6,8 +6,8 @@ namespace ProceduralCreature.Morphology.Sdf
     /// The smooth-min operation, factored out as a reusable math primitive
     /// (implementation guide §2.2: "polynomial smooth minimum as a reusable
     /// mathematical operation, not embedded directly inside node evaluation logic")
-    /// so it can be unit-tested against known values independent of any SDF node,
-    /// and so SmoothUnionNode stays a thin wrapper.
+    /// so it can be unit-tested against known values independently from the
+    /// portable operation evaluator.
     ///
     /// EDGE CASE HANDLING (§2.2: "deterministic handling for edge cases such as
     /// extreme smoothing parameters"): blendRadius &lt;= 0 falls back to a hard

@@ -64,28 +64,4 @@ namespace ProceduralCreature.Tests.Runtime
         }
     }
 
-    [TestFixture]
-    public class SmoothUnionNodeTests
-    {
-        [Test]
-        public void Evaluate_MatchesSmoothMinOfChildren()
-        {
-            var a = new SphereSdfNode(1f);
-            var b = new SphereSdfNode(1f);
-            var union = new SmoothUnionNode(a, b, 0.5f);
-
-            Vector3 point = new Vector3(3f, 0f, 0f);
-            float expected = SmoothMinMath.SmoothMin(a.Evaluate(point), b.Evaluate(point), 0.5f);
-
-            Assert.AreEqual(expected, union.Evaluate(point), 1e-6f);
-        }
-
-        [Test]
-        public void Constructor_RejectsNullChildren()
-        {
-            var sphere = new SphereSdfNode(1f);
-            Assert.Throws<DomainException>(() => new SmoothUnionNode(null, sphere, 0.1f));
-            Assert.Throws<DomainException>(() => new SmoothUnionNode(sphere, null, 0.1f));
-        }
-    }
 }

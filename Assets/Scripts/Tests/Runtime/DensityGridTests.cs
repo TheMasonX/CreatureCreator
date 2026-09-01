@@ -18,14 +18,15 @@ namespace ProceduralCreature.Tests.Runtime
         {
             var bounds = new BoundsDefinition { MaxX = 1f, MaxY = 1f, MaxZ = 1f };
             var settings = new GenerationSettings { VoxelsPerUnit = 4f };
-            var sphere = new SphereSdfNode(1f);
+            using (SdfProgram program = SdfProgramBuilder.CompilePortable(CreatureDefinition.CreateEmpty()))
+            {
+                DensityGrid grid = DensityGrid.SamplePortable(program, bounds, settings);
 
-            DensityGrid grid = DensityGrid.Sample(sphere, bounds, settings);
-
-            // 2 units of extent per axis * 4 voxels/unit = 8 cells per axis.
-            Assert.AreEqual(8, grid.CellsX);
-            Assert.AreEqual(8, grid.CellsY);
-            Assert.AreEqual(8, grid.CellsZ);
+                // 2 units of extent per axis * 4 voxels/unit = 8 cells per axis.
+                Assert.AreEqual(8, grid.CellsX);
+                Assert.AreEqual(8, grid.CellsY);
+                Assert.AreEqual(8, grid.CellsZ);
+            }
         }
 
         [Test]
@@ -33,17 +34,21 @@ namespace ProceduralCreature.Tests.Runtime
         {
             var bounds = new BoundsDefinition { MaxX = 1f, MaxY = 1f, MaxZ = 1f };
             var settings = new GenerationSettings { VoxelsPerUnit = 2f };
-            var sphere = new SphereSdfNode(0.5f);
+            CreatureDefinition definition = CreatureDefinition.CreateEmpty();
+            definition.AddPart(new CreaturePart { Id = "sphere", PartType = PartType.Body, Transform = TransformData.Identity,
+                Shape = new ShapeDefinition { Type = ShapeType.Sphere, PrimarySize = 0.5f, SmoothBlendRadius = 0f }, Appearance = AppearanceDefinition.Default });
+            using (SdfProgram program = SdfProgramBuilder.CompilePortable(definition))
+            {
+                DensityGrid grid = DensityGrid.SamplePortable(program, bounds, settings);
 
-            DensityGrid grid = DensityGrid.Sample(sphere, bounds, settings);
+                Vector3 cornerWorldPos = grid.CornerPosition(0, 0, 0);
+                Assert.AreEqual(new Vector3(-1f, -1f, -1f), cornerWorldPos,
+                    "Grid origin corner should sit at (-MaxX,-MaxY,-MaxZ).");
+                Assert.AreEqual(SdfProgramEvaluator.Evaluate(program, new float3(cornerWorldPos.x, cornerWorldPos.y, cornerWorldPos.z)), grid.GetSample(0, 0, 0), 1e-5f);
 
-            Vector3 cornerWorldPos = grid.CornerPosition(0, 0, 0);
-            Assert.AreEqual(new Vector3(-1f, -1f, -1f), cornerWorldPos,
-                "Grid origin corner should sit at (-MaxX,-MaxY,-MaxZ).");
-            Assert.AreEqual(sphere.Evaluate(cornerWorldPos), grid.GetSample(0, 0, 0), 1e-5f);
-
-            Vector3 centerish = grid.CornerPosition(grid.CellsX / 2, grid.CellsY / 2, grid.CellsZ / 2);
-            Assert.AreEqual(sphere.Evaluate(centerish), grid.GetSample(grid.CellsX / 2, grid.CellsY / 2, grid.CellsZ / 2), 1e-5f);
+                Vector3 centerish = grid.CornerPosition(grid.CellsX / 2, grid.CellsY / 2, grid.CellsZ / 2);
+                Assert.AreEqual(SdfProgramEvaluator.Evaluate(program, new float3(centerish.x, centerish.y, centerish.z)), grid.GetSample(grid.CellsX / 2, grid.CellsY / 2, grid.CellsZ / 2), 1e-5f);
+            }
         }
 
         [Test]
@@ -51,14 +56,18 @@ namespace ProceduralCreature.Tests.Runtime
         {
             var bounds = new BoundsDefinition { MaxX = 2f, MaxY = 2f, MaxZ = 2f };
             var settings = new GenerationSettings { VoxelsPerUnit = 16f };
-            var sphere = new SphereSdfNode(1f);
+            CreatureDefinition definition = CreatureDefinition.CreateEmpty();
+            definition.AddPart(new CreaturePart { Id = "sphere", PartType = PartType.Body, Transform = TransformData.Identity,
+                Shape = new ShapeDefinition { Type = ShapeType.Sphere, PrimarySize = 1f, SmoothBlendRadius = 0f }, Appearance = AppearanceDefinition.Default });
+            using (SdfProgram program = SdfProgramBuilder.CompilePortable(definition))
+            {
+                DensityGrid grid = DensityGrid.SamplePortable(program, bounds, settings);
+                Vector3 gradient = grid.EstimateGradient(new Vector3(1f, 0f, 0f));
 
-            DensityGrid grid = DensityGrid.Sample(sphere, bounds, settings);
-            Vector3 gradient = grid.EstimateGradient(new Vector3(1f, 0f, 0f));
-
-            Assert.Greater(gradient.x, 0f);
-            Assert.AreEqual(0f, gradient.y, 1e-4f);
-            Assert.AreEqual(0f, gradient.z, 1e-4f);
+                Assert.Greater(gradient.x, 0f);
+                Assert.AreEqual(0f, gradient.y, 1e-4f);
+                Assert.AreEqual(0f, gradient.z, 1e-4f);
+            }
         }
 
         [Test]
@@ -66,16 +75,17 @@ namespace ProceduralCreature.Tests.Runtime
         {
             var badBounds = new BoundsDefinition { MaxX = -1f, MaxY = 1f, MaxZ = 1f };
             var settings = GenerationSettings.Default;
-            var sphere = new SphereSdfNode(1f);
-
-            Assert.Throws<DomainException>(() => DensityGrid.Sample(sphere, badBounds, settings));
+            using (SdfProgram program = SdfProgramBuilder.CompilePortable(CreatureDefinition.CreateEmpty()))
+            {
+                Assert.Throws<DomainException>(() => DensityGrid.SamplePortable(program, badBounds, settings));
+            }
         }
 
         [Test]
-        public void Sample_RejectsNullNode()
+        public void SamplePortable_RejectsNullProgram()
         {
             Assert.Throws<DomainException>(() =>
-                DensityGrid.Sample(null, BoundsDefinition.Default, GenerationSettings.Default));
+            DensityGrid.SamplePortable(null, BoundsDefinition.Default, GenerationSettings.Default));
         }
 
         [Test]
@@ -117,10 +127,10 @@ namespace ProceduralCreature.Tests.Runtime
                 Appearance = AppearanceDefinition.Default,
             });
 
-            ISdfNode managedNode = SdfProgramBuilder.Compile(definition);
-            DensityGrid managed = DensityGrid.Sample(managedNode, definition.Bounds, definition.Generation);
+            using (SdfProgram managedProgram = SdfProgramBuilder.CompilePortable(definition))
             using (SdfProgram portableProgram = SdfProgramBuilder.CompilePortable(definition))
             {
+                DensityGrid managed = DensityGrid.SamplePortable(managedProgram, definition.Bounds, definition.Generation);
                 DensityGrid portable = DensityGrid.SamplePortable(
                     portableProgram, definition.Bounds, definition.Generation);
                 for (int z = 0; z <= managed.CellsZ; z++)

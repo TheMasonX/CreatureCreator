@@ -10,291 +10,116 @@ namespace ProceduralCreature.Tests.Runtime
     [TestFixture]
     public class SdfProgramBuilderTests
     {
-        private static CreaturePart Sphere(string id, Vector3 position, string parentId = null)
+        private static CreatureDefinition Sphere(string id, Vector3 position, string parentId = null)
         {
-            return new CreaturePart
-            {
-                Id = id,
-                ParentId = parentId,
-                PartType = PartType.Body,
+            var definition = CreatureDefinition.CreateEmpty();
+            definition.AddPart(new CreaturePart { Id = id, ParentId = parentId,
                 Transform = new TransformData { Position = position, Rotation = Quaternion.identity, Scale = Vector3.one },
-                Shape = new ShapeDefinition { Type = ShapeType.Sphere, PrimarySize = 1f, SmoothBlendRadius = 0.5f },
-                Appearance = AppearanceDefinition.Default,
-            };
+                Shape = ShapeDefinition.DefaultSphere, Appearance = AppearanceDefinition.Default });
+            return definition;
+        }
+
+        private static float Evaluate(SdfProgram program, Vector3 point)
+        {
+            return SdfProgramEvaluator.Evaluate(program, new float3(point.x, point.y, point.z));
         }
 
         [Test]
-        public void Compile_EmptyDefinition_ReturnsEmptyNodeEverywhereOutside()
+        public void CompilePortable_EmptyDefinitionIsOutside()
+        {
+            using (SdfProgram program = SdfProgramBuilder.CompilePortable(CreatureDefinition.CreateEmpty()))
+                Assert.IsTrue(float.IsPositiveInfinity(Evaluate(program, Vector3.zero)));
+        }
+
+        [Test]
+        public void CompilePortable_SinglePartProducesSphereField()
+        {
+            using (SdfProgram program = SdfProgramBuilder.CompilePortable(Sphere("part", Vector3.zero)))
+                Assert.Less(Evaluate(program, Vector3.zero), 0f);
+        }
+
+        [Test]
+        public void CompilePortable_BodySplineIsPrimaryField()
         {
             CreatureDefinition definition = CreatureDefinition.CreateEmpty();
-            ISdfNode node = SdfProgramBuilder.Compile(definition);
-
-            Assert.IsInstanceOf<EmptySdfNode>(node);
-            Assert.IsTrue(float.IsPositiveInfinity(node.Evaluate(Vector3.zero)));
-        }
-
-        [Test]
-        public void Compile_SinglePart_MatchesDirectPrimitiveEvaluation()
-        {
-            var definition = CreatureDefinition.CreateEmpty();
-            definition.AddPart(Sphere("part_a", Vector3.zero));
-
-            ISdfNode compiled = SdfProgramBuilder.Compile(definition);
-            var reference = new SphereSdfNode(1f);
-
-            Vector3 point = new Vector3(0.5f, 0.5f, 0.5f);
-            Assert.AreEqual(reference.Evaluate(point), compiled.Evaluate(point), 1e-4f);
-        }
-
-        [Test]
-        public void Compile_BodySpline_IsThePrimaryField()
-        {
-            var definition = CreatureDefinition.CreateEmpty();
             definition.Body.Samples.Add(new BodySample { Id = 1, Position = new Vector3(0f, 0f, -1f), Radius = 0.75f });
             definition.Body.Samples.Add(new BodySample { Id = 2, Position = new Vector3(0f, 0f, 1f), Radius = 0.9f });
-
-            ISdfNode compiled = SdfProgramBuilder.Compile(definition);
-
-            // A point at a Body sample center must be well inside the field even
-            // though the definition has no parts at all.
-            Assert.Less(compiled.Evaluate(new Vector3(0f, 0f, -1f)), 0f,
-                "The Body spline alone must produce a primary implicit surface.");
-            Assert.Less(compiled.Evaluate(new Vector3(0f, 0f, 1f)), 0f);
-            Assert.Greater(compiled.Evaluate(new Vector3(0f, 0f, 4f)), 0f,
-                "A point far outside the spline must be outside the field.");
-        }
-
-        [Test]
-        public void CompilePortable_BodySpline_MatchesManagedGraph()
-        {
-            var definition = CreatureDefinition.CreateEmpty();
-            definition.Body.Samples.Add(new BodySample { Id = 1, Position = new Vector3(0f, 0f, -1f), Radius = 0.75f });
-            definition.Body.Samples.Add(new BodySample { Id = 2, Position = new Vector3(0f, 0f, 1f), Radius = 0.9f });
-            definition.AddPart(Sphere("part_leg", new Vector3(1f, -1f, 0f)));
-
-            ISdfNode managed = SdfProgramBuilder.Compile(definition);
-            using (SdfProgram portable = SdfProgramBuilder.CompilePortable(definition))
+            using (SdfProgram program = SdfProgramBuilder.CompilePortable(definition))
             {
-                for (float x = -2f; x <= 2f; x += 0.31f)
-                for (float y = -2f; y <= 2f; y += 0.37f)
-                {
-                    Vector3 point = new Vector3(x, y, 0.21f);
-                    Assert.AreEqual(managed.Evaluate(point),
-                        SdfProgramEvaluator.Evaluate(portable, new float3(point.x, point.y, point.z)),
-                        1e-4f, $"Mismatch at {point}.");
-                }
+                Assert.Less(Evaluate(program, new Vector3(0f, 0f, -1f)), 0f);
+                Assert.Less(Evaluate(program, new Vector3(0f, 0f, 1f)), 0f);
+                Assert.Greater(Evaluate(program, new Vector3(0f, 0f, 4f)), 0f);
             }
         }
 
         [Test]
-        public void Compile_IsDeterministicRegardlessOfPartsInsertionOrder()
+        public void CompilePortable_IsDeterministicRegardlessOfPartOrder()
         {
-            var definitionA = CreatureDefinition.CreateEmpty();
-            definitionA.AddPart(Sphere("part_a", new Vector3(0f, 0f, 0f)));
-            definitionA.AddPart(Sphere("part_b", new Vector3(3f, 0f, 0f)));
-
-            var definitionB = CreatureDefinition.CreateEmpty();
-            definitionB.AddPart(Sphere("part_b", new Vector3(3f, 0f, 0f)));
-            definitionB.AddPart(Sphere("part_a", new Vector3(0f, 0f, 0f)));
-
-            ISdfNode compiledA = SdfProgramBuilder.Compile(definitionA);
-            ISdfNode compiledB = SdfProgramBuilder.Compile(definitionB);
-
-            // Sample a grid of points and confirm both compiled trees agree everywhere,
-            // not just at one convenient point — this is what "changing serialized
-            // part order does not change the resulting SDF" actually needs to mean.
-            for (float x = -2f; x <= 5f; x += 0.5f)
+            CreatureDefinition first = Sphere("part_a", Vector3.zero);
+            first.AddPart(new CreaturePart { Id = "part_b", Transform = new TransformData { Position = Vector3.right * 3f,
+                Rotation = Quaternion.identity, Scale = Vector3.one }, Shape = ShapeDefinition.DefaultSphere, Appearance = AppearanceDefinition.Default });
+            CreatureDefinition second = Sphere("part_b", Vector3.right * 3f);
+            second.AddPart(new CreaturePart { Id = "part_a", Transform = TransformData.Identity,
+                Shape = ShapeDefinition.DefaultSphere, Appearance = AppearanceDefinition.Default });
+            using (SdfProgram a = SdfProgramBuilder.CompilePortable(first))
+            using (SdfProgram b = SdfProgramBuilder.CompilePortable(second))
             {
-                Vector3 point = new Vector3(x, 0.3f, -0.2f);
-                Assert.AreEqual(compiledA.Evaluate(point), compiledB.Evaluate(point), 1e-4f,
-                    $"Mismatch at point {point}.");
+                for (float x = -2f; x <= 5f; x += 0.5f)
+                    Assert.AreEqual(Evaluate(a, new Vector3(x, 0.3f, -0.2f)), Evaluate(b, new Vector3(x, 0.3f, -0.2f)), 1e-4f);
             }
         }
 
         [Test]
-        public void Compile_ChildInheritsParentTransform()
+        public void CompilePortable_ChildInheritsParentTransform()
         {
-            var definition = CreatureDefinition.CreateEmpty();
-            definition.AddPart(Sphere("part_root", new Vector3(10f, 0f, 0f)));
-            definition.AddPart(Sphere("part_child", new Vector3(0f, 0f, 0f), parentId: "part_root"));
-
-            ISdfNode compiled = SdfProgramBuilder.Compile(definition);
-
-            // Child sphere is centered at local (0,0,0) relative to root, so in
-            // creature space it should be centered at (10,0,0) too.
-            Assert.Less(compiled.Evaluate(new Vector3(10f, 0f, 0f)), -0.9f);
+            CreatureDefinition definition = Sphere("root", new Vector3(10f, 0f, 0f));
+            definition.AddPart(new CreaturePart { Id = "child", ParentId = "root", Transform = TransformData.Identity,
+                Shape = ShapeDefinition.DefaultSphere, Appearance = AppearanceDefinition.Default });
+            using (SdfProgram program = SdfProgramBuilder.CompilePortable(definition))
+                Assert.Less(Evaluate(program, new Vector3(10f, 0f, 0f)), -0.9f);
         }
 
         [Test]
-        public void Compile_MirroredPart_ProducesGeometryOnBothSides()
+        public void CompilePortable_MirroredPartProducesBothSides()
         {
-            var definition = CreatureDefinition.CreateEmpty();
+            CreatureDefinition definition = Sphere("leg", new Vector3(5f, 0f, 0f));
             definition.SymmetryMode = SymmetryMode.MirrorAcrossXAxis;
-
-            CreaturePart mirroredLeg = Sphere("part_leg", new Vector3(5f, 0f, 0f));
-            mirroredLeg.MirrorAcrossSymmetryPlane = true;
-            definition.AddPart(mirroredLeg);
-
-            ISdfNode compiled = SdfProgramBuilder.Compile(definition);
-
-            Assert.Less(compiled.Evaluate(new Vector3(5f, 0f, 0f)), 0f, "Original side should have geometry.");
-            Assert.Less(compiled.Evaluate(new Vector3(-5f, 0f, 0f)), 0f, "Mirrored side should also have geometry.");
-            Assert.Greater(compiled.Evaluate(new Vector3(0f, 0f, 0f)), 0f, "Gap between the two legs should be empty.");
+            definition.FindPart("leg").MirrorAcrossSymmetryPlane = true;
+            using (SdfProgram program = SdfProgramBuilder.CompilePortable(definition))
+            {
+                Assert.Less(Evaluate(program, new Vector3(5f, 0f, 0f)), 0f);
+                Assert.Less(Evaluate(program, new Vector3(-5f, 0f, 0f)), 0f);
+                Assert.Greater(Evaluate(program, Vector3.zero), 0f);
+            }
         }
 
         [Test]
-        public void Compile_UnmirroredPart_DoesNotProduceGeometryOnOppositeSide()
+        public void CompilePortable_UnmirroredPartStaysOnOriginalSide()
         {
-            var definition = CreatureDefinition.CreateEmpty();
+            CreatureDefinition definition = Sphere("leg", new Vector3(5f, 0f, 0f));
             definition.SymmetryMode = SymmetryMode.MirrorAcrossXAxis;
-            definition.AddPart(Sphere("part_leg", new Vector3(5f, 0f, 0f))); // MirrorAcrossSymmetryPlane defaults to false
-
-            ISdfNode compiled = SdfProgramBuilder.Compile(definition);
-
-            Assert.Greater(compiled.Evaluate(new Vector3(-5f, 0f, 0f)), 0f,
-                "A part not flagged for mirroring must not appear on the opposite side even when SymmetryMode is set.");
+            using (SdfProgram program = SdfProgramBuilder.CompilePortable(definition))
+                Assert.Greater(Evaluate(program, new Vector3(-5f, 0f, 0f)), 0f);
         }
 
         [Test]
-        public void Compile_NullDefinition_ThrowsDomainException()
+        public void CompilePortable_NullDefinitionThrowsDomainException()
         {
-            Assert.Throws<DomainException>(() => SdfProgramBuilder.Compile(null));
+            Assert.Throws<DomainException>(() => SdfProgramBuilder.CompilePortable(null));
         }
 
         [Test]
-        public void CompilePortable_MatchesManagedGraphAcrossPrimitiveAndCompositionSamples()
+        public void CompilePortable_CurrentSchemaSphereIgnoresLegacyPrimarySize()
         {
-            var definition = CreatureDefinition.CreateEmpty();
-            definition.SymmetryMode = SymmetryMode.MirrorAcrossXAxis;
-            CreaturePart body = Sphere("body", new Vector3(1f, 0.25f, -0.5f));
-            body.Shape.Type = ShapeType.Box;
-            body.Shape.PrimarySize = 0.8f;
-            body.Shape.SmoothBlendRadius = 0.2f;
-            definition.AddPart(body);
-            CreaturePart limb = Sphere("limb", new Vector3(-1.2f, 0.4f, 0f));
-            limb.Shape.Type = ShapeType.Capsule;
-            limb.Shape.PrimarySize = 0.35f;
-            limb.Shape.SmoothBlendRadius = 0.1f;
-            limb.MirrorAcrossSymmetryPlane = true;
-            definition.AddPart(limb);
-
-            ISdfNode managed = SdfProgramBuilder.Compile(definition);
-            using (SdfProgram portable = SdfProgramBuilder.CompilePortable(definition))
-            {
-                for (float x = -3f; x <= 3f; x += 0.37f)
-                for (float y = -2f; y <= 2f; y += 0.41f)
-                {
-                    Vector3 point = new Vector3(x, y, 0.23f);
-                    Assert.AreEqual(managed.Evaluate(point),
-                        SdfProgramEvaluator.Evaluate(portable, new float3(point.x, point.y, point.z)),
-                        1e-4f, $"Mismatch at {point}.");
-                }
-            }
-        }
-
-        [Test]
-        public void CompilePortable_MatchesManagedGraphForAuthoredCapsuleAxisAndEllipsoidRadii()
-        {
-            var definition = CreatureDefinition.CreateEmpty();
-            CreaturePart capsule = Sphere("capsule", Vector3.zero);
-            capsule.Shape = new ShapeDefinition
-            {
-                Type = ShapeType.Capsule,
-                PrimarySize = 0.2f,
-                Radius = 0.2f,
-                CapsuleAxis = ShapeAxis.Z,
-                CapsuleHeight = 1.7f,
-                SmoothBlendRadius = 0f,
-            };
-            definition.AddPart(capsule);
-
-            CreaturePart ellipsoid = Sphere("ellipsoid", new Vector3(1.5f, 0f, 0f));
-            ellipsoid.Shape = new ShapeDefinition
-            {
-                Type = ShapeType.Ellipsoid,
-                PrimarySize = 0.5f,
-                EllipsoidRadii = new Vector3(2f, 1f, 0.5f),
-                SmoothBlendRadius = 0f,
-            };
-            definition.AddPart(ellipsoid);
-
-            ISdfNode managed = SdfProgramBuilder.Compile(definition);
-            using (SdfProgram portable = SdfProgramBuilder.CompilePortable(definition))
-            {
-                for (float x = -2f; x <= 2f; x += 0.31f)
-                for (float y = -1.5f; y <= 1.5f; y += 0.37f)
-                for (float z = -1.5f; z <= 1.5f; z += 0.43f)
-                {
-                    Vector3 point = new Vector3(x, y, z);
-                    Assert.AreEqual(managed.Evaluate(point),
-                        SdfProgramEvaluator.Evaluate(portable, new float3(point.x, point.y, point.z)),
-                        1e-4f, $"Mismatch at {point}.");
-                }
-            }
-        }
-
-        [Test]
-        public void CompilePortable_EmptyDefinitionMatchesManagedGraph()
-        {
-            using (SdfProgram portable = SdfProgramBuilder.CompilePortable(CreatureDefinition.CreateEmpty()))
-            {
-                Assert.IsTrue(float.IsPositiveInfinity(SdfProgramEvaluator.Evaluate(portable, float3.zero)));
-            }
-        }
-
-        [Test]
-        public void CompilePortable_CurrentSchemaSphere_IgnoresLegacyPrimarySize()
-        {
-            var authoredShape = new ShapeDefinition
-            {
-                Type = ShapeType.Sphere,
-                PrimarySize = 0.25f,
-                Radius = 1.5f,
-                CapsuleHeight = 1f,
-                EllipsoidRadii = Vector3.one,
-                BoxHalfExtents = Vector3.one,
-                SmoothBlendRadius = 0f,
-            };
-            var changedLegacyShape = authoredShape;
-            changedLegacyShape.PrimarySize = 4f;
-
-            CreatureDefinition authored = CreatureDefinition.CreateEmpty();
-            authored.AddPart(new CreaturePart
-            {
-                Id = "authored_sphere",
-                PartType = PartType.Body,
-                Transform = TransformData.Identity,
-                Shape = authoredShape,
-                Appearance = AppearanceDefinition.Default,
-            });
-            CreatureDefinition changedLegacy = CreatureDefinition.CreateEmpty();
-            changedLegacy.AddPart(new CreaturePart
-            {
-                Id = "authored_sphere",
-                PartType = PartType.Body,
-                Transform = TransformData.Identity,
-                Shape = changedLegacyShape,
-                Appearance = AppearanceDefinition.Default,
-            });
-
-            using (SdfProgram authoredProgram = SdfProgramBuilder.CompilePortable(authored))
-            using (SdfProgram changedLegacyProgram = SdfProgramBuilder.CompilePortable(changedLegacy))
-            {
-                foreach (Vector3 point in new[]
-                {
-                    Vector3.zero,
-                    new Vector3(1f, 0f, 0f),
-                    new Vector3(2f, 0.25f, -0.5f),
-                })
-                {
-                    float authoredValue = SdfProgramEvaluator.Evaluate(authoredProgram,
-                        new float3(point.x, point.y, point.z));
-                    float changedLegacyValue = SdfProgramEvaluator.Evaluate(changedLegacyProgram,
-                        new float3(point.x, point.y, point.z));
-                    Assert.AreEqual(authoredValue, changedLegacyValue, 1e-4f,
-                        $"Changing legacy PrimarySize must not change authored shape output at {point}.");
-                }
-            }
+            ShapeDefinition shape = new ShapeDefinition { Type = ShapeType.Sphere, PrimarySize = 0.25f, Radius = 1.5f, SmoothBlendRadius = 0f };
+            CreatureDefinition first = CreatureDefinition.CreateEmpty();
+            first.AddPart(new CreaturePart { Id = "sphere", Transform = TransformData.Identity, Shape = shape, Appearance = AppearanceDefinition.Default });
+            shape.PrimarySize = 4f;
+            CreatureDefinition second = CreatureDefinition.CreateEmpty();
+            second.AddPart(new CreaturePart { Id = "sphere", Transform = TransformData.Identity, Shape = shape, Appearance = AppearanceDefinition.Default });
+            using (SdfProgram a = SdfProgramBuilder.CompilePortable(first))
+            using (SdfProgram b = SdfProgramBuilder.CompilePortable(second))
+                Assert.AreEqual(Evaluate(a, Vector3.right), Evaluate(b, Vector3.right), 1e-4f);
         }
     }
 }

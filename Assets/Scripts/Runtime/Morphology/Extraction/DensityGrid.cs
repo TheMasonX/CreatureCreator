@@ -14,7 +14,7 @@ namespace ProceduralCreature.Morphology.Extraction
     /// GenerationSettings.EstimateVoxelCount uses for its safety-budget estimate
     /// (Sprint 3.1), so the estimate a definition was validated against matches
     /// what actually gets allocated here — callers must have already run that
-    /// budget check via DefinitionValidator before calling Sample.
+    /// budget check via DefinitionValidator before calling SamplePortable.
     ///
     /// CC-064 non-finite contract: in Fast culling mode samples may read `+inf`
     /// ("outside/culled"), never NaN. Consumers that scan the grid (min/max,
@@ -47,40 +47,6 @@ namespace ProceduralCreature.Morphology.Extraction
             _samples = new float[(long)(cellsX + 1) * (cellsY + 1) * (cellsZ + 1) <= int.MaxValue
                 ? (cellsX + 1) * (cellsY + 1) * (cellsZ + 1)
                 : throw new DomainException("Grid corner count exceeds addressable array size.")];
-        }
-
-        public static DensityGrid Sample(ISdfNode node, BoundsDefinition bounds, GenerationSettings settings)
-        {
-            if (node == null) throw new DomainException("node must not be null.");
-            if (!bounds.IsFinite() || !bounds.IsPositive())
-            {
-                throw new DomainException("Cannot sample a grid over invalid bounds; validate first.");
-            }
-            if (!settings.IsFinite() || !settings.IsPositive())
-            {
-                throw new DomainException("Cannot sample a grid with invalid GenerationSettings; validate first.");
-            }
-
-            float cellSize = 1f / settings.VoxelsPerUnit;
-            int cellsX = Mathf.CeilToInt(bounds.MaxX * 2f * settings.VoxelsPerUnit);
-            int cellsY = Mathf.CeilToInt(bounds.MaxY * 2f * settings.VoxelsPerUnit);
-            int cellsZ = Mathf.CeilToInt(bounds.MaxZ * 2f * settings.VoxelsPerUnit);
-            cellsX = Mathf.Max(cellsX, 1);
-            cellsY = Mathf.Max(cellsY, 1);
-            cellsZ = Mathf.Max(cellsZ, 1);
-
-            Vector3 origin = new Vector3(-bounds.MaxX, -bounds.MaxY, -bounds.MaxZ);
-            var grid = new DensityGrid(cellsX, cellsY, cellsZ, origin, cellSize);
-
-            for (int z = 0; z < grid.CornersZ; z++)
-            for (int y = 0; y < grid.CornersY; y++)
-            for (int x = 0; x < grid.CornersX; x++)
-            {
-                Vector3 worldPoint = grid.CornerPosition(x, y, z);
-                grid.SetSample(x, y, z, node.Evaluate(worldPoint));
-            }
-
-            return grid;
         }
 
         public static DensityGrid SamplePortable(SdfProgram program, BoundsDefinition bounds, GenerationSettings settings,

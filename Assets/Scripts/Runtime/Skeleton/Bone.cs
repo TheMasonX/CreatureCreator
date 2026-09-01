@@ -44,7 +44,7 @@ namespace ProceduralCreature.Skeleton
         /// Creature-space rotation in the rest/authored pose. Extracted from the
         /// resolved world matrix via Matrix4x4.rotation — exact for uniform scale
         /// chains, an approximation under non-uniform scale (the same documented
-        /// tradeoff TransformNode makes for SDF evaluation; see that class).
+        /// tradeoff the portable SDF transform operation makes for evaluation).
         /// </summary>
         public Quaternion Rotation;
     }

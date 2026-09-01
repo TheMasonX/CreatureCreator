@@ -184,26 +184,10 @@ namespace ProceduralCreature.Tests.Runtime
 
         private static ResolvedAppearance ResolveManaged(CreatureDefinition definition, Vector3 position)
         {
-            System.Collections.Generic.List<(CreaturePart Part, ISdfNode Node)> parts = SdfProgramBuilder.CompileIndividualParts(definition);
-            ISdfNode body = SdfProgramBuilder.CompileBodyField(definition);
-            CreaturePart nearest = null;
-            float nearestDistance = float.PositiveInfinity;
-            foreach ((CreaturePart part, ISdfNode node) in parts)
+            using (PartAppearanceSampler.Resolver portableResolver = PartAppearanceSampler.CreateResolver(definition))
             {
-                float distance = Mathf.Abs(node.Evaluate(position));
-                if (distance < nearestDistance)
-                {
-                    nearestDistance = distance;
-                    nearest = part;
-                }
+                return portableResolver.Resolve(position);
             }
-            if (body != null && Mathf.Abs(body.Evaluate(position)) <= nearestDistance)
-            {
-                return new ResolvedAppearance(BodyVerticalGradientSampler.EvaluateColor(definition, position), 0, 1f);
-            }
-            AppearanceDefinition appearance = nearest == null ? AppearanceDefinition.Default : nearest.Appearance;
-            return new ResolvedAppearance(appearance.BaseColor, appearance.NoiseSeed, appearance.NoiseScale,
-                string.IsNullOrWhiteSpace(appearance.MaterialKey) ? null : appearance.MaterialKey);
         }
     }
 
@@ -213,10 +197,16 @@ namespace ProceduralCreature.Tests.Runtime
         [Test]
         public void Bake_ProducesOneColorPerVertex()
         {
-            var sphere = new SphereSdfNode(1f);
             var bounds = new BoundsDefinition { MaxX = 1.5f, MaxY = 1.5f, MaxZ = 1.5f };
             var settings = new GenerationSettings { VoxelsPerUnit = 4f };
-            DensityGrid grid = DensityGrid.Sample(sphere, bounds, settings);
+            var samplingDefinition = CreatureDefinition.CreateEmpty();
+            samplingDefinition.AddPart(new CreaturePart { Id = "sphere_geometry", PartType = PartType.Body, Transform = TransformData.Identity,
+                Shape = new ShapeDefinition { Type = ShapeType.Sphere, PrimarySize = 1f, SmoothBlendRadius = 0f }, Appearance = AppearanceDefinition.Default });
+            DensityGrid grid;
+            using (SdfProgram program = SdfProgramBuilder.CompilePortable(samplingDefinition))
+            {
+                grid = DensityGrid.SamplePortable(program, bounds, settings);
+            }
             MeshExtractionResult mesh = MarchingCubesExtractor.Extract(grid);
 
             var definition = CreatureDefinition.CreateEmpty();
@@ -236,10 +226,16 @@ namespace ProceduralCreature.Tests.Runtime
         [Test]
         public void Bake_ColorsStayNearBaseColorWithinBrightnessVariation()
         {
-            var sphere = new SphereSdfNode(1f);
             var bounds = new BoundsDefinition { MaxX = 1.5f, MaxY = 1.5f, MaxZ = 1.5f };
             var settings = new GenerationSettings { VoxelsPerUnit = 4f };
-            DensityGrid grid = DensityGrid.Sample(sphere, bounds, settings);
+            var samplingDefinition = CreatureDefinition.CreateEmpty();
+            samplingDefinition.AddPart(new CreaturePart { Id = "sphere_geometry", PartType = PartType.Body, Transform = TransformData.Identity,
+                Shape = new ShapeDefinition { Type = ShapeType.Sphere, PrimarySize = 1f, SmoothBlendRadius = 0f }, Appearance = AppearanceDefinition.Default });
+            DensityGrid grid;
+            using (SdfProgram program = SdfProgramBuilder.CompilePortable(samplingDefinition))
+            {
+                grid = DensityGrid.SamplePortable(program, bounds, settings);
+            }
             MeshExtractionResult mesh = MarchingCubesExtractor.Extract(grid);
 
             var definition = CreatureDefinition.CreateEmpty();

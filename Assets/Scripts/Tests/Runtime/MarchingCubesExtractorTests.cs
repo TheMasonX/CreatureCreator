@@ -11,11 +11,10 @@ namespace ProceduralCreature.Tests.Runtime
         [Test]
         public void Extract_Sphere_ProducesWatertightMesh()
         {
-            var sphere = new SphereSdfNode(1f);
             var bounds = new BoundsDefinition { MaxX = 1.5f, MaxY = 1.5f, MaxZ = 1.5f };
             var settings = new GenerationSettings { VoxelsPerUnit = 6f };
 
-            DensityGrid grid = DensityGrid.Sample(sphere, bounds, settings);
+            DensityGrid grid = DensityGrid.SamplePortable(SdfProgramBuilder.CompilePortable(SphereDefinition(1f)), bounds, settings);
             MeshExtractionResult mesh = MarchingCubesExtractor.Extract(grid);
 
             Assert.Greater(mesh.TriangleCount, 0, "Sphere should produce a non-empty mesh at this resolution.");
@@ -32,16 +31,14 @@ namespace ProceduralCreature.Tests.Runtime
             // A union of two overlapping spheres is more likely to produce
             // saddle-shaped (ambiguous-face-prone) regions near the join than a
             // single sphere — a more meaningful stress test for the decider.
-            var a = new SphereSdfNode(1f);
-            UnityEngine.Matrix4x4 offset = UnityEngine.Matrix4x4.TRS(
-                new UnityEngine.Vector3(1f, 0f, 0f), UnityEngine.Quaternion.identity, UnityEngine.Vector3.one);
-            var b = new TransformNode(new SphereSdfNode(1f), offset);
-            var union = new SmoothUnionNode(a, b, 0.3f);
-
             var bounds = new BoundsDefinition { MaxX = 2.5f, MaxY = 1.5f, MaxZ = 1.5f };
             var settings = new GenerationSettings { VoxelsPerUnit = 5f };
 
-            DensityGrid grid = DensityGrid.Sample(union, bounds, settings);
+            CreatureDefinition definition = SphereDefinition(1f);
+            definition.AddPart(new CreaturePart { Id = "sphere_b", Transform = new TransformData { Position = UnityEngine.Vector3.right,
+                Rotation = UnityEngine.Quaternion.identity, Scale = UnityEngine.Vector3.one }, Shape = new ShapeDefinition { Type = ShapeType.Sphere,
+                PrimarySize = 1f, SmoothBlendRadius = 0.3f }, Appearance = AppearanceDefinition.Default });
+            DensityGrid grid = DensityGrid.SamplePortable(SdfProgramBuilder.CompilePortable(definition), bounds, settings);
             MeshExtractionResult mesh = MarchingCubesExtractor.Extract(grid);
 
             MeshTopologyReport report = MeshTopologyValidator.Validate(mesh);
@@ -53,14 +50,13 @@ namespace ProceduralCreature.Tests.Runtime
         [Test]
         public void Extract_EmptyRegion_ProducesEmptyMesh()
         {
-            var farAwaySphere = new SphereSdfNode(0.1f);
             var bounds = new BoundsDefinition { MaxX = 0.5f, MaxY = 0.5f, MaxZ = 0.5f };
             var settings = new GenerationSettings { VoxelsPerUnit = 4f };
 
             // Sphere radius 0.1 centered at origin, sampled well within bounds --
-            // should still produce geometry; verify the inverse (an EmptySdfNode
-            // produces zero triangles) as the true "nothing here" case.
-            DensityGrid grid = DensityGrid.Sample(new EmptySdfNode(), bounds, settings);
+            // The empty portable program produces zero triangles, which is the
+            // true "nothing here" case.
+            DensityGrid grid = DensityGrid.SamplePortable(SdfProgramBuilder.CompilePortable(CreatureDefinition.CreateEmpty()), bounds, settings);
             MeshExtractionResult mesh = MarchingCubesExtractor.Extract(grid);
 
             Assert.AreEqual(0, mesh.TriangleCount);
@@ -69,11 +65,10 @@ namespace ProceduralCreature.Tests.Runtime
         [Test]
         public void Extract_VertexCountIsWeldedNotPerCubeDuplicated()
         {
-            var sphere = new SphereSdfNode(1f);
             var bounds = new BoundsDefinition { MaxX = 1.5f, MaxY = 1.5f, MaxZ = 1.5f };
             var settings = new GenerationSettings { VoxelsPerUnit = 6f };
 
-            DensityGrid grid = DensityGrid.Sample(sphere, bounds, settings);
+            DensityGrid grid = DensityGrid.SamplePortable(SdfProgramBuilder.CompilePortable(SphereDefinition(1f)), bounds, settings);
             MeshExtractionResult mesh = MarchingCubesExtractor.Extract(grid);
 
             // A welded 2-manifold closed mesh satisfies Euler's formula
@@ -86,6 +81,15 @@ namespace ProceduralCreature.Tests.Runtime
 
             Assert.AreEqual(2, eulerCharacteristic,
                 "Welded closed genus-0 mesh should satisfy V - E + F = 2.");
+        }
+
+        private static CreatureDefinition SphereDefinition(float radius)
+        {
+            var definition = CreatureDefinition.CreateEmpty();
+            definition.AddPart(new CreaturePart { Id = "sphere", Transform = TransformData.Identity,
+                Shape = new ShapeDefinition { Type = ShapeType.Sphere, PrimarySize = radius, SmoothBlendRadius = 0f },
+                Appearance = AppearanceDefinition.Default });
+            return definition;
         }
     }
 

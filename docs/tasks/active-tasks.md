@@ -28,7 +28,7 @@
 | CC-042 | Update ClonePartAsChild XML doc comment to list Limb as copied | Backlog | P3 |
 | CC-043 | Per-shape parameters (capsule axis + radius/height, ellipsoid 3-axis lengths, box dimensions) | In Progress | P1 |
 | CC-044 | Export the generated mesh as an asset | Backlog | P2 |
-| CC-045 | Remove the legacy managed SDF from production generation | In Progress | P1 |
+| CC-045 | Remove the legacy managed SDF from production generation | Review | P1 |
 | CC-046 | Investigate recurring broken-ankle mesh artifacts | Backlog | P1 |
 | CC-052 | Preserve mesh rest transforms and mirrored binding identity | In Progress | P1 |
 | CC-053 | Complete multi-geometry editor selection and visibility | Backlog | P1 |
@@ -55,3 +55,7 @@
 | CC-089 | Make malformed-definition validation and cloning total | Backlog | P1 |
 | CC-090 | Consolidate shared runtime utilities and tolerances | Backlog | P2 |
 | CC-091 | Establish concrete generation pipeline stage boundaries | Backlog | P2 |
+| CC-093 | Adopt MemorySmith task tracking and memory deployment | In Progress | P1 |
+| CC-094 | Decompose CreatureEditorWindow responsibilities | Backlog | P2 |
+| CC-095 | Click the preview mesh in the viewport to select the owning part | Backlog | P1 |
+| CC-096 | Edit any skeleton node with composable move/scale/rotation gizmos (including limb attachment points) | Backlog | P2 |

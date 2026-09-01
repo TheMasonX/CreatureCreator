@@ -49,6 +49,7 @@ tools in `docs/tasks/tools/`.
 | CC-084 | Fix DisplayName round-trip mismatch after JSON round-trip | Done | P2 |
 | CC-087 | Canonical resolved-creature snapshot and ownership boundary | Done | P1 |
 | CC-088 | SDF backend and legacy shape semantics exit | Done | P1 |
+| CC-092 | Adapt council and subagent swarm skills for CreatureCreator | Done | P2 |
 
 ## Changelog
 
@@ -94,3 +95,4 @@ tools in `docs/tasks/tools/`.
 - 2026-08-31: Restored CC-001 (Configure creature creator test scene) to tickets/ as Backlog.
 - 2026-08-31: Archived CC-001 (Configure creature creator test scene) as Done. (status Backlog -> Done) Round-trip test complete
 - 2026-08-31: Archived CC-088 (SDF backend and legacy shape semantics exit) as Done. Resolved snapshot-owned portable SDF compilation, legacy PrimarySize regression passed, raw limb sampler removed, and Unity PlayMode validation passed
+- 2026-08-31: Archived CC-092 (Adapt council and subagent swarm skills for CreatureCreator) as Done. (status Backlog -> Done) Adapted council and subagent-swarm skills added and focused metadata/link checks passed; repository validator retains unrelated CC-087/CC-088 errors.

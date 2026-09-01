@@ -2,7 +2,7 @@ namespace ProceduralCreature.Definition
 {
     /// <summary>
     /// Primitive SDF shape vocabulary. This is the DNA-level shape identifier; the
-    /// actual ISdfNode implementations that interpret it belong to Phase 2 and must
+    /// portable SDF operations that interpret it belong to Phase 2 and must
     /// not be referenced from here (Definition code has no knowledge of SDF/mesh
     /// generation types — implementation guide §1.2 dependency rules).
     /// </summary>
