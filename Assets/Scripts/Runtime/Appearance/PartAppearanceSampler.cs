@@ -1,5 +1,6 @@
 using UnityEngine;
 using Unity.Collections;
+using Unity.Mathematics;
 using ProceduralCreature.Common;
 using ProceduralCreature.Definition;
 using ProceduralCreature.Morphology.Sdf;
@@ -74,13 +75,28 @@ namespace ProceduralCreature.Appearance
         {
             private readonly CreatureDefinition _definition;
             private readonly System.Collections.Generic.List<(CreaturePart Part, SdfProgram Program)> _compiledParts;
+            private readonly PartBounds[] _partBounds;
             private readonly SdfProgram _bodyProgram;
             private readonly NativeArray<float> _scratchValues;
+
+            /// <summary>
+            /// Test hook: when false, <see cref="Resolve"/> evaluates every part
+            /// unconditionally, bypassing the AABB broad phase. Tests compare this
+            /// reference path against the broad-phase path to prove the
+            /// optimization is behavior-preserving. Production code never toggles
+            /// this; it defaults to true.
+            /// </summary>
+            internal bool EnableBroadPhase = true;
 
             internal Resolver(CreatureDefinition definition)
             {
                 _definition = definition;
                 _compiledParts = SdfProgramBuilder.CompileIndividualPartsPortable(definition);
+                _partBounds = new PartBounds[_compiledParts.Count];
+                for (int i = 0; i < _compiledParts.Count; i++)
+                {
+                    _partBounds[i] = PartBounds.FromProgram(_compiledParts[i].Program);
+                }
                 _bodyProgram = SdfProgramBuilder.CompilePortableBodyField(definition);
                 int scratchLength = _bodyProgram.Operations.Length;
                 foreach ((CreaturePart part, SdfProgram program) in _compiledParts)
@@ -116,27 +132,44 @@ namespace ProceduralCreature.Appearance
 
                 CreaturePart nearestPart = null;
                 float nearestAbsDistance = float.PositiveInfinity;
+                float nearestAbsDistanceSq = float.PositiveInfinity;
+                var point3 = new float3(position.x, position.y, position.z);
 
-                foreach ((CreaturePart part, SdfProgram program) in _compiledParts)
+                for (int i = 0; i < _compiledParts.Count; i++)
                 {
+                    // AABB broad phase: when every op in a part's program is
+                    // Cullable (no ellipsoid), the part's SDF is bounded below by
+                    // the distance to its world AABB. A part whose AABB distance is
+                    // not smaller than the closest part found so far can never win,
+                    // so skipping it is bit-identical to evaluating it — it saves
+                    // the full per-operation walk over a far part's program.
+                    PartBounds bounds = _partBounds[i];
+                    if (EnableBroadPhase
+                        && bounds.CanBroadPhase
+                        && DistanceToAabbSquared(point3, bounds.Min, bounds.Max) >= nearestAbsDistanceSq)
+                    {
+                        continue;
+                    }
+
+                    CreaturePart part = _compiledParts[i].Part;
+                    SdfProgram program = _compiledParts[i].Program;
                     // CC-064 non-finite contract: a culled/outside sample reads +inf,
                     // which means "no candidate here" — never a giant valid distance.
                     // Skip it so it cannot win (or poison) the nearest-part decision.
-                    float rawDistance = SdfProgramEvaluator.Evaluate(program,
-                        new Unity.Mathematics.float3(position.x, position.y, position.z), _scratchValues);
+                    float rawDistance = SdfProgramEvaluator.Evaluate(program, point3, _scratchValues);
                     if (float.IsPositiveInfinity(rawDistance)) continue;
                     float distance = Mathf.Abs(rawDistance);
                     if (distance < nearestAbsDistance)
                     {
                         nearestAbsDistance = distance;
+                        nearestAbsDistanceSq = distance * distance;
                         nearestPart = part;
                     }
                 }
 
                 float bodyAbsDistance = !_bodyProgram.Operations.IsCreated
                     ? float.PositiveInfinity
-                    : Mathf.Abs(SdfProgramEvaluator.Evaluate(_bodyProgram,
-                        new Unity.Mathematics.float3(position.x, position.y, position.z), _scratchValues));
+                    : Mathf.Abs(SdfProgramEvaluator.Evaluate(_bodyProgram, point3, _scratchValues));
 
                 // The Body owns this surface point only when it is a real (finite)
                 // candidate — +inf is "outside", not "the Body is nearest". Without
@@ -159,6 +192,53 @@ namespace ProceduralCreature.Appearance
                 return new ResolvedAppearance(
                     appearance.BaseColor, appearance.NoiseSeed, appearance.NoiseScale,
                     string.IsNullOrWhiteSpace(appearance.MaterialKey) ? null : appearance.MaterialKey);
+            }
+
+            /// <summary>
+            /// Precomputed world AABB and cullability of a part's compiled SDF
+            /// program, used by <see cref="Resolve"/> for its broad phase. When
+            /// every op in the program is Cullable (no ellipsoid), the part's SDF
+            /// is bounded below by the Euclidean distance to its world AABB, so a
+            /// part whose AABB distance is not smaller than the closest part found
+            /// so far can be skipped without changing the nearest-part decision.
+            /// </summary>
+            private readonly struct PartBounds
+            {
+                public readonly float3 Min;
+                public readonly float3 Max;
+                public readonly bool CanBroadPhase;
+
+                public PartBounds(float3 min, float3 max, bool canBroadPhase)
+                {
+                    Min = min;
+                    Max = max;
+                    CanBroadPhase = canBroadPhase;
+                }
+
+                public static PartBounds FromProgram(SdfProgram program)
+                {
+                    if (program == null || !program.Operations.IsCreated)
+                    {
+                        return new PartBounds(default, default, false);
+                    }
+
+                    SdfOperation root = program.Operations[program.RootIndex];
+                    bool hasBounds = root.MinBound.x <= root.MaxBound.x
+                        && root.MinBound.y <= root.MaxBound.y
+                        && root.MinBound.z <= root.MaxBound.z;
+                    return new PartBounds(root.MinBound, root.MaxBound, hasBounds && root.Cullable);
+                }
+            }
+
+            /// <summary>
+            /// Squared Euclidean distance from <paramref name="point"/> to the AABB
+            /// [min, max]. Zero when the point is inside the box.
+            /// </summary>
+            private static float DistanceToAabbSquared(float3 point, float3 min, float3 max)
+            {
+                float3 closest = math.clamp(point, min, max);
+                float3 delta = point - closest;
+                return math.dot(delta, delta);
             }
         }
     }

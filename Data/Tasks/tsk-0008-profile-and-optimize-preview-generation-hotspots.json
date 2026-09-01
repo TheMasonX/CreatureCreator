@@ -34,15 +34,21 @@
       "author": "anonymous",
       "body": "Slice A (Burst active-cell scan \u002B native grid handoff) \u2014 VALIDATED 2026-09-01.\n\nChange: DensityGrid is now native-backed (IDisposable, Persistent NativeArray\u003Cfloat\u003E Samples); the managed float[] copy after sampling is gone. ActiveCellBuilder.Build replaced its serialized managed full-grid scan with a Burst-compiled single-threaded ActiveCellScanJob (IJob, same z/y/x iteration order, identical NormalizeSurfaceDensity semantics; \u002Binf/NaN preserved). CreatureMeshGenerator disposes the grid in a try/finally after extraction. All test call sites wrap grids in using.\n\nValidation:\n- dotnet build Runtime \u002B Tests.Runtime: 0 errors.\n- Unity compile after refresh: 0 errors / 0 warnings.\n- PlayMode (ProceduralCreature.Tests.Runtime, full assembly): 417/417 passed, 0 failed, 0 skipped.\n- get_errors clean on all 11 edited files; git diff --check clean.\n\nTiming evidence (in-editor, dino_creature.json, 112x112x112 cells = 1,442,897 samples, vpu 14.0, 7,408 mixed cells, Burst warmup done):\n- Managed-equivalent scan (old path replica): 219.3 ms\n- New Burst ActiveCellBuilder.Build: 25.2 ms\n- In-environment speedup: 8.7x; vs recorded editor baseline (149.0 ms at 112^3): ~5.9x\n- Output bit-identical: managed vs Burst cell index \u002B case index order matches exactly (orderMatches=True).\n\nResidual risk: ActiveCellScanJob is single-threaded by design (deterministic ordering); a later parallel prefix-sum scan could go further but would require a determinism/ordering change. AppearanceBake (O(parts x vertices) managed SDF evals, ~172 ms @112^3) and FieldSampling (region-aware sparse sampling) remain the larger absolute targets.",
       "createdAtUtc": "2026-09-01T13:46:32.108762Z"
+    },
+    {
+      "id": "c-ed07bffff612416ab1f248b9899a0544",
+      "author": "anonymous",
+      "body": "Slice C (appearance Resolver AABB broad-phase) \u2014 VALIDATED 2026-09-01.\n\nChange: PartAppearanceSampler.Resolver now precomputes each part\u0027s world AABB \u002B Cullable flag from its compiled SdfProgram root op (data already produced by the CC-062 builder), and Resolve skips a part provably farther than the closest found so far (a Cullable part\u0027s SDF is bounded below by distance to its AABB, so skipping is bit-identical). Internal EnableBroadPhase test hook (default true) compares the broad-phase path against the unconditional reference. No pipeline or determinism changes; appearance output is unchanged.\n\nValidation:\n- dotnet build clean; Unity compile 0 errors/0 warnings.\n- PlayMode ProceduralCreature.Tests.Runtime 420/420 (was 417; \u002B3 new: far-part-skip, overlapping-AABB nearer-pick, and broad-phase-vs-reference across a point grid incl. active Body field).\n- get_errors clean; git diff --check clean.\n\nTiming (in-editor, dino_creature.json at 96^3 = 10,306 tris / 5,155 verts, the exact recorded-baseline fixture):\n- AppearanceBaker.Bake 5-run: min 111.9 / median 112.4 / avg 112.7 ms vs recorded baseline 111.9 ms -\u003E NEUTRAL (~0%).\n\nRoot cause of neutrality: the dino has 6 parts; per-vertex appearance cost is dominated by the always-evaluated Body program (62 ops) plus the two large limb programs (65 and 107 ops) whose AABBs contain body-surface vertices, so the broad phase skips only the small far parts. The broad phase helps creatures with many spatially-separated parts, not this fixture.\n\nResidual risk / next: the real appearance lever is Burst-ing the per-vertex bake or precomputing the Body field into a coarse grid; FieldSampling (region-aware sparse sampling) remains the biggest absolute target (~507 ms at 96^3).",
+      "createdAtUtc": "2026-09-01T13:58:41.4882603Z"
     }
   ],
   "epicId": null,
   "parentId": null,
   "dueDateUtc": null,
   "createdAtUtc": "2026-09-01T03:16:25.5654277Z",
-  "updatedAtUtc": "2026-09-01T13:46:32.108762Z",
+  "updatedAtUtc": "2026-09-01T13:58:41.4882603Z",
   "completedAtUtc": null,
-  "revision": 3,
+  "revision": 4,
   "isArchived": false,
   "hasLoadError": false,
   "loadError": null,

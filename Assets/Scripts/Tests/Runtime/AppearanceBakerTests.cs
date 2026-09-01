@@ -124,6 +124,71 @@ namespace ProceduralCreature.Tests.Runtime
         }
 
         [Test]
+        public void Resolve_FarPartOutsideAabb_IsSkippedByBroadPhase()
+        {
+            // Part B's world AABB is ~10 units from the query point at A's
+            // surface, so the broad phase must skip it without evaluating its
+            // program. The result must still be A's color (no over-skip).
+            var definition = CreatureDefinition.CreateEmpty();
+            definition.AddPart(ColoredSphere("part_a", new Vector3(-5f, 0f, 0f), Color.red));
+            definition.AddPart(ColoredSphere("part_b", new Vector3(5f, 0f, 0f), Color.blue));
+
+            ResolvedAppearance atA = PartAppearanceSampler.Resolve(definition, new Vector3(-5f, 0f, 0f));
+            ResolvedAppearance atB = PartAppearanceSampler.Resolve(definition, new Vector3(5f, 0f, 0f));
+
+            Assert.AreEqual(Color.red, atA.BaseColor);
+            Assert.AreEqual(Color.blue, atB.BaseColor);
+        }
+
+        [Test]
+        public void Resolve_OverlappingAabbs_StillPicksNearerPart()
+        {
+            // Both part AABBs overlap near the origin, so the broad phase cannot
+            // skip either; the nearer surface must still win.
+            var definition = CreatureDefinition.CreateEmpty();
+            definition.AddPart(ColoredSphere("part_a", new Vector3(-0.6f, 0f, 0f), Color.red));
+            definition.AddPart(ColoredSphere("part_b", new Vector3(0.6f, 0f, 0f), Color.blue));
+
+            ResolvedAppearance nearA = PartAppearanceSampler.Resolve(definition, new Vector3(-0.9f, 0f, 0f));
+            ResolvedAppearance nearB = PartAppearanceSampler.Resolve(definition, new Vector3(0.9f, 0f, 0f));
+
+            Assert.AreEqual(Color.red, nearA.BaseColor);
+            Assert.AreEqual(Color.blue, nearB.BaseColor);
+        }
+
+        [Test]
+        public void Resolve_BroadPhase_MatchesUnconditionalReferenceAcrossPoints()
+        {
+            // The broad phase must be behavior-preserving: for a grid of query
+            // points over a multi-part definition (with a Body field active), the
+            // broad-phase Resolver must return the exact same color + material key
+            // as a reference Resolver that evaluates every part unconditionally.
+            var definition = CreatureDefinition.CreateEmpty();
+            definition.Body.Samples.Add(new BodySample { Id = 1, Position = Vector3.zero, Radius = 0.8f });
+            definition.AddPart(ColoredSphere("part_a", new Vector3(-2.5f, 0f, 0f), Color.red));
+            definition.AddPart(ColoredSphere("part_b", new Vector3(2.5f, 0f, 0f), Color.blue));
+            definition.AddPart(ColoredSphere("part_c", new Vector3(0f, 2.2f, 0f), Color.green));
+            definition.AddPart(ColoredSphere("part_d", new Vector3(0f, -2.2f, 0f), Color.yellow));
+
+            using (PartAppearanceSampler.Resolver broadPhase = PartAppearanceSampler.CreateResolver(definition))
+            using (PartAppearanceSampler.Resolver reference = PartAppearanceSampler.CreateResolver(definition))
+            {
+                reference.EnableBroadPhase = false;
+
+                for (float x = -4f; x <= 4f; x += 0.5f)
+                for (float y = -3.5f; y <= 3.5f; y += 0.5f)
+                for (float z = -1.5f; z <= 1.5f; z += 0.5f)
+                {
+                    var point = new Vector3(x, y, z);
+                    ResolvedAppearance expected = reference.Resolve(point);
+                    ResolvedAppearance actual = broadPhase.Resolve(point);
+                    Assert.AreEqual(expected.BaseColor, actual.BaseColor, $"BaseColor mismatch at {point}.");
+                    Assert.AreEqual(expected.MaterialKey, actual.MaterialKey, $"MaterialKey mismatch at {point}.");
+                }
+            }
+        }
+
+        [Test]
         public void Resolve_EmptyDefinition_ReturnsDefaultRatherThanThrowing()
         {
             CreatureDefinition definition = CreatureDefinition.CreateEmpty();
