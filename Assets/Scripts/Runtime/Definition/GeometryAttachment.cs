@@ -1,4 +1,5 @@
 using System;
+using ProceduralCreature.Common;
 
 namespace ProceduralCreature.Definition
 {
@@ -20,20 +21,9 @@ namespace ProceduralCreature.Definition
 
         public bool IsFinite()
         {
-            return IsFiniteVector(Offset)
-                && IsFiniteVector(Scale)
-                && IsFinite(Orientation.x) && IsFinite(Orientation.y)
-                && IsFinite(Orientation.z) && IsFinite(Orientation.w);
-        }
-
-        private static bool IsFiniteVector(UnityEngine.Vector3 v)
-        {
-            return IsFinite(v.x) && IsFinite(v.y) && IsFinite(v.z);
-        }
-
-        private static bool IsFinite(float f)
-        {
-            return !float.IsNaN(f) && !float.IsInfinity(f);
+            return NumericValidity.IsFinite(Offset)
+                && NumericValidity.IsFinite(Scale)
+                && NumericValidity.IsFinite(Orientation);
         }
 
         public GeometryAttachment Clone()

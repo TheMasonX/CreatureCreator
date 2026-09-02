@@ -1,4 +1,5 @@
 using System;
+using ProceduralCreature.Common;
 
 namespace ProceduralCreature.Definition
 {
@@ -41,11 +42,12 @@ namespace ProceduralCreature.Definition
 
         public readonly bool IsFinite()
         {
-            return !float.IsNaN(PrimarySize) && !float.IsInfinity(PrimarySize)
-                && !float.IsNaN(Radius) && !float.IsInfinity(Radius)
-                && !float.IsNaN(CapsuleHeight) && !float.IsInfinity(CapsuleHeight)
-                && IsFinite(EllipsoidRadii) && IsFinite(BoxHalfExtents)
-                && !float.IsNaN(SmoothBlendRadius) && !float.IsInfinity(SmoothBlendRadius);
+            return NumericValidity.IsFinite(PrimarySize)
+                && NumericValidity.IsFinite(Radius)
+                && NumericValidity.IsFinite(CapsuleHeight)
+                && NumericValidity.IsFinite(EllipsoidRadii)
+                && NumericValidity.IsFinite(BoxHalfExtents)
+                && NumericValidity.IsFinite(SmoothBlendRadius);
         }
 
         /// <summary>
@@ -79,13 +81,6 @@ namespace ProceduralCreature.Definition
 
         public override readonly int GetHashCode() => HashCode.Combine(Type, Radius, CapsuleAxis, CapsuleHeight,
             EllipsoidRadii, BoxHalfExtents, SmoothBlendRadius);
-
-        private static bool IsFinite(UnityEngine.Vector3 value)
-        {
-            return !float.IsNaN(value.x) && !float.IsInfinity(value.x)
-                && !float.IsNaN(value.y) && !float.IsInfinity(value.y)
-                && !float.IsNaN(value.z) && !float.IsInfinity(value.z);
-        }
 
         private static bool Positive(UnityEngine.Vector3 value)
         {

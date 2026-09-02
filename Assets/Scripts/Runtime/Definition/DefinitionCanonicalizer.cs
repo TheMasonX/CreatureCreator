@@ -2,6 +2,7 @@ using System.Collections.Generic;
 using System.Linq;
 using UnityEngine;
 using ProceduralCreature.Common;
+using static ProceduralCreature.Common.NumericValidity;
 
 namespace ProceduralCreature.Definition
 {
@@ -34,6 +35,19 @@ namespace ProceduralCreature.Definition
             }
 
             CreatureDefinition result = definition.Clone();
+            CreaturePartHierarchyIndex hierarchy = result.CreateHierarchyIndex();
+            if (hierarchy.HasNullEntries)
+            {
+                throw new DomainException("Cannot canonicalize a definition with a null part entry.");
+            }
+            if (hierarchy.DuplicateIds.Count > 0)
+            {
+                throw new DomainException($"Cannot canonicalize a definition with duplicate part Id '{hierarchy.DuplicateIds[0]}'.");
+            }
+            if (hierarchy.HasParentCycle(out List<string> cyclePartIds))
+            {
+                throw new DomainException($"Cannot canonicalize a definition with a parent cycle involving part '{cyclePartIds[0]}'.");
+            }
 
             if (result.Body == null || result.Body.Samples == null)
             {
@@ -90,13 +104,8 @@ namespace ProceduralCreature.Definition
             // Stable ordering independent of authoring/insertion order — this is what
             // makes "definition order independence where semantics are unchanged"
             // (§13.4 determinism tests) hold for serialization output.
-            var childrenByParent = result.Parts
-                .Where(p => p != null)
-                .GroupBy(p => p.ParentId ?? string.Empty)
-                .ToDictionary(group => group.Key,
-                    group => group.OrderBy(p => p.Id, System.StringComparer.Ordinal).ToList());
             var orderedParts = new List<CreaturePart>();
-            AppendChildren(CreatureDefinition.BodyId, childrenByParent, orderedParts);
+            AppendChildren(CreatureDefinition.BodyId, hierarchy, orderedParts);
             foreach (CreaturePart part in result.Parts
                 .Where(p => p != null && !orderedParts.Contains(p))
                 .OrderBy(p => p.Id, System.StringComparer.Ordinal))
@@ -245,25 +254,18 @@ namespace ProceduralCreature.Definition
         }
 
         private static void AppendChildren(string parentId,
-            Dictionary<string, List<CreaturePart>> childrenByParent,
+            CreaturePartHierarchyIndex hierarchy,
             List<CreaturePart> orderedParts)
         {
-            if (!childrenByParent.TryGetValue(parentId, out List<CreaturePart> children)) return;
+            List<CreaturePart> children = hierarchy.GetChildren(parentId)
+                .OrderBy(child => child.Id, System.StringComparer.Ordinal)
+                .ToList();
             foreach (CreaturePart child in children)
             {
                 orderedParts.Add(child);
-                AppendChildren(child.Id, childrenByParent, orderedParts);
+                AppendChildren(child.Id, hierarchy, orderedParts);
             }
         }
 
-        private static bool IsFinite(Vector3 value)
-        {
-            return IsFinite(value.x) && IsFinite(value.y) && IsFinite(value.z);
-        }
-
-        private static bool IsFinite(float value)
-        {
-            return !float.IsNaN(value) && !float.IsInfinity(value);
-        }
     }
 }

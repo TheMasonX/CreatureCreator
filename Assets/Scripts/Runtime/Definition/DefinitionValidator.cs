@@ -3,6 +3,7 @@ using System.Collections.Generic;
 using UnityEngine;
 using ProceduralCreature.Common;
 using ProceduralCreature.Morphology;
+using static ProceduralCreature.Common.NumericValidity;
 
 namespace ProceduralCreature.Definition
 {
@@ -270,11 +271,6 @@ namespace ProceduralCreature.Definition
             }
         }
 
-        private static bool IsFinite(float value)
-        {
-            return !float.IsNaN(value) && !float.IsInfinity(value);
-        }
-
         /// <summary>
         /// Validates the Body vertical-gradient appearance (CC-025). Reports only;
         /// never repairs. The canonicalizer handles key ordering and quantization
@@ -396,8 +392,15 @@ namespace ProceduralCreature.Definition
 
         private static void ValidateDuplicateIds(CreatureDefinition definition, List<ValidationIssue> issues)
         {
-            var seen = new HashSet<string>(StringComparer.Ordinal);
-            foreach (CreaturePart part in definition.Parts)
+            CreaturePartHierarchyIndex hierarchy = definition.CreateHierarchyIndex();
+            if (hierarchy.HasNullEntries)
+            {
+                issues.Add(new ValidationIssue(
+                    ValidationSeverity.Error, ValidationCode.NullPart,
+                    "Definition contains a null part entry."));
+            }
+
+            foreach (CreaturePart part in hierarchy.Parts)
             {
                 if (part == null) continue;
                 if (string.IsNullOrWhiteSpace(part.Id))
@@ -409,22 +412,22 @@ namespace ProceduralCreature.Definition
                     continue;
                 }
 
-                if (!seen.Add(part.Id))
-                {
-                    issues.Add(new ValidationIssue(
-                        ValidationSeverity.Error,
-                        ValidationCode.DuplicatePartId,
-                        $"Duplicate part Id '{part.Id}'.", part.Id));
-                }
+            }
+
+            foreach (string duplicateId in hierarchy.DuplicateIds)
+            {
+                issues.Add(new ValidationIssue(
+                    ValidationSeverity.Error,
+                    ValidationCode.DuplicatePartId,
+                    $"Duplicate part Id '{duplicateId}'.", duplicateId));
             }
         }
 
         private static void ValidateParentsAndCycles(CreatureDefinition definition, List<ValidationIssue> issues)
         {
-            var idsById = new HashSet<string>(StringComparer.Ordinal);
-            foreach (CreaturePart part in definition.Parts) idsById.Add(part.Id);
+            CreaturePartHierarchyIndex hierarchy = definition.CreateHierarchyIndex();
 
-            foreach (CreaturePart part in definition.Parts)
+            foreach (CreaturePart part in hierarchy.Parts)
             {
                 if (part == null) continue;
                 if (part.ParentId == null)
@@ -433,7 +436,7 @@ namespace ProceduralCreature.Definition
                         ValidationSeverity.Error, ValidationCode.InvalidBodyParent,
                         $"Part '{part.Id}' must be a descendant of the Body.", part.Id));
                 }
-                else if (part.ParentId != CreatureDefinition.BodyId && !idsById.Contains(part.ParentId))
+                else if (part.ParentId != CreatureDefinition.BodyId && !hierarchy.TryResolve(part.ParentId, out _))
                 {
                     issues.Add(new ValidationIssue(
                         ValidationSeverity.Error,

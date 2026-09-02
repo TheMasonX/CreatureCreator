@@ -35,20 +35,9 @@ namespace ProceduralCreature.Definition
         /// </summary>
         public readonly bool IsFinite()
         {
-            return IsFiniteVector(Position)
-                && IsFiniteVector(Scale)
-                && IsFinite(Rotation.x) && IsFinite(Rotation.y)
-                && IsFinite(Rotation.z) && IsFinite(Rotation.w);
-        }
-
-        private static bool IsFiniteVector(Vector3 v)
-        {
-            return IsFinite(v.x) && IsFinite(v.y) && IsFinite(v.z);
-        }
-
-        private static bool IsFinite(float f)
-        {
-            return !float.IsNaN(f) && !float.IsInfinity(f);
+            return NumericValidity.IsFinite(Position)
+                && NumericValidity.IsFinite(Scale)
+                && NumericValidity.IsFinite(Rotation);
         }
 
         /// <summary>

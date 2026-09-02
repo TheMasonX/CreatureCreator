@@ -1,4 +1,5 @@
 using System;
+using ProceduralCreature.Common;
 
 namespace ProceduralCreature.Definition
 {
@@ -24,9 +25,9 @@ namespace ProceduralCreature.Definition
 
         public readonly bool IsFinite()
         {
-            return !float.IsNaN(MaxX) && !float.IsInfinity(MaxX)
-                && !float.IsNaN(MaxY) && !float.IsInfinity(MaxY)
-                && !float.IsNaN(MaxZ) && !float.IsInfinity(MaxZ);
+            return NumericValidity.IsFinite(MaxX)
+                && NumericValidity.IsFinite(MaxY)
+                && NumericValidity.IsFinite(MaxZ);
         }
 
         public readonly bool IsPositive()
