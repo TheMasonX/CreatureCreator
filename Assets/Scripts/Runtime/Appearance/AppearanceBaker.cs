@@ -47,6 +47,25 @@ namespace ProceduralCreature.Appearance
             CreatureDefinition definition, MeshExtractionResult mesh,
             GenerationDiagnostics diagnostics)
         {
+            var compiledParts = SdfProgramBuilder.CompileIndividualPartsPortable(definition);
+            SdfProgram bodyProgram = SdfProgramBuilder.CompilePortableBodyField(definition);
+            try
+            {
+                return Bake(definition, mesh, diagnostics, compiledParts, bodyProgram);
+            }
+            finally
+            {
+                foreach ((CreaturePart part, SdfProgram program) in compiledParts) program.Dispose();
+                bodyProgram.Dispose();
+            }
+        }
+
+        internal static Color[] Bake(
+            CreatureDefinition definition, MeshExtractionResult mesh,
+            GenerationDiagnostics diagnostics,
+            System.Collections.Generic.List<(CreaturePart Part, SdfProgram Program)> compiledParts,
+            SdfProgram bodyProgram)
+        {
             if (definition == null) throw new DomainException("definition must not be null.");
             if (mesh == null) throw new DomainException("mesh must not be null.");
 
@@ -62,11 +81,12 @@ namespace ProceduralCreature.Appearance
                 colors = new Color[mesh.Positions.Count];
                 if (UseBurstResolve)
                 {
-                    BakeBurst(definition, mesh, colors);
+                    BakeBurst(definition, mesh, colors, compiledParts, bodyProgram);
                 }
                 else
                 {
-                    using (PartAppearanceSampler.Resolver resolver = PartAppearanceSampler.CreateResolver(definition))
+                    using (PartAppearanceSampler.Resolver resolver = PartAppearanceSampler.CreateResolver(
+                        definition, compiledParts, bodyProgram))
                     {
                         for (int i = 0; i < mesh.Positions.Count; i++)
                         {
@@ -95,12 +115,11 @@ namespace ProceduralCreature.Appearance
         /// for Body-owned vertices) and triplanar noise in managed code. The
         /// final colors are bit-identical to the managed resolver path.
         /// </summary>
-        private static void BakeBurst(CreatureDefinition definition, MeshExtractionResult mesh, Color[] colors)
+        private static void BakeBurst(
+            CreatureDefinition definition, MeshExtractionResult mesh, Color[] colors,
+            System.Collections.Generic.List<(CreaturePart Part, SdfProgram Program)> compiledParts,
+            SdfProgram bodyProgram)
         {
-            var compiledParts = SdfProgramBuilder.CompileIndividualPartsPortable(definition);
-            SdfProgram bodyProgram = SdfProgramBuilder.CompilePortableBodyField(definition);
-            try
-            {
                 int programCount = compiledParts.Count + 1;
                 int maxOps = 1;
                 foreach ((CreaturePart part, SdfProgram program) in compiledParts)
@@ -158,18 +177,6 @@ namespace ProceduralCreature.Appearance
                     outScale.Dispose();
                     outBody.Dispose();
                 }
-            }
-            finally
-            {
-                foreach ((CreaturePart part, SdfProgram program) in compiledParts)
-                {
-                    program.Dispose();
-                }
-                if (bodyProgram != null)
-                {
-                    bodyProgram.Dispose();
-                }
-            }
         }
 
         /// <summary>

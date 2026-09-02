@@ -135,7 +135,7 @@ namespace ProceduralCreature.Definition
             {
                 ThicknessKey key = Keys[i];
                 if (key == null) return false;
-                if (!IsFinite(key.T) || !IsFinite(key.Value)) return false;
+                if (!NumericValidity.IsFinite(key.T) || !NumericValidity.IsFinite(key.Value)) return false;
             }
             return true;
         }
@@ -185,9 +185,5 @@ namespace ProceduralCreature.Definition
                 .ToList();
         }
 
-        private static bool IsFinite(float value)
-        {
-            return !float.IsNaN(value) && !float.IsInfinity(value);
-        }
     }
 }

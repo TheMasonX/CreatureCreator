@@ -102,9 +102,9 @@ namespace ProceduralCreature.Definition
                 for (int i = 0; i < gradient.colorKeys.Length; i++)
                 {
                     GradientColorKey key = gradient.colorKeys[i];
-                    if (!IsFinite(key.time)
-                        || !IsFinite(key.color.r) || !IsFinite(key.color.g)
-                        || !IsFinite(key.color.b) || !IsFinite(key.color.a))
+                    if (!NumericValidity.IsFinite(key.time)
+                        || !NumericValidity.IsFinite(key.color.r) || !NumericValidity.IsFinite(key.color.g)
+                        || !NumericValidity.IsFinite(key.color.b) || !NumericValidity.IsFinite(key.color.a))
                     {
                         return false;
                     }
@@ -115,7 +115,7 @@ namespace ProceduralCreature.Definition
                 for (int i = 0; i < gradient.alphaKeys.Length; i++)
                 {
                     GradientAlphaKey key = gradient.alphaKeys[i];
-                    if (!IsFinite(key.time) || !IsFinite(key.alpha)) return false;
+                    if (!NumericValidity.IsFinite(key.time) || !NumericValidity.IsFinite(key.alpha)) return false;
                 }
             }
             return true;
@@ -182,9 +182,5 @@ namespace ProceduralCreature.Definition
             }
         }
 
-        private static bool IsFinite(float value)
-        {
-            return !float.IsNaN(value) && !float.IsInfinity(value);
-        }
     }
 }

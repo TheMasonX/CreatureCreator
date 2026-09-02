@@ -7,6 +7,7 @@ namespace ProceduralCreature.Definition
     /// </summary>
     public enum ValidationCode
     {
+        NullPart,
         DuplicatePartId,
         MissingParent,
         ParentCycle,

@@ -1,7 +1,7 @@
 # Handoff: deduplication, god-class decomposition, and consolidation
 
-**Date:** 2026-09-01  
-**Review mode:** Read-only repository review followed by task-tracker updates  
+**Date:** 2026-09-02
+**Review mode:** Read-only repository review followed by task-tracker updates
 **Scope:** Runtime ownership, malformed-definition handling, shared utilities,
 editor decomposition, and task deduplication
 
@@ -15,8 +15,8 @@ to own the work. Do not create new CC tickets for these findings.
 | Async preview generation | TSK-0103 | Done | Unity validation passed; hand off to hierarchy consolidation |
 | Malformed graph and hierarchy mechanics | TSK-0093 | Done | Tolerant index and canonicalizer integration validated |
 | Resolved snapshot and generation stages | TSK-0095 / CC-091 | Done | One snapshot, revision identity, and attachment correspondence complete |
-| Shared mechanical utilities | TSK-0094 | Backlog | Remove hierarchy semantics from this task |
-| Editor god-class decomposition | TSK-0098 | Backlog | Start with preview ownership |
+| Shared mechanical utilities | TSK-0094 | Done | Finite-check consolidation complete; hierarchy remains with TSK-0093 |
+| Editor god-class decomposition | TSK-0098 | InProgress | Preview controller slice complete; extract placement/stale state next |
 
 MemorySmith comments were added to all five tasks on 2026-09-01. The live
 MemorySmith task records remain authoritative. Markdown CC records remain
@@ -160,10 +160,9 @@ Static evidence on 2026-09-01:
     normal test-result save message and the performance-test post-build cleanup
     warning.
 
-The Unity gate for this CC-089 slice is now satisfied. TSK-0093 can move to
-`Done` with the recorded 428/428 runtime evidence. Next agent: advance
-TSK-0095 / CC-091 and establish the one resolved snapshot at the generation
-boundary; preserve the passing hierarchy and canonicalization tests.
+The Unity gate for this CC-089 slice is satisfied and TSK-0093 is `Done` with
+the recorded 428/428 runtime evidence. Preserve the passing hierarchy and
+canonicalization tests.
 
 ### 3. Complete TSK-0095
 
@@ -209,10 +208,8 @@ Validation completed on 2026-09-02 in Unity `6000.0.35f1`:
 - The pre-existing persistent-allocation warning remains the only console
     warning observed.
 
-The single snapshot boundary and compatibility overloads remain intact. The
-next agent should begin TSK-0094 / CC-090's mechanically identical utility
-extraction, then execute TSK-0098 / CC-094's preview-controller slice. Do not
-create a second snapshot or generation-stage task.
+The single snapshot boundary and compatibility overloads remain intact. Do
+not create a second snapshot or generation-stage task.
 
 Create one resolved snapshot at the generation boundary. Pass explicit derived
 programs, frames, and appearance correspondence through the stages.
@@ -257,12 +254,21 @@ Validation completed on 2026-09-01 in Unity `6000.0.35f1`:
 The same focused validation was repeated after removing the canonicalizer and
 validator-local predicates: 53/53 tests passed with zero failures or skips.
 
-The next agent should continue TSK-0094 with one additional mechanically
-identical utility family, such as the remaining local finite wrappers or
-deterministic ID comparison. Preserve domain-specific curve, hierarchy,
-tolerance, and mirror semantics. Run focused runtime tests and the runtime
-build after that slice. Only then begin TSK-0098 / CC-094's preview-controller
-extraction.
+The three finite-check slices are complete. `NumericValidity` now owns the
+shared scalar, `Vector3`, and `Quaternion` finiteness checks used by the
+definition, canonicalization, projection, curve, gradient, and thickness
+paths. TSK-0094 should remain closed unless a mechanically identical utility
+family is found with a concrete call-site inventory; do not move hierarchy,
+domain-specific curve semantics, tolerances, or mirror semantics into Common.
+
+Validation completed on 2026-09-02 in Unity `6000.0.35f1`:
+
+- `dotnet build .\\ProceduralCreature.Tests.Runtime.csproj --no-restore` passed
+    with zero warnings and zero errors.
+- Focused PlayMode validation passed 108/108 tests across definition,
+    serialization, body projection, and body appearance fixtures.
+- TSK-0094 is `Done` in MemorySmith with implementation and validation
+    evidence recorded.
 
 Move `PartType` limb-chain classification to a Runtime-owned contract so Editor
 authoring and Runtime validation cannot drift. Do not move domain semantics into
@@ -270,9 +276,27 @@ Common merely because method names match.
 
 ### 5. Execute TSK-0098 in slices
 
-Extract preview generation and lifecycle ownership first. Then extract
-placement and stale-preview state, followed by SceneView authoring, and finally
-tree and inspector presentation.
+The first preview-controller slice is complete. `CreaturePreviewController`
+owns `CreatureGenerationScheduler` lifecycle, cloned enqueue configuration,
+completion polling, stale-result suppression, preview GameObject creation,
+mesh/collider assignment, generated geometry children, and preview material
+assignment. `CreatureEditorWindow` remains the coordinator and retains
+validation, palette policy, diagnostics, placement fingerprinting, auto
+regeneration timing, and all mutation/session/undo boundaries.
+
+Validation completed on 2026-09-02 in Unity `6000.0.35f1`:
+
+- `ProceduralCreature.Tests.Editor` EditMode run passed 107/107 tests with
+    zero failures or skips.
+- Runtime build passed with zero warnings and zero errors.
+- `git diff --check` passed.
+
+Residual risk: no SceneView manual smoke check was performed for this slice.
+The next agent should extract placement and stale-preview state as the next
+reversible slice, preserving the current stale Body fingerprint behavior and
+the single `MutateDefinition` placement path. Add focused EditMode coverage,
+then perform the SceneView smoke check for stale blocking, placement drag,
+cancellation, and preview regeneration before extracting SceneView authoring.
 
 After each slice, run focused EditMode tests and a Unity SceneView smoke check.
 Preserve `MutateDefinition`, `CreatureEditorSession`, and `CreatureUndoState`

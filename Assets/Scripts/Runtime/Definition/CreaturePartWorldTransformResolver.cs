@@ -1,8 +1,11 @@
 using System;
 using System.Collections.Generic;
+using System.Security.Cryptography;
+using System.Text;
 using UnityEngine;
 using ProceduralCreature.Common;
 using ProceduralCreature.Morphology;
+using ProceduralCreature.Serialization;
 
 namespace ProceduralCreature.Definition
 {
@@ -54,6 +57,12 @@ namespace ProceduralCreature.Definition
         public readonly ResolvedLimb Limb;
         public readonly Matrix4x4 PartFrameToCreatureSpace;
         public readonly Matrix4x4 ChildFrameToCreatureSpace;
+        public readonly bool HasMeshGeometry;
+        public readonly string MeshAssetKey;
+        public readonly Vector3 GeometryOffset;
+        public readonly Quaternion GeometryOrientation;
+        public readonly Vector3 GeometryScale;
+        public readonly Matrix4x4 GeometryPlacementToCreatureSpace;
 
         internal ResolvedPartSnapshot(CreaturePart part, ResolvedLimb limb,
             Matrix4x4 partFrameToCreatureSpace, Matrix4x4 childFrameToCreatureSpace)
@@ -67,6 +76,13 @@ namespace ProceduralCreature.Definition
             Limb = limb;
             PartFrameToCreatureSpace = partFrameToCreatureSpace;
             ChildFrameToCreatureSpace = childFrameToCreatureSpace;
+            HasMeshGeometry = part.MeshGeometry != null;
+            MeshAssetKey = part.MeshGeometry?.MeshAssetKey;
+            GeometryOffset = part.MeshGeometry?.Attachment?.Offset ?? Vector3.zero;
+            GeometryOrientation = (part.MeshGeometry?.Attachment?.Orientation ?? Quaternion.identity).normalized;
+            GeometryScale = part.MeshGeometry?.Attachment?.Scale ?? Vector3.one;
+            GeometryPlacementToCreatureSpace = partFrameToCreatureSpace * Matrix4x4.TRS(
+                GeometryOffset, GeometryOrientation, GeometryScale);
         }
     }
 
@@ -81,14 +97,17 @@ namespace ProceduralCreature.Definition
 
         public readonly bool HasBody;
         public readonly ResolvedBody Body;
+        public string RevisionId { get; }
         public IReadOnlyDictionary<string, ResolvedPartSnapshot> PartsById => partsById;
 
         private ResolvedCreatureSnapshot(bool hasBody, ResolvedBody body,
-            IReadOnlyDictionary<string, ResolvedPartSnapshot> partsById)
+            IReadOnlyDictionary<string, ResolvedPartSnapshot> partsById,
+            string revisionId)
         {
             HasBody = hasBody;
             Body = body;
             this.partsById = partsById;
+            RevisionId = revisionId;
         }
 
         public static ResolvedCreatureSnapshot Resolve(CreatureDefinition definition)
@@ -101,6 +120,8 @@ namespace ProceduralCreature.Definition
             {
                 throw new DomainException("Cannot resolve a CreatureDefinition with null Parts.");
             }
+
+            string revisionId = ComputeRevisionId(definition);
 
             bool hasBody = definition.Body != null
                 && definition.Body.Samples != null
@@ -142,7 +163,19 @@ namespace ProceduralCreature.Definition
             return new ResolvedCreatureSnapshot(
                 hasBody,
                 body,
-                new System.Collections.ObjectModel.ReadOnlyDictionary<string, ResolvedPartSnapshot>(resolvedParts));
+                new System.Collections.ObjectModel.ReadOnlyDictionary<string, ResolvedPartSnapshot>(resolvedParts),
+                revisionId);
+        }
+
+        private static string ComputeRevisionId(CreatureDefinition definition)
+        {
+            string canonicalJson = new JsonDnaSerializer().Serialize(definition);
+            byte[] hash;
+            using (SHA256 sha256 = SHA256.Create())
+            {
+                hash = sha256.ComputeHash(Encoding.UTF8.GetBytes(canonicalJson));
+            }
+            return BitConverter.ToString(hash).Replace("-", string.Empty).ToLowerInvariant();
         }
 
         public bool TryGetPart(string id, out ResolvedPartSnapshot part)

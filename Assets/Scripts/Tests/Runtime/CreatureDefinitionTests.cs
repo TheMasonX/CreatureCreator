@@ -89,6 +89,38 @@ namespace ProceduralCreature.Tests.Runtime
         }
 
         [Test]
+        public void MalformedHierarchy_IsTotalAndPreservesDiagnostics()
+        {
+            var definition = CreatureDefinition.CreateEmpty();
+            definition.Parts.Add(null);
+            definition.Parts.Add(MakePart("duplicate", "cycle"));
+            definition.Parts.Add(MakePart("duplicate", CreatureDefinition.BodyId));
+            definition.Parts.Add(MakePart("cycle", "duplicate"));
+
+            CreaturePartHierarchyIndex hierarchy = definition.CreateHierarchyIndex();
+
+            Assert.IsTrue(hierarchy.HasNullEntries);
+            CollectionAssert.Contains(hierarchy.DuplicateIds, "duplicate");
+            Assert.IsTrue(hierarchy.TryResolve("duplicate", out _));
+            Assert.IsTrue(hierarchy.HasParentCycle(out List<string> cycleIds));
+            CollectionAssert.Contains(cycleIds, "duplicate");
+            Assert.IsNotNull(definition.FindPart("duplicate"));
+            Assert.DoesNotThrow(() => definition.GetChildren(CreatureDefinition.BodyId));
+        }
+
+        [Test]
+        public void Clone_PreservesNullPartEntriesWithoutThrowing()
+        {
+            var definition = CreatureDefinition.CreateEmpty();
+            definition.Parts.Add(null);
+
+            CreatureDefinition clone = definition.Clone();
+
+            Assert.AreEqual(1, clone.Parts.Count);
+            Assert.IsNull(clone.Parts[0]);
+        }
+
+        [Test]
         public void CloneAsDuplicate_GeneratesNewId()
         {
             CreaturePart original = MakePart("part_original");

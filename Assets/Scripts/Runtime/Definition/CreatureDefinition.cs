@@ -49,18 +49,18 @@ namespace ProceduralCreature.Definition
                 Generation = Generation,
                 Body = Body == null ? null : Body.Clone(),
                 Forward = Forward,
-                Parts = Parts.Select(p => p.Clone()).ToList(),
+                Parts = (Parts ?? new List<CreaturePart>()).Select(p => p == null ? null : p.Clone()).ToList(),
             };
+        }
+
+        public CreaturePartHierarchyIndex CreateHierarchyIndex()
+        {
+            return new CreaturePartHierarchyIndex(this);
         }
 
         public CreaturePart FindPart(string id)
         {
-            if (string.IsNullOrEmpty(id)) return null;
-            for (int i = 0; i < Parts.Count; i++)
-            {
-                if (Parts[i].Id == id) return Parts[i];
-            }
-            return null;
+            return CreateHierarchyIndex().TryResolve(id, out CreaturePart part) ? part : null;
         }
 
         /// <summary>
@@ -73,7 +73,7 @@ namespace ProceduralCreature.Definition
         /// </summary>
         public IEnumerable<CreaturePart> GetChildren(string parentId)
         {
-            return Parts.Where(p => p.ParentId == parentId);
+            return CreateHierarchyIndex().GetChildren(parentId);
         }
 
         /// <summary>
@@ -86,37 +86,7 @@ namespace ProceduralCreature.Definition
         {
             partIdsInCycle = new List<string>();
 
-            // Tolerant lookup: first-wins on duplicate Ids so this never throws
-            // (CC-082). Duplicate part Ids are reported separately by
-            // DefinitionValidator; cycle detection must stay total and report-only.
-            var byId = new Dictionary<string, CreaturePart>(StringComparer.Ordinal);
-            foreach (CreaturePart part in Parts)
-            {
-                if (part == null || part.Id == null) continue;
-                if (!byId.ContainsKey(part.Id)) byId[part.Id] = part;
-            }
-
-            foreach (CreaturePart part in Parts)
-            {
-                var visited = new HashSet<string>();
-                string currentId = part.Id;
-
-                while (true)
-                {
-                    if (!visited.Add(currentId))
-                    {
-                        partIdsInCycle.Add(part.Id);
-                        break;
-                    }
-
-                    if (!byId.TryGetValue(currentId, out CreaturePart current)) break;
-                    if (current.ParentId == null) break;
-
-                    currentId = current.ParentId;
-                }
-            }
-
-            return partIdsInCycle.Count > 0;
+            return CreateHierarchyIndex().HasParentCycle(out partIdsInCycle);
         }
 
         /// <summary>

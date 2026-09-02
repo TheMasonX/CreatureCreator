@@ -210,7 +210,14 @@ namespace ProceduralCreature.Morphology.Sdf
         {
             if (definition == null) throw new DomainException("Cannot compile a null CreatureDefinition.");
 
-            ResolvedCreatureSnapshot snapshot = ResolvedCreatureSnapshot.Resolve(definition);
+            return CompilePortable(definition, ResolvedCreatureSnapshot.Resolve(definition));
+        }
+
+        public static SdfProgram CompilePortable(
+            CreatureDefinition definition, ResolvedCreatureSnapshot snapshot)
+        {
+            if (definition == null) throw new DomainException("Cannot compile a null CreatureDefinition.");
+            if (snapshot == null) throw new DomainException("Cannot compile with a null resolved snapshot.");
 
             var operations = new List<SdfOperation>();
             List<CreaturePart> orderedParts = definition.Parts
@@ -390,7 +397,14 @@ namespace ProceduralCreature.Morphology.Sdf
         {
             if (definition == null) throw new DomainException("Cannot compile a null CreatureDefinition.");
 
-            ResolvedCreatureSnapshot snapshot = ResolvedCreatureSnapshot.Resolve(definition);
+            return CompilePortableBodyField(definition, ResolvedCreatureSnapshot.Resolve(definition));
+        }
+
+        public static SdfProgram CompilePortableBodyField(
+            CreatureDefinition definition, ResolvedCreatureSnapshot snapshot)
+        {
+            if (definition == null) throw new DomainException("Cannot compile a null CreatureDefinition.");
+            if (snapshot == null) throw new DomainException("Cannot compile with a null resolved snapshot.");
 
             var operations = new List<SdfOperation>();
             int root = AppendPortableBodyField(operations, snapshot);
@@ -407,7 +421,15 @@ namespace ProceduralCreature.Morphology.Sdf
         {
             if (definition == null) throw new DomainException("Cannot compile a null CreatureDefinition.");
 
-            ResolvedCreatureSnapshot snapshot = ResolvedCreatureSnapshot.Resolve(definition);
+            return CompileIndividualPartsPortable(definition, ResolvedCreatureSnapshot.Resolve(definition));
+        }
+
+        public static List<(CreaturePart Part, SdfProgram Program)> CompileIndividualPartsPortable(
+            CreatureDefinition definition, ResolvedCreatureSnapshot snapshot)
+        {
+            if (definition == null) throw new DomainException("Cannot compile a null CreatureDefinition.");
+            if (snapshot == null) throw new DomainException("Cannot compile with a null resolved snapshot.");
+
             return definition.Parts
                 .OrderBy(p => p.Id, System.StringComparer.Ordinal)
                 .Where(part => part.MeshGeometry == null)

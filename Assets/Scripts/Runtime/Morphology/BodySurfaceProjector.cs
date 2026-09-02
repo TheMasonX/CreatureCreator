@@ -47,8 +47,8 @@ namespace ProceduralCreature.Morphology
             {
                 throw new DomainException("Cannot project a null BodySurfaceAnchor.");
             }
-            if (!IsFinite(anchor.RadialAngle) || !IsFinite(anchor.SurfaceOffset)
-                || !IsFinite(anchor.Roll) || !IsFinite(anchor.SegmentT))
+            if (!NumericValidity.IsFinite(anchor.RadialAngle) || !NumericValidity.IsFinite(anchor.SurfaceOffset)
+                || !NumericValidity.IsFinite(anchor.Roll) || !NumericValidity.IsFinite(anchor.SegmentT))
             {
                 throw new DomainException("BodySurfaceAnchor contains a non-finite coordinate.");
             }
@@ -104,8 +104,8 @@ namespace ProceduralCreature.Morphology
                 throw new DomainException(
                     "Cannot project a hit onto a ResolvedBody with fewer than two samples.");
             }
-            if (!IsFinite(position.x) || !IsFinite(position.y) || !IsFinite(position.z)
-                || !IsFinite(outwardNormal.x) || !IsFinite(outwardNormal.y) || !IsFinite(outwardNormal.z))
+            if (!NumericValidity.IsFinite(position.x) || !NumericValidity.IsFinite(position.y) || !NumericValidity.IsFinite(position.z)
+                || !NumericValidity.IsFinite(outwardNormal.x) || !NumericValidity.IsFinite(outwardNormal.y) || !NumericValidity.IsFinite(outwardNormal.z))
             {
                 throw new DomainException("Hit position and outward normal must be finite.");
             }
@@ -179,9 +179,5 @@ namespace ProceduralCreature.Morphology
             return -1;
         }
 
-        private static bool IsFinite(float value)
-        {
-            return !float.IsNaN(value) && !float.IsInfinity(value);
-        }
     }
 }

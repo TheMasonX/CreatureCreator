@@ -4,7 +4,7 @@
   "title": "Async generation pipeline: keep the editor responsive",
   "description": "## User Mandate\n\n\u003E \u0022Create a handoff for the next agent to further resolve rendering speed issues, and to make it async if at all possible.\u0022\n\nSTRICT. Binding constraints:\n- Make creature preview generation async so the editor does not block on regeneration.\n- Keep the generated output deterministic and bit-identical for the same input (async must not change appearance or topology).\n- Preserve the CC-064 \u002Binf contract, native DensityGrid dispose ownership, and the three-tier preview model (CC-057).\n- Keep the synchronous Generate path as the reference/fallback.\n\n## Summary\n\nGeneration currently runs synchronously on the main thread: TotalGeneration 216.6 ms at 96^3 (dino) blocks the editor. The heavy stages (SdfCompile, FieldSampling, MeshExtraction, AppearanceBake) are pure runtime data; only MeshExtractionResult.ToUnityMesh() \u002B SetColors touch UnityEngine.Mesh and must stay on the main thread. Run the pipeline off-thread and swap the finished preview in without a hitch.\n\n## Scope\n\n- Add a GenerationRequest (validated definition \u002B sequence/fingerprint \u002B callback) enqueued by CreatureEditorWindow.RegeneratePreview / ProcessAutoRegeneration and by CreatureRuntimePreview.\n- Background runner executes compile -\u003E sample -\u003E extract -\u003E appearance bake off the main thread, disposing native buffers (DensityGrid, scratch, programs) exactly once on that thread.\n- Main-thread completion: drop stale results (newer edit wins), then ToUnityMesh \u002B SetColors, swap preview, record GenerationDiagnostics.\n- Do not cross the Unity-Mesh main-thread boundary on the background thread.\n- Reference/fallback: keep synchronous CreatureMeshGenerator.Generate intact.\n\n## Acceptance Criteria\n\n- Regenerating a preview does not block the editor main thread (proxy or previous mesh stays interactive while generating).\n- Async output is deterministically identical to synchronous output for the same definition (mesh topology \u002B colors).\n- A stale in-flight result is never applied after a newer edit (sequence number / fingerprint gate).\n- All native buffers are disposed exactly once; no TempJob/Persistent leak warnings.\n- Existing PlayMode baseline (422/422) stays green; new determinism \u002B staleness tests added.\n\n## Validation\n\n- Determinism test: synchronous vs async generation of the same definition -\u003E identical topology \u002B colors.\n- Staleness test: two enqueued requests -\u003E older result dropped.\n- EditMode tests for the scheduler state machine; PlayMode/manual for the editor window swap (bridge cannot drive the interactive window).\n- dotnet build \u002B Unity compile 0 errors/0 warnings; console clean.\n\n## Findings\n\n- 2026-09-01 handoff \u0060docs/tasks/handoffs/2026-09-01-generation-speed-slices-a-d-async-next-handoff.md\u0060 details the split, design, and gotchas.\n- Off-main-thread-safe stages produce/consume SdfProgram, DensityGrid, MeshExtractionResult, Color[] (no Unity objects). ToUnityMesh is the main-thread seam.\n- FieldSampling (121.4 ms, 56%) and contour resolution (30 ms) remain after async.\n\n## Blockers\n\n- None. Unity Mesh creation is main-thread-only; the design routes around it.\n\n## Next Step\n\nReview the handoff, then implement the smallest async slice (GenerationRequest \u002B background runner \u002B main-thread completion \u002B staleness gate) with the determinism/staleness tests.\n\nSource: docs/tasks/handoffs/2026-09-01-generation-speed-slices-a-d-async-next-handoff.md",
   "type": "Feature",
-  "status": "InProgress",
+  "status": "Done",
   "priority": "High",
   "assigneeMode": "Custom",
   "assigneeDirectoryId": null,
@@ -42,15 +42,27 @@
       "author": "anonymous",
       "body": "User reported that the preview only regenerated on mouse release despite holding a limb joint for 30 seconds. Root cause: DrawLimbJointHandles intentionally kept the definition transient and only called MutateDefinition from CommitLimbJointDrag on release. Fixed by debouncing async generation from each joint movement using a cloned transient definition; ProcessAutoRegeneration now enqueues that transient preview while the drag remains active. Release still performs exactly one authored DNA mutation and Undo. Runtime/editor builds pass, diagnostics are clean, Unity refresh is ready; console showed only an unrelated selection message.",
       "createdAtUtc": "2026-09-02T01:35:22.872185Z"
+    },
+    {
+      "id": "c-5e2e2f04bb564d51aa398b7c70fab60c",
+      "author": "anonymous",
+      "body": "Review disposition (2026-09-01): keep this as the single user-mandated async generation task. The implementation slice is present and includes scheduler, cloned definitions, background GenerateData, main-thread Assemble, stale sequence gating, and transient limb-drag preview generation. Do not mark Done yet: the recorded Unity Test Framework initialization timeout leaves real-editor scheduler tests and manual editor preview swap verification outstanding. Next gate: refresh/compile, clean console, focused Unity tests, then SceneView smoke checks.",
+      "createdAtUtc": "2026-09-02T01:47:00.008238Z"
+    },
+    {
+      "id": "c-31f8da35e2474c1191f0bb2c7668ea4b",
+      "author": "anonymous",
+      "body": "Validation completed 2026-09-01 in Unity 6000.0.35f1. Refresh/compile completed ready; post-validation console contained no errors or warnings (only TestResults save and IPostBuildCleanup log entries). Focused PlayMode run ProceduralCreature.Tests.Runtime.CreatureGenerationSchedulerTests succeeded: 2/2 passed, 0 failed, including AsyncGeneration_MatchesSynchronousMeshAndColors and NewerRequest_MakesOlderCompletedResultStale. Editor smoke check found one CreatureEditorWindow, invoked regeneration, processed completion, and confirmed an active CreatureCreator Preview with MeshFilter 5,229 vertices / 10,454 triangles and assigned MeshCollider. Synchronous Generate remains the reference path. Remaining work is the next handoff: TSK-0093 / CC-089 tolerant hierarchy index and malformed-definition ownership.",
+      "createdAtUtc": "2026-09-02T01:56:31.4390118Z"
     }
   ],
   "epicId": null,
   "parentId": null,
   "dueDateUtc": null,
   "createdAtUtc": "2026-09-02T00:54:44.7143755Z",
-  "updatedAtUtc": "2026-09-02T01:35:22.872185Z",
-  "completedAtUtc": null,
-  "revision": 5,
+  "updatedAtUtc": "2026-09-02T01:56:33.4113421Z",
+  "completedAtUtc": "2026-09-02T01:56:33.4113421Z",
+  "revision": 8,
   "isArchived": false,
   "hasLoadError": false,
   "loadError": null,

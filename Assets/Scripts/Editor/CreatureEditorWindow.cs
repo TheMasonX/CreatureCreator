@@ -138,7 +138,6 @@ namespace ProceduralCreature.Editor
         private Vector2 _validationScroll;
         private bool _showValidationPanel = true;
         private GameObject _previewGameObject;
-        private readonly List<GameObject> _previewGeometryObjects = new List<GameObject>();
         private CreatureUndoState _undoState;
         private bool _placementModeActive;
         // CC-007: transient placement result shown under the Place Part Mode
@@ -177,11 +176,9 @@ namespace ProceduralCreature.Editor
         private double _autoRegenerateAt = -1d;
         private CreatureDefinition _transientPreviewDefinition;
         private string _currentFilePath;
-        private CreatureGenerationScheduler _generationScheduler;
+        private CreaturePreviewController _previewController;
 
         private static readonly IDnaSerializer Serializer = new JsonDnaSerializer();
-        private const string PreviewObjectName = "CreatureCreator Preview";
-        private const string PreviewGeometryChildPrefix = "CreatureCreator Preview Geometry ";
         private const float MinimumAutoRegenerationDelaySeconds = 0.01f;
         private const string AutoRegenerationDelayKey = "ProceduralCreature.AutoRegenerationDelay";
         private const string PreviewVoxelsPerUnitKey = "ProceduralCreature.PreviewVoxelsPerUnit";
@@ -290,8 +287,10 @@ namespace ProceduralCreature.Editor
             SceneView.duringSceneGui += OnSceneGUI;
             EditorApplication.update += ProcessAutoRegeneration;
 
-            _previewGameObject = GameObject.Find(PreviewObjectName);
-            _generationScheduler = new CreatureGenerationScheduler();
+            _previewGameObject = GameObject.Find("CreatureCreator Preview");
+            _previewController = new CreaturePreviewController(
+                ResolveDefaultMaterial,
+                key => MaterialResolver.Resolve(EffectiveMaterialPalette, key));
         }
 
         private void OnDisable()
@@ -305,8 +304,8 @@ namespace ProceduralCreature.Editor
             SceneView.duringSceneGui -= OnSceneGUI;
             EditorApplication.update -= ProcessAutoRegeneration;
 
-            _generationScheduler?.Dispose();
-            _generationScheduler = null;
+            _previewController?.Dispose();
+            _previewController = null;
 
             if (_undoState != null)
             {
@@ -2995,17 +2994,14 @@ namespace ProceduralCreature.Editor
 
         private void EnqueuePreviewGeneration(CreatureDefinition definition)
         {
-            definition = definition.Clone();
-            definition.Generation.VoxelsPerUnit = _previewVoxelsPerUnit;
-            _generationScheduler.Enqueue(definition, new GenerationDiagnostics(_logGenerationDiagnostics));
+            _previewController.Enqueue(definition, _previewVoxelsPerUnit, _logGenerationDiagnostics);
         }
 
         private void ProcessGenerationCompletions()
         {
-            if (_generationScheduler == null) return;
-            while (_generationScheduler.TryTakeCompleted(out CreatureGenerationResult result))
+            if (_previewController == null) return;
+            _previewController.ProcessCompletions(result =>
             {
-                if (result.IsStale) continue;
                 if (!result.Succeeded)
                 {
                     string validationDetails = string.Join("\n", _validation.Issues.Select(issue => issue.Message));
@@ -3013,14 +3009,15 @@ namespace ProceduralCreature.Editor
                         "Generation Failed",
                         $"Stage: {result.Diagnostics?.FailedStage}\n{result.Exception.Message}\n\n{validationDetails}",
                         "OK");
-                    continue;
+                    return;
                 }
 
                 try
                 {
                     GeneratedCreature generated = CreatureMeshGenerator.Assemble(result.Data, ResolveMeshAsset);
                     Mesh unityMesh = generated.MainMesh;
-                    ApplyPreviewGeometry(generated);
+                    _previewController.ApplyPreviewGeometry(generated);
+                    _previewGameObject = _previewController.PreviewGameObject;
                     _previewBodyFingerprint = BuildPlacementFingerprint(_definition);
                     MeshTopologyReport topologyReport = result.Data.TopologyReport;
                     if (!topologyReport.IsWatertight)
@@ -3042,7 +3039,7 @@ namespace ProceduralCreature.Editor
                 {
                     EditorUtility.DisplayDialog("Generation Failed", ex.Message, "OK");
                 }
-            }
+            });
         }
 
         private static string FormatDiagnosticTiming(StageTiming timing)
@@ -3055,63 +3052,6 @@ namespace ProceduralCreature.Editor
             return $"{indentation}{timing.Stage}: {timing.Elapsed.TotalMilliseconds:F1}ms";
         }
 
-        private void ApplyPreviewMesh(Mesh mesh)
-        {
-            // The _previewGameObject field reference is lost across a domain
-            // reload; look the object up by name first so re-generating after a
-            // recompile updates the existing preview instead of creating a
-            // second one. OnEnable does the same lookup so "Place Part Mode"
-            // correctly re-enables itself after a reload too, without requiring
-            // an unnecessary re-regenerate first.
-            if (_previewGameObject == null)
-            {
-                _previewGameObject = GameObject.Find(PreviewObjectName);
-            }
-
-            if (_previewGameObject == null)
-            {
-                _previewGameObject = new GameObject(PreviewObjectName);
-                _previewGameObject.AddComponent<MeshFilter>();
-                MeshRenderer renderer = _previewGameObject.AddComponent<MeshRenderer>();
-                Material material = ResolveDefaultMaterial();
-                if (material != null) renderer.sharedMaterial = material;
-                _previewGameObject.AddComponent<MeshCollider>();
-            }
-
-            _previewGameObject.GetComponent<MeshFilter>().sharedMesh = mesh;
-            MeshRenderer previewRenderer = _previewGameObject.GetComponent<MeshRenderer>();
-            if (previewRenderer == null) previewRenderer = _previewGameObject.AddComponent<MeshRenderer>();
-            // CC-074: re-resolve the palette default each regenerate so a palette
-            // or config change is reflected without reopening the window.
-            Material resolvedDefault = ResolveDefaultMaterial();
-            if (resolvedDefault != null) previewRenderer.sharedMaterial = resolvedDefault;
-
-            // MeshCollider needs sharedMesh reassigned (not just relying on the
-            // same Mesh object being mutated) to pick up topology changes —
-            // ToUnityMesh() always returns a brand-new Mesh each regenerate, so
-            // this reassignment happens naturally every time.
-            MeshCollider collider = _previewGameObject.GetComponent<MeshCollider>();
-            if (collider == null) collider = _previewGameObject.AddComponent<MeshCollider>();
-            collider.sharedMesh = mesh;
-        }
-
-        private void ApplyPreviewGeometry(GeneratedCreature generated)
-        {
-            ApplyPreviewMesh(generated.MainMesh);
-            ClearPreviewGeometryChildren();
-
-            for (int i = 1; i < generated.Geometry.Count; i++)
-            {
-                GeometryItem item = generated.Geometry[i];
-                var child = new GameObject(PreviewGeometryChildPrefix + i);
-                child.transform.SetParent(_previewGameObject.transform, worldPositionStays: false);
-                child.AddComponent<MeshFilter>().sharedMesh = item.Mesh;
-                MeshRenderer renderer = child.AddComponent<MeshRenderer>();
-                AssignPreviewItemMaterials(renderer, item);
-                _previewGeometryObjects.Add(child);
-            }
-        }
-
         /// <summary>
         /// Assigns materials to a preview item's renderer. A mesh-asset item whose
         /// part carries a submaterial key (CC-028) resolves that key through the
@@ -3122,44 +3062,6 @@ namespace ProceduralCreature.Editor
         /// material region keep the palette's default surface material (CC-074);
         /// extra submeshes keep the default too.
         /// </summary>
-        private void AssignPreviewItemMaterials(MeshRenderer renderer, GeometryItem item)
-        {
-            Material fallback = ResolveDefaultMaterial();
-            if (item.MaterialRegions.Count == 0)
-            {
-                if (fallback != null) renderer.sharedMaterial = fallback;
-                return;
-            }
-
-            Material resolved = MaterialResolver.Resolve(EffectiveMaterialPalette, item.MaterialRegions[0].MaterialKey);
-            if (fallback == null && resolved == null) return;
-
-            int subMeshCount = Mathf.Max(1, item.Mesh != null ? item.Mesh.subMeshCount : 1);
-            var materials = new Material[subMeshCount];
-            for (int i = 0; i < materials.Length; i++) materials[i] = fallback;
-            materials[0] = resolved != null ? resolved : fallback;
-            renderer.sharedMaterials = materials;
-        }
-
-        private void ClearPreviewGeometryChildren()
-        {
-            for (int i = _previewGeometryObjects.Count - 1; i >= 0; i--)
-            {
-                if (_previewGeometryObjects[i] != null) Object.DestroyImmediate(_previewGeometryObjects[i]);
-            }
-            _previewGeometryObjects.Clear();
-
-            if (_previewGameObject == null) return;
-            for (int i = _previewGameObject.transform.childCount - 1; i >= 0; i--)
-            {
-                Transform child = _previewGameObject.transform.GetChild(i);
-                if (child.name.StartsWith(PreviewGeometryChildPrefix, System.StringComparison.Ordinal))
-                {
-                    Object.DestroyImmediate(child.gameObject);
-                }
-            }
-        }
-
         private Mesh ResolveMeshAsset(string key)
         {
             return EffectiveMeshPalette != null && EffectiveMeshPalette.TryResolve(key, out Mesh mesh) ? mesh : null;

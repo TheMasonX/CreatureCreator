@@ -282,6 +282,82 @@ namespace ProceduralCreature.Tests.Runtime
         }
 
         [Test]
+        public void ResolvedCreatureSnapshot_RevisionId_IsCanonicalAndStable()
+        {
+            var firstDefinition = CreatureDefinition.CreateEmpty();
+            firstDefinition.AddPart(new CreaturePart
+            {
+                Id = "part_b",
+                Transform = TransformData.Identity,
+                Shape = ShapeDefinition.DefaultSphere,
+                Appearance = AppearanceDefinition.Default,
+            });
+            firstDefinition.AddPart(new CreaturePart
+            {
+                Id = "part_a",
+                Transform = TransformData.Identity,
+                Shape = ShapeDefinition.DefaultSphere,
+                Appearance = AppearanceDefinition.Default,
+            });
+
+            CreatureDefinition reorderedDefinition = firstDefinition.Clone();
+            CreaturePart firstPart = reorderedDefinition.Parts[0];
+            reorderedDefinition.Parts[0] = reorderedDefinition.Parts[1];
+            reorderedDefinition.Parts[1] = firstPart;
+
+            ResolvedCreatureSnapshot first = ResolvedCreatureSnapshot.Resolve(firstDefinition);
+            ResolvedCreatureSnapshot reordered = ResolvedCreatureSnapshot.Resolve(reorderedDefinition);
+            Assert.AreEqual(first.RevisionId, reordered.RevisionId,
+                "canonical ordering must not change the snapshot revision");
+            Assert.IsNotEmpty(first.RevisionId);
+
+            reorderedDefinition.FindPart("part_a").Transform.Position = new Vector3(1f, 0f, 0f);
+            ResolvedCreatureSnapshot changed = ResolvedCreatureSnapshot.Resolve(reorderedDefinition);
+            Assert.AreNotEqual(first.RevisionId, changed.RevisionId,
+                "a DNA change must create a different snapshot revision");
+        }
+
+        [Test]
+        public void ResolvedCreatureSnapshot_CapturesMeshAttachmentCorrespondence()
+        {
+            var definition = CreatureDefinition.CreateEmpty();
+            var part = new CreaturePart
+            {
+                Id = "mesh_part",
+                ParentId = CreatureDefinition.BodyId,
+                Transform = new TransformData
+                {
+                    Position = new Vector3(1f, 2f, 3f),
+                    Rotation = Quaternion.identity,
+                    Scale = Vector3.one,
+                },
+                Shape = ShapeDefinition.DefaultSphere,
+                Appearance = AppearanceDefinition.Default,
+                MeshGeometry = new MeshGeometry
+                {
+                    MeshAssetKey = "mesh_asset",
+                    Attachment = new GeometryAttachment
+                    {
+                        Offset = new Vector3(0f, 0.25f, 0f),
+                        Orientation = Quaternion.Euler(0f, 90f, 0f),
+                        Scale = new Vector3(2f, 1f, 1f),
+                    },
+                },
+            };
+            definition.AddPart(part);
+
+            ResolvedCreatureSnapshot snapshot = ResolvedCreatureSnapshot.Resolve(definition);
+            Assert.IsTrue(snapshot.TryGetPart(part.Id, out ResolvedPartSnapshot resolved));
+            Assert.IsTrue(resolved.HasMeshGeometry);
+            Assert.AreEqual("mesh_asset", resolved.MeshAssetKey);
+            Assert.AreEqual(part.MeshGeometry.Attachment.Offset, resolved.GeometryOffset);
+            Assert.AreEqual(part.MeshGeometry.Attachment.Orientation.normalized, resolved.GeometryOrientation);
+            Assert.AreEqual(part.MeshGeometry.Attachment.Scale, resolved.GeometryScale);
+            Assert.AreEqual(new Vector3(1f, 2.25f, 3f),
+                resolved.GeometryPlacementToCreatureSpace.MultiplyPoint3x4(Vector3.zero));
+        }
+
+        [Test]
         public void ResolvedCreatureSnapshot_UsesResolvedLimbTerminalForChildFrame()
         {
             var definition = CreatureDefinition.CreateEmpty();

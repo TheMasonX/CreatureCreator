@@ -71,6 +71,15 @@ namespace ProceduralCreature.Appearance
             return new Resolver(definition);
         }
 
+        internal static Resolver CreateResolver(
+            CreatureDefinition definition,
+            System.Collections.Generic.List<(CreaturePart Part, SdfProgram Program)> compiledParts,
+            SdfProgram bodyProgram)
+        {
+            if (definition == null) throw new DomainException("definition must not be null.");
+            return new Resolver(definition, compiledParts, bodyProgram);
+        }
+
         public sealed class Resolver : System.IDisposable
         {
             private readonly CreatureDefinition _definition;
@@ -78,6 +87,7 @@ namespace ProceduralCreature.Appearance
             private readonly PartBounds[] _partBounds;
             private readonly SdfProgram _bodyProgram;
             private readonly NativeArray<float> _scratchValues;
+            private readonly bool _ownsPrograms;
 
             /// <summary>
             /// Test hook: when false, <see cref="Resolve"/> evaluates every part
@@ -89,15 +99,29 @@ namespace ProceduralCreature.Appearance
             internal bool EnableBroadPhase = true;
 
             internal Resolver(CreatureDefinition definition)
+                : this(
+                    definition,
+                    SdfProgramBuilder.CompileIndividualPartsPortable(definition),
+                    SdfProgramBuilder.CompilePortableBodyField(definition),
+                    ownsPrograms: true)
+            {
+            }
+
+            internal Resolver(
+                CreatureDefinition definition,
+                System.Collections.Generic.List<(CreaturePart Part, SdfProgram Program)> compiledParts,
+                SdfProgram bodyProgram,
+                bool ownsPrograms = false)
             {
                 _definition = definition;
-                _compiledParts = SdfProgramBuilder.CompileIndividualPartsPortable(definition);
+                _compiledParts = compiledParts ?? throw new DomainException("compiledParts must not be null.");
+                _ownsPrograms = ownsPrograms;
                 _partBounds = new PartBounds[_compiledParts.Count];
                 for (int i = 0; i < _compiledParts.Count; i++)
                 {
                     _partBounds[i] = PartBounds.FromProgram(_compiledParts[i].Program);
                 }
-                _bodyProgram = SdfProgramBuilder.CompilePortableBodyField(definition);
+                _bodyProgram = bodyProgram ?? throw new DomainException("bodyProgram must not be null.");
                 int scratchLength = _bodyProgram.Operations.Length;
                 foreach ((CreaturePart part, SdfProgram program) in _compiledParts)
                 {
@@ -108,11 +132,14 @@ namespace ProceduralCreature.Appearance
 
             public void Dispose()
             {
-                foreach ((CreaturePart part, SdfProgram program) in _compiledParts)
+                if (_ownsPrograms)
                 {
-                    program.Dispose();
+                    foreach ((CreaturePart part, SdfProgram program) in _compiledParts)
+                    {
+                        program.Dispose();
+                    }
+                    _bodyProgram.Dispose();
                 }
-                _bodyProgram.Dispose();
                 if (_scratchValues.IsCreated)
                 {
                     _scratchValues.Dispose();

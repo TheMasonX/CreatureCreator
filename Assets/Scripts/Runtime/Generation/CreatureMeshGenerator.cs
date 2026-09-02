@@ -62,10 +62,12 @@ namespace ProceduralCreature.Generation
                 throw new DomainException("CreatureDefinition is invalid and cannot be generated.");
             }
 
+            ResolvedCreatureSnapshot snapshot = ResolvedCreatureSnapshot.Resolve(definition);
+
             SdfProgram portableProgram = null;
             Time(diagnostics, GenerationStage.SdfCompile, () =>
             {
-                portableProgram = SdfProgramBuilder.CompilePortable(definition);
+                portableProgram = SdfProgramBuilder.CompilePortable(definition, snapshot);
             });
 
             DensityGrid grid = null;
@@ -116,10 +118,20 @@ namespace ProceduralCreature.Generation
                 () => generatedTopologyReport = MeshTopologyValidator.Validate(meshResult));
 
             Color[] colors = null;
-            Time(diagnostics, GenerationStage.AppearanceBake,
-                () => colors = AppearanceBaker.Bake(definition, meshResult));
+            var compiledParts = SdfProgramBuilder.CompileIndividualPartsPortable(definition, snapshot);
+            SdfProgram bodyProgram = SdfProgramBuilder.CompilePortableBodyField(definition, snapshot);
+            try
+            {
+                Time(diagnostics, GenerationStage.AppearanceBake,
+                    () => colors = AppearanceBaker.Bake(definition, meshResult, null, compiledParts, bodyProgram));
+            }
+            finally
+            {
+                foreach ((CreaturePart part, SdfProgram program) in compiledParts) program.Dispose();
+                bodyProgram.Dispose();
+            }
 
-            return new GeneratedCreatureData(definition, meshResult, colors, generatedTopologyReport);
+            return new GeneratedCreatureData(definition, snapshot, meshResult, colors, generatedTopologyReport);
         }
 
         public static GeneratedCreature Assemble(GeneratedCreatureData data, Func<string, Mesh> meshResolver = null)
@@ -146,12 +158,12 @@ namespace ProceduralCreature.Generation
 
             foreach (CreaturePart part in meshParts)
             {
-                Matrix4x4 localToCreature = CreaturePartWorldTransformResolver.ResolveLocalToCreatureSpace(data.Definition, part);
-                Mesh sourceMesh = ResolveMesh(part, meshResolver);
-
-                GeometryAttachment attachment = part.MeshGeometry.Attachment ?? new GeometryAttachment();
-                Matrix4x4 placement = localToCreature
-                    * Matrix4x4.TRS(attachment.Offset, attachment.Orientation.normalized, attachment.Scale);
+                if (!data.Snapshot.TryGetPart(part.Id, out ResolvedPartSnapshot resolvedPart))
+                {
+                    throw new DomainException($"No resolved snapshot entry exists for part '{part.Id}'.");
+                }
+                Mesh sourceMesh = ResolveMesh(part.Id, resolvedPart.MeshAssetKey, meshResolver);
+                Matrix4x4 placement = resolvedPart.GeometryPlacementToCreatureSpace;
 
                 generated.Geometry.Add(BuildMeshAssetItem(part, sourceMesh, placement, mirror: false));
 
@@ -164,19 +176,19 @@ namespace ProceduralCreature.Generation
             return generated;
         }
 
-        private static Mesh ResolveMesh(CreaturePart part, Func<string, Mesh> meshResolver)
+        private static Mesh ResolveMesh(string partId, string meshAssetKey, Func<string, Mesh> meshResolver)
         {
             if (meshResolver == null)
             {
                 throw new DomainException(
-                    $"Part '{part.Id}' declares mesh geometry ('{part.MeshGeometry.MeshAssetKey}') " +
+                    $"Part '{partId}' declares mesh geometry ('{meshAssetKey}') " +
                     "but no mesh resolver was provided.");
             }
-            Mesh resolved = meshResolver(part.MeshGeometry.MeshAssetKey);
+            Mesh resolved = meshResolver(meshAssetKey);
             if (resolved == null)
             {
                 throw new DomainException(
-                    $"Mesh asset '{part.MeshGeometry.MeshAssetKey}' for part '{part.Id}' could not be resolved.");
+                    $"Mesh asset '{meshAssetKey}' for part '{partId}' could not be resolved.");
             }
             return resolved;
         }

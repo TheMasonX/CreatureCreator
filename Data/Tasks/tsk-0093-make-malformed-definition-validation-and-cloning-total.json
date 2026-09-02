@@ -4,7 +4,7 @@
   "title": "Make malformed-definition validation and cloning total",
   "description": "Source: docs/tasks/tickets/CC-089-total-validation-and-clone-boundary.md\nSource key: CC-089\nSource status: Backlog\nSource priority: P1\n\n## Summary\r\n\r\nMake malformed definitions produce stable validation or domain errors instead of incidental collection and null exceptions.\r\n\r\n## Scope\r\n\r\n- Use one tolerant part index for duplicate IDs, null entries, parent lookup, and cycle analysis.\r\n- Preserve duplicate diagnostics without forcing malformed data into a throwing dictionary.\r\n- Define clone behavior for null part entries and document the boundary.\r\n- Prefer non-throwing \u0060TryResolve\u0060 paths for validator-only resolved-envelope\r\n  checks, so routine incomplete authoring data does not use exceptions for\r\n  control flow.\r\n- Keep canonicalization non-repairing and use domain-specific failures.\r\n- Preserve the corrected CC-082, CC-083, and CC-084 evidence as regression cases.\r\n\r\n## Acceptance Criteria\r\n\r\n- \u0060DefinitionValidator.Validate\u0060 returns issues for null parts, duplicate IDs, missing parents, and cycles.\r\n- Direct cycle analysis does not throw on duplicate IDs or null entries.\r\n- Clone and canonicalization behavior is explicit and covered for malformed input.\r\n- Validator envelope checks report or skip structurally invalid entries without\r\n  exception-driven control flow.\r\n- The null-parent test fixture constructs a true null parent case.\r\n- Canonical JSON preserves null or blank display-name intent according to the chosen documented contract.\r\n- Validation remains report-only and does not silently rewrite DNA.\r\n\r\n## Validation\r\n\r\nRun focused DefinitionValidator, CreatureDefinition, canonicalizer, and JSON round-trip tests in Unity. Include malformed object-graph fixtures and inspect the console.\r\n\r\n## Findings\r\n\r\nThe audit series confirms a throwing \u0060HasParentCycle\u0060 dictionary path and broader null-entry risks. It also corrects the original CC-083 diagnosis: the existing validator rule is present, but the test helper cannot express an explicit null parent.\r\n\r\n## Blockers\r\n\r\nNone.\r\n\r\n## Next Step\r\n\r\nChoose the tolerant-index contract, then add the malformed graph fixtures before changing validation implementation.",
   "type": "Bug Fix",
-  "status": "Backlog",
+  "status": "Done",
   "priority": "High",
   "assigneeMode": "Custom",
   "assigneeDirectoryId": null,
@@ -21,16 +21,41 @@
   "attachments": [],
   "externalLinks": [],
   "linkedPages": [],
-  "comments": [],
+  "comments": [
+    {
+      "id": "c-10d0923e042c4a4c8a9980d1b9877cca",
+      "author": "anonymous",
+      "body": "Review disposition (2026-09-01): make this the single owner for malformed-definition graph mechanics. Consolidate duplicate-ID handling, null entries, parent lookup, cycle analysis, cloning policy, and canonicalization traversal around one concrete tolerant hierarchy/index utility. Fold the older CC-078/079/080/082/083/084 findings into this task as evidence or subtasks; do not create parallel tickets. Preserve report-only validation and non-repairing canonicalization. Next gate: define first-wins/diagnostic behavior, add malformed graph fixtures, then run focused Unity validator, clone, canonicalizer, and serializer tests.",
+      "createdAtUtc": "2026-09-02T01:47:00.0852683Z"
+    },
+    {
+      "id": "c-fe9b59127cf74875ac604b81dd6e6603",
+      "author": "anonymous",
+      "body": "Incoming handoff from completed TSK-0103 validation, 2026-09-01. Start with the tolerant hierarchy/index contract for malformed definitions. Preserve null entries and duplicate diagnostics, define deterministic non-throwing lookup behavior, and then migrate validation, cloning policy, canonicalization traversal, and cycle detection. Do not create parallel CC tickets or move hierarchy work into TSK-0094. Handoff document: docs/tasks/handoffs/2026-09-01-deduplication-god-class-consolidation-handoff.md.",
+      "createdAtUtc": "2026-09-02T02:12:58.5255198Z"
+    },
+    {
+      "id": "c-57bf2f174488476aa8eaa411bc2e6c6e",
+      "author": "anonymous",
+      "body": "Implementation/validation update (2026-09-01): the first CC-089 slice is present in the working tree. CreaturePartHierarchyIndex provides first-wins lookup, null/duplicate diagnostics, parent-child lookup, and terminating cycle analysis; CreatureDefinition, DefinitionValidator, DefinitionCanonicalizer, and Clone now use explicit malformed-input behavior. Regression fixtures cover null entries, duplicate IDs, cycles, and clone preservation. \u0060dotnet build ProceduralCreature.Tests.Runtime.csproj --no-restore\u0060 passed with 0 compiler errors and \u0060git diff --check\u0060 passed. Unity console returned 0 errors/warnings, but focused Unity tests could not run because no Unity Editor instance was connected. Keep TSK-0093 InProgress; next gate is focused Unity execution of the CreatureDefinition and DefinitionValidator malformed-graph fixtures.",
+      "createdAtUtc": "2026-09-02T02:29:00.5475963Z"
+    },
+    {
+      "id": "c-e919b53508784b81bd5d34f45b0d99c1",
+      "author": "anonymous",
+      "body": "Implementation update (2026-09-01): canonicalization now consumes CreaturePartHierarchyIndex.GetChildren for deterministic parent-child ordering instead of constructing a second childrenByParent map. Canonicalize explicitly rejects parent cycles with DomainException before traversal, covered by DefinitionCanonicalizerTests.Canonicalize_RejectsParentCycleWithDomainException. Focused static validation: dotnet build .\\ProceduralCreature.Tests.Runtime.csproj --no-restore passed with 0 errors and 0 warnings. Unity refresh requested compilation and editor was ready, but the focused EditMode ProceduralCreature.Tests.Runtime job timed out during test initialization after 120 seconds; no product compilation errors were reported. Keep TSK-0093 InProgress. Next gate: rerun CreatureDefinitionTests, DefinitionValidatorTests, and DefinitionCanonicalizerTests in Unity after resolving test initialization, then hand off to TSK-0095.",
+      "createdAtUtc": "2026-09-02T02:37:52.8980049Z"
+    }
+  ],
   "epicId": null,
   "parentId": null,
   "dueDateUtc": null,
   "createdAtUtc": "2026-09-01T03:20:52.6991944Z",
-  "updatedAtUtc": "2026-09-01T03:20:52.6991944Z",
-  "completedAtUtc": null,
-  "revision": 1,
+  "updatedAtUtc": "2026-09-02T02:48:20.8074051Z",
+  "completedAtUtc": "2026-09-02T02:48:20.8074051Z",
+  "revision": 7,
   "isArchived": false,
   "hasLoadError": false,
   "loadError": null,
-  "sourceFilePath": null
+  "sourceFilePath": "tsk-0093-make-malformed-definition-validation-and-cloning-total.json"
 }

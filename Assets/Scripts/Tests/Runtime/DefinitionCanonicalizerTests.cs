@@ -153,5 +153,23 @@ namespace ProceduralCreature.Tests.Runtime
             Assert.AreEqual(1.23456f, definition.Parts[0].Transform.Position.x,
                 "Canonicalize must return a new definition, not mutate the input in place.");
         }
+
+        [Test]
+        public void Canonicalize_RejectsNullPartWithDomainException()
+        {
+            var definition = CreatureDefinition.CreateEmpty();
+            definition.Parts.Add(null);
+
+            Assert.Throws<DomainException>(() => DefinitionCanonicalizer.Canonicalize(definition));
+        }
+
+        [Test]
+        public void Canonicalize_RejectsParentCycleWithDomainException()
+        {
+            var definition = MakeSinglePartDefinition(TransformData.Identity);
+            definition.Parts[0].ParentId = definition.Parts[0].Id;
+
+            Assert.Throws<DomainException>(() => DefinitionCanonicalizer.Canonicalize(definition));
+        }
     }
 }

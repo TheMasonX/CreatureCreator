@@ -4,7 +4,7 @@
   "title": "Consolidate shared runtime utilities and tolerances",
   "description": "Source: docs/tasks/tickets/CC-090-common-utility-and-tolerance-consolidation.md\nSource key: CC-090\nSource status: Backlog\nSource priority: P2\n\n## Summary\r\n\r\nExtract repeated mechanics into small concrete Common utilities while keeping domain semantics in their owning types.\r\n\r\n## Scope\r\n\r\n- Centralize finite checks and named linear/squared degenerate tolerances.\r\n- Centralize mirror-point/reflection primitives in a dependency-neutral Common location.\r\n- Share curve cloning, key comparison, vector/quaternion quantization, and deterministic ID comparison where contracts match.\r\n- Move shared \u0060PartType\u0060 classification, including \u0060IsLimbChainType\u0060, into the\r\n  Runtime-owned contract so Editor authoring and Runtime validation cannot drift.\r\n- Provide one concrete hierarchy-index utility for repeated ID mechanics.\r\n- Make the unused sibling-order strategy production-configurable through the\r\n  existing authoring control, or delete it only if the control decision is\r\n  explicitly withdrawn; do not leave the behavior as an undocumented choice.\r\n- Do not add adapter base classes, generic service interfaces, or speculative frameworks.\r\n\r\n## Acceptance Criteria\r\n\r\n- Shared constants cannot drift between linear and squared forms.\r\n- \u0060MinSpacingSqr\u0060 is compared only with squared magnitudes, or is removed in favor of a resolved metric.\r\n- Mirror consumers use one common point/reflection primitive without behavior changes.\r\n- Duplicate utility implementations are removed only where semantics are identical.\r\n- Editor and Runtime use the same Runtime-owned limb-chain classification.\r\n- Existing deterministic serialization, mirror, validation, and geometry tests remain green.\r\n\r\n## Validation\r\n\r\nRun focused runtime utility, canonicalization, mirror, morphology, and editor ordering tests. Run \u0060dotnet build\u0060 for runtime and test projects when available.\r\n\r\n## Findings\r\n\r\nThe audits found repeated finite checks, curve helpers, mirror operations, hierarchy indexing, and two divergent epsilon families. These are shared mechanics, not reasons to create more domain abstractions.\r\n\r\n## Blockers\r\n\r\nCC-087 and CC-089 define the hierarchy and malformed-input contracts that utilities must preserve.\r\n\r\n## Next Step\r\n\r\nInventory exact call sites and select only mechanically identical helpers for extraction.",
   "type": "Cleanup",
-  "status": "Backlog",
+  "status": "Done",
   "priority": "Medium",
   "assigneeMode": "Custom",
   "assigneeDirectoryId": null,
@@ -22,16 +22,47 @@
   "attachments": [],
   "externalLinks": [],
   "linkedPages": [],
-  "comments": [],
+  "comments": [
+    {
+      "id": "c-8ad685aaa41c4f599078543d240cef4b",
+      "author": "anonymous",
+      "body": "Review disposition (2026-09-01): narrow this task to mechanically identical shared utilities only. Keep finite numeric/vector checks, curve cloning/key comparison, quantization helpers, mirror primitives, Runtime-owned PartType classification, and deterministic ID comparison. Remove hierarchy-index construction from this task because TSK-0093 owns malformed graph and hierarchy semantics. Do not add adapter base classes, generic services, or a utility framework. Next gate: inventory exact call sites, extract one small utility slice, and run focused runtime/editor determinism and mirror tests.",
+      "createdAtUtc": "2026-09-02T01:47:00.1689493Z"
+    },
+    {
+      "id": "c-301b670d8e1a456db163f2080f221dea",
+      "author": "anonymous",
+      "body": "Implemented first CC-090 utility slice on 2026-09-02: added runtime Common.NumericValidity with exact NaN/infinity rejection for float, Vector3, and Quaternion; routed TransformData, GeometryAttachment, ShapeDefinition, and BoundsDefinition through it. No hierarchy semantics or domain-specific utilities changed. Validation: \u0060dotnet build .\\\\ProceduralCreature.Tests.Runtime.csproj --no-restore\u0060 passed with 0 errors and 0 warnings; \u0060git diff --check\u0060 passed; Unity 6000.0.35f1 focused PlayMode run passed 53/53 DefinitionValidatorTests, CreatureDefinitionTests, and JsonDnaSerializerTests with 0 failures/skips. Next slice: inventory and consolidate another mechanically identical helper family, likely deterministic ID comparison or remaining finite wrappers, before CC-094 preview-controller extraction.",
+      "createdAtUtc": "2026-09-02T03:28:52.0862267Z"
+    },
+    {
+      "id": "c-f2120cafa8a2496593377c7377d21c4c",
+      "author": "anonymous",
+      "body": "Completed the second CC-090 finite-check slice on 2026-09-02: removed duplicate local finite predicates from DefinitionCanonicalizer and DefinitionValidator; both now resolve the shared NumericValidity overloads. Behavior and validation policy are unchanged. Validation: \u0060dotnet build .\\\\ProceduralCreature.Tests.Runtime.csproj --no-restore\u0060 passed with 0 errors and 0 warnings; \u0060git diff --check\u0060 passed; Unity 6000.0.35f1 focused PlayMode run passed 53/53 DefinitionValidatorTests, CreatureDefinitionTests, and JsonDnaSerializerTests with 0 failures/skips. Next agent should choose one remaining mechanically identical utility family, then move to CC-094 preview-controller extraction after focused validation.",
+      "createdAtUtc": "2026-09-02T03:34:06.6379571Z"
+    },
+    {
+      "id": "c-f45433c8cd3845c8b7193cbd5ce04b18",
+      "author": "anonymous",
+      "body": "Completed the third CC-090 utility slice on 2026-09-02: CurveAdapter, GradientAdapter, ThicknessProfile, and BodySurfaceProjector now use the shared NumericValidity.IsFinite(float); duplicate scalar predicates were removed. Public APIs and curve, gradient, thickness, projection, ordering, and validation semantics are unchanged. Validation: \u0060dotnet build .\\\\ProceduralCreature.Tests.Runtime.csproj --no-restore\u0060 passed with 0 errors and 0 warnings; Unity 6000.0.35f1 PlayMode focused run passed 108/108 tests across DefinitionValidatorTests, CreatureDefinitionTests, JsonDnaSerializerTests, BodySurfaceProjectorTests, and BodyVerticalGradientAppearanceTests with 0 failures/skips. Proceeding to TSK-0098 / CC-094 preview-controller extraction.",
+      "createdAtUtc": "2026-09-02T03:37:09.0004934Z"
+    },
+    {
+      "id": "c-6d40ec02e8c2459e8fcd98c14f231e35",
+      "author": "anonymous",
+      "body": "Completed TSK-0094 on 2026-09-02. NumericValidity now owns the shared scalar, Vector3, and Quaternion finiteness checks used by definition, canonicalization, projection, curve, gradient, and thickness paths. No hierarchy construction or domain-specific semantics moved into Common. Validation: Unity 6000.0.35f1 focused PlayMode passed 108/108 with 0 failures/skips; dotnet build ProceduralCreature.Tests.Runtime.csproj --no-restore passed with 0 warnings/errors; git diff --check passed. Future utility work requires a concrete mechanically-identical call-site inventory.",
+      "createdAtUtc": "2026-09-02T04:13:17.5085259Z"
+    }
+  ],
   "epicId": null,
   "parentId": null,
   "dueDateUtc": null,
   "createdAtUtc": "2026-09-01T03:20:52.7198384Z",
-  "updatedAtUtc": "2026-09-01T03:20:52.7198384Z",
-  "completedAtUtc": null,
-  "revision": 1,
+  "updatedAtUtc": "2026-09-02T04:13:17.5085259Z",
+  "completedAtUtc": "2026-09-02T04:13:17.4527209Z",
+  "revision": 8,
   "isArchived": false,
   "hasLoadError": false,
   "loadError": null,
-  "sourceFilePath": null
+  "sourceFilePath": "tsk-0094-consolidate-shared-runtime-utilities-and-tolerances.json"
 }

@@ -129,10 +129,10 @@ namespace ProceduralCreature.Definition
             if (keys == null) return true;
             for (int i = 0; i < keys.Length; i++)
             {
-                if (!IsFinite(keys[i].time)
-                    || !IsFinite(keys[i].value)
-                    || !IsFinite(keys[i].inTangent)
-                    || !IsFinite(keys[i].outTangent))
+                if (!NumericValidity.IsFinite(keys[i].time)
+                    || !NumericValidity.IsFinite(keys[i].value)
+                    || !NumericValidity.IsFinite(keys[i].inTangent)
+                    || !NumericValidity.IsFinite(keys[i].outTangent))
                 {
                     return false;
                 }
@@ -181,9 +181,5 @@ namespace ProceduralCreature.Definition
                 .ToArray();
         }
 
-        private static bool IsFinite(float value)
-        {
-            return !float.IsNaN(value) && !float.IsInfinity(value);
-        }
     }
 }

@@ -4,7 +4,7 @@
   "title": "Establish concrete generation pipeline stage boundaries",
   "description": "Source: docs/tasks/tickets/CC-091-generation-pipeline-stage-boundaries.md\nSource key: CC-091\nSource status: Backlog\nSource priority: P2\n\n## Summary\r\n\r\nSplit generation into concrete field, mesh-asset, and assembly stages while keeping one public generator entry point.\r\n\r\n## Scope\r\n\r\n- Keep validation and resolution at the public boundary.\r\n- Separate implicit field generation, mesh-asset placement, appearance baking, and final assembly.\r\n- Thread one resolved snapshot or explicit generated correspondence through field,\r\n  appearance, mesh-asset placement, and assembly stages; do not recompile\r\n  morphology independently from raw DNA in a downstream stage.\r\n- Make generated artifacts immutable after assembly where the current API permits.\r\n- Preserve mesh palette, symmetry, attachment, topology, and source identity behavior.\r\n- Do not create a dozen service interfaces.\r\n\r\n## Acceptance Criteria\r\n\r\n- Each stage consumes resolved or explicit generated values and does not reinterpret raw DNA.\r\n- Appearance baking does not independently resolve and compile morphology from\r\n  \u0060CreatureDefinition\u0060, or the duplication is explicitly accepted with a\r\n  documented performance and consistency test.\r\n- Mesh-asset placement and editor placement consume the same resolved frame\r\n  contract, with a defined revision identity for stale-preview checks.\r\n- \u0060CreatureMeshGenerator.Generate\u0060 remains a thin orchestration path.\r\n- Implicit and mesh-asset failure models are separately testable.\r\n- Generated items retain deterministic order, source identity, transforms, and material data.\r\n- Existing topology, appearance, and generation determinism tests remain green.\r\n\r\n## Validation\r\n\r\nRun focused generator, mesh-asset, appearance, topology, determinism, and preview smoke tests. Record benchmark metrics under CC-062.\r\n\r\n## Findings\r\n\r\nThe audits identify \u0060CreatureMeshGenerator\u0060 as a growing God method that combines unrelated generation stages. They also confirm that \u0060AppearanceBaker\u0060 recompiles portable Body and per-part programs from raw DNA after field generation. This is a bounded internal decomposition and ownership correction, not a new plugin architecture.\r\n\r\n## Blockers\r\n\r\nCC-087 and CC-088 provide the historical foundation and backend decisions. Their\r\nremaining ownership gaps are integration inputs for this task; do not create a\r\nsecond snapshot task.\r\n\r\n## Next Step\r\n\r\nMap the current generator stages, then extract one pure stage with parity tests\r\nand add evidence that the generation request does not recreate resolved\r\nmorphology for appearance or mesh placement.",
   "type": "Architecture",
-  "status": "Backlog",
+  "status": "Done",
   "priority": "Medium",
   "assigneeMode": "Custom",
   "assigneeDirectoryId": null,
@@ -22,16 +22,41 @@
   "attachments": [],
   "externalLinks": [],
   "linkedPages": [],
-  "comments": [],
+  "comments": [
+    {
+      "id": "c-f11593d61659438a9b8965d944a679d6",
+      "author": "anonymous",
+      "body": "Review disposition (2026-09-01): this is the single owner for resolved-snapshot and generation-stage consolidation. The current async runner does not remove the deeper duplication: AppearanceBaker still recompiles individual part and Body SDF programs, and mesh-asset assembly still resolves placement from raw DNA. Integrate one resolved snapshot and explicit derived correspondence through field sampling, appearance, and assembly. Do not create a second CC-087/CC-088 snapshot task. Next gate: preserve synchronous Generate as reference, add snapshot/program reuse and parity tests, then validate topology, appearance, determinism, and mesh-asset placement.",
+      "createdAtUtc": "2026-09-02T01:47:00.3527017Z"
+    },
+    {
+      "id": "c-1ab937a585354dd691e434e7b7eb9ccc",
+      "author": "anonymous",
+      "body": "Incoming handoff from completed TSK-0093 / CC-089 (2026-09-01). Hierarchy consolidation is complete and Unity-validated: ProceduralCreature.Tests.Runtime PlayMode passed 428/428. Advance the one-snapshot generation boundary: CreatureDefinition -\u003E validation/canonicalization -\u003E one resolved snapshot -\u003E field sampling, extraction, appearance, mesh-asset placement, and main-thread assembly. Preserve deterministic ordering, symmetry, attachments, topology, and synchronous fallback; add parity tests before removing duplicate derivation paths. Handoff: docs/tasks/handoffs/2026-09-01-deduplication-god-class-consolidation-handoff.md.",
+      "createdAtUtc": "2026-09-02T02:48:20.8671865Z"
+    },
+    {
+      "id": "c-35a5d402b0bb4eee8ae16ac0f5efca14",
+      "author": "anonymous",
+      "body": "Implementation phase completed (2026-09-02): GenerateData now validates once and creates one ResolvedCreatureSnapshot. Explicit snapshot overloads feed field compilation, individual part/body appearance compilation, and mesh-asset assembly; GeneratedCreatureData retains the snapshot for placement. AppearanceBaker receives precompiled programs, and injected managed resolvers borrow them while legacy standalone resolver paths retain ownership. Compatibility overloads remain for standalone callers. Validation: dotnet build .\\ProceduralCreature.Tests.Runtime.csproj --no-restore passed with 0 warnings/0 errors; Unity 6000.0.35f1 focused AppearanceBakerTests PlayMode passed 7/7; full ProceduralCreature.Tests.Runtime PlayMode passed 428/428. Remaining CC-091 gate: stable revision identity and complete attachment correspondence in the resolved generation context, followed by topology/appearance/determinism/mesh-placement/scheduler parity reruns. Handoff updated at docs/tasks/handoffs/2026-09-01-deduplication-god-class-consolidation-handoff.md.",
+      "createdAtUtc": "2026-09-02T02:55:30.0850384Z"
+    },
+    {
+      "id": "c-96e34cb5bd104dda930710dd5bfa133d",
+      "author": "anonymous",
+      "body": "CC-091 residual phase completed on 2026-09-02. Added ResolvedCreatureSnapshot.RevisionId as a deterministic SHA-256 of canonical DNA. ResolvedPartSnapshot now owns mesh correspondence (HasMeshGeometry, MeshAssetKey, normalized GeometryOffset/GeometryOrientation/GeometryScale, and GeometryPlacementToCreatureSpace), and CreatureMeshGenerator.Assemble uses the captured key and placement instead of raw MeshGeometry attachment fields. Added regression tests for canonical revision stability/change and attachment placement. Evidence: dotnet build .\\ProceduralCreature.Tests.Runtime.csproj --no-restore passed with 0 warnings/0 errors; Unity 6000.0.35f1 focused CreaturePartWorldTransformResolverTests PlayMode passed 28/28; full runtime PlayMode retry failed initialization before tests started after timeout. Known persistent-allocation warning only. Handoff updated to CC-090 then CC-094; no new task created.",
+      "createdAtUtc": "2026-09-02T03:10:46.8798867Z"
+    }
+  ],
   "epicId": null,
   "parentId": null,
   "dueDateUtc": null,
   "createdAtUtc": "2026-09-01T03:20:52.7496119Z",
-  "updatedAtUtc": "2026-09-01T03:20:52.7496119Z",
-  "completedAtUtc": null,
-  "revision": 1,
+  "updatedAtUtc": "2026-09-02T03:10:46.8798867Z",
+  "completedAtUtc": "2026-09-02T03:10:44.2511455Z",
+  "revision": 7,
   "isArchived": false,
   "hasLoadError": false,
   "loadError": null,
-  "sourceFilePath": null
+  "sourceFilePath": "tsk-0095-establish-concrete-generation-pipeline-stage-boundaries.json"
 }
