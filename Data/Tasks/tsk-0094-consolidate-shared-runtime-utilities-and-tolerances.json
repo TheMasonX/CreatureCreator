@@ -52,15 +52,21 @@
       "author": "anonymous",
       "body": "Completed TSK-0094 on 2026-09-02. NumericValidity now owns the shared scalar, Vector3, and Quaternion finiteness checks used by definition, canonicalization, projection, curve, gradient, and thickness paths. No hierarchy construction or domain-specific semantics moved into Common. Validation: Unity 6000.0.35f1 focused PlayMode passed 108/108 with 0 failures/skips; dotnet build ProceduralCreature.Tests.Runtime.csproj --no-restore passed with 0 warnings/errors; git diff --check passed. Future utility work requires a concrete mechanically-identical call-site inventory.",
       "createdAtUtc": "2026-09-02T04:13:17.5085259Z"
+    },
+    {
+      "id": "c-58aaef4c9db94016ae281c1562f210e0",
+      "author": "anonymous",
+      "body": "Council review 2026-09-02: retain Done within the narrowed finite-check scope. No verified gap requires reopening this task; hierarchy, mirror semantics, quantization, classification, and other utility families remain outside scope unless separately inventoried.",
+      "createdAtUtc": "2026-09-02T04:43:05.6225616Z"
     }
   ],
   "epicId": null,
   "parentId": null,
   "dueDateUtc": null,
   "createdAtUtc": "2026-09-01T03:20:52.7198384Z",
-  "updatedAtUtc": "2026-09-02T04:25:17.6481026Z",
+  "updatedAtUtc": "2026-09-02T04:43:05.6225616Z",
   "completedAtUtc": "2026-09-02T04:13:17.4527209Z",
-  "revision": 9,
+  "revision": 10,
   "isArchived": false,
   "hasLoadError": false,
   "loadError": null,

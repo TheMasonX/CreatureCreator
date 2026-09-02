@@ -52,15 +52,21 @@
       "author": "anonymous",
       "body": "Council review follow-up, 2026-09-02: retain CC-091 implementation but keep the authority/evidence gate active. Extend the resolved generation record to own all output-affecting part decisions used by field compilation, appearance, and assembly; ensure RevisionId corresponds to the exact canonical input used for generation; add canonicalization-equivalent revision/output parity coverage. Unity full ProceduralCreature.Tests.Runtime PlayMode rerun attempted with 120s initialization timeout but 0 tests started, so no assertion result is available.",
       "createdAtUtc": "2026-09-02T04:25:17.7280166Z"
+    },
+    {
+      "id": "c-c8729d592d0c42078ceb2f0796fb9423",
+      "author": "anonymous",
+      "body": "Council review 2026-09-02: retain InProgress. ResolvedCreatureSnapshot.RevisionId is directionally correct, but raw output-affecting bounds, generation settings, part ordering/source, symmetry/mirror, appearance, and assembly inputs remain reachable in downstream paths. Add snapshot-owned input parity and canonicalization-equivalent revision/output tests, then rerun the full runtime PlayMode suite. Evidence report: docs/audits/2026-09-02-consolidation-handoff-council-review-2.md.",
+      "createdAtUtc": "2026-09-02T04:43:05.4669714Z"
     }
   ],
   "epicId": null,
   "parentId": null,
   "dueDateUtc": null,
   "createdAtUtc": "2026-09-01T03:20:52.7496119Z",
-  "updatedAtUtc": "2026-09-02T04:25:17.7280166Z",
+  "updatedAtUtc": "2026-09-02T04:43:05.4669714Z",
   "completedAtUtc": "2026-09-02T03:10:44.2511455Z",
-  "revision": 9,
+  "revision": 10,
   "isArchived": false,
   "hasLoadError": false,
   "loadError": null,

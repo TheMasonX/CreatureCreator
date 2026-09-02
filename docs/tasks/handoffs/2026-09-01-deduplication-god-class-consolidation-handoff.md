@@ -302,6 +302,38 @@ After each slice, run focused EditMode tests and a Unity SceneView smoke check.
 Preserve `MutateDefinition`, `CreatureEditorSession`, and `CreatureUndoState`
 as the existing mutation, persistence, and undo boundaries.
 
+### 6. Completed next TSK-0098 slice: accepted preview identity
+
+The next reversible slice is now implemented in
+`Assets/Scripts/Editor/CreaturePreviewAcceptanceState.cs`. The editor accepts a
+preview only with both the generated `ResolvedCreatureSnapshot.RevisionId` and
+the Body placement fingerprint. Placement stale checks now fail closed when no
+preview has been accepted, when the current revision differs, or when Body
+geometry/Forward/sample identity differs. Part-only edits remain outside the
+placement fingerprint, and all DNA changes still flow through
+`MutateDefinition`.
+
+Validation completed on 2026-09-02:
+
+- `dotnet build .\\ProceduralCreature.Editor.csproj --no-restore` passed with
+    zero warnings and zero errors.
+- `dotnet build .\\ProceduralCreature.Tests.Editor.csproj --no-restore` passed
+    with zero warnings and zero errors.
+- Unity refresh completed with no error or warning console entries.
+- Assembly-scoped EditMode run `ProceduralCreature.Tests.Editor` passed 107/107
+    tests with zero failures or skips, including the new acceptance-state tests.
+
+The focused source and assembly gates pass. The accepted revision is stricter
+than the historical Body-only fingerprint rule: any DNA change, including a
+part-only edit, invalidates the generated preview revision, while the
+Body-only fingerprint remains useful as a placement-specific diagnostic. This
+is the safer policy because the current preview collider represents the full
+generated mesh. Required SceneView smoke coverage
+for placement drag, cancellation, stale blocking, accepted-result application,
+and domain-reload reuse is still outstanding. Keep TSK-0098 `InProgress` until
+that manual gate is recorded; the next code slice should not bypass this state
+or introduce a second placement mutation path.
+
 ## Council review: 2026-09-02
 
 The council report is recorded at

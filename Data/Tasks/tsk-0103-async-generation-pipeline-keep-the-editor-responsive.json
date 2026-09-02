@@ -54,15 +54,21 @@
       "author": "anonymous",
       "body": "Validation completed 2026-09-01 in Unity 6000.0.35f1. Refresh/compile completed ready; post-validation console contained no errors or warnings (only TestResults save and IPostBuildCleanup log entries). Focused PlayMode run ProceduralCreature.Tests.Runtime.CreatureGenerationSchedulerTests succeeded: 2/2 passed, 0 failed, including AsyncGeneration_MatchesSynchronousMeshAndColors and NewerRequest_MakesOlderCompletedResultStale. Editor smoke check found one CreatureEditorWindow, invoked regeneration, processed completion, and confirmed an active CreatureCreator Preview with MeshFilter 5,229 vertices / 10,454 triangles and assigned MeshCollider. Synchronous Generate remains the reference path. Remaining work is the next handoff: TSK-0093 / CC-089 tolerant hierarchy index and malformed-definition ownership.",
       "createdAtUtc": "2026-09-02T01:56:31.4390118Z"
+    },
+    {
+      "id": "c-96cfbcb2ae634a97a27b74f03ece546e",
+      "author": "anonymous",
+      "body": "Council review 2026-09-02: retain Done. The async scheduler, parity, stale-result suppression, and editor smoke evidence remain valid; no new performance or async task is justified.",
+      "createdAtUtc": "2026-09-02T04:43:05.5968908Z"
     }
   ],
   "epicId": null,
   "parentId": null,
   "dueDateUtc": null,
   "createdAtUtc": "2026-09-02T00:54:44.7143755Z",
-  "updatedAtUtc": "2026-09-02T01:56:33.4113421Z",
+  "updatedAtUtc": "2026-09-02T04:43:05.5968908Z",
   "completedAtUtc": "2026-09-02T01:56:33.4113421Z",
-  "revision": 8,
+  "revision": 9,
   "isArchived": false,
   "hasLoadError": false,
   "loadError": null,

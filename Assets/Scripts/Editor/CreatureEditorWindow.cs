@@ -140,6 +140,7 @@ namespace ProceduralCreature.Editor
         private GameObject _previewGameObject;
         private CreatureUndoState _undoState;
         private bool _placementModeActive;
+            private readonly CreaturePreviewAcceptanceState _previewAcceptance = new CreaturePreviewAcceptanceState();
         // CC-007: transient placement result shown under the Place Part Mode
         // HelpBox (clear editor result on miss/failure; editor state, never DNA).
         private string _placementFeedback;
@@ -149,7 +150,6 @@ namespace ProceduralCreature.Editor
         // definition the collider is stale and placement is blocked until the
         // user regenerates. Part edits do NOT change it — only the Body geometry
         // the placement anchor depends on.
-        private string _previewBodyFingerprint;
         // CC-007 step 6: new-part placement DRAG gesture. Mouse-down on the Body
         // surface starts it (no part selected); a transient ghost follows the
         // cursor, projected onto the surface each frame through
@@ -2543,14 +2543,23 @@ namespace ProceduralCreature.Editor
 
         /// <summary>
         /// True when the preview's MeshCollider was generated from a different
-        /// Body than the live definition (CC-007 step 5). A null fingerprint (a
-        /// preview carried across a domain reload with no recorded generate) is
-        /// treated as fresh so a recompile does not force a regenerate.
+        /// Body than the live definition (CC-007 step 5). An unknown accepted
+        /// preview (including one carried across a domain reload) is stale and
+        /// must be regenerated before placement is allowed.
         /// </summary>
         private bool IsPreviewStale()
         {
-            return _previewBodyFingerprint != null
-                && BuildPlacementFingerprint(_definition) != _previewBodyFingerprint;
+                string currentRevisionId;
+                try
+                {
+                    currentRevisionId = ResolvedCreatureSnapshot.Resolve(_definition).RevisionId;
+                }
+                catch (DomainException)
+                {
+                    return true;
+                }
+
+                return _previewAcceptance.IsStale(currentRevisionId, BuildPlacementFingerprint(_definition));
         }
 
         private void HandlePlacementClick()
@@ -3018,7 +3027,9 @@ namespace ProceduralCreature.Editor
                     Mesh unityMesh = generated.MainMesh;
                     _previewController.ApplyPreviewGeometry(generated);
                     _previewGameObject = _previewController.PreviewGameObject;
-                    _previewBodyFingerprint = BuildPlacementFingerprint(_definition);
+                    _previewAcceptance.Accept(
+                        result.Data.Snapshot.RevisionId,
+                        BuildPlacementFingerprint(_definition));
                     MeshTopologyReport topologyReport = result.Data.TopologyReport;
                     if (!topologyReport.IsWatertight)
                     {

@@ -46,15 +46,27 @@
       "author": "anonymous",
       "body": "Council review follow-up, 2026-09-02: first preview-controller extraction is directionally sound and remains InProgress. Before placement/stale-preview work is considered complete, bind accepted results to snapshot revision, treat unknown/reused preview fingerprints as stale, recheck identity at drag release, clean owned SceneView gesture state on disable, and define preview-object reuse/cleanup policy. Required evidence: focused editor tests plus SceneView smoke coverage for Body/limb drag, cancellation, stale blocking, regeneration/collider replacement, and domain reload reuse.",
       "createdAtUtc": "2026-09-02T04:25:17.751612Z"
+    },
+    {
+      "id": "c-1001082103d64914b71c76c40753382c",
+      "author": "anonymous",
+      "body": "Completed the next reversible stale-preview slice on 2026-09-02. Added CreaturePreviewAcceptanceState under Assets/Scripts/Editor. CreatureEditorWindow now accepts the generated ResolvedCreatureSnapshot.RevisionId together with the Body placement fingerprint, and placement stale checks fail closed when no preview has been accepted, the current revision changes, or the Body fingerprint changes. This removes the prior unknown-preview-as-fresh behavior while preserving MutateDefinition and the existing Body-only placement granularity. Validation: dotnet build .\\ProceduralCreature.Editor.csproj --no-restore passed with 0 warnings/errors; dotnet build .\\ProceduralCreature.Tests.Editor.csproj --no-restore passed with 0 warnings/errors; Unity refresh reported no error/warning entries; assembly-scoped EditMode run ProceduralCreature.Tests.Editor passed 107/107 with 0 failures/skips. Residual risk: SceneView manual checks for placement drag, cancellation, stale blocking, accepted-result application, and domain reload reuse remain outstanding. Next slice should cover placement gesture ownership or perform the required SceneView smoke check before broader extraction.",
+      "createdAtUtc": "2026-09-02T04:36:41.9019808Z"
+    },
+    {
+      "id": "c-295db560556747f6b09c1680581c161a",
+      "author": "anonymous",
+      "body": "Council review 2026-09-02: the accepted-preview identity slice is sound and remains InProgress. The stricter RevisionId comparison invalidates all DNA edits, including part-only edits; this is safer because the collider represents the complete generated mesh, while the Body fingerprint is diagnostic. Required SceneView evidence remains open for drag release, cancellation, stale blocking, accepted-result application, regeneration/collider replacement, hot-control cleanup, and domain-reload reuse. Report: docs/audits/2026-09-02-consolidation-handoff-council-review-2.md.",
+      "createdAtUtc": "2026-09-02T04:43:05.5358173Z"
     }
   ],
   "epicId": null,
   "parentId": null,
   "dueDateUtc": null,
   "createdAtUtc": "2026-09-01T03:20:52.8300758Z",
-  "updatedAtUtc": "2026-09-02T04:25:17.751612Z",
+  "updatedAtUtc": "2026-09-02T04:43:05.5358173Z",
   "completedAtUtc": null,
-  "revision": 6,
+  "revision": 8,
   "isArchived": false,
   "hasLoadError": false,
   "loadError": null,
