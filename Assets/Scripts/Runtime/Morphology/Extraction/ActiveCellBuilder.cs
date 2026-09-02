@@ -31,8 +31,8 @@ namespace ProceduralCreature.Morphology.Extraction
             int cellCount = grid.CellsX * grid.CellsY * grid.CellsZ;
             // Worst case every cell is active; the job writes only the active
             // prefix and reports its length. Transient TempJob buffers.
-            var output = new NativeArray<ActiveCellEntry>(cellCount, Allocator.TempJob);
-            var outputCount = new NativeArray<int>(1, Allocator.TempJob);
+            var output = new NativeArray<ActiveCellEntry>(cellCount, Allocator.Persistent);
+            var outputCount = new NativeArray<int>(1, Allocator.Persistent);
             try
             {
                 var job = new ActiveCellScanJob

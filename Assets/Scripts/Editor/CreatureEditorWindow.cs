@@ -175,12 +175,14 @@ namespace ProceduralCreature.Editor
         private CreatureGenerationConfig _generationConfig;
         private bool _logGenerationDiagnostics = true;
         private double _autoRegenerateAt = -1d;
+        private CreatureDefinition _transientPreviewDefinition;
         private string _currentFilePath;
+        private CreatureGenerationScheduler _generationScheduler;
 
         private static readonly IDnaSerializer Serializer = new JsonDnaSerializer();
         private const string PreviewObjectName = "CreatureCreator Preview";
         private const string PreviewGeometryChildPrefix = "CreatureCreator Preview Geometry ";
-        private const float MinimumAutoRegenerationDelaySeconds = 1f;
+        private const float MinimumAutoRegenerationDelaySeconds = 0.01f;
         private const string AutoRegenerationDelayKey = "ProceduralCreature.AutoRegenerationDelay";
         private const string PreviewVoxelsPerUnitKey = "ProceduralCreature.PreviewVoxelsPerUnit";
         // CC-066: skeleton display mode persistence key.
@@ -289,6 +291,7 @@ namespace ProceduralCreature.Editor
             EditorApplication.update += ProcessAutoRegeneration;
 
             _previewGameObject = GameObject.Find(PreviewObjectName);
+            _generationScheduler = new CreatureGenerationScheduler();
         }
 
         private void OnDisable()
@@ -301,6 +304,9 @@ namespace ProceduralCreature.Editor
             Undo.undoRedoPerformed -= OnUndoRedoPerformed;
             SceneView.duringSceneGui -= OnSceneGUI;
             EditorApplication.update -= ProcessAutoRegeneration;
+
+            _generationScheduler?.Dispose();
+            _generationScheduler = null;
 
             if (_undoState != null)
             {
@@ -1971,6 +1977,7 @@ namespace ProceduralCreature.Editor
                         _limbDragSnapshotLocal = joint.Position;
                     }
                     _limbDragFinalTargetLocal = LimbAuthoring.LocalJointPosition(worldMatrix, newWorld);
+                    ScheduleLimbDragPreview(part.Id, i, _limbDragFinalTargetLocal);
                 }
             }
         }
@@ -1995,6 +2002,7 @@ namespace ProceduralCreature.Editor
             _limbDragJointIndex = -1;
             _limbDragSnapshotLocal = Vector3.zero;
             _limbDragFinalTargetLocal = Vector3.zero;
+            _transientPreviewDefinition = null;
 
             Vector3 clamped = LimbAuthoring.ClampJointToBounds(targetLocal, index, _definition.Bounds);
             MutateDefinition("Drag Limb Joint (Viewport)", definition =>
@@ -2018,6 +2026,7 @@ namespace ProceduralCreature.Editor
             _limbDragJointIndex = -1;
             _limbDragSnapshotLocal = Vector3.zero;
             _limbDragFinalTargetLocal = Vector3.zero;
+            _transientPreviewDefinition = null;
             SceneView.RepaintAll();
         }
 
@@ -2980,57 +2989,59 @@ namespace ProceduralCreature.Editor
                 return;
             }
 
-            var diagnostics = new GenerationDiagnostics(_logGenerationDiagnostics);
-            try
-            {
-                CreatureDefinition generationDefinition = _definition.Clone();
-                generationDefinition.Generation.VoxelsPerUnit = _previewVoxelsPerUnit;
-                MeshTopologyReport topologyReport = null;
-                GeneratedCreature generated = CreatureMeshGenerator.Generate(
-                    generationDefinition, out topologyReport, diagnostics,
-                    ResolveMeshAsset);
-                Mesh unityMesh = generated.MainMesh;
-                ApplyPreviewGeometry(generated);
-                _autoRegenerateAt = -1d;
-                // CC-007 step 5: record the Body the collider was built from so
-                // placement can detect a stale preview before raycasting it.
-                _previewBodyFingerprint = BuildPlacementFingerprint(_definition);
+            EnqueuePreviewGeneration(_definition);
+            _autoRegenerateAt = -1d;
+        }
 
-                if (!topologyReport.IsWatertight)
+        private void EnqueuePreviewGeneration(CreatureDefinition definition)
+        {
+            definition = definition.Clone();
+            definition.Generation.VoxelsPerUnit = _previewVoxelsPerUnit;
+            _generationScheduler.Enqueue(definition, new GenerationDiagnostics(_logGenerationDiagnostics));
+        }
+
+        private void ProcessGenerationCompletions()
+        {
+            if (_generationScheduler == null) return;
+            while (_generationScheduler.TryTakeCompleted(out CreatureGenerationResult result))
+            {
+                if (result.IsStale) continue;
+                if (!result.Succeeded)
                 {
-                    Debug.LogWarning(
-                        $"[CreatureCreator] Generated mesh is not watertight: " +
-                        $"{topologyReport.BoundaryEdgeCount} boundary edge(s), " +
-                        $"{topologyReport.NonManifoldEdgeCount} non-manifold edge(s) out of " +
-                        $"{topologyReport.TotalEdgeCount} total. See MeshTopologyValidator.");
+                    string validationDetails = string.Join("\n", _validation.Issues.Select(issue => issue.Message));
+                    EditorUtility.DisplayDialog(
+                        "Generation Failed",
+                        $"Stage: {result.Diagnostics?.FailedStage}\n{result.Exception.Message}\n\n{validationDetails}",
+                        "OK");
+                    continue;
                 }
 
-                if (_logGenerationDiagnostics)
+                try
                 {
-                    string timingReport = string.Join("\n",
-                        diagnostics.Timings.Select(FormatDiagnosticTiming));
-                    Debug.Log(
-                        $"[CreatureCreator] Preview regenerated — " +
-                        $"{unityMesh.triangles.Length / 3} triangles, " +
-                        $"{unityMesh.vertexCount} vertices, " +
-                        "SDF Sampling: Burst, " +
-                        "Culling: Fast, " +
-                        $"grid {diagnostics.GridCellsX}x{diagnostics.GridCellsY}x{diagnostics.GridCellsZ} " +
-                        $"({diagnostics.GridSampleCount:N0} samples), " +
-                        $"{diagnostics.MixedCellCount:N0} mixed cells, " +
-                        $"{diagnostics.GradientEvaluationCount:N0} gradient evaluations.\n" +
-                        $"  TotalGeneration: {diagnostics.TotalTime.TotalMilliseconds:F1}ms\n" +
-                        timingReport);
+                    GeneratedCreature generated = CreatureMeshGenerator.Assemble(result.Data, ResolveMeshAsset);
+                    Mesh unityMesh = generated.MainMesh;
+                    ApplyPreviewGeometry(generated);
+                    _previewBodyFingerprint = BuildPlacementFingerprint(_definition);
+                    MeshTopologyReport topologyReport = result.Data.TopologyReport;
+                    if (!topologyReport.IsWatertight)
+                    {
+                        Debug.LogWarning($"[CreatureCreator] Generated mesh is not watertight: " +
+                            $"{topologyReport.BoundaryEdgeCount} boundary edge(s), " +
+                            $"{topologyReport.NonManifoldEdgeCount} non-manifold edge(s) out of " +
+                            $"{topologyReport.TotalEdgeCount} total. See MeshTopologyValidator.");
+                    }
+                    if (_logGenerationDiagnostics)
+                    {
+                        string timingReport = string.Join("\n", result.Diagnostics.Timings.Select(FormatDiagnosticTiming));
+                        Debug.Log($"[CreatureCreator] Preview regenerated — " +
+                            $"{unityMesh.triangles.Length / 3} triangles, {unityMesh.vertexCount} vertices, " +
+                            $"TotalGeneration: {result.Diagnostics.TotalTime.TotalMilliseconds:F1}ms\n{timingReport}");
+                    }
                 }
-            }
-            catch (DomainException ex)
-            {
-                string validationDetails = string.Join(
-                    "\n", _validation.Issues.Select(issue => issue.Message));
-                EditorUtility.DisplayDialog(
-                    "Generation Failed",
-                    $"Stage: {diagnostics.FailedStage}\n{ex.Message}\n\n{validationDetails}",
-                    "OK");
+                catch (DomainException ex)
+                {
+                    EditorUtility.DisplayDialog("Generation Failed", ex.Message, "OK");
+                }
             }
         }
 
@@ -3201,16 +3212,41 @@ namespace ProceduralCreature.Editor
         private void ScheduleAutoRegeneration()
         {
             if (!_autoRegenerate) return;
+            _transientPreviewDefinition = null;
+            _autoRegenerateAt = EditorApplication.timeSinceStartup + _autoRegenerationDelaySeconds;
+        }
+
+        private void ScheduleLimbDragPreview(string partId, int jointIndex, Vector3 targetLocal)
+        {
+            if (!_autoRegenerate) return;
+
+            CreatureDefinition previewDefinition = _definition.Clone();
+            LimbChain chain = previewDefinition.FindPart(partId)?.Limb;
+            if (chain == null || jointIndex <= 0 || jointIndex >= chain.Joints.Count) return;
+
+            chain.Joints[jointIndex].Position = LimbAuthoring.ClampJointToBounds(
+                targetLocal, jointIndex, previewDefinition.Bounds);
+            _transientPreviewDefinition = previewDefinition;
             _autoRegenerateAt = EditorApplication.timeSinceStartup + _autoRegenerationDelaySeconds;
         }
 
         private void ProcessAutoRegeneration()
         {
+            ProcessGenerationCompletions();
             if (!_autoRegenerate || _autoRegenerateAt < 0d) return;
             if (EditorApplication.timeSinceStartup < _autoRegenerateAt) return;
 
             _autoRegenerateAt = -1d;
-            RegeneratePreview();
+            if (_transientPreviewDefinition != null)
+            {
+                CreatureDefinition previewDefinition = _transientPreviewDefinition;
+                _transientPreviewDefinition = null;
+                EnqueuePreviewGeneration(previewDefinition);
+            }
+            else
+            {
+                RegeneratePreview();
+            }
         }
     }
 }

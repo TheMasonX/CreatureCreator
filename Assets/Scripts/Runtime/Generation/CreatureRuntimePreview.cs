@@ -19,6 +19,12 @@ namespace ProceduralCreature.Generation
 
         private readonly List<GameObject> _geometryObjects = new List<GameObject>();
         private Material _previewMaterial;
+        private CreatureGenerationScheduler _generationScheduler;
+
+        private void Awake()
+        {
+            _generationScheduler = new CreatureGenerationScheduler();
+        }
 
         private void Start()
         {
@@ -33,26 +39,45 @@ namespace ProceduralCreature.Generation
             {
                 definition.Generation.VoxelsPerUnit = generationConfig.DefaultVoxelsPerUnit;
             }
-            var diagnostics = new GenerationDiagnostics(collectTimings: false);
-            MeshTopologyReport topology;
-            GeneratedCreature generated = CreatureMeshGenerator.Generate(
-                definition, out topology, diagnostics,
-                meshResolver: ResolveMeshAsset);
+            _generationScheduler.Enqueue(definition, new GenerationDiagnostics(collectTimings: false));
+        }
 
-            DestroyGeneratedGeometry();
-
-            for (int i = 0; i < generated.Geometry.Count; i++)
+        private void Update()
+        {
+            if (_generationScheduler == null) return;
+            while (_generationScheduler.TryTakeCompleted(out CreatureGenerationResult result))
             {
-                CreateGeometryObject(i, generated.Geometry[i]);
-            }
+                if (result.IsStale) continue;
+                if (!result.Succeeded)
+                {
+                    Debug.LogException(result.Exception, this);
+                    continue;
+                }
 
-            int implicitTriangles = generated.MainMesh != null ? generated.MainMesh.triangles.Length / 3 : 0;
-            Debug.Log($"[CreatureCreator] Runtime preview generated: {generated.Count} geometry item(s), " +
-                      $"{implicitTriangles} implicit triangles.", this);
-            if (!topology.IsWatertight)
-            {
-                Debug.LogWarning("[CreatureCreator] Runtime preview implicit mesh is not watertight.", this);
+                GeneratedCreature generated = CreatureMeshGenerator.Assemble(result.Data, ResolveMeshAsset);
+                MeshTopologyReport topology = result.Data.TopologyReport;
+
+                DestroyGeneratedGeometry();
+
+                for (int i = 0; i < generated.Geometry.Count; i++)
+                {
+                    CreateGeometryObject(i, generated.Geometry[i]);
+                }
+
+                int implicitTriangles = generated.MainMesh != null ? generated.MainMesh.triangles.Length / 3 : 0;
+                Debug.Log($"[CreatureCreator] Runtime preview generated: {generated.Count} geometry item(s), " +
+                          $"{implicitTriangles} implicit triangles.", this);
+                if (!topology.IsWatertight)
+                {
+                    Debug.LogWarning("[CreatureCreator] Runtime preview implicit mesh is not watertight.", this);
+                }
             }
+        }
+
+        private void OnDestroy()
+        {
+            _generationScheduler?.Dispose();
+            _generationScheduler = null;
         }
 
         private CreatureDefinition LoadDefinition()

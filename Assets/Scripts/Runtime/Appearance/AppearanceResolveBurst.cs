@@ -51,9 +51,9 @@ namespace ProceduralCreature.Appearance
         {
             int vertexCount = vertices.Length;
 
-            var partColors = new NativeArray<float4>(compiledParts.Count, Allocator.TempJob);
-            var partSeeds = new NativeArray<int>(compiledParts.Count, Allocator.TempJob);
-            var partScales = new NativeArray<float>(compiledParts.Count, Allocator.TempJob);
+            var partColors = new NativeArray<float4>(compiledParts.Count, Allocator.Persistent);
+            var partSeeds = new NativeArray<int>(compiledParts.Count, Allocator.Persistent);
+            var partScales = new NativeArray<float>(compiledParts.Count, Allocator.Persistent);
             try
             {
                 for (int p = 0; p < compiledParts.Count; p++)
@@ -72,7 +72,7 @@ namespace ProceduralCreature.Appearance
                 }
 
                 int batchSize = Mathf.Max(1, ScratchValueBudget / Mathf.Max(maxOps, 1));
-                var scratch = new NativeArray<float>(batchSize * maxOps, Allocator.TempJob);
+                var scratch = new NativeArray<float>(batchSize * maxOps, Allocator.Persistent);
                 try
                 {
                     for (int p = 0; p < compiledParts.Count; p++)

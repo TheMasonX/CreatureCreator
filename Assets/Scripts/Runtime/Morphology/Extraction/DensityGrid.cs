@@ -119,7 +119,7 @@ namespace ProceduralCreature.Morphology.Extraction
             // One scratch buffer sized for the largest batch, reused across every
             // batch (each job completes before the next starts, so reuse is safe).
             // Avoids allocating and freeing the buffer once per batch.
-            var scratchValues = new NativeArray<float>((int)scratchLength, Allocator.TempJob);
+            var scratchValues = new NativeArray<float>((int)scratchLength, Allocator.Persistent);
             try
             {
                 // Fail fast on a malformed program before any batch runs. Without

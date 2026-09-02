@@ -118,12 +118,12 @@ namespace ProceduralCreature.Appearance
                 {
                     throw new DomainException("Appearance bake distance matrix exceeds addressable array size.");
                 }
-                var vertices = new NativeArray<float3>(vertexCount, Allocator.TempJob);
-                var distances = new NativeArray<float>((int)distanceCount, Allocator.TempJob);
-                var outBase = new NativeArray<float4>(vertexCount, Allocator.TempJob);
-                var outSeed = new NativeArray<int>(vertexCount, Allocator.TempJob);
-                var outScale = new NativeArray<float>(vertexCount, Allocator.TempJob);
-                var outBody = new NativeArray<bool>(vertexCount, Allocator.TempJob);
+                var vertices = new NativeArray<float3>(vertexCount, Allocator.Persistent);
+                var distances = new NativeArray<float>((int)distanceCount, Allocator.Persistent);
+                var outBase = new NativeArray<float4>(vertexCount, Allocator.Persistent);
+                var outSeed = new NativeArray<int>(vertexCount, Allocator.Persistent);
+                var outScale = new NativeArray<float>(vertexCount, Allocator.Persistent);
+                var outBody = new NativeArray<bool>(vertexCount, Allocator.Persistent);
                 try
                 {
                     for (int i = 0; i < vertexCount; i++)

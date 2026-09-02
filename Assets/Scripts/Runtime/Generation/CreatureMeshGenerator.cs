@@ -43,6 +43,15 @@ namespace ProceduralCreature.Generation
             GenerationDiagnostics diagnostics,
             Func<string, Mesh> meshResolver = null)
         {
+            GeneratedCreatureData data = GenerateData(definition, diagnostics);
+            topologyReport = data.TopologyReport;
+            return Assemble(data, meshResolver);
+        }
+
+        public static GeneratedCreatureData GenerateData(
+            CreatureDefinition definition,
+            GenerationDiagnostics diagnostics = null)
+        {
             if (definition == null) throw new DomainException("definition must not be null.");
 
             ValidationResult validation = DefinitionValidator.Validate(definition);
@@ -105,14 +114,20 @@ namespace ProceduralCreature.Generation
             MeshTopologyReport generatedTopologyReport = null;
             Time(diagnostics, GenerationStage.MeshValidation,
                 () => generatedTopologyReport = MeshTopologyValidator.Validate(meshResult));
-            topologyReport = generatedTopologyReport;
 
             Color[] colors = null;
             Time(diagnostics, GenerationStage.AppearanceBake,
                 () => colors = AppearanceBaker.Bake(definition, meshResult));
 
-            Mesh mesh = meshResult.ToUnityMesh();
-            mesh.SetColors(colors);
+            return new GeneratedCreatureData(definition, meshResult, colors, generatedTopologyReport);
+        }
+
+        public static GeneratedCreature Assemble(GeneratedCreatureData data, Func<string, Mesh> meshResolver = null)
+        {
+            if (data == null) throw new DomainException("generation data must not be null.");
+
+            Mesh mesh = data.MeshResult.ToUnityMesh();
+            mesh.SetColors(data.Colors);
 
             var generated = new GeneratedCreature();
             generated.Geometry.Add(new GeometryItem
@@ -125,13 +140,13 @@ namespace ProceduralCreature.Generation
 
             // Items 1..n: mesh-asset parts, ordered by SourcePartId for a
             // deterministic output independent of authoring order.
-            var meshParts = definition.Parts
+            var meshParts = data.Definition.Parts
                 .Where(p => p != null && p.MeshGeometry != null)
                 .OrderBy(p => p.Id, StringComparer.Ordinal);
 
             foreach (CreaturePart part in meshParts)
             {
-                Matrix4x4 localToCreature = CreaturePartWorldTransformResolver.ResolveLocalToCreatureSpace(definition, part);
+                Matrix4x4 localToCreature = CreaturePartWorldTransformResolver.ResolveLocalToCreatureSpace(data.Definition, part);
                 Mesh sourceMesh = ResolveMesh(part, meshResolver);
 
                 GeometryAttachment attachment = part.MeshGeometry.Attachment ?? new GeometryAttachment();
@@ -140,7 +155,7 @@ namespace ProceduralCreature.Generation
 
                 generated.Geometry.Add(BuildMeshAssetItem(part, sourceMesh, placement, mirror: false));
 
-                if (part.MirrorAcrossSymmetryPlane && definition.SymmetryMode != SymmetryMode.None)
+                if (part.MirrorAcrossSymmetryPlane && data.Definition.SymmetryMode != SymmetryMode.None)
                 {
                     generated.Geometry.Add(BuildMeshAssetItem(part, sourceMesh, ReflectAcrossX * placement, mirror: true));
                 }
