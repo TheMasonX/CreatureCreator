@@ -302,6 +302,23 @@ After each slice, run focused EditMode tests and a Unity SceneView smoke check.
 Preserve `MutateDefinition`, `CreatureEditorSession`, and `CreatureUndoState`
 as the existing mutation, persistence, and undo boundaries.
 
+## Council review: 2026-09-02
+
+The council report is recorded at
+`docs/audits/2026-09-02-consolidation-handoff-council-review.md`. The three
+review seats agreed that the implementation direction is sound, but identified
+three durable follow-ups: make snapshot revision and all output-affecting state
+authoritative in TSK-0095, add the null-safe `RemovePart` regression under
+TSK-0093, and bind preview placement/application to accepted revision identity
+and explicit lifecycle policy under TSK-0098. TSK-0094's live acceptance scope
+was narrowed to the validated finite-check consolidation.
+
+The full `ProceduralCreature.Tests.Runtime` PlayMode rerun was attempted in
+Unity `6000.0.35f1` with a 120-second initialization timeout, but failed before
+any tests started. This is recorded as an evidence blocker, not a product test
+failure. The next agent must retry it after the CC-091 authority work and must
+perform the CC-094 SceneView smoke checks before closing the editor track.
+
 ## Tracker and record hygiene
 
 The task index contains historical CC numbering drift. Expected frozen files for

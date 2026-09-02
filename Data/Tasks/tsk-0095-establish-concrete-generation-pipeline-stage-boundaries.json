@@ -4,7 +4,7 @@
   "title": "Establish concrete generation pipeline stage boundaries",
   "description": "Source: docs/tasks/tickets/CC-091-generation-pipeline-stage-boundaries.md\nSource key: CC-091\nSource status: Backlog\nSource priority: P2\n\n## Summary\r\n\r\nSplit generation into concrete field, mesh-asset, and assembly stages while keeping one public generator entry point.\r\n\r\n## Scope\r\n\r\n- Keep validation and resolution at the public boundary.\r\n- Separate implicit field generation, mesh-asset placement, appearance baking, and final assembly.\r\n- Thread one resolved snapshot or explicit generated correspondence through field,\r\n  appearance, mesh-asset placement, and assembly stages; do not recompile\r\n  morphology independently from raw DNA in a downstream stage.\r\n- Make generated artifacts immutable after assembly where the current API permits.\r\n- Preserve mesh palette, symmetry, attachment, topology, and source identity behavior.\r\n- Do not create a dozen service interfaces.\r\n\r\n## Acceptance Criteria\r\n\r\n- Each stage consumes resolved or explicit generated values and does not reinterpret raw DNA.\r\n- Appearance baking does not independently resolve and compile morphology from\r\n  \u0060CreatureDefinition\u0060, or the duplication is explicitly accepted with a\r\n  documented performance and consistency test.\r\n- Mesh-asset placement and editor placement consume the same resolved frame\r\n  contract, with a defined revision identity for stale-preview checks.\r\n- \u0060CreatureMeshGenerator.Generate\u0060 remains a thin orchestration path.\r\n- Implicit and mesh-asset failure models are separately testable.\r\n- Generated items retain deterministic order, source identity, transforms, and material data.\r\n- Existing topology, appearance, and generation determinism tests remain green.\r\n\r\n## Validation\r\n\r\nRun focused generator, mesh-asset, appearance, topology, determinism, and preview smoke tests. Record benchmark metrics under CC-062.\r\n\r\n## Findings\r\n\r\nThe audits identify \u0060CreatureMeshGenerator\u0060 as a growing God method that combines unrelated generation stages. They also confirm that \u0060AppearanceBaker\u0060 recompiles portable Body and per-part programs from raw DNA after field generation. This is a bounded internal decomposition and ownership correction, not a new plugin architecture.\r\n\r\n## Blockers\r\n\r\nCC-087 and CC-088 provide the historical foundation and backend decisions. Their\r\nremaining ownership gaps are integration inputs for this task; do not create a\r\nsecond snapshot task.\r\n\r\n## Next Step\r\n\r\nMap the current generator stages, then extract one pure stage with parity tests\r\nand add evidence that the generation request does not recreate resolved\r\nmorphology for appearance or mesh placement.",
   "type": "Architecture",
-  "status": "Done",
+  "status": "InProgress",
   "priority": "Medium",
   "assigneeMode": "Custom",
   "assigneeDirectoryId": null,
@@ -46,15 +46,21 @@
       "author": "anonymous",
       "body": "CC-091 residual phase completed on 2026-09-02. Added ResolvedCreatureSnapshot.RevisionId as a deterministic SHA-256 of canonical DNA. ResolvedPartSnapshot now owns mesh correspondence (HasMeshGeometry, MeshAssetKey, normalized GeometryOffset/GeometryOrientation/GeometryScale, and GeometryPlacementToCreatureSpace), and CreatureMeshGenerator.Assemble uses the captured key and placement instead of raw MeshGeometry attachment fields. Added regression tests for canonical revision stability/change and attachment placement. Evidence: dotnet build .\\ProceduralCreature.Tests.Runtime.csproj --no-restore passed with 0 warnings/0 errors; Unity 6000.0.35f1 focused CreaturePartWorldTransformResolverTests PlayMode passed 28/28; full runtime PlayMode retry failed initialization before tests started after timeout. Known persistent-allocation warning only. Handoff updated to CC-090 then CC-094; no new task created.",
       "createdAtUtc": "2026-09-02T03:10:46.8798867Z"
+    },
+    {
+      "id": "c-69c600b9e81b4bad97c84109e0b5d47d",
+      "author": "anonymous",
+      "body": "Council review follow-up, 2026-09-02: retain CC-091 implementation but keep the authority/evidence gate active. Extend the resolved generation record to own all output-affecting part decisions used by field compilation, appearance, and assembly; ensure RevisionId corresponds to the exact canonical input used for generation; add canonicalization-equivalent revision/output parity coverage. Unity full ProceduralCreature.Tests.Runtime PlayMode rerun attempted with 120s initialization timeout but 0 tests started, so no assertion result is available.",
+      "createdAtUtc": "2026-09-02T04:25:17.7280166Z"
     }
   ],
   "epicId": null,
   "parentId": null,
   "dueDateUtc": null,
   "createdAtUtc": "2026-09-01T03:20:52.7496119Z",
-  "updatedAtUtc": "2026-09-02T03:10:46.8798867Z",
+  "updatedAtUtc": "2026-09-02T04:25:17.7280166Z",
   "completedAtUtc": "2026-09-02T03:10:44.2511455Z",
-  "revision": 7,
+  "revision": 9,
   "isArchived": false,
   "hasLoadError": false,
   "loadError": null,

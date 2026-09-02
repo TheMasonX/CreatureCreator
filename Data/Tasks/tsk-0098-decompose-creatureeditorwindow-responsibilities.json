@@ -40,15 +40,21 @@
       "author": "anonymous",
       "body": "Completed the first CC-094 preview-controller slice on 2026-09-02. CreaturePreviewController now owns scheduler lifecycle, cloned enqueue configuration, completion polling, stale-result suppression, preview GameObject creation, mesh/collider assignment, generated geometry children, and preview material assignment. CreatureEditorWindow remains coordinator and retains validation, palette policy, diagnostics, placement fingerprinting, auto-regeneration timing, and all MutateDefinition/session/undo boundaries. Validation: Unity 6000.0.35f1 ProceduralCreature.Tests.Editor EditMode passed 107/107 with 0 failures/skips; runtime build passed with 0 warnings/errors; git diff --check passed. Residual risk: no SceneView manual smoke check. Next agent: extract placement and stale-preview state, add focused editor coverage, and perform SceneView stale-blocking, drag, cancellation, and regeneration checks.",
       "createdAtUtc": "2026-09-02T04:13:17.4874234Z"
+    },
+    {
+      "id": "c-65c99030a4f7454b949c5d114b502118",
+      "author": "anonymous",
+      "body": "Council review follow-up, 2026-09-02: first preview-controller extraction is directionally sound and remains InProgress. Before placement/stale-preview work is considered complete, bind accepted results to snapshot revision, treat unknown/reused preview fingerprints as stale, recheck identity at drag release, clean owned SceneView gesture state on disable, and define preview-object reuse/cleanup policy. Required evidence: focused editor tests plus SceneView smoke coverage for Body/limb drag, cancellation, stale blocking, regeneration/collider replacement, and domain reload reuse.",
+      "createdAtUtc": "2026-09-02T04:25:17.751612Z"
     }
   ],
   "epicId": null,
   "parentId": null,
   "dueDateUtc": null,
   "createdAtUtc": "2026-09-01T03:20:52.8300758Z",
-  "updatedAtUtc": "2026-09-02T04:13:17.4874234Z",
+  "updatedAtUtc": "2026-09-02T04:25:17.751612Z",
   "completedAtUtc": null,
-  "revision": 5,
+  "revision": 6,
   "isArchived": false,
   "hasLoadError": false,
   "loadError": null,

@@ -45,15 +45,21 @@
       "author": "anonymous",
       "body": "Implementation update (2026-09-01): canonicalization now consumes CreaturePartHierarchyIndex.GetChildren for deterministic parent-child ordering instead of constructing a second childrenByParent map. Canonicalize explicitly rejects parent cycles with DomainException before traversal, covered by DefinitionCanonicalizerTests.Canonicalize_RejectsParentCycleWithDomainException. Focused static validation: dotnet build .\\ProceduralCreature.Tests.Runtime.csproj --no-restore passed with 0 errors and 0 warnings. Unity refresh requested compilation and editor was ready, but the focused EditMode ProceduralCreature.Tests.Runtime job timed out during test initialization after 120 seconds; no product compilation errors were reported. Keep TSK-0093 InProgress. Next gate: rerun CreatureDefinitionTests, DefinitionValidatorTests, and DefinitionCanonicalizerTests in Unity after resolving test initialization, then hand off to TSK-0095.",
       "createdAtUtc": "2026-09-02T02:37:52.8980049Z"
+    },
+    {
+      "id": "c-358830fa7cae44a99ad87c8d96b681b7",
+      "author": "anonymous",
+      "body": "Council review follow-up, 2026-09-02: the tolerant hierarchy/index implementation is sound, but CreatureDefinition.RemovePart still uses a null-unsafe predicate (\u0060Parts.FindIndex(p =\u003E p.Id == id)\u0060). Add a focused regression with null entries and duplicate IDs, and define deterministic removal semantics (first match, all matches, or reject ambiguity). Keep this under TSK-0093; do not create a duplicate CC task.",
+      "createdAtUtc": "2026-09-02T04:25:17.7035277Z"
     }
   ],
   "epicId": null,
   "parentId": null,
   "dueDateUtc": null,
   "createdAtUtc": "2026-09-01T03:20:52.6991944Z",
-  "updatedAtUtc": "2026-09-02T02:48:20.8074051Z",
+  "updatedAtUtc": "2026-09-02T04:25:17.7035277Z",
   "completedAtUtc": "2026-09-02T02:48:20.8074051Z",
-  "revision": 7,
+  "revision": 8,
   "isArchived": false,
   "hasLoadError": false,
   "loadError": null,
