@@ -23,16 +23,35 @@
   "attachments": [],
   "externalLinks": [],
   "linkedPages": [],
-  "comments": [],
+  "comments": [
+    {
+      "id": "c-c5cf4f34be1b4792a25db286a66f913e",
+      "author": "anonymous",
+      "body": "Audit synthesis 2026-09-02: Delta Audit #13 confirmed the remaining portable symmetry defect in SdfProgramEvaluator.EvaluateOperation. The Symmetry operation previously evaluated the mirrored child through original-point value slots, so composite subtrees (including SmoothUnion) were not mirrored correctly. Implemented recursive mirrored-subtree evaluation with the existing AABB culling contract. Focused runtime dotnet build passed 0 warnings/errors. Remaining validation gate: Unity runtime symmetry/composite parity tests.",
+      "createdAtUtc": "2026-09-02T05:51:44.8909956Z"
+    },
+    {
+      "id": "c-56c201d055cd44f2ae4dae53dcdd524c",
+      "author": "anonymous",
+      "body": "Validation completed 2026-09-02 in Unity 6000.0.35f1: focused ProceduralCreature.Tests.Runtime PlayMode run passed 56/56, 0 failed, 0 skipped. Includes Evaluate_SymmetryMirrorsCompositeSubtree, proving a reflected SmoothUnion subtree evaluates finite/inside on the mirrored side.",
+      "createdAtUtc": "2026-09-02T05:53:22.7433396Z"
+    },
+    {
+      "id": "c-85b900ca6365413b81f5cab1271309ae",
+      "author": "anonymous",
+      "body": "Council follow-up and implementation evidence: recursive EvaluateOperation now evaluates reflected composite subtrees instead of reusing original-point value slots. Current-source Unity PlayMode full runtime suite passed 437/437 with 0 failures and 0 skips; focused SDF parity/topology expansion remains desirable. Keep InProgress.",
+      "createdAtUtc": "2026-09-02T06:05:35.0063843Z"
+    }
+  ],
   "epicId": null,
   "parentId": null,
   "dueDateUtc": null,
   "createdAtUtc": "2026-09-01T03:16:57.7252448Z",
-  "updatedAtUtc": "2026-09-01T03:16:57.7252448Z",
+  "updatedAtUtc": "2026-09-02T06:05:35.0063843Z",
   "completedAtUtc": null,
-  "revision": 1,
+  "revision": 4,
   "isArchived": false,
   "hasLoadError": false,
   "loadError": null,
-  "sourceFilePath": null
+  "sourceFilePath": "tsk-0014-port-sdf-evaluation-to-a-burst-compatible-execution-program.json"
 }

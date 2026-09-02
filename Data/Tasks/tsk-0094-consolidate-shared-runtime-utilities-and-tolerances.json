@@ -58,15 +58,33 @@
       "author": "anonymous",
       "body": "Council review 2026-09-02: retain Done within the narrowed finite-check scope. No verified gap requires reopening this task; hierarchy, mirror semantics, quantization, classification, and other utility families remain outside scope unless separately inventoried.",
       "createdAtUtc": "2026-09-02T04:43:05.6225616Z"
+    },
+    {
+      "id": "c-949644fae4414b58a2b8c27747ee271a",
+      "author": "anonymous",
+      "body": "Audit synthesis 2026-09-02: Delta Audit #13 confirmed ResolvedShape.Resolve independently reimplements PrimarySize fallback semantics and retains the CapsuleHeight fallback inconsistency (hardcoded 1f). Disposition: keep under this existing shared-utilities/consolidation task; no duplicate task created. Follow-up remains to expose/reuse one canonical shape expansion rule and add capsule legacy/current-schema parity tests.",
+      "createdAtUtc": "2026-09-02T05:51:45.0022517Z"
+    },
+    {
+      "id": "c-7579ff02f0444f8593f51604adc65e21",
+      "author": "anonymous",
+      "body": "Disposition confirmed 2026-09-02: no implementation claimed for ResolvedShape fallback consolidation. The duplicated PrimarySize rule and CapsuleHeight=1f inconsistency remain open under CC-090 pending a canonical semantics decision and parity tests.",
+      "createdAtUtc": "2026-09-02T05:53:23.008317Z"
+    },
+    {
+      "id": "c-1890339b90e34707b39405757fffa6c2",
+      "author": "anonymous",
+      "body": "Council disposition: no new shape fallback semantics were introduced or silently changed. The narrowed shared-utility work remains Done, while the unresolved ResolvedShape fallback duplication from Delta Audit 13 remains outside this implementation wave and must not be represented as closed by this evidence.",
+      "createdAtUtc": "2026-09-02T06:05:35.1145182Z"
     }
   ],
   "epicId": null,
   "parentId": null,
   "dueDateUtc": null,
   "createdAtUtc": "2026-09-01T03:20:52.7198384Z",
-  "updatedAtUtc": "2026-09-02T04:43:05.6225616Z",
+  "updatedAtUtc": "2026-09-02T06:05:35.1145182Z",
   "completedAtUtc": "2026-09-02T04:13:17.4527209Z",
-  "revision": 10,
+  "revision": 13,
   "isArchived": false,
   "hasLoadError": false,
   "loadError": null,

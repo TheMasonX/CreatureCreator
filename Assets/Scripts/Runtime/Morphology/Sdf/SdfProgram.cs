@@ -195,14 +195,15 @@ namespace ProceduralCreature.Morphology.Sdf
                     continue;
                 }
 
-                values[valueOffset + i] = EvaluateOperation(operation, values, operations, point, valueOffset);
+                values[valueOffset + i] = EvaluateOperation(
+                    operation, values, operations, point, valueOffset, influenceRadius, allowCulling);
             }
             return values[valueOffset + rootIndex];
         }
 
         internal static float EvaluateOperation(
             SdfOperation operation, NativeArray<float> values, NativeArray<SdfOperation> operations,
-            float3 point, int valueOffset)
+            float3 point, int valueOffset, float influenceRadius = 0f, bool allowCulling = false)
         {
             switch (operation.Type)
             {
@@ -218,12 +219,56 @@ namespace ProceduralCreature.Morphology.Sdf
                 case SdfOperationType.Symmetry:
                     return math.min(
                         EvaluateOperation(operations[operation.A], values, operations, point, valueOffset),
-                        EvaluateOperation(operations[operation.A], values, operations,
-                            new float3(-point.x, point.y, point.z), valueOffset));
+                        EvaluateSubtree(operations, operation.A,
+                            new float3(-point.x, point.y, point.z), influenceRadius, allowCulling: false));
                 case SdfOperationType.SmoothUnion:
                     return SmoothMin(values[valueOffset + operation.A], values[valueOffset + operation.B], operation.Parameters.x);
                 case SdfOperationType.Empty: return float.PositiveInfinity;
                 default: return 0f;
+            }
+        }
+
+        private static float EvaluateSubtree(
+            NativeArray<SdfOperation> operations, int operationIndex, float3 point,
+            float influenceRadius, bool allowCulling)
+        {
+            SdfOperation operation = operations[operationIndex];
+            bool hasBounds = operation.MinBound.x <= operation.MaxBound.x
+                && operation.MinBound.y <= operation.MaxBound.y
+                && operation.MinBound.z <= operation.MaxBound.z;
+            if (allowCulling && hasBounds
+                && (point.x < operation.MinBound.x - influenceRadius || point.x > operation.MaxBound.x + influenceRadius
+                    || point.y < operation.MinBound.y - influenceRadius || point.y > operation.MaxBound.y + influenceRadius
+                    || point.z < operation.MinBound.z - influenceRadius || point.z > operation.MaxBound.z + influenceRadius))
+            {
+                return float.PositiveInfinity;
+            }
+
+            switch (operation.Type)
+            {
+                case SdfOperationType.Sphere:
+                case SdfOperationType.Box:
+                case SdfOperationType.Capsule:
+                case SdfOperationType.Ellipsoid:
+                    return EvaluatePrimitive(operation, point);
+                case SdfOperationType.Transform:
+                    return EvaluatePrimitive(
+                        operations[operation.A], math.mul(operation.Matrix, new float4(point, 1f)).xyz)
+                        * operation.DistanceScale;
+                case SdfOperationType.Symmetry:
+                    return math.min(
+                        EvaluateSubtree(operations, operation.A, point, influenceRadius, allowCulling),
+                        EvaluateSubtree(operations, operation.A,
+                            new float3(-point.x, point.y, point.z), influenceRadius, allowCulling));
+                case SdfOperationType.SmoothUnion:
+                    return SmoothMin(
+                        EvaluateSubtree(operations, operation.A, point, influenceRadius, allowCulling),
+                        EvaluateSubtree(operations, operation.B, point, influenceRadius, allowCulling),
+                        operation.Parameters.x);
+                case SdfOperationType.Empty:
+                    return float.PositiveInfinity;
+                default:
+                    return 0f;
             }
         }
 

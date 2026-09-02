@@ -3,6 +3,7 @@ using Unity.Collections;
 using Unity.Mathematics;
 using ProceduralCreature.Common;
 using ProceduralCreature.Definition;
+using ProceduralCreature.Morphology;
 using ProceduralCreature.Morphology.Sdf;
 
 namespace ProceduralCreature.Appearance
@@ -80,14 +81,28 @@ namespace ProceduralCreature.Appearance
             return new Resolver(definition, compiledParts, bodyProgram);
         }
 
+        internal static Resolver CreateResolver(
+            CreatureDefinition definition,
+            System.Collections.Generic.List<(CreaturePart Part, SdfProgram Program)> compiledParts,
+            SdfProgram bodyProgram, ResolvedCreatureSnapshot snapshot)
+        {
+            if (definition == null) throw new DomainException("definition must not be null.");
+            if (snapshot == null) throw new DomainException("snapshot must not be null.");
+            return new Resolver(definition, compiledParts, bodyProgram, snapshot);
+        }
+
         public sealed class Resolver : System.IDisposable
         {
             private readonly CreatureDefinition _definition;
             private readonly System.Collections.Generic.List<(CreaturePart Part, SdfProgram Program)> _compiledParts;
-            private readonly PartBounds[] _partBounds;
-            private readonly SdfProgram _bodyProgram;
-            private readonly NativeArray<float> _scratchValues;
-            private readonly bool _ownsPrograms;
+            private PartBounds[] _partBounds;
+            private SdfProgram _bodyProgram;
+            private readonly ResolvedBody _body;
+            private readonly BodyVerticalGradientAppearance _bodyAppearance;
+            private readonly Vector3 _forward;
+            private readonly AppearanceDefinition[] _partAppearances;
+            private NativeArray<float> _scratchValues;
+            private bool _ownsPrograms;
 
             /// <summary>
             /// Test hook: when false, <see cref="Resolve"/> evaluates every part
@@ -115,6 +130,41 @@ namespace ProceduralCreature.Appearance
             {
                 _definition = definition;
                 _compiledParts = compiledParts ?? throw new DomainException("compiledParts must not be null.");
+                _bodyAppearance = definition.Body?.Appearance;
+                _forward = definition.Forward;
+                _body = definition.Body != null && definition.Body.Samples != null
+                    && definition.Body.Samples.Count > 0
+                    ? ResolvedBody.Resolve(definition.Body) : default;
+                _partAppearances = new AppearanceDefinition[_compiledParts.Count];
+                for (int i = 0; i < _compiledParts.Count; i++)
+                {
+                    _partAppearances[i] = _compiledParts[i].Part.Appearance;
+                }
+                InitializePrograms(bodyProgram, ownsPrograms);
+            }
+
+            internal Resolver(
+                CreatureDefinition definition,
+                System.Collections.Generic.List<(CreaturePart Part, SdfProgram Program)> compiledParts,
+                SdfProgram bodyProgram, ResolvedCreatureSnapshot snapshot)
+            {
+                _definition = definition;
+                _compiledParts = compiledParts ?? throw new DomainException("compiledParts must not be null.");
+                _bodyAppearance = snapshot.BodyAppearance;
+                _forward = snapshot.Forward;
+                _body = snapshot.Body;
+                _partAppearances = new AppearanceDefinition[_compiledParts.Count];
+                for (int i = 0; i < _compiledParts.Count; i++)
+                {
+                    _partAppearances[i] = snapshot.TryGetPart(_compiledParts[i].Part.Id, out ResolvedPartSnapshot part)
+                        ? part.Appearance
+                        : _compiledParts[i].Part.Appearance;
+                }
+                InitializePrograms(bodyProgram, ownsPrograms: false);
+            }
+
+            private void InitializePrograms(SdfProgram bodyProgram, bool ownsPrograms)
+            {
                 _ownsPrograms = ownsPrograms;
                 _partBounds = new PartBounds[_compiledParts.Count];
                 for (int i = 0; i < _compiledParts.Count; i++)
@@ -158,6 +208,7 @@ namespace ProceduralCreature.Appearance
                 }
 
                 CreaturePart nearestPart = null;
+                int nearestPartIndex = -1;
                 float nearestAbsDistance = float.PositiveInfinity;
                 float nearestAbsDistanceSq = float.PositiveInfinity;
                 var point3 = new float3(position.x, position.y, position.z);
@@ -191,6 +242,7 @@ namespace ProceduralCreature.Appearance
                         nearestAbsDistance = distance;
                         nearestAbsDistanceSq = distance * distance;
                         nearestPart = part;
+                        nearestPartIndex = i;
                     }
                 }
 
@@ -206,7 +258,8 @@ namespace ProceduralCreature.Appearance
                     && !float.IsPositiveInfinity(bodyAbsDistance)
                     && bodyAbsDistance <= nearestAbsDistance)
                 {
-                    Color bodyColor = BodyVerticalGradientSampler.EvaluateColor(_definition, position);
+                    Color bodyColor = BodyVerticalGradientSampler.EvaluateColor(
+                        _bodyAppearance, _body, _forward, position);
                     return new ResolvedAppearance(bodyColor, 0, 1f);
                 }
 
@@ -215,7 +268,7 @@ namespace ProceduralCreature.Appearance
                     return new ResolvedAppearance(AppearanceDefinition.Default.BaseColor, 0, 1f);
                 }
 
-                AppearanceDefinition appearance = nearestPart.Appearance;
+                AppearanceDefinition appearance = _partAppearances[nearestPartIndex];
                 return new ResolvedAppearance(
                     appearance.BaseColor, appearance.NoiseSeed, appearance.NoiseScale,
                     string.IsNullOrWhiteSpace(appearance.MaterialKey) ? null : appearance.MaterialKey);

@@ -101,6 +101,8 @@ namespace ProceduralCreature.Definition
 
         public readonly bool HasBody;
         public readonly ResolvedBody Body;
+        public readonly BodyVerticalGradientAppearance BodyAppearance;
+        public readonly Vector3 Forward;
         public BoundsDefinition Bounds { get; }
         public GenerationSettings Generation { get; }
         public SymmetryMode SymmetryMode { get; }
@@ -108,12 +110,15 @@ namespace ProceduralCreature.Definition
         public IReadOnlyDictionary<string, ResolvedPartSnapshot> PartsById => partsById;
 
         private ResolvedCreatureSnapshot(bool hasBody, ResolvedBody body,
+            BodyVerticalGradientAppearance bodyAppearance, Vector3 forward,
             BoundsDefinition bounds, GenerationSettings generation, SymmetryMode symmetryMode,
             IReadOnlyDictionary<string, ResolvedPartSnapshot> partsById,
             string revisionId)
         {
             HasBody = hasBody;
             Body = body;
+            BodyAppearance = bodyAppearance;
+            Forward = forward;
             Bounds = bounds;
             Generation = generation;
             SymmetryMode = symmetryMode;
@@ -174,6 +179,8 @@ namespace ProceduralCreature.Definition
             return new ResolvedCreatureSnapshot(
                 hasBody,
                 body,
+                definition.Body?.Appearance?.Clone(),
+                definition.Forward,
                 definition.Bounds,
                 definition.Generation,
                 definition.SymmetryMode,

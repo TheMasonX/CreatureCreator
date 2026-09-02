@@ -123,7 +123,8 @@ namespace ProceduralCreature.Generation
             try
             {
                 Time(diagnostics, GenerationStage.AppearanceBake,
-                    () => colors = AppearanceBaker.Bake(definition, meshResult, null, compiledParts, bodyProgram));
+                    () => colors = AppearanceBaker.Bake(
+                        definition, meshResult, null, compiledParts, bodyProgram, snapshot.Body, snapshot));
             }
             finally
             {

@@ -1,6 +1,7 @@
 using System.Collections.Generic;
 using UnityEngine;
 using ProceduralCreature.Definition;
+using ProceduralCreature.Morphology;
 
 namespace ProceduralCreature.Appearance
 {
@@ -53,19 +54,21 @@ namespace ProceduralCreature.Appearance
                 return false;
             }
 
-            IReadOnlyList<BodySample> samples = definition.Body.Samples;
-            int count = samples.Count;
+            ResolvedBody body = ResolvedBody.Resolve(definition.Body);
+            return TryGetBodySample(body, definition.Forward, position, out lengthT, out verticalSample);
+        }
 
-            // Per-segment chord lengths; sample order IS the spline, so arc length
-            // here is Euclidean chord length (matching DefinitionValidator's
-            // spacing metric — equal chords, not arc-length resampling).
-            var arcs = new float[count];
-            float total = 0f;
-            for (int i = 0; i < count - 1; i++)
-            {
-                arcs[i] = Vector3.Distance(samples[i].Position, samples[i + 1].Position);
-                total += arcs[i];
-            }
+        public static bool TryGetBodySample(
+            ResolvedBody body, Vector3 forward, Vector3 position,
+            out float lengthT, out float verticalSample)
+        {
+            lengthT = 0f;
+            verticalSample = 0f;
+            if (body.SamplePositions == null || body.SamplePositions.Count == 0) return false;
+
+            IReadOnlyList<Vector3> positions = body.SamplePositions;
+            IReadOnlyList<float> radii = body.SampleRadii;
+            int count = positions.Count;
 
             // Closest point on the polyline (per-segment projection, clamped).
             int closestSegment = 0;
@@ -73,8 +76,8 @@ namespace ProceduralCreature.Appearance
             float closestSqr = float.PositiveInfinity;
             for (int i = 0; i < count - 1; i++)
             {
-                Vector3 a = samples[i].Position;
-                Vector3 b = samples[i + 1].Position;
+                Vector3 a = positions[i];
+                Vector3 b = positions[i + 1];
                 Vector3 ab = b - a;
                 float segT = ab.sqrMagnitude <= EpsilonSqr
                     ? 0f
@@ -89,17 +92,20 @@ namespace ProceduralCreature.Appearance
             }
 
             float arcToPoint = 0f;
-            for (int i = 0; i < closestSegment; i++) arcToPoint += arcs[i];
-            arcToPoint += arcs[closestSegment] * closestSegT;
-            float arcFrac = total <= 1e-6f ? 0f : Mathf.Clamp01(arcToPoint / total);
+            if (count > 1)
+            {
+                for (int i = 0; i < closestSegment; i++) arcToPoint += body.SegmentLengths[i];
+                arcToPoint += body.SegmentLengths[closestSegment] * closestSegT;
+            }
+            float arcFrac = body.TotalLength <= 1e-6f ? 0f : Mathf.Clamp01(arcToPoint / body.TotalLength);
 
             // Body-length parameter: 0 at the HEAD, 1 at the tail. The head is the
             // end of the spline with the highest projection onto the creature's
             // Forward axis (the creature faces forward). That is the LAST sample in
             // the standard authoring flow, so t runs backwards along the stored
             // sample order unless the spline was authored head-first.
-            float headForward = Vector3.Dot(samples[count - 1].Position, definition.Forward);
-            float tailForward = Vector3.Dot(samples[0].Position, definition.Forward);
+            float headForward = Vector3.Dot(positions[count - 1], forward);
+            float tailForward = Vector3.Dot(positions[0], forward);
             lengthT = headForward >= tailForward ? 1f - arcFrac : arcFrac;
 
             // Vertical sample: signed distance of the surface point from the local
@@ -111,15 +117,15 @@ namespace ProceduralCreature.Appearance
             float radius;
             if (count == 1)
             {
-                centerline = samples[0].Position;
-                radius = samples[0].Radius;
+                centerline = positions[0];
+                radius = radii[0];
             }
             else
             {
-                Vector3 a = samples[closestSegment].Position;
-                Vector3 b = samples[closestSegment + 1].Position;
+                Vector3 a = positions[closestSegment];
+                Vector3 b = positions[closestSegment + 1];
                 centerline = Vector3.Lerp(a, b, closestSegT);
-                radius = Mathf.Lerp(samples[closestSegment].Radius, samples[closestSegment + 1].Radius, closestSegT);
+                radius = Mathf.Lerp(radii[closestSegment], radii[closestSegment + 1], closestSegT);
             }
 
             float verticalRaw = radius <= 1e-6f ? 0f : (position.y - centerline.y) / radius;
@@ -136,12 +142,27 @@ namespace ProceduralCreature.Appearance
         {
             BodyVerticalGradientAppearance appearance = definition?.Body?.Appearance;
             if (appearance == null || appearance.TopGradient == null || appearance.BottomGradient == null
+                || appearance.VerticalCurve == null || definition.Body.Samples == null
+                || definition.Body.Samples.Count == 0)
+            {
+                return Color.gray;
+            }
+
+            ResolvedBody body = ResolvedBody.Resolve(definition.Body);
+            return EvaluateColor(appearance, body, definition.Forward, position);
+        }
+
+        public static Color EvaluateColor(
+            BodyVerticalGradientAppearance appearance, ResolvedBody body,
+            Vector3 forward, Vector3 position)
+        {
+            if (appearance == null || appearance.TopGradient == null || appearance.BottomGradient == null
                 || appearance.VerticalCurve == null)
             {
                 return Color.gray;
             }
 
-            if (!TryGetBodySample(definition, position, out float t, out float verticalSample))
+            if (!TryGetBodySample(body, forward, position, out float t, out float verticalSample))
             {
                 return Color.gray;
             }

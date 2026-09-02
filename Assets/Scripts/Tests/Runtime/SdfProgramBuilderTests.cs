@@ -1,4 +1,5 @@
 using NUnit.Framework;
+using Unity.Collections;
 using Unity.Mathematics;
 using UnityEngine;
 using ProceduralCreature.Common;
@@ -100,6 +101,47 @@ namespace ProceduralCreature.Tests.Runtime
             definition.SymmetryMode = SymmetryMode.MirrorAcrossXAxis;
             using (SdfProgram program = SdfProgramBuilder.CompilePortable(definition))
                 Assert.Greater(Evaluate(program, new Vector3(-5f, 0f, 0f)), 0f);
+        }
+
+        [Test]
+        public void Evaluate_SymmetryMirrorsCompositeSubtree()
+        {
+            var operations = new NativeArray<SdfOperation>(6, Allocator.Temp);
+            operations[0] = SdfOperation.Primitive(SdfOperationType.Sphere, new float3(1f, 0f, 0f));
+            operations[1] = new SdfOperation
+            {
+                Type = SdfOperationType.Transform,
+                A = 0,
+                Matrix = float4x4.Translate(new float3(2f, 0f, 0f)),
+                DistanceScale = 1f,
+            };
+            operations[2] = SdfOperation.Primitive(SdfOperationType.Sphere, new float3(1f, 0f, 0f));
+            operations[3] = new SdfOperation
+            {
+                Type = SdfOperationType.Transform,
+                A = 2,
+                Matrix = float4x4.Translate(new float3(4f, 0f, 0f)),
+                DistanceScale = 1f,
+            };
+            operations[4] = new SdfOperation
+            {
+                Type = SdfOperationType.SmoothUnion,
+                A = 1,
+                B = 3,
+                Parameters = new float3(0f, 0f, 0f),
+            };
+            operations[5] = new SdfOperation { Type = SdfOperationType.Symmetry, A = 4 };
+
+            try
+            {
+                float mirrored = SdfProgramEvaluator.Evaluate(
+                    operations, 5, new float3(-4f, 0f, 0f), 0f, allowCulling: false);
+                Assert.Less(mirrored, 0f);
+            }
+            finally
+            {
+                operations.Dispose();
+            }
         }
 
         [Test]

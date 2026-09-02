@@ -3,6 +3,7 @@ using UnityEngine;
 using ProceduralCreature.Appearance;
 using ProceduralCreature.Common;
 using ProceduralCreature.Definition;
+using ProceduralCreature.Morphology;
 using ProceduralCreature.Morphology.Extraction;
 using ProceduralCreature.Morphology.Sdf;
 using ProceduralCreature.Serialization;
@@ -324,6 +325,21 @@ namespace ProceduralCreature.Tests.Runtime
         }
 
         [Test]
+        public void ResolvedBodyOverloads_MatchDefinitionOverloads()
+        {
+            CreatureDefinition definition = HorizontalBodyDefinition();
+            ResolvedBody body = ResolvedBody.Resolve(definition.Body);
+            Vector3 position = new Vector3(0.2f, 0.35f, 0.25f);
+
+            Assert.IsTrue(BodyVerticalGradientSampler.TryGetBodySample(
+                definition, position, out float definitionT, out float definitionVertical));
+            Assert.IsTrue(BodyVerticalGradientSampler.TryGetBodySample(
+                body, definition.Forward, position, out float resolvedT, out float resolvedVertical));
+            Assert.AreEqual(definitionT, resolvedT);
+            Assert.AreEqual(definitionVertical, resolvedVertical);
+        }
+
+        [Test]
         public void TryGetBodySample_OnTopOfTube_ReturnsPlusOne()
         {
             CreatureDefinition definition = HorizontalBodyDefinition();
@@ -345,6 +361,37 @@ namespace ProceduralCreature.Tests.Runtime
         {
             CreatureDefinition definition = CreatureDefinition.CreateEmpty();
             Assert.IsFalse(BodyVerticalGradientSampler.TryGetBodySample(definition, Vector3.zero, out _, out _));
+        }
+
+        [Test]
+        public void OneSampleBody_ReturnsStableSampleAndColor()
+        {
+            CreatureDefinition definition = CreatureDefinition.CreateEmpty();
+            definition.Body.Samples.Add(new BodySample
+            {
+                Id = 1,
+                Position = new Vector3(0f, 0f, 0f),
+                Radius = 1f,
+            });
+            definition.Body.Appearance.TopGradient = GradientAdapter.Solid(Color.red);
+            definition.Body.Appearance.BottomGradient = GradientAdapter.Solid(Color.blue);
+
+            Assert.IsTrue(BodyVerticalGradientSampler.TryGetBodySample(
+                definition, new Vector3(0f, 1f, 0f), out float lengthT, out float verticalSample));
+            Assert.AreEqual(1f, lengthT);
+            Assert.AreEqual(1f, verticalSample, 1e-5f);
+            Assert.AreEqual(Color.red, BodyVerticalGradientSampler.EvaluateColor(
+                definition, new Vector3(0f, 1f, 0f)));
+        }
+
+        [Test]
+        public void EmptyBodyWithAppearance_ReturnsGrayFallback()
+        {
+            CreatureDefinition definition = CreatureDefinition.CreateEmpty();
+            definition.Body.Appearance.TopGradient = GradientAdapter.Solid(Color.red);
+            definition.Body.Appearance.BottomGradient = GradientAdapter.Solid(Color.blue);
+
+            Assert.AreEqual(Color.gray, BodyVerticalGradientSampler.EvaluateColor(definition, Vector3.zero));
         }
 
         [Test]

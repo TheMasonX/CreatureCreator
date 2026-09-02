@@ -5,6 +5,7 @@ using Unity.Mathematics;
 using ProceduralCreature.Common;
 using ProceduralCreature.Definition;
 using ProceduralCreature.Generation;
+using ProceduralCreature.Morphology;
 using ProceduralCreature.Morphology.Extraction;
 using ProceduralCreature.Morphology.Sdf;
 
@@ -49,9 +50,13 @@ namespace ProceduralCreature.Appearance
         {
             var compiledParts = SdfProgramBuilder.CompileIndividualPartsPortable(definition);
             SdfProgram bodyProgram = SdfProgramBuilder.CompilePortableBodyField(definition);
+            ResolvedBody body = definition.Body == null
+                || definition.Body.Samples == null || definition.Body.Samples.Count == 0
+                ? default
+                : ResolvedBody.Resolve(definition.Body);
             try
             {
-                return Bake(definition, mesh, diagnostics, compiledParts, bodyProgram);
+                return Bake(definition, mesh, diagnostics, compiledParts, bodyProgram, body);
             }
             finally
             {
@@ -64,7 +69,16 @@ namespace ProceduralCreature.Appearance
             CreatureDefinition definition, MeshExtractionResult mesh,
             GenerationDiagnostics diagnostics,
             System.Collections.Generic.List<(CreaturePart Part, SdfProgram Program)> compiledParts,
-            SdfProgram bodyProgram)
+            SdfProgram bodyProgram, ResolvedBody body)
+        {
+            return Bake(definition, mesh, diagnostics, compiledParts, bodyProgram, body, null);
+        }
+
+        internal static Color[] Bake(
+            CreatureDefinition definition, MeshExtractionResult mesh,
+            GenerationDiagnostics diagnostics,
+            System.Collections.Generic.List<(CreaturePart Part, SdfProgram Program)> compiledParts,
+            SdfProgram bodyProgram, ResolvedBody body, ResolvedCreatureSnapshot snapshot)
         {
             if (definition == null) throw new DomainException("definition must not be null.");
             if (mesh == null) throw new DomainException("mesh must not be null.");
@@ -81,12 +95,13 @@ namespace ProceduralCreature.Appearance
                 colors = new Color[mesh.Positions.Count];
                 if (UseBurstResolve)
                 {
-                    BakeBurst(definition, mesh, colors, compiledParts, bodyProgram);
+                    BakeBurst(definition, mesh, colors, compiledParts, bodyProgram, body, snapshot);
                 }
                 else
                 {
-                    using (PartAppearanceSampler.Resolver resolver = PartAppearanceSampler.CreateResolver(
-                        definition, compiledParts, bodyProgram))
+                    using (PartAppearanceSampler.Resolver resolver = snapshot == null
+                        ? PartAppearanceSampler.CreateResolver(definition, compiledParts, bodyProgram)
+                        : PartAppearanceSampler.CreateResolver(definition, compiledParts, bodyProgram, snapshot))
                     {
                         for (int i = 0; i < mesh.Positions.Count; i++)
                         {
@@ -118,7 +133,7 @@ namespace ProceduralCreature.Appearance
         private static void BakeBurst(
             CreatureDefinition definition, MeshExtractionResult mesh, Color[] colors,
             System.Collections.Generic.List<(CreaturePart Part, SdfProgram Program)> compiledParts,
-            SdfProgram bodyProgram)
+            SdfProgram bodyProgram, ResolvedBody body, ResolvedCreatureSnapshot snapshot)
         {
                 int programCount = compiledParts.Count + 1;
                 int maxOps = 1;
@@ -158,7 +173,11 @@ namespace ProceduralCreature.Appearance
                     {
                         if (outBody[i])
                         {
-                            Color bodyColor = BodyVerticalGradientSampler.EvaluateColor(definition, mesh.Positions[i]);
+                            Color bodyColor = BodyVerticalGradientSampler.EvaluateColor(
+                                snapshot == null ? definition.Body?.Appearance : snapshot.BodyAppearance,
+                                body,
+                                snapshot == null ? definition.Forward : snapshot.Forward,
+                                mesh.Positions[i]);
                             colors[i] = BakeVertexColor(mesh.Positions[i], mesh.Normals[i], bodyColor, 0, 1f);
                         }
                         else

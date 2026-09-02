@@ -76,15 +76,33 @@
       "author": "anonymous",
       "body": "Council review 2026-09-02: explicit SDF snapshot overloads were found to bypass snapshot authority for part ordering, mesh exclusion, limb/shape selection, mirror, and symmetry. This wave corrected those reads to use ResolvedPartSnapshot and snapshot SymmetryMode. Keep InProgress: Body appearance capture, remaining raw-input audit, canonicalization-equivalent output parity, and final-source full-suite evidence remain required. No new task created.",
       "createdAtUtc": "2026-09-02T05:07:40.1859914Z"
+    },
+    {
+      "id": "c-6172e80d1b164e6ba39a7fbe8fd1e515",
+      "author": "anonymous",
+      "body": "Audit synthesis 2026-09-02: Delta Audit #14 corroborates the open body-appearance authority concern. AppearanceBaker now threads the already-resolved ResolvedBody into managed and Burst body-gradient paths; BodyVerticalGradientSampler has ResolvedBody overloads and no longer allocates/recomputes segment lengths per body vertex. Definition overloads remain compatibility wrappers that resolve once. Focused runtime build passed 0 warnings/errors; body resolved-vs-definition parity test passes in compilation. Remaining gate: Unity appearance/full runtime validation.",
+      "createdAtUtc": "2026-09-02T05:51:44.9267514Z"
+    },
+    {
+      "id": "c-6807495cbd424bd6bf0d3e7f15435989",
+      "author": "anonymous",
+      "body": "Validation completed 2026-09-02: focused ProceduralCreature.Tests.Runtime PlayMode run passed 56/56, 0 failed, 0 skipped. BodyVerticalGradientAppearanceTests includes resolved-body parity coverage; runtime dotnet build passed 0 warnings/errors.",
+      "createdAtUtc": "2026-09-02T05:53:22.8603201Z"
+    },
+    {
+      "id": "c-f5b4a6e0dcf64c938612bba189bc3383",
+      "author": "anonymous",
+      "body": "User Mandate (STRICT): \u201CReview your work and the tasks with 3 agents, make the necessary changes and task tracking, then commit and push\u201D. Council found one-sample/empty Body appearance edge cases and incomplete snapshot authority. Fixed one-sample sampling, empty-body gray fallback, and threaded snapshot-owned Body appearance, Forward, and part appearances through generation baking. Current-source Unity PlayMode full runtime suite passed 437/437 with 0 failures and 0 skips. Keep InProgress pending mutation-after-snapshot tests and final commit/push evidence.",
+      "createdAtUtc": "2026-09-02T06:05:35.0405861Z"
     }
   ],
   "epicId": null,
   "parentId": null,
   "dueDateUtc": null,
   "createdAtUtc": "2026-09-01T03:20:52.7496119Z",
-  "updatedAtUtc": "2026-09-02T05:07:40.1859914Z",
+  "updatedAtUtc": "2026-09-02T06:05:35.0405861Z",
   "completedAtUtc": "2026-09-02T03:10:44.2511455Z",
-  "revision": 13,
+  "revision": 16,
   "isArchived": false,
   "hasLoadError": false,
   "loadError": null,
