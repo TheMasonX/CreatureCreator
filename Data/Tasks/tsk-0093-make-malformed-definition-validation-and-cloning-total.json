@@ -57,15 +57,27 @@
       "author": "anonymous",
       "body": "Council review 2026-09-02: retain the validated hierarchy slice, but record a durable follow-up gap. CreatureDefinition.RemovePart still uses a null-unsafe FindIndex predicate and has no regression for null entries plus duplicate IDs. Add deterministic removal semantics and focused Unity coverage before claiming malformed-definition handling is fully complete. No duplicate task created.",
       "createdAtUtc": "2026-09-02T04:43:05.4272287Z"
+    },
+    {
+      "id": "c-3817326ab1544e11b4154e7986e30a72",
+      "author": "anonymous",
+      "body": "User mandate (2026-09-02, STRICT): \u0022Review the latest handoff status and continue the next wave of tasks, updating the handoff after you finish\u0022. Binding constraints: use the council findings as the next-wave scope, preserve existing task ownership, validate each slice, and update the consolidation handoff after completion.",
+      "createdAtUtc": "2026-09-02T04:55:02.9903893Z"
+    },
+    {
+      "id": "c-bda18b627c384ec4b4dc0fc4e146f6a1",
+      "author": "anonymous",
+      "body": "RemovePart follow-up completed 2026-09-02. CreatureDefinition.RemovePart now returns false for a null Parts list, skips null entries, and removes only the first non-null matching ID. Unity 6000.0.35f1 focused PlayMode CreatureDefinitionTests passed 10/10 (including RemovePart_SkipsNullEntriesAndRemovesOnlyFirstDuplicate and RemovePart_ReturnsFalseForNullPartList). Runtime dotnet build passed with 0 warnings/errors.",
+      "createdAtUtc": "2026-09-02T04:58:17.926309Z"
     }
   ],
   "epicId": null,
   "parentId": null,
   "dueDateUtc": null,
   "createdAtUtc": "2026-09-01T03:20:52.6991944Z",
-  "updatedAtUtc": "2026-09-02T04:43:05.4272287Z",
-  "completedAtUtc": "2026-09-02T02:48:20.8074051Z",
-  "revision": 9,
+  "updatedAtUtc": "2026-09-02T04:58:18.0043074Z",
+  "completedAtUtc": "2026-09-02T04:58:18.0043074Z",
+  "revision": 13,
   "isArchived": false,
   "hasLoadError": false,
   "loadError": null,

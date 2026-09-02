@@ -220,7 +220,7 @@ namespace ProceduralCreature.Morphology.Sdf
             if (snapshot == null) throw new DomainException("Cannot compile with a null resolved snapshot.");
 
             var operations = new List<SdfOperation>();
-            List<CreaturePart> orderedParts = definition.Parts
+            List<ResolvedPartSnapshot> orderedParts = snapshot.PartsById.Values
                 .OrderBy(p => p.Id, System.StringComparer.Ordinal)
                 .ToList();
 
@@ -284,22 +284,21 @@ namespace ProceduralCreature.Morphology.Sdf
                 }
             }
 
-            foreach (CreaturePart part in orderedParts)
+            foreach (ResolvedPartSnapshot part in orderedParts)
             {
                 // A mesh-asset part (CC-031) has no implicit surface; its geometry
                 // comes from the resolved mesh asset, so it does not join the
                 // portable SDF field.
-                if (part.MeshGeometry != null) continue;
+                if (part.HasMeshGeometry) continue;
 
                 int previousRoot = root;
-                snapshot.TryGetPart(part.Id, out ResolvedPartSnapshot resolvedPart);
-                Matrix4x4 localToCreature = resolvedPart.PartFrameToCreatureSpace;
+                Matrix4x4 localToCreature = part.PartFrameToCreatureSpace;
                 Vector3 scale = localToCreature.lossyScale;
                 float distanceScale = Mathf.Min(Mathf.Abs(scale.x), Mathf.Min(Mathf.Abs(scale.y), Mathf.Abs(scale.z)));
-                bool shouldMirror = part.MirrorAcrossSymmetryPlane && definition.SymmetryMode != SymmetryMode.None;
+                bool shouldMirror = part.MirrorAcrossSymmetryPlane && snapshot.SymmetryMode != SymmetryMode.None;
 
                 int primitive;
-                if (part.Limb != null)
+                if (part.HasLimb)
                 {
                     // A limb compiles to a chain of derived metaball spheres with
                     // the part's creature-space transform BAKED into each ball's
@@ -310,7 +309,7 @@ namespace ProceduralCreature.Morphology.Sdf
                     // limb bakes a mirrored copy of the chain in instead of using
                     // a Symmetry op — the hard union of the two sides equals
                     // Portable symmetry evaluates the original and reflected roots.
-                    primitive = CompileLimbChainPortable(operations, resolvedPart.Limb, localToCreature, distanceScale, shouldMirror);
+                    primitive = CompileLimbChainPortable(operations, part.Limb, localToCreature, distanceScale, shouldMirror);
                 }
                 else
                 {
@@ -333,7 +332,7 @@ namespace ProceduralCreature.Morphology.Sdf
                             throw new DomainException($"No portable SDF primitive mapping exists for ShapeType.{part.Shape.Type}.");
                     }
 
-                    ResolvedShape shape = resolvedPart.Shape;
+                    ResolvedShape shape = part.Shape;
                     float radius = shape.Radius;
                     float height = shape.CapsuleHeight;
                     float3 boxHalfExtents = new float3(shape.BoxHalfExtents.x, shape.BoxHalfExtents.y, shape.BoxHalfExtents.z);
@@ -381,7 +380,7 @@ namespace ProceduralCreature.Morphology.Sdf
                         Type = SdfOperationType.SmoothUnion,
                         A = previousRoot,
                         B = root,
-                        Parameters = new float3(PartUnionBlendRadius(resolvedPart), 0f, 0f),
+                        Parameters = new float3(PartUnionBlendRadius(part), 0f, 0f),
                     });
                     SetWorldAabb(operations, unionIndex, Aabb.Union(ReadAabb(operations, previousRoot), ReadAabb(operations, root)));
                     SetCullable(operations, unionIndex, ReadCullable(operations, previousRoot) && ReadCullable(operations, root));
@@ -430,13 +429,13 @@ namespace ProceduralCreature.Morphology.Sdf
             if (definition == null) throw new DomainException("Cannot compile a null CreatureDefinition.");
             if (snapshot == null) throw new DomainException("Cannot compile with a null resolved snapshot.");
 
-            return definition.Parts
-                .OrderBy(p => p.Id, System.StringComparer.Ordinal)
-                .Where(part => part.MeshGeometry == null)
+            return snapshot.PartsById.Values
+                .OrderBy(part => part.Id, System.StringComparer.Ordinal)
+                .Where(part => !part.HasMeshGeometry)
                 .Select(part =>
                 {
-                    snapshot.TryGetPart(part.Id, out ResolvedPartSnapshot resolvedPart);
-                    return (part, CompilePortablePart(definition, part, resolvedPart));
+                    CreaturePart sourcePart = definition.FindPart(part.Id);
+                    return (sourcePart, CompilePortablePart(snapshot, part));
                 })
                 .ToList();
         }
@@ -493,19 +492,19 @@ namespace ProceduralCreature.Morphology.Sdf
             return root;
         }
 
-        private static SdfProgram CompilePortablePart(CreatureDefinition definition,
-            CreaturePart part, ResolvedPartSnapshot resolvedPart)
+        private static SdfProgram CompilePortablePart(
+            ResolvedCreatureSnapshot snapshot, ResolvedPartSnapshot part)
         {
             var operations = new List<SdfOperation>();
-            Matrix4x4 localToCreature = resolvedPart.PartFrameToCreatureSpace;
+            Matrix4x4 localToCreature = part.PartFrameToCreatureSpace;
             Vector3 scale = localToCreature.lossyScale;
             float distanceScale = Mathf.Min(Mathf.Abs(scale.x), Mathf.Min(Mathf.Abs(scale.y), Mathf.Abs(scale.z)));
-            bool shouldMirror = part.MirrorAcrossSymmetryPlane && definition.SymmetryMode != SymmetryMode.None;
+            bool shouldMirror = part.MirrorAcrossSymmetryPlane && snapshot.SymmetryMode != SymmetryMode.None;
             int root;
 
-            if (part.Limb != null)
+            if (part.HasLimb)
             {
-                root = CompileLimbChainPortable(operations, resolvedPart.Limb, localToCreature, distanceScale, shouldMirror);
+                root = CompileLimbChainPortable(operations, part.Limb, localToCreature, distanceScale, shouldMirror);
             }
             else
             {
@@ -519,7 +518,7 @@ namespace ProceduralCreature.Morphology.Sdf
                     default: throw new DomainException($"No portable SDF primitive mapping exists for ShapeType.{part.Shape.Type}.");
                 }
 
-                ResolvedShape shape = resolvedPart.Shape;
+                ResolvedShape shape = part.Shape;
                 float radius = shape.Radius;
                 float height = shape.CapsuleHeight;
                 float3 boxHalfExtents = new float3(shape.BoxHalfExtents.x, shape.BoxHalfExtents.y, shape.BoxHalfExtents.z);

@@ -58,15 +58,27 @@
       "author": "anonymous",
       "body": "Council review 2026-09-02: the accepted-preview identity slice is sound and remains InProgress. The stricter RevisionId comparison invalidates all DNA edits, including part-only edits; this is safer because the collider represents the complete generated mesh, while the Body fingerprint is diagnostic. Required SceneView evidence remains open for drag release, cancellation, stale blocking, accepted-result application, regeneration/collider replacement, hot-control cleanup, and domain-reload reuse. Report: docs/audits/2026-09-02-consolidation-handoff-council-review-2.md.",
       "createdAtUtc": "2026-09-02T04:43:05.5358173Z"
+    },
+    {
+      "id": "c-4634b17131024faf9461053c8466b03d",
+      "author": "anonymous",
+      "body": "Wave handoff update 2026-09-02: TSK-0093 RemovePart and a TSK-0095 snapshot-authority slice completed and validated. TSK-0098 remains InProgress; required real Unity SceneView evidence for drag release, cancellation, stale blocking, collider replacement, hot-control cleanup, accepted-result application, and domain-reload reuse is still outstanding.",
+      "createdAtUtc": "2026-09-02T05:01:51.4912651Z"
+    },
+    {
+      "id": "c-3924298cea674dadaa0733677a855610",
+      "author": "anonymous",
+      "body": "Council review 2026-09-02: stale-preview UI wording was corrected to describe full authored-definition invalidation. Keep InProgress: real Unity SceneView evidence remains required for drag release, Escape cancellation, stale blocking, collider replacement, hot-control cleanup, accepted-result application, and domain-reload policy. No new task created.",
+      "createdAtUtc": "2026-09-02T05:07:40.2335699Z"
     }
   ],
   "epicId": null,
   "parentId": null,
   "dueDateUtc": null,
   "createdAtUtc": "2026-09-01T03:20:52.8300758Z",
-  "updatedAtUtc": "2026-09-02T04:43:05.5358173Z",
+  "updatedAtUtc": "2026-09-02T05:07:40.2335699Z",
   "completedAtUtc": null,
-  "revision": 8,
+  "revision": 10,
   "isArchived": false,
   "hasLoadError": false,
   "loadError": null,

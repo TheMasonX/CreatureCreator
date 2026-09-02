@@ -121,6 +121,31 @@ namespace ProceduralCreature.Tests.Runtime
         }
 
         [Test]
+        public void RemovePart_SkipsNullEntriesAndRemovesOnlyFirstDuplicate()
+        {
+            var definition = CreatureDefinition.CreateEmpty();
+            definition.Parts.Add(null);
+            definition.Parts.Add(MakePart("duplicate"));
+            definition.Parts.Add(MakePart("duplicate"));
+
+            Assert.DoesNotThrow(() => Assert.IsTrue(definition.RemovePart("duplicate")));
+            Assert.AreEqual(2, definition.Parts.Count);
+            Assert.IsNull(definition.Parts[0]);
+            Assert.IsNotNull(definition.Parts[1]);
+            Assert.AreEqual("duplicate", definition.Parts[1].Id,
+                "Duplicate removal must be deterministic and remove only the first match.");
+        }
+
+        [Test]
+        public void RemovePart_ReturnsFalseForNullPartList()
+        {
+            var definition = CreatureDefinition.CreateEmpty();
+            definition.Parts = null;
+
+            Assert.IsFalse(definition.RemovePart("missing"));
+        }
+
+        [Test]
         public void CloneAsDuplicate_GeneratesNewId()
         {
             CreaturePart original = MakePart("part_original");

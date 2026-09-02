@@ -363,12 +363,12 @@ namespace ProceduralCreature.Editor
                     "Place Part Mode: click the preview mesh in the Scene view. With a part selected, the " +
                     "part snaps to the clicked position. With no part selected, a new part is created there. " +
                     "Placement raycasts against the mesh from the last 'Regenerate Preview', so it is blocked " +
-                    "when the Body has changed since then — regenerate first.",
+                    "when the authored definition has changed since then — regenerate first.",
                     MessageType.Info);
                 if (IsPreviewStale())
                 {
                     EditorGUILayout.HelpBox(
-                        "Preview is stale: the Body changed since the last 'Regenerate Preview'. " +
+                        "Preview is stale: the authored definition changed since the last 'Regenerate Preview'. " +
                         "Regenerate before placing parts.",
                         MessageType.Warning);
                 }

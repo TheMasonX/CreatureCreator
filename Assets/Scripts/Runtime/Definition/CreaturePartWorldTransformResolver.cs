@@ -52,6 +52,8 @@ namespace ProceduralCreature.Definition
         public readonly string ParentId;
         public readonly PartType PartType;
         public readonly TransformData Transform;
+        public readonly AppearanceDefinition Appearance;
+        public readonly bool MirrorAcrossSymmetryPlane;
         public readonly ResolvedShape Shape;
         public readonly bool HasLimb;
         public readonly ResolvedLimb Limb;
@@ -71,6 +73,8 @@ namespace ProceduralCreature.Definition
             ParentId = part.ParentId;
             PartType = part.PartType;
             Transform = part.Transform;
+            Appearance = part.Appearance;
+            MirrorAcrossSymmetryPlane = part.MirrorAcrossSymmetryPlane;
             Shape = ResolvedShape.Resolve(part.Shape);
             HasLimb = part.Limb != null;
             Limb = limb;
@@ -97,15 +101,22 @@ namespace ProceduralCreature.Definition
 
         public readonly bool HasBody;
         public readonly ResolvedBody Body;
+        public BoundsDefinition Bounds { get; }
+        public GenerationSettings Generation { get; }
+        public SymmetryMode SymmetryMode { get; }
         public string RevisionId { get; }
         public IReadOnlyDictionary<string, ResolvedPartSnapshot> PartsById => partsById;
 
         private ResolvedCreatureSnapshot(bool hasBody, ResolvedBody body,
+            BoundsDefinition bounds, GenerationSettings generation, SymmetryMode symmetryMode,
             IReadOnlyDictionary<string, ResolvedPartSnapshot> partsById,
             string revisionId)
         {
             HasBody = hasBody;
             Body = body;
+            Bounds = bounds;
+            Generation = generation;
+            SymmetryMode = symmetryMode;
             this.partsById = partsById;
             RevisionId = revisionId;
         }
@@ -163,6 +174,9 @@ namespace ProceduralCreature.Definition
             return new ResolvedCreatureSnapshot(
                 hasBody,
                 body,
+                definition.Bounds,
+                definition.Generation,
+                definition.SymmetryMode,
                 new System.Collections.ObjectModel.ReadOnlyDictionary<string, ResolvedPartSnapshot>(resolvedParts),
                 revisionId);
         }

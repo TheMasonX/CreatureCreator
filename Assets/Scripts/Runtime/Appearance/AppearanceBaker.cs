@@ -192,6 +192,11 @@ namespace ProceduralCreature.Appearance
         public static Color[] BakePart(CreaturePart part, IReadOnlyList<Vector3> positions, IReadOnlyList<Vector3> normals)
         {
             if (part == null) throw new DomainException("part must not be null.");
+            return BakePart(part.Appearance, positions, normals);
+        }
+
+        public static Color[] BakePart(AppearanceDefinition appearance, IReadOnlyList<Vector3> positions, IReadOnlyList<Vector3> normals)
+        {
             if (positions == null) throw new DomainException("positions must not be null.");
             if (normals == null) throw new DomainException("normals must not be null.");
             if (positions.Count != normals.Count)
@@ -199,7 +204,6 @@ namespace ProceduralCreature.Appearance
                 throw new DomainException("positions and normals must have the same length.");
             }
 
-            AppearanceDefinition appearance = part.Appearance;
             var colors = new Color[positions.Count];
             for (int i = 0; i < positions.Count; i++)
             {

@@ -358,6 +358,50 @@ namespace ProceduralCreature.Tests.Runtime
         }
 
         [Test]
+        public void ResolvedCreatureSnapshot_CapturesGenerationAndAssemblyInputs()
+        {
+            var definition = CreatureDefinition.CreateEmpty();
+            definition.Bounds = new BoundsDefinition { MaxX = 7f, MaxY = 8f, MaxZ = 9f };
+            definition.Generation = new GenerationSettings { VoxelsPerUnit = 12f };
+            definition.SymmetryMode = SymmetryMode.MirrorAcrossXAxis;
+            var part = new CreaturePart
+            {
+                Id = "mesh_part",
+                Transform = TransformData.Identity,
+                Shape = ShapeDefinition.DefaultSphere,
+                Appearance = new AppearanceDefinition
+                {
+                    BaseColor = Color.red,
+                    NoiseSeed = 17,
+                    NoiseScale = 2f,
+                    MaterialKey = "accent",
+                },
+                MirrorAcrossSymmetryPlane = true,
+                MeshGeometry = new MeshGeometry { MeshAssetKey = "mesh_asset" },
+            };
+            definition.AddPart(part);
+
+            ResolvedCreatureSnapshot snapshot = ResolvedCreatureSnapshot.Resolve(definition);
+
+            Assert.AreEqual(definition.Bounds, snapshot.Bounds);
+            Assert.AreEqual(definition.Generation, snapshot.Generation);
+            Assert.AreEqual(SymmetryMode.MirrorAcrossXAxis, snapshot.SymmetryMode);
+            Assert.IsTrue(snapshot.TryGetPart(part.Id, out ResolvedPartSnapshot resolved));
+            Assert.AreEqual(part.Appearance, resolved.Appearance);
+            Assert.IsTrue(resolved.MirrorAcrossSymmetryPlane);
+
+            definition.Bounds.MaxX = 1f;
+            definition.Generation.VoxelsPerUnit = 4f;
+            part.Appearance = AppearanceDefinition.Default;
+            part.MirrorAcrossSymmetryPlane = false;
+
+            Assert.AreEqual(7f, snapshot.Bounds.MaxX);
+            Assert.AreEqual(12f, snapshot.Generation.VoxelsPerUnit);
+            Assert.AreEqual(Color.red, resolved.Appearance.BaseColor);
+            Assert.IsTrue(resolved.MirrorAcrossSymmetryPlane);
+        }
+
+        [Test]
         public void ResolvedCreatureSnapshot_UsesResolvedLimbTerminalForChildFrame()
         {
             var definition = CreatureDefinition.CreateEmpty();

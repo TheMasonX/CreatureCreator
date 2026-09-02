@@ -103,10 +103,19 @@ namespace ProceduralCreature.Definition
 
         public bool RemovePart(string id)
         {
-            int index = Parts.FindIndex(p => p.Id == id);
-            if (index < 0) return false;
-            Parts.RemoveAt(index);
-            return true;
+            if (Parts == null) return false;
+
+            for (int index = 0; index < Parts.Count; index++)
+            {
+                CreaturePart part = Parts[index];
+                if (part != null && part.Id == id)
+                {
+                    Parts.RemoveAt(index);
+                    return true;
+                }
+            }
+
+            return false;
         }
 
         /// <summary>

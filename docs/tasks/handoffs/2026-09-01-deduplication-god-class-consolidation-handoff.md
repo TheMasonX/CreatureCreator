@@ -13,8 +13,8 @@ to own the work. Do not create new CC tickets for these findings.
 | Mechanism | Single owner | Status | Decision |
 | --- | --- | --- | --- |
 | Async preview generation | TSK-0103 | Done | Unity validation passed; hand off to hierarchy consolidation |
-| Malformed graph and hierarchy mechanics | TSK-0093 | Done | Tolerant index and canonicalizer integration validated |
-| Resolved snapshot and generation stages | TSK-0095 / CC-091 | Done | One snapshot, revision identity, and attachment correspondence complete |
+| Malformed graph and hierarchy mechanics | TSK-0093 | Done | Tolerant index, canonicalizer integration, and null-safe RemovePart validated |
+| Resolved snapshot and generation stages | TSK-0095 / CC-091 | InProgress | Snapshot authority slice extended; parity and full-suite evidence remain |
 | Shared mechanical utilities | TSK-0094 | Done | Finite-check consolidation complete; hierarchy remains with TSK-0093 |
 | Editor god-class decomposition | TSK-0098 | InProgress | Preview controller slice complete; extract placement/stale state next |
 
@@ -350,6 +350,36 @@ Unity `6000.0.35f1` with a 120-second initialization timeout, but failed before
 any tests started. This is recorded as an evidence blocker, not a product test
 failure. The next agent must retry it after the CC-091 authority work and must
 perform the CC-094 SceneView smoke checks before closing the editor track.
+
+### Wave update: 2026-09-02
+
+The council-required `CreatureDefinition.RemovePart` regression is complete.
+`RemovePart` now returns false for a null `Parts` list, skips null entries, and
+removes only the first non-null matching ID. This gives malformed duplicate IDs
+a deterministic first-match policy without changing the tolerant hierarchy
+contract. TSK-0093 is `Done` in MemorySmith.
+
+Validation in Unity `6000.0.35f1`:
+
+- Runtime dotnet build passed with zero warnings and zero errors.
+- Focused PlayMode `CreatureDefinitionTests` passed 10/10, including null-list,
+    null-entry, and duplicate-ID removal coverage.
+
+The next TSK-0095 slice extends `ResolvedCreatureSnapshot` ownership to include
+the bounds, generation settings, and symmetry mode used by field sampling and
+mesh assembly, plus per-part appearance and mirror decisions used by mesh-asset
+assembly. `CreatureMeshGenerator` consumes these captured values for those
+decisions, and `AppearanceBaker` accepts a direct `AppearanceDefinition` input
+for mesh-asset baking. Resolver regression coverage proves the captured values
+remain stable after the live definition is mutated.
+
+Validation in Unity `6000.0.35f1`:
+
+- Runtime dotnet build passed with zero warnings and zero errors.
+- Focused PlayMode `CreaturePartWorldTransformResolverTests` passed 29/29.
+- TSK-0095 remains `InProgress`; remaining gates are canonicalization-equivalent
+    revision/output parity, full runtime PlayMode execution, and any remaining raw
+    output-input reads.
 
 ## Tracker and record hygiene
 

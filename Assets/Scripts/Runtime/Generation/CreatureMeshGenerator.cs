@@ -76,7 +76,7 @@ namespace ProceduralCreature.Generation
                 {
                     try
                     {
-                        grid = DensityGrid.SamplePortable(portableProgram, definition.Bounds, definition.Generation);
+                        grid = DensityGrid.SamplePortable(portableProgram, snapshot.Bounds, snapshot.Generation);
                     }
                     finally
                     {
@@ -152,24 +152,20 @@ namespace ProceduralCreature.Generation
 
             // Items 1..n: mesh-asset parts, ordered by SourcePartId for a
             // deterministic output independent of authoring order.
-            var meshParts = data.Definition.Parts
-                .Where(p => p != null && p.MeshGeometry != null)
+            var meshParts = data.Snapshot.PartsById.Values
+                .Where(p => p.HasMeshGeometry)
                 .OrderBy(p => p.Id, StringComparer.Ordinal);
 
-            foreach (CreaturePart part in meshParts)
+            foreach (ResolvedPartSnapshot resolvedPart in meshParts)
             {
-                if (!data.Snapshot.TryGetPart(part.Id, out ResolvedPartSnapshot resolvedPart))
-                {
-                    throw new DomainException($"No resolved snapshot entry exists for part '{part.Id}'.");
-                }
-                Mesh sourceMesh = ResolveMesh(part.Id, resolvedPart.MeshAssetKey, meshResolver);
+                Mesh sourceMesh = ResolveMesh(resolvedPart.Id, resolvedPart.MeshAssetKey, meshResolver);
                 Matrix4x4 placement = resolvedPart.GeometryPlacementToCreatureSpace;
 
-                generated.Geometry.Add(BuildMeshAssetItem(part, sourceMesh, placement, mirror: false));
+                generated.Geometry.Add(BuildMeshAssetItem(resolvedPart, sourceMesh, placement, mirror: false));
 
-                if (part.MirrorAcrossSymmetryPlane && data.Definition.SymmetryMode != SymmetryMode.None)
+                if (resolvedPart.MirrorAcrossSymmetryPlane && data.Snapshot.SymmetryMode != SymmetryMode.None)
                 {
-                    generated.Geometry.Add(BuildMeshAssetItem(part, sourceMesh, ReflectAcrossX * placement, mirror: true));
+                    generated.Geometry.Add(BuildMeshAssetItem(resolvedPart, sourceMesh, ReflectAcrossX * placement, mirror: true));
                 }
             }
 
@@ -200,7 +196,7 @@ namespace ProceduralCreature.Generation
         /// shades correctly. The source mesh asset is never mutated. Mirrored items
         /// reuse the same source mesh with a reflected placement.
         /// </summary>
-        private static GeometryItem BuildMeshAssetItem(CreaturePart part, Mesh source, Matrix4x4 placement, bool mirror)
+        private static GeometryItem BuildMeshAssetItem(ResolvedPartSnapshot part, Mesh source, Matrix4x4 placement, bool mirror)
         {
             Vector3[] positions = source.vertices;
             Vector3[] transformed = new Vector3[positions.Length];
@@ -236,7 +232,7 @@ namespace ProceduralCreature.Generation
             // not part of the implicit SDF field, so AppearanceBaker.BakePart
             // resolves its color from the part itself rather than nearest-surface
             // sampling — never from the Body's implicit gradient.
-            mesh.SetColors(AppearanceBaker.BakePart(part, mesh.vertices, mesh.normals));
+            mesh.SetColors(AppearanceBaker.BakePart(part.Appearance, mesh.vertices, mesh.normals));
 
             var item = new GeometryItem
             {

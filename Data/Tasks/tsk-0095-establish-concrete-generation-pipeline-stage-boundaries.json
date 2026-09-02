@@ -58,15 +58,33 @@
       "author": "anonymous",
       "body": "Council review 2026-09-02: retain InProgress. ResolvedCreatureSnapshot.RevisionId is directionally correct, but raw output-affecting bounds, generation settings, part ordering/source, symmetry/mirror, appearance, and assembly inputs remain reachable in downstream paths. Add snapshot-owned input parity and canonicalization-equivalent revision/output tests, then rerun the full runtime PlayMode suite. Evidence report: docs/audits/2026-09-02-consolidation-handoff-council-review-2.md.",
       "createdAtUtc": "2026-09-02T04:43:05.4669714Z"
+    },
+    {
+      "id": "c-a761e9bdcc5c41b6886169393dc2e5df",
+      "author": "anonymous",
+      "body": "Authority slice continued 2026-09-02. ResolvedCreatureSnapshot now captures Bounds, GenerationSettings, SymmetryMode, per-part Appearance, and MirrorAcrossSymmetryPlane. CreatureMeshGenerator sampling and mesh-asset assembly consume snapshot-owned values; AppearanceBaker exposes a snapshot-compatible AppearanceDefinition overload. Regression coverage proves captured values remain stable after live DNA mutation. Runtime dotnet build passed with 0 warnings/errors; Unity 6000.0.35f1 focused CreaturePartWorldTransformResolverTests PlayMode passed 29/29. Remaining gate: broader generation parity/full runtime suite and any remaining raw source inputs.",
+      "createdAtUtc": "2026-09-02T04:58:18.0350587Z"
+    },
+    {
+      "id": "c-23537d3d21ff411c81c855397a4e9f35",
+      "author": "anonymous",
+      "body": "Full authority-wave validation completed 2026-09-02 in Unity 6000.0.35f1: ProceduralCreature.Tests.Runtime PlayMode passed 433/433 with 0 failures and 0 skips after snapshot-owned bounds, generation, symmetry, appearance, and mirror changes. Runtime dotnet build remained clean with 0 warnings/errors. TSK-0095 remains InProgress for remaining raw-input audit and canonicalization-equivalent output parity evidence.",
+      "createdAtUtc": "2026-09-02T05:01:51.4289422Z"
+    },
+    {
+      "id": "c-68df55bd826248699079ff4205190cd1",
+      "author": "anonymous",
+      "body": "Council review 2026-09-02: explicit SDF snapshot overloads were found to bypass snapshot authority for part ordering, mesh exclusion, limb/shape selection, mirror, and symmetry. This wave corrected those reads to use ResolvedPartSnapshot and snapshot SymmetryMode. Keep InProgress: Body appearance capture, remaining raw-input audit, canonicalization-equivalent output parity, and final-source full-suite evidence remain required. No new task created.",
+      "createdAtUtc": "2026-09-02T05:07:40.1859914Z"
     }
   ],
   "epicId": null,
   "parentId": null,
   "dueDateUtc": null,
   "createdAtUtc": "2026-09-01T03:20:52.7496119Z",
-  "updatedAtUtc": "2026-09-02T04:43:05.4669714Z",
+  "updatedAtUtc": "2026-09-02T05:07:40.1859914Z",
   "completedAtUtc": "2026-09-02T03:10:44.2511455Z",
-  "revision": 10,
+  "revision": 13,
   "isArchived": false,
   "hasLoadError": false,
   "loadError": null,
