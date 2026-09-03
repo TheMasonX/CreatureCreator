@@ -22,16 +22,29 @@
   "attachments": [],
   "externalLinks": [],
   "linkedPages": [],
-  "comments": [],
+  "comments": [
+    {
+      "id": "c-492b1435f273455fbd4dedfb38fcb8a7",
+      "author": "anonymous",
+      "body": "Audit synthesis 2026-09-03: mesh/material palette duplication is confirmed by Delta Audit #18 and is owned by new TSK-0105. Keep shared config/runtime palette parity scope active; do not fold material-specific default/display-name policy into the generic helper. Existing PlayMode parity blocker remains unchanged.",
+      "createdAtUtc": "2026-09-03T22:37:37.9677057Z"
+    },
+    {
+      "id": "c-039be265f04b44fbb563cbb1a09e954b",
+      "author": "anonymous",
+      "body": "Council follow-up 2026-09-03: palette helper work belongs to TSK-0105. Keep CC-072 focused on runtime/editor palette parity and mesh binding. Its PlayMode parity blocker remains a separate completion gate.",
+      "createdAtUtc": "2026-09-03T22:48:20.5877777Z"
+    }
+  ],
   "epicId": null,
   "parentId": null,
   "dueDateUtc": null,
   "createdAtUtc": "2026-09-01T03:20:52.2461192Z",
-  "updatedAtUtc": "2026-09-01T03:20:52.2461192Z",
+  "updatedAtUtc": "2026-09-03T22:48:20.5877777Z",
   "completedAtUtc": null,
-  "revision": 1,
+  "revision": 3,
   "isArchived": false,
   "hasLoadError": false,
   "loadError": null,
-  "sourceFilePath": null
+  "sourceFilePath": "tsk-0076-shared-generation-configuration-and-mesh-palette-ownership.json"
 }

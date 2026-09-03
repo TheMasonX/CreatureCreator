@@ -70,15 +70,27 @@
       "author": "anonymous",
       "body": "Council review 2026-09-02: stale-preview UI wording was corrected to describe full authored-definition invalidation. Keep InProgress: real Unity SceneView evidence remains required for drag release, Escape cancellation, stale blocking, collider replacement, hot-control cleanup, accepted-result application, and domain-reload policy. No new task created.",
       "createdAtUtc": "2026-09-02T05:07:40.2335699Z"
+    },
+    {
+      "id": "c-02c740eff792416fb9c70a1163abdf3f",
+      "author": "anonymous",
+      "body": "Audit synthesis 2026-09-03, sources S02/S05/S06: retain InProgress. The preview-controller extraction is validated as a first slice, but ownership remains incomplete. Coordinate TSK-0104 for bounded scheduler work, single clone ownership, request-scoped diagnostics, generated Unity-object cleanup, domain-reload policy, and complete result application. Remaining CC-094 scope includes placement/SceneView gesture ownership, hot-control cleanup, accepted-result identity, and later extraction of authoring/tree/inspector responsibilities. Do not create another editor god-class task.",
+      "createdAtUtc": "2026-09-03T22:37:37.8928727Z"
+    },
+    {
+      "id": "c-0928e57eb3104caa85844396673134a9",
+      "author": "anonymous",
+      "body": "Council follow-up 2026-09-03: expand editor decomposition gates to enumerate body, radius, limb, and placement hot-control owners; result identity versus current DNA; transient limb-drag clone accounting; preview-root/generated-mesh disposal; and domain-reload rediscovery. These remain CC-094/TSK-0104 scope, not a new task family. Markdown active index and older handoffs are frozen historical status.",
+      "createdAtUtc": "2026-09-03T22:48:20.4336349Z"
     }
   ],
   "epicId": null,
   "parentId": null,
   "dueDateUtc": null,
   "createdAtUtc": "2026-09-01T03:20:52.8300758Z",
-  "updatedAtUtc": "2026-09-02T05:07:40.2335699Z",
+  "updatedAtUtc": "2026-09-03T22:48:20.4336349Z",
   "completedAtUtc": null,
-  "revision": 10,
+  "revision": 12,
   "isArchived": false,
   "hasLoadError": false,
   "loadError": null,

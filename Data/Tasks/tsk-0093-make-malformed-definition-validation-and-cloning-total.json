@@ -4,7 +4,7 @@
   "title": "Make malformed-definition validation and cloning total",
   "description": "Source: docs/tasks/tickets/CC-089-total-validation-and-clone-boundary.md\nSource key: CC-089\nSource status: Backlog\nSource priority: P1\n\n## Summary\r\n\r\nMake malformed definitions produce stable validation or domain errors instead of incidental collection and null exceptions.\r\n\r\n## Scope\r\n\r\n- Use one tolerant part index for duplicate IDs, null entries, parent lookup, and cycle analysis.\r\n- Preserve duplicate diagnostics without forcing malformed data into a throwing dictionary.\r\n- Define clone behavior for null part entries and document the boundary.\r\n- Prefer non-throwing \u0060TryResolve\u0060 paths for validator-only resolved-envelope\r\n  checks, so routine incomplete authoring data does not use exceptions for\r\n  control flow.\r\n- Keep canonicalization non-repairing and use domain-specific failures.\r\n- Preserve the corrected CC-082, CC-083, and CC-084 evidence as regression cases.\r\n\r\n## Acceptance Criteria\r\n\r\n- \u0060DefinitionValidator.Validate\u0060 returns issues for null parts, duplicate IDs, missing parents, and cycles.\r\n- Direct cycle analysis does not throw on duplicate IDs or null entries.\r\n- Clone and canonicalization behavior is explicit and covered for malformed input.\r\n- Validator envelope checks report or skip structurally invalid entries without\r\n  exception-driven control flow.\r\n- The null-parent test fixture constructs a true null parent case.\r\n- Canonical JSON preserves null or blank display-name intent according to the chosen documented contract.\r\n- Validation remains report-only and does not silently rewrite DNA.\r\n\r\n## Validation\r\n\r\nRun focused DefinitionValidator, CreatureDefinition, canonicalizer, and JSON round-trip tests in Unity. Include malformed object-graph fixtures and inspect the console.\r\n\r\n## Findings\r\n\r\nThe audit series confirms a throwing \u0060HasParentCycle\u0060 dictionary path and broader null-entry risks. It also corrects the original CC-083 diagnosis: the existing validator rule is present, but the test helper cannot express an explicit null parent.\r\n\r\n## Blockers\r\n\r\nNone.\r\n\r\n## Next Step\r\n\r\nChoose the tolerant-index contract, then add the malformed graph fixtures before changing validation implementation.",
   "type": "Bug Fix",
-  "status": "Done",
+  "status": "InProgress",
   "priority": "High",
   "assigneeMode": "Custom",
   "assigneeDirectoryId": null,
@@ -69,15 +69,33 @@
       "author": "anonymous",
       "body": "RemovePart follow-up completed 2026-09-02. CreatureDefinition.RemovePart now returns false for a null Parts list, skips null entries, and removes only the first non-null matching ID. Unity 6000.0.35f1 focused PlayMode CreatureDefinitionTests passed 10/10 (including RemovePart_SkipsNullEntriesAndRemovesOnlyFirstDuplicate and RemovePart_ReturnsFalseForNullPartList). Runtime dotnet build passed with 0 warnings/errors.",
       "createdAtUtc": "2026-09-02T04:58:17.926309Z"
+    },
+    {
+      "id": "c-217b3b88217946168b1fa15799b3990b",
+      "author": "anonymous",
+      "body": "Audit synthesis 2026-09-03, sources S05/S06: reopened to InProgress. Confirmed residuals are DefinitionValidator direct enumeration of null Parts and missing reserved BodyId rejection. Also retain hierarchy read-only aliasing, validator split/context, non-throwing envelope resolution, explicit authoring-vs-resolved bounds diagnostics, and CC-078/079/080 dispositions as scoped follow-ups. Prior Done evidence remains valid for tolerant index, clone, RemovePart, duplicate/null/cycle fixtures only. Next gate: focused malformed-definition Unity tests with no exceptions and report-only behavior.",
+      "createdAtUtc": "2026-09-03T22:37:37.8303749Z"
+    },
+    {
+      "id": "c-6f06ab903e4e402cad4b09f6bfd7bb15",
+      "author": "anonymous",
+      "body": "Council follow-up 2026-09-03: expand malformed-input coverage beyond DefinitionValidator. Runtime seat identified direct null Parts reads in SkeletonInferrer and PartAppearanceSampler. Add either tolerant behavior or an explicit validated-input precondition, plus reserved BodyId tests. Keep CC-089 as owner for graph/validator mechanics and do not create another malformed-state task.",
+      "createdAtUtc": "2026-09-03T22:48:20.3288918Z"
+    },
+    {
+      "id": "c-f3c8a0d66f0d4f28b221d41f11be1533",
+      "author": "anonymous",
+      "body": "Implementation wave 1, 2026-09-03: DefinitionValidator now reports a NullPart issue for a null Parts collection and routes all part validation through the tolerant hierarchy index. SkeletonInferrer fallback and PartAppearanceSampler default resolution no longer dereference null Parts. Focused validation: ProceduralCreature.Runtime.csproj and ProceduralCreature.Tests.Runtime.csproj both built with --no-restore successfully, zero errors. Unity test execution remains pending.",
+      "createdAtUtc": "2026-09-03T23:16:13.1754356Z"
     }
   ],
   "epicId": null,
   "parentId": null,
   "dueDateUtc": null,
   "createdAtUtc": "2026-09-01T03:20:52.6991944Z",
-  "updatedAtUtc": "2026-09-02T04:58:18.0043074Z",
+  "updatedAtUtc": "2026-09-03T23:16:13.1754356Z",
   "completedAtUtc": "2026-09-02T04:58:18.0043074Z",
-  "revision": 13,
+  "revision": 17,
   "isArchived": false,
   "hasLoadError": false,
   "loadError": null,

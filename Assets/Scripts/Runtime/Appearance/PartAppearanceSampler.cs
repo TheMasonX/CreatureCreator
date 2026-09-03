@@ -202,7 +202,7 @@ namespace ProceduralCreature.Appearance
                     && _definition.Body.Samples != null
                     && _definition.Body.Samples.Count > 0;
 
-                if (_definition.Parts.Count == 0 && !hasBody)
+                if ((_definition.Parts == null || _definition.Parts.Count == 0) && !hasBody)
                 {
                     return new ResolvedAppearance(AppearanceDefinition.Default.BaseColor, 0, 1f);
                 }

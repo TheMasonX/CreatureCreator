@@ -26,24 +26,52 @@ namespace ProceduralCreature.Definition
         public readonly bool IsPositive() => VoxelsPerUnit > 0f;
 
         /// <summary>
-        /// Estimated total voxel count for a given bounds, used by DefinitionValidator's
-        /// "Generation settings exceed safety budget" check (§2.4) BEFORE any grid is
-        /// allocated (Sprint 3.1 exit gate: "grid memory cost can be calculated before
-        /// allocation").
+        /// Estimated total cell count for a given bounds. This is useful for
+        /// diagnostics, but the safety budget must use <see cref="EstimateSampleCount"/>
+        /// because the sampler allocates one corner sample beyond each cell axis.
         /// </summary>
         public readonly long EstimateVoxelCount(BoundsDefinition bounds)
+        {
+            GetCellCounts(bounds, out long cellsX, out long cellsY, out long cellsZ);
+            return SaturatingProduct(cellsX, cellsY, cellsZ);
+        }
+
+        /// <summary>
+        /// Estimated corner-sample count for the portable density grid. This is
+        /// the allocation guarded by DefinitionValidator's safety budget.
+        /// </summary>
+        public readonly long EstimateSampleCount(BoundsDefinition bounds)
+        {
+            GetCellCounts(bounds, out long cellsX, out long cellsY, out long cellsZ);
+            return SaturatingProduct(cellsX + 1L, cellsY + 1L, cellsZ + 1L);
+        }
+
+        private readonly void GetCellCounts(BoundsDefinition bounds,
+            out long cellsX, out long cellsY, out long cellsZ)
         {
             double sizeX = bounds.MaxX * 2.0 * VoxelsPerUnit;
             double sizeY = bounds.MaxY * 2.0 * VoxelsPerUnit;
             double sizeZ = bounds.MaxZ * 2.0 * VoxelsPerUnit;
 
-            double total = Math.Ceiling(sizeX) * Math.Ceiling(sizeY) * Math.Ceiling(sizeZ);
+            cellsX = CeilToLong(sizeX);
+            cellsY = CeilToLong(sizeY);
+            cellsZ = CeilToLong(sizeZ);
+        }
 
-            // Clamp to long range explicitly rather than overflowing silently — an
-            // absurd bounds/resolution combination should read as "huge", not wrap
-            // around into a small or negative number.
-            if (total > long.MaxValue) return long.MaxValue;
-            return (long)total;
+        private static long CeilToLong(double value)
+        {
+            if (value >= long.MaxValue) return long.MaxValue;
+            if (value <= 0d) return 0L;
+            return (long)Math.Ceiling(value);
+        }
+
+        private static long SaturatingProduct(long first, long second, long third)
+        {
+            if (first == 0L || second == 0L || third == 0L) return 0L;
+            if (first > long.MaxValue / second) return long.MaxValue;
+            long partial = first * second;
+            if (partial > long.MaxValue / third) return long.MaxValue;
+            return partial * third;
         }
 
         public readonly bool Equals(GenerationSettings other) => VoxelsPerUnit.Equals(other.VoxelsPerUnit);

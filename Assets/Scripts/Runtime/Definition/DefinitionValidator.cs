@@ -98,7 +98,7 @@ namespace ProceduralCreature.Definition
                 }
             }
 
-            foreach (CreaturePart part in definition.Parts)
+            foreach (CreaturePart part in definition.CreateHierarchyIndex().Parts)
             {
                 if (part == null) continue;
                 if (!IsFinite(part.Transform.Position.x) || !IsFinite(part.Transform.Position.y) || !IsFinite(part.Transform.Position.z)) continue;
@@ -378,13 +378,13 @@ namespace ProceduralCreature.Definition
                 return;
             }
 
-            long estimated = definition.Generation.EstimateVoxelCount(definition.Bounds);
+            long estimated = definition.Generation.EstimateSampleCount(definition.Bounds);
             if (estimated > GenerationTolerances.MaxVoxelBudget)
             {
                 issues.Add(new ValidationIssue(
                     ValidationSeverity.Error,
                     ValidationCode.GenerationBudgetExceeded,
-                    $"Estimated voxel count {estimated:N0} exceeds the safety budget " +
+                    $"Estimated grid sample count {estimated:N0} exceeds the safety budget " +
                     $"of {GenerationTolerances.MaxVoxelBudget:N0}. Reduce bounds or " +
                     "VoxelsPerUnit."));
             }
@@ -392,6 +392,13 @@ namespace ProceduralCreature.Definition
 
         private static void ValidateDuplicateIds(CreatureDefinition definition, List<ValidationIssue> issues)
         {
+            if (definition.Parts == null)
+            {
+                issues.Add(new ValidationIssue(
+                    ValidationSeverity.Error, ValidationCode.NullPart,
+                    "Definition has a null Parts collection."));
+            }
+
             CreaturePartHierarchyIndex hierarchy = definition.CreateHierarchyIndex();
             if (hierarchy.HasNullEntries)
             {
@@ -461,7 +468,7 @@ namespace ProceduralCreature.Definition
 
         private static void ValidatePartTypes(CreatureDefinition definition, List<ValidationIssue> issues)
         {
-            foreach (CreaturePart part in definition.Parts)
+            foreach (CreaturePart part in definition.CreateHierarchyIndex().Parts)
             {
                 if (part == null) continue;
                 if (!Enum.IsDefined(typeof(PartType), part.PartType))
@@ -491,7 +498,7 @@ namespace ProceduralCreature.Definition
         private static void ValidateTransformsAndShapesAndAppearance(
             CreatureDefinition definition, List<ValidationIssue> issues)
         {
-            foreach (CreaturePart part in definition.Parts)
+            foreach (CreaturePart part in definition.CreateHierarchyIndex().Parts)
             {
                 if (part == null) continue;
                 if (!part.Transform.IsFinite())
@@ -600,7 +607,7 @@ namespace ProceduralCreature.Definition
         /// </summary>
         private static void ValidateMeshGeometry(CreatureDefinition definition, List<ValidationIssue> issues)
         {
-            foreach (CreaturePart part in definition.Parts)
+            foreach (CreaturePart part in definition.CreateHierarchyIndex().Parts)
             {
                 if (part == null || part.MeshGeometry == null) continue;
 
@@ -657,7 +664,7 @@ namespace ProceduralCreature.Definition
         /// </summary>
         private static void ValidateLimbChains(CreatureDefinition definition, List<ValidationIssue> issues)
         {
-            foreach (CreaturePart part in definition.Parts)
+            foreach (CreaturePart part in definition.CreateHierarchyIndex().Parts)
             {
                 if (part == null) continue;
 

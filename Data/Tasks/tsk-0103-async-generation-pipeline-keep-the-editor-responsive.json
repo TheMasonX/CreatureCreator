@@ -60,15 +60,27 @@
       "author": "anonymous",
       "body": "Council review 2026-09-02: retain Done. The async scheduler, parity, stale-result suppression, and editor smoke evidence remain valid; no new performance or async task is justified.",
       "createdAtUtc": "2026-09-02T04:43:05.5968908Z"
+    },
+    {
+      "id": "c-2f671a2317c440bdabc21bc6bc1804b6",
+      "author": "anonymous",
+      "body": "Audit synthesis 2026-09-03: retain Done. The async foundation has direct Unity parity, stale-result suppression, and preview smoke evidence. The exhaustive audit identifies residual bounded-work, capture ownership, result taxonomy, diagnostic correlation, and Unity-object lifecycle gaps, but these are explicitly assigned to TSK-0104 rather than reopening the completed foundation.",
+      "createdAtUtc": "2026-09-03T22:37:37.9458708Z"
+    },
+    {
+      "id": "c-ec3a14dc4e254e3098437d20e30a6a76",
+      "author": "anonymous",
+      "body": "Council follow-up 2026-09-03: retain Done. The review confirms the async foundation is complete, while bounded queueing, capture ownership, result identity, diagnostics taxonomy, and Unity-object lifetime are residual TSK-0104 scope. No reopening or duplicate async foundation task.",
+      "createdAtUtc": "2026-09-03T22:48:20.5508331Z"
     }
   ],
   "epicId": null,
   "parentId": null,
   "dueDateUtc": null,
   "createdAtUtc": "2026-09-02T00:54:44.7143755Z",
-  "updatedAtUtc": "2026-09-02T04:43:05.5968908Z",
+  "updatedAtUtc": "2026-09-03T22:48:20.5508331Z",
   "completedAtUtc": "2026-09-02T01:56:33.4113421Z",
-  "revision": 9,
+  "revision": 11,
   "isArchived": false,
   "hasLoadError": false,
   "loadError": null,

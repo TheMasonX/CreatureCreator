@@ -94,15 +94,33 @@
       "author": "anonymous",
       "body": "User Mandate (STRICT): \u201CReview your work and the tasks with 3 agents, make the necessary changes and task tracking, then commit and push\u201D. Council found one-sample/empty Body appearance edge cases and incomplete snapshot authority. Fixed one-sample sampling, empty-body gray fallback, and threaded snapshot-owned Body appearance, Forward, and part appearances through generation baking. Current-source Unity PlayMode full runtime suite passed 437/437 with 0 failures and 0 skips. Keep InProgress pending mutation-after-snapshot tests and final commit/push evidence.",
       "createdAtUtc": "2026-09-02T06:05:35.0405861Z"
+    },
+    {
+      "id": "c-30f2939c919944ad9df5fb9588c3621c",
+      "author": "anonymous",
+      "body": "Audit synthesis 2026-09-03, sources S01/S03/S05/S06: retain InProgress as the single resolved-generation owner. Confirmed follow-ups are one batch hierarchy/resolution context, detached snapshot contract and mutation-after-snapshot tests, universal ResolvedLimb downstream signatures, GenerationGridSpec, semantic revision hashing seam, effective-shape boundary coordination with CC-043, validator non-throwing resolution, and final GenerateData/Unity assembly separation. Existing snapshot authority and body-appearance fixes are corroborated, not reopened. Full canonicalization-equivalent output parity and raw-input audit remain required.",
+      "createdAtUtc": "2026-09-03T22:37:37.8532174Z"
+    },
+    {
+      "id": "c-4a4433b71bf04c509a8a2f2aa96cf884",
+      "author": "anonymous",
+      "body": "Council follow-up 2026-09-03: CC-091 is the sole owner of the batch resolved context and GenerationGridSpec. Add SemanticBoneResolver and CompileIndividualPartsPortable to the raw-input inventory, nested limb mutation isolation tests, and define whether MaxVoxelBudget bounds cells, corners, or total samples. CC-008 remains owner of profiling/execution strategy; do not duplicate grid work in CC-090.",
+      "createdAtUtc": "2026-09-03T22:48:20.3562064Z"
+    },
+    {
+      "id": "c-34483c8ed9a246ee8fa66cc965884f98",
+      "author": "anonymous",
+      "body": "Implementation wave 1, 2026-09-03: GenerationSettings now exposes saturating EstimateSampleCount, counting actual density-grid corner allocations; DefinitionValidator uses it for MaxVoxelBudget and reports grid sample count. Added exact regression coverage for 128 VPU over 2-unit bounds: 16,777,216 cells versus 16,972,609 corner samples, correctly rejected. Focused runtime projects built successfully with --no-restore, zero errors. Unity EditMode bridge jobs started but discovered zero project tests (placeholder CreatureCreator result), so no Unity test pass is claimed.",
+      "createdAtUtc": "2026-09-03T23:17:29.3908799Z"
     }
   ],
   "epicId": null,
   "parentId": null,
   "dueDateUtc": null,
   "createdAtUtc": "2026-09-01T03:20:52.7496119Z",
-  "updatedAtUtc": "2026-09-02T06:05:35.0405861Z",
+  "updatedAtUtc": "2026-09-03T23:17:29.3908799Z",
   "completedAtUtc": "2026-09-02T03:10:44.2511455Z",
-  "revision": 16,
+  "revision": 19,
   "isArchived": false,
   "hasLoadError": false,
   "loadError": null,

@@ -98,9 +98,10 @@ namespace ProceduralCreature.Skeleton
                 AppendBodyBones(skeleton, definition,
                     hasBody ? ResolvedBody.Resolve(definition.Body) : default,
                     hasBody);
-                for (int i = 0; i < definition.Parts.Count; i++)
+                IReadOnlyList<CreaturePart> parts = definition.CreateHierarchyIndex().Parts;
+                for (int i = 0; i < parts.Count; i++)
                 {
-                    CreaturePart part = definition.Parts[i];
+                    CreaturePart part = parts[i];
                     if (part == null || part.Limb != null) continue;
 
                     try

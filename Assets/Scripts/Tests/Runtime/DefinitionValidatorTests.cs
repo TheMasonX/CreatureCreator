@@ -30,6 +30,18 @@ namespace ProceduralCreature.Tests.Runtime
         }
 
         [Test]
+        public void Validate_NullPartsReportsIssueWithoutThrowing()
+        {
+            CreatureDefinition definition = ValidDefinitionWithBody();
+            definition.Parts = null;
+
+            ValidationResult result = DefinitionValidator.Validate(definition);
+
+            Assert.IsFalse(result.IsValid);
+            Assert.IsTrue(HasCode(result, ValidationCode.NullPart));
+        }
+
+        [Test]
         public void Validate_DetectsDuplicateIds()
         {
             var definition = CreatureDefinition.CreateEmpty();
@@ -406,6 +418,21 @@ namespace ProceduralCreature.Tests.Runtime
             var definition = CreatureDefinition.CreateEmpty();
             definition.Bounds = new BoundsDefinition { MaxX = 1000f, MaxY = 1000f, MaxZ = 1000f };
             definition.Generation = new GenerationSettings { VoxelsPerUnit = 64f };
+
+            ValidationResult result = DefinitionValidator.Validate(definition);
+
+            Assert.IsTrue(HasCode(result, ValidationCode.GenerationBudgetExceeded));
+        }
+
+        [Test]
+        public void Validate_GenerationBudgetIncludesGridCornerSamples()
+        {
+            var definition = CreatureDefinition.CreateEmpty();
+            definition.Bounds = new BoundsDefinition { MaxX = 1f, MaxY = 1f, MaxZ = 1f };
+            definition.Generation = new GenerationSettings { VoxelsPerUnit = 128f };
+
+            Assert.AreEqual(16_777_216L, definition.Generation.EstimateVoxelCount(definition.Bounds));
+            Assert.AreEqual(16_972_609L, definition.Generation.EstimateSampleCount(definition.Bounds));
 
             ValidationResult result = DefinitionValidator.Validate(definition);
 

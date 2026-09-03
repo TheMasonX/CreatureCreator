@@ -1,0 +1,49 @@
+﻿{
+  "id": "tsk-0104-bound-async-preview-work-and-define-generated-unity-object-ownership",
+  "key": "TSK-0104",
+  "title": "Bound async preview work and define generated Unity-object ownership",
+  "description": "## User Mandate\n\n\u003E \u0022Sythesize these into durable tasks. Ensure nothing is lost. We\u0027re trying to emphasize consolidation, deduping, decomposition of god classes, and other codebase health improvements\u0022\n\nSTRICT. Binding constraints:\n- Preserve every accepted mechanism from the 2026-09-02 and 2026-09-03 audits in a durable owner or explicit rejected/unresolved record.\n- Consolidate overlapping async preview, stale-result, generated-object lifetime, and editor decomposition work instead of creating parallel task families.\n- Preserve deterministic synchronous fallback behavior and authoritative DNA ownership.\n\n## Summary\n\nHarden the asynchronous preview boundary after the first scheduler/controller slice. Bound stale work, remove double definition capture, carry request-scoped diagnostics, and define ownership and domain-reload behavior for generated Unity preview objects.\n\n## Scope\n\n- Make latest-request-wins bound queued work with one running request and at most one queued request, or an equivalent measured policy.\n- Choose one owner for detached definition capture. The scheduler and preview controller must not both clone the same request.\n- Carry sequence, revision, validation summary, failed stage, and failure classification with the generation result.\n- Distinguish current, superseded, disposed, cancelled, domain, infrastructure, and unexpected completion states with a minimal contract.\n- Make the preview controller the explicit owner of generated Mesh, MeshCollider, GameObject, and child preview objects. Never destroy source assets.\n- Define and test domain-reload policy, accepted-result identity, replacement cleanup, and late-result disposal.\n- Keep CreatureEditorWindow as coordinator and route complete result application through the preview controller.\n\n## Acceptance Criteria\n\n- Repeated preview requests do not create unbounded queued work, and superseded work is not started when it is already known stale.\n- A request captures the definition exactly once and the synchronous Generate path remains a deterministic reference.\n- Failure UI displays diagnostics captured for the failed request, never mutable validation state for a newer definition.\n- Replacing or disposing a preview releases generated Unity objects without destroying source mesh/material assets.\n- Domain reload follows one documented policy and leaves no stale accepted artifact or leaked generated object.\n- Focused scheduler and editor tests cover coalescing, disposal, result identity, diagnostic correlation, replacement, and late completion. Unity SceneView smoke validation covers drag, cancellation, stale blocking, collider replacement, and domain reload.\n\n## Validation\n\nRun runtime/editor builds, focused scheduler tests, and the full available Unity EditMode/PlayMode suites. Perform the required Unity SceneView and domain-reload manual checks. Record queue depth, clone count, completion disposition, and generated-object cleanup evidence.\n\n## Findings\n\nSources S05 and S06, F-12 through F-19 and F-36 through F-38: the scheduler starts every request and only suppresses stale application; PreviewController and scheduler both clone; result failure context is incomplete; generated Unity-object ownership and domain-reload policy are implicit; the controller remains a broad policy hub. TSK-0103 is correctly retained as the completed async foundation, not reopened for its validated parity slice. This follow-up owns the residual boundary work and coordinates with CC-094 and CC-052/061.\n\n## Blockers\n\nUnity execution is required for SceneView lifecycle, domain reload, and Unity-object destruction evidence. Do not mark Done from static inspection alone.\n\n## Next Step\n\nDefine the request/result and ownership contracts, then add the smallest scheduler coalescing and preview cleanup tests before implementation.",
+  "type": "Architecture",
+  "status": "Backlog",
+  "priority": "High",
+  "assigneeMode": "Custom",
+  "assigneeDirectoryId": null,
+  "assigneeCustomText": "Unassigned",
+  "reporter": "BeastMaster",
+  "labels": [
+    "audit-synthesis",
+    "user-mandated",
+    "async",
+    "editor",
+    "preview",
+    "ownership",
+    "consolidation",
+    "cc-008",
+    "cc-052",
+    "cc-061",
+    "cc-094",
+    "follow-up"
+  ],
+  "attachments": [],
+  "externalLinks": [],
+  "linkedPages": [],
+  "comments": [
+    {
+      "id": "c-e54250c172e34368bd2492f281da017c",
+      "author": "anonymous",
+      "body": "Council follow-up 2026-09-03: source traceability is S05/S06, docs/audits/creaturecreator-audit-synthesis-2026-09-03.md, Assets/Scripts/Runtime/Generation/CreatureGenerationScheduler.cs, Assets/Scripts/Editor/CreaturePreviewController.cs, Assets/Scripts/Editor/CreatureEditorWindow.cs, and Assets/Scripts/Editor/CreaturePreviewAcceptanceState.cs. Add the third transient limb-drag clone to capture accounting. Result identity must match current DNA, and SceneView gates must cover each gesture owner, hot-control cleanup, preview root/Mesh disposal, collider replacement, late results, and domain reload. Bounded scheduler work may proceed in parallel; final identity/lifetime closure depends on CC-091 snapshot/revision contract.",
+      "createdAtUtc": "2026-09-03T22:48:20.4852622Z"
+    }
+  ],
+  "epicId": null,
+  "parentId": "tsk-0098-decompose-creatureeditorwindow-responsibilities",
+  "dueDateUtc": null,
+  "createdAtUtc": "2026-09-03T22:37:19.7381337Z",
+  "updatedAtUtc": "2026-09-03T22:48:20.4852622Z",
+  "completedAtUtc": null,
+  "revision": 2,
+  "isArchived": false,
+  "hasLoadError": false,
+  "loadError": null,
+  "sourceFilePath": "tsk-0104-bound-async-preview-work-and-define-generated-unity-object-ownership.json"
+}
