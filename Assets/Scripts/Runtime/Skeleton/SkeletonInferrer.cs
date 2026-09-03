@@ -143,18 +143,18 @@ namespace ProceduralCreature.Skeleton
                 {
                     // A limb emits one bone per consecutive joint pair, plus a
                     // full mirrored chain when flagged.
-                    AppendLimbBones(skeleton, definition, part, resolvedPart, mirrored: false);
+                    AppendLimbBones(skeleton, definition, snapshot, part, resolvedPart, mirrored: false);
                     if (shouldMirror)
                     {
-                        AppendLimbBones(skeleton, definition, part, resolvedPart, mirrored: true);
+                        AppendLimbBones(skeleton, definition, snapshot, part, resolvedPart, mirrored: true);
                     }
                 }
                 else
                 {
-                    skeleton.Bones.Add(BuildBone(definition, part, resolvedPart, mirrored: false));
+                    skeleton.Bones.Add(BuildBone(snapshot, part, resolvedPart, mirrored: false));
                     if (shouldMirror)
                     {
-                        skeleton.Bones.Add(BuildBone(definition, part, resolvedPart, mirrored: true));
+                        skeleton.Bones.Add(BuildBone(snapshot, part, resolvedPart, mirrored: true));
                     }
                 }
             }
@@ -169,7 +169,7 @@ namespace ProceduralCreature.Skeleton
         /// the part origin, and it reflects the part's rotation so the mirrored
         /// bone points the right way.
         /// </summary>
-        private static Bone BuildBone(CreatureDefinition definition, CreaturePart part,
+        private static Bone BuildBone(ResolvedCreatureSnapshot snapshot, CreaturePart part,
             ResolvedPartSnapshot resolvedPart, bool mirrored)
         {
             Matrix4x4 world = resolvedPart.PartFrameToCreatureSpace;
@@ -181,7 +181,7 @@ namespace ProceduralCreature.Skeleton
             return new Bone
             {
                 Id = SemanticBoneResolver.ResolvePartRootBoneId(part, mirrored),
-                ParentBoneId = SemanticBoneResolver.ResolveParentBoneId(definition, part, mirrored),
+                ParentBoneId = SemanticBoneResolver.ResolveParentBoneId(snapshot, resolvedPart, mirrored),
                 SourcePartId = part.Id,
                 PartType = part.PartType,
                 IsMirrored = mirrored,
@@ -209,6 +209,7 @@ namespace ProceduralCreature.Skeleton
         /// guards direct calls.
         /// </summary>
         private static void AppendLimbBones(Skeleton skeleton, CreatureDefinition definition,
+            ResolvedCreatureSnapshot snapshot,
             CreaturePart part, ResolvedPartSnapshot resolvedPart, bool mirrored)
         {
             LimbChain limb = part.Limb;
@@ -242,7 +243,7 @@ namespace ProceduralCreature.Skeleton
                 upHint = Vector3.Scale(upHint, new Vector3(-1f, 1f, 1f));
             }
 
-            string rootParentBoneId = SemanticBoneResolver.ResolveParentBoneId(definition, part, mirrored);
+            string rootParentBoneId = SemanticBoneResolver.ResolveParentBoneId(snapshot, resolvedPart, mirrored);
             string previousBoneId = null;
 
             for (int i = 0; i < resolved.JointPositions.Count - 1; i++)

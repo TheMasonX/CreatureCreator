@@ -112,15 +112,21 @@
       "author": "anonymous",
       "body": "Implementation wave 1, 2026-09-03: GenerationSettings now exposes saturating EstimateSampleCount, counting actual density-grid corner allocations; DefinitionValidator uses it for MaxVoxelBudget and reports grid sample count. Added exact regression coverage for 128 VPU over 2-unit bounds: 16,777,216 cells versus 16,972,609 corner samples, correctly rejected. Focused runtime projects built successfully with --no-restore, zero errors. Unity EditMode bridge jobs started but discovered zero project tests (placeholder CreatureCreator result), so no Unity test pass is claimed.",
       "createdAtUtc": "2026-09-03T23:17:29.3908799Z"
+    },
+    {
+      "id": "c-4f6a8886f95a44c79ee513f0f8960200",
+      "author": "anonymous",
+      "body": "Next-stage implementation, 2026-09-03: Added snapshot-backed SemanticBoneResolver.ResolveParentBoneId and routed normal SkeletonInferrer generation through ResolvedCreatureSnapshot/ResolvedPartSnapshot. ResolvedPartSnapshot now captures BodySurfaceAnchor segment-start identity so anchored Body binding remains equivalent. Added mutation-after-snapshot coverage for parent limb terminal identity. Runtime and test projects build successfully with --no-restore; touched files have no diagnostics; Unity refresh completed with zero console errors/warnings. Unity test bridge still discovers zero project tests, so CC-091 remains open.",
+      "createdAtUtc": "2026-09-03T23:19:34.4547432Z"
     }
   ],
   "epicId": null,
   "parentId": null,
   "dueDateUtc": null,
   "createdAtUtc": "2026-09-01T03:20:52.7496119Z",
-  "updatedAtUtc": "2026-09-03T23:17:29.3908799Z",
+  "updatedAtUtc": "2026-09-03T23:19:34.4547432Z",
   "completedAtUtc": "2026-09-02T03:10:44.2511455Z",
-  "revision": 19,
+  "revision": 20,
   "isArchived": false,
   "hasLoadError": false,
   "loadError": null,

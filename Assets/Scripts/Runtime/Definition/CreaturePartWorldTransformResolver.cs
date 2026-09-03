@@ -65,6 +65,8 @@ namespace ProceduralCreature.Definition
         public readonly Quaternion GeometryOrientation;
         public readonly Vector3 GeometryScale;
         public readonly Matrix4x4 GeometryPlacementToCreatureSpace;
+        public readonly bool HasBodySurfaceAnchor;
+        public readonly uint BodySurfaceAnchorSegmentStartSampleId;
 
         internal ResolvedPartSnapshot(CreaturePart part, ResolvedLimb limb,
             Matrix4x4 partFrameToCreatureSpace, Matrix4x4 childFrameToCreatureSpace)
@@ -87,6 +89,8 @@ namespace ProceduralCreature.Definition
             GeometryScale = part.MeshGeometry?.Attachment?.Scale ?? Vector3.one;
             GeometryPlacementToCreatureSpace = partFrameToCreatureSpace * Matrix4x4.TRS(
                 GeometryOffset, GeometryOrientation, GeometryScale);
+            HasBodySurfaceAnchor = part.ParentAttachment != null;
+            BodySurfaceAnchorSegmentStartSampleId = part.ParentAttachment?.SegmentStartSampleId ?? 0u;
         }
     }
 

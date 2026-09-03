@@ -112,6 +112,35 @@ namespace ProceduralCreature.Skeleton
         }
 
         /// <summary>
+        /// Resolves a parent bone from the immutable generation snapshot. Normal
+        /// generation uses this overload so parent lookup and limb terminal data
+        /// cannot observe later authored mutations.
+        /// </summary>
+        public static string ResolveParentBoneId(
+            ResolvedCreatureSnapshot snapshot, ResolvedPartSnapshot part, bool mirrored)
+        {
+            if (snapshot == null) throw new DomainException("snapshot must not be null.");
+
+            if (part.ParentId == null || part.ParentId == CreatureDefinition.BodyId)
+            {
+                return ResolveBodyParentBoneId(snapshot, part, mirrored);
+            }
+
+            if (snapshot.TryGetPart(part.ParentId, out ResolvedPartSnapshot parent))
+            {
+                bool parentIsAlsoMirrored = parent.MirrorAcrossSymmetryPlane
+                    && snapshot.SymmetryMode != SymmetryMode.None;
+                string parentBoneBaseId = parent.HasLimb
+                    ? ResolveLimbTerminalBoneId(
+                        new CreaturePart { Id = parent.Id }, parent.Limb, mirrored: false)
+                    : parent.Id;
+                return ResolveMirroredBoneId(parentBoneBaseId, mirrored && parentIsAlsoMirrored);
+            }
+
+            return part.ParentId;
+        }
+
+        /// <summary>
         /// The Body socket bone for a Body-rooted part. A direct Body child that
         /// carries a <see cref="BodySurfaceAnchor"/> (ParentAttachment) binds to
         /// the socket of the anchor's segment-start sample — the SAME sample
@@ -169,6 +198,56 @@ namespace ProceduralCreature.Skeleton
             }
 
             return ResolveBodySocketBoneId(resolvedBody.SampleIds[nearestIndex]);
+        }
+
+        private static string ResolveBodyParentBoneId(
+            ResolvedCreatureSnapshot snapshot, ResolvedPartSnapshot part, bool mirrored)
+        {
+            if (!snapshot.HasBody || snapshot.Body.SamplePositions.Count == 0)
+            {
+                return null;
+            }
+
+            if (part.ParentId == CreatureDefinition.BodyId)
+            {
+                string anchorSocket = ResolveAnchorSocketBoneId(snapshot.Body, part);
+                if (anchorSocket != null)
+                {
+                    return anchorSocket;
+                }
+            }
+
+            Vector3 position = part.HasLimb
+                ? part.PartFrameToCreatureSpace.MultiplyPoint3x4(part.Limb.RootSocket)
+                : part.PartFrameToCreatureSpace.GetColumn(3);
+            if (mirrored) position = ReflectAcrossX.MultiplyPoint3x4(position);
+
+            int nearestIndex = 0;
+            float nearestDistance = float.PositiveInfinity;
+            for (int i = 0; i < snapshot.Body.SamplePositions.Count; i++)
+            {
+                float distance = (snapshot.Body.SamplePositions[i] - position).sqrMagnitude;
+                if (distance < nearestDistance)
+                {
+                    nearestDistance = distance;
+                    nearestIndex = i;
+                }
+            }
+
+            return ResolveBodySocketBoneId(snapshot.Body.SampleIds[nearestIndex]);
+        }
+
+        private static string ResolveAnchorSocketBoneId(ResolvedBody body, ResolvedPartSnapshot part)
+        {
+            if (!part.HasBodySurfaceAnchor) return null;
+            for (int i = 0; i < body.SampleIds.Count - 1; i++)
+            {
+                if (body.SampleIds[i] == part.BodySurfaceAnchorSegmentStartSampleId)
+                {
+                    return ResolveBodySocketBoneId(part.BodySurfaceAnchorSegmentStartSampleId);
+                }
+            }
+            return null;
         }
     }
 }

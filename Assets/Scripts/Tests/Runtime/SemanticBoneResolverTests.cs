@@ -154,6 +154,23 @@ namespace ProceduralCreature.Tests.Runtime
         }
 
         [Test]
+        public void SnapshotResolver_UsesCapturedParentLimbAfterAuthoredMutation()
+        {
+            CreatureDefinition definition = BuildDefinition();
+            CreaturePart hand = definition.FindPart("part_hand");
+            ResolvedCreatureSnapshot snapshot = ResolvedCreatureSnapshot.Resolve(definition);
+            Assert.IsTrue(snapshot.TryGetPart(hand.Id, out ResolvedPartSnapshot resolvedHand));
+
+            CreaturePart arm = definition.FindPart("part_arm");
+            arm.Limb.Joints[arm.Limb.Joints.Count - 1].Position = new Vector3(0f, -20f, 0f);
+
+            string parentId = SemanticBoneResolver.ResolveParentBoneId(
+                snapshot, resolvedHand, mirrored: false);
+
+            Assert.AreEqual("part_arm_j1", parentId);
+        }
+
+        [Test]
         public void ResolverMatchesInferredSkeleton_ForMirroredLimb()
         {
             CreatureDefinition definition = BuildDefinition();
