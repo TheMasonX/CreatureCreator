@@ -33,15 +33,21 @@
       "author": "anonymous",
       "body": "Council follow-up 2026-09-03: source traceability is S05/S06, docs/audits/creaturecreator-audit-synthesis-2026-09-03.md, Assets/Scripts/Runtime/Generation/CreatureGenerationScheduler.cs, Assets/Scripts/Editor/CreaturePreviewController.cs, Assets/Scripts/Editor/CreatureEditorWindow.cs, and Assets/Scripts/Editor/CreaturePreviewAcceptanceState.cs. Add the third transient limb-drag clone to capture accounting. Result identity must match current DNA, and SceneView gates must cover each gesture owner, hot-control cleanup, preview root/Mesh disposal, collider replacement, late results, and domain reload. Bounded scheduler work may proceed in parallel; final identity/lifetime closure depends on CC-091 snapshot/revision contract.",
       "createdAtUtc": "2026-09-03T22:48:20.4852622Z"
+    },
+    {
+      "id": "c-668c8b9cd43c430eb4a2b74b744202ea",
+      "author": "anonymous",
+      "body": "Critical implementation review 2026-09-03: no async code was changed in the latest commits. Keep Backlog; result identity, request-scoped diagnostics, bounded queueing, Unity-object cleanup, and domain-reload gates remain future scope under this owner.",
+      "createdAtUtc": "2026-09-03T23:22:11.3675831Z"
     }
   ],
   "epicId": null,
   "parentId": "tsk-0098-decompose-creatureeditorwindow-responsibilities",
   "dueDateUtc": null,
   "createdAtUtc": "2026-09-03T22:37:19.7381337Z",
-  "updatedAtUtc": "2026-09-03T22:48:20.4852622Z",
+  "updatedAtUtc": "2026-09-03T23:22:11.3675831Z",
   "completedAtUtc": null,
-  "revision": 2,
+  "revision": 3,
   "isArchived": false,
   "hasLoadError": false,
   "loadError": null,

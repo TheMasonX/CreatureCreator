@@ -118,15 +118,21 @@
       "author": "anonymous",
       "body": "Next-stage implementation, 2026-09-03: Added snapshot-backed SemanticBoneResolver.ResolveParentBoneId and routed normal SkeletonInferrer generation through ResolvedCreatureSnapshot/ResolvedPartSnapshot. ResolvedPartSnapshot now captures BodySurfaceAnchor segment-start identity so anchored Body binding remains equivalent. Added mutation-after-snapshot coverage for parent limb terminal identity. Runtime and test projects build successfully with --no-restore; touched files have no diagnostics; Unity refresh completed with zero console errors/warnings. Unity test bridge still discovers zero project tests, so CC-091 remains open.",
       "createdAtUtc": "2026-09-03T23:19:34.4547432Z"
+    },
+    {
+      "id": "c-51e141a861144c478a650bdd287ae5e2",
+      "author": "anonymous",
+      "body": "Critical implementation review 2026-09-03: snapshot-backed skeleton parent resolution and anchor capture have no confirmed correctness regression. Residual completeness gates: test mirrored limb parents, absent/invalid parent entries, anchored Body children after authored mutation, and canonicalization-equivalent output parity across revision, geometry, appearance, order, source identity, and transforms. Keep InProgress. Unity bridge discovered zero project tests, so no Unity pass is claimed; imported Source status remains historical provenance.",
+      "createdAtUtc": "2026-09-03T23:22:11.3440703Z"
     }
   ],
   "epicId": null,
   "parentId": null,
   "dueDateUtc": null,
   "createdAtUtc": "2026-09-01T03:20:52.7496119Z",
-  "updatedAtUtc": "2026-09-03T23:19:34.4547432Z",
+  "updatedAtUtc": "2026-09-03T23:22:11.3440703Z",
   "completedAtUtc": "2026-09-02T03:10:44.2511455Z",
-  "revision": 20,
+  "revision": 21,
   "isArchived": false,
   "hasLoadError": false,
   "loadError": null,

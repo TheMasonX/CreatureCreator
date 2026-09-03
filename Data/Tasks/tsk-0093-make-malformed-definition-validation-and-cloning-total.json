@@ -87,15 +87,21 @@
       "author": "anonymous",
       "body": "Implementation wave 1, 2026-09-03: DefinitionValidator now reports a NullPart issue for a null Parts collection and routes all part validation through the tolerant hierarchy index. SkeletonInferrer fallback and PartAppearanceSampler default resolution no longer dereference null Parts. Focused validation: ProceduralCreature.Runtime.csproj and ProceduralCreature.Tests.Runtime.csproj both built with --no-restore successfully, zero errors. Unity test execution remains pending.",
       "createdAtUtc": "2026-09-03T23:16:13.1754356Z"
+    },
+    {
+      "id": "c-20e7b326ef83426982be5e2ef0891523",
+      "author": "anonymous",
+      "body": "Critical implementation review 2026-09-03: commits 0254f99 and 0a1f3ee have no confirmed correctness regression in malformed Parts handling. Residual completeness gates: execute combined Parts=null coverage through DefinitionValidator, SkeletonInferrer, appearance resolution, and documented SDF entry points; retain report-only behavior. Keep InProgress because Unity bridge discovered zero project tests. The description\u0027s imported Source status is historical provenance; live MemorySmith status is InProgress.",
+      "createdAtUtc": "2026-09-03T23:22:11.314407Z"
     }
   ],
   "epicId": null,
   "parentId": null,
   "dueDateUtc": null,
   "createdAtUtc": "2026-09-01T03:20:52.6991944Z",
-  "updatedAtUtc": "2026-09-03T23:16:13.1754356Z",
+  "updatedAtUtc": "2026-09-03T23:22:11.314407Z",
   "completedAtUtc": "2026-09-02T04:58:18.0043074Z",
-  "revision": 17,
+  "revision": 18,
   "isArchived": false,
   "hasLoadError": false,
   "loadError": null,
