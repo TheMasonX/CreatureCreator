@@ -124,15 +124,33 @@
       "author": "anonymous",
       "body": "Critical implementation review 2026-09-03: snapshot-backed skeleton parent resolution and anchor capture have no confirmed correctness regression. Residual completeness gates: test mirrored limb parents, absent/invalid parent entries, anchored Body children after authored mutation, and canonicalization-equivalent output parity across revision, geometry, appearance, order, source identity, and transforms. Keep InProgress. Unity bridge discovered zero project tests, so no Unity pass is claimed; imported Source status remains historical provenance.",
       "createdAtUtc": "2026-09-03T23:22:11.3440703Z"
+    },
+    {
+      "id": "c-6d4299c50eec4689aec95ecc4f49f05b",
+      "author": "anonymous",
+      "body": "Unity gate update 2026-09-03: unfiltered EditMode run passed 112/112, 0 failed, 0 skipped. Focused PlayMode request discovered only placeholder CreatureCreator with 0 project tests; unfiltered PlayMode then failed initialization after 120 seconds before any test started. No PlayMode pass is claimed. Next-agent handoff: docs/tasks/handoffs/2026-09-03-runtime-correctness-and-codebase-health-next-agent.md. Keep InProgress pending snapshot parity and valid full runtime evidence.",
+      "createdAtUtc": "2026-09-03T23:28:18.393654Z"
+    },
+    {
+      "id": "c-a19b9ac4f0194679905fc0e2b771c295",
+      "author": "anonymous",
+      "body": "Critical peer review correction, 2026-09-03 (Unity 6000.5.9f1): an earlier evidence comment recorded \u002216,972,609 corner samples\u0022 for 128 VPU over 2-unit bounds; the correct value is 257^3 = 16,974,593. The wrong constant was committed in DefinitionValidatorTests.Validate_GenerationBudgetIncludesGridCornerSamples (line 435) and is now fixed to 16_974_593. EstimateSampleCount = (cells\u002B1)^3 matches DensityGrid.SamplePortable corner allocation exactly. New runnable EditMode fixture GenerationBudgetEstimateTests pins cells 16,777,216 / corners 16,974,593, the validator rejection at 128 VPU, and the boundary (corner count == MaxVoxelBudget at 127.5 VPU is allowed). EditMode suite 115/115 green in the real editor. PlayMode discovery of ProceduralCreature.Tests.Runtime (440 tests incl. the new snapshot resolver tests) is still broken in this editor, so no PlayMode assertion is claimed. Open semantics question (already flagged): MaxVoxelBudget is a 256^3 cell-sized constant now compared to corner-sample counts, and the editor status bar still reports EstimateVoxelCount while DefinitionValidator gates on EstimateSampleCount; decide the intended budget meaning under CC-091 before closing.",
+      "createdAtUtc": "2026-09-03T23:43:44.3914962Z"
+    },
+    {
+      "id": "c-aea020a227884985b4e1365967ce58af",
+      "author": "anonymous",
+      "body": "PlayMode gate unblocked and full CC-091 evidence, 2026-09-03 (Unity 6000.5.9f1): the MCP run_tests filter required fully-qualified fixture names (namespace.Class); bare class names returned 0 tests (placeholder) and were misread as a discovery failure. With fully-qualified names the FULL ProceduralCreature.Tests.Runtime PlayMode suite passes 443/443 (0 failed, 0 skipped). This validates the corrected EstimateSampleCount constant (257^3 = 16,974,593), the new snapshot-authority tests SnapshotResolver_UsesCapturedParentLimbAfterAuthoredMutation and SnapshotResolver_MirroredChildOfMirroredLimbParent_ResolvesToMirroredTerminalBone, and the missing-parent orphan-skip fallback. EditMode 115/115. Residual CC-091 gates still open: canonicalization-equivalent revision/output parity (compare geometry, appearance, deterministic order, source identity, transforms, revision), the MaxVoxelBudget cells-vs-corner-samples semantics decision (editor status bar reports EstimateVoxelCount while the validator gates on EstimateSampleCount), and confirming ResolvedLimb enforces a \u003E=2-joint invariant that the snapshot parent resolver now relies on. Keep InProgress.",
+      "createdAtUtc": "2026-09-03T23:51:05.6454153Z"
     }
   ],
   "epicId": null,
   "parentId": null,
   "dueDateUtc": null,
   "createdAtUtc": "2026-09-01T03:20:52.7496119Z",
-  "updatedAtUtc": "2026-09-03T23:22:11.3440703Z",
+  "updatedAtUtc": "2026-09-03T23:51:05.6454153Z",
   "completedAtUtc": "2026-09-02T03:10:44.2511455Z",
-  "revision": 21,
+  "revision": 24,
   "isArchived": false,
   "hasLoadError": false,
   "loadError": null,

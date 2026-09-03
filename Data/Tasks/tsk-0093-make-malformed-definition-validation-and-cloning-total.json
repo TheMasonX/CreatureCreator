@@ -93,15 +93,33 @@
       "author": "anonymous",
       "body": "Critical implementation review 2026-09-03: commits 0254f99 and 0a1f3ee have no confirmed correctness regression in malformed Parts handling. Residual completeness gates: execute combined Parts=null coverage through DefinitionValidator, SkeletonInferrer, appearance resolution, and documented SDF entry points; retain report-only behavior. Keep InProgress because Unity bridge discovered zero project tests. The description\u0027s imported Source status is historical provenance; live MemorySmith status is InProgress.",
       "createdAtUtc": "2026-09-03T23:22:11.314407Z"
+    },
+    {
+      "id": "c-38fd605086ad4f478ce0f9a45502a414",
+      "author": "anonymous",
+      "body": "Unity gate update 2026-09-03: unfiltered EditMode run passed 112/112, 0 failed, 0 skipped. Focused PlayMode request discovered only placeholder CreatureCreator with 0 project tests; unfiltered PlayMode then failed initialization after 120 seconds before any test started. No PlayMode pass is claimed. Next-agent handoff: docs/tasks/handoffs/2026-09-03-runtime-correctness-and-codebase-health-next-agent.md. Keep InProgress pending combined malformed-input Unity evidence.",
+      "createdAtUtc": "2026-09-03T23:28:18.3647822Z"
+    },
+    {
+      "id": "c-20e5aa12822245b5b5d65d8584ae83e3",
+      "author": "anonymous",
+      "body": "Critical peer review \u002B CC-089 evidence, 2026-09-03 (Unity 6000.5.9f1): the prior implementation review\u0027s \u0022no confirmed correctness defects\u0022 verdict was too strong. Its newly added PlayMode regression asserted the wrong corner-sample constant (16_972_609 vs correct 257^3 = 16_974_593) in DefinitionValidatorTests.Validate_GenerationBudgetIncludesGridCornerSamples, which cannot pass when PlayMode runs. Fixed the constant. Added a runnable EditMode fixture (GenerationBudgetEstimateTests, 3 tests) that pins the corrected cells/corners math and the validator budget boundary in the real editor. Added CC-089 combined malformed-input test SkeletonInferrerTests.Infer_NullParts_FallsBackToBodyBonesWithoutThrowing (Parts == null reaches snapshot resolve, throws, and inference uses the documented Body-only fallback without leaking the exception). EditMode suite passed 115/115 (was 112). PlayMode discovery remains broken (focused, assembly-scoped, and unfiltered forms all return 0 project tests or fail init), so the new PlayMode tests compile cleanly but are not yet executed. Do not close CC-089 on static evidence. Next gate: repair PlayMode discovery, then run the DefinitionValidator and SkeletonInferrer malformed fixtures.",
+      "createdAtUtc": "2026-09-03T23:43:44.3619267Z"
+    },
+    {
+      "id": "c-23dbcc8b0daf454d990a86ecf22630ca",
+      "author": "anonymous",
+      "body": "PlayMode gate unblocked and full CC-089 evidence, 2026-09-03 (Unity 6000.5.9f1): the prior \u00220 project tests / PlayMode discovery broken\u0022 results were an MCP run_tests filter-format artifact \u2014 bare class names (e.g. DefinitionValidatorTests) match nothing and return the placeholder, while fully-qualified fixture names (namespace.Class, or namespace.Class.Method) discover and run. With fully-qualified names the FULL ProceduralCreature.Tests.Runtime PlayMode suite passes 443/443 (0 failed, 0 skipped, ~3 s). This executes the combined malformed-input coverage the audit required: Parts == null through DefinitionValidator (NullPart, report-only), SkeletonInferrer null-Parts fallback (Infer_NullParts_FallsBackToBodyBonesWithoutThrowing) and missing-parent orphan skip (Infer_MissingParent_SkipsOrphanPartWithoutThrowing), appearance empty-part fallback, and SDF entry-point domain errors. EditMode 115/115. Residual CC-089 items from the 09-03 audit synthesis remain open and are NOT closed here: reserved BodyId rejection, hierarchy read-only aliasing, validator split/context, non-throwing envelope resolution, and authoring-vs-resolved bounds diagnostics. Keep InProgress.",
+      "createdAtUtc": "2026-09-03T23:51:05.6261739Z"
     }
   ],
   "epicId": null,
   "parentId": null,
   "dueDateUtc": null,
   "createdAtUtc": "2026-09-01T03:20:52.6991944Z",
-  "updatedAtUtc": "2026-09-03T23:22:11.314407Z",
+  "updatedAtUtc": "2026-09-03T23:51:05.6261739Z",
   "completedAtUtc": "2026-09-02T04:58:18.0043074Z",
-  "revision": 18,
+  "revision": 21,
   "isArchived": false,
   "hasLoadError": false,
   "loadError": null,

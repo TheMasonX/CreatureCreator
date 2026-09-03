@@ -292,5 +292,47 @@ namespace ProceduralCreature.Tests.Runtime
             Assert.AreNotEqual(SemanticBoneResolver.ResolveBodySocketBoneId(2), parentBoneId,
                 "The anchor's segment-start sample must not drive binding for a null-parent part.");
         }
+
+        [Test]
+        public void SnapshotResolver_MirroredChildOfMirroredLimbParent_ResolvesToMirroredTerminalBone()
+        {
+            // CC-091: the snapshot parent resolver must bind a mirrored child of a
+            // mirrored limb to the mirrored limb's terminal bone, matching the
+            // definition-based resolver and the inferred skeleton.
+            var definition = CreatureDefinition.CreateEmpty();
+            definition.Forward = Vector3.forward;
+            definition.SymmetryMode = SymmetryMode.MirrorAcrossXAxis;
+            definition.Body.Samples.Add(new BodySample { Id = 1, Position = new Vector3(0f, 0f, -1f), Radius = 0.75f });
+            definition.Body.Samples.Add(new BodySample { Id = 2, Position = new Vector3(0f, 0f, 1f), Radius = 0.9f });
+            definition.AddPart(new CreaturePart
+            {
+                Id = "part_leg",
+                ParentId = CreatureDefinition.BodyId,
+                PartType = PartType.Limb,
+                Transform = TransformData.Identity,
+                Shape = ShapeDefinition.DefaultSphere,
+                Appearance = AppearanceDefinition.Default,
+                MirrorAcrossSymmetryPlane = true,
+                Limb = LimbChainWith(Vector3.zero, new Vector3(0f, -1f, 0f), new Vector3(0f, -2f, 0f)),
+            });
+            definition.AddPart(Part("part_foot", "part_leg", TransformData.Identity, mirrored: true));
+
+            ResolvedCreatureSnapshot snapshot = ResolvedCreatureSnapshot.Resolve(definition);
+            Assert.IsTrue(snapshot.TryGetPart("part_foot", out ResolvedPartSnapshot resolvedFoot));
+
+            string parentId = SemanticBoneResolver.ResolveParentBoneId(
+                snapshot, resolvedFoot, mirrored: true);
+
+            Assert.AreEqual(
+                "part_leg" + SemanticBoneResolver.LimbJointBoneSeparator + 1 + SemanticBoneResolver.MirrorSuffix,
+                parentId,
+                "A mirrored child of a mirrored limb binds to the mirrored terminal bone.");
+
+            Skeleton.Skeleton skeleton = SkeletonInferrer.Infer(definition);
+            Assert.IsNotNull(skeleton.FindBone(parentId), "Mirrored parent terminal bone must exist in the inferred skeleton.");
+            Assert.AreEqual(parentId,
+                skeleton.FindBone("part_foot" + SemanticBoneResolver.MirrorSuffix).ParentBoneId,
+                "Inferred skeleton must agree with the snapshot resolver.");
+        }
     }
 }

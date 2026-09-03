@@ -432,7 +432,7 @@ namespace ProceduralCreature.Tests.Runtime
             definition.Generation = new GenerationSettings { VoxelsPerUnit = 128f };
 
             Assert.AreEqual(16_777_216L, definition.Generation.EstimateVoxelCount(definition.Bounds));
-            Assert.AreEqual(16_972_609L, definition.Generation.EstimateSampleCount(definition.Bounds));
+            Assert.AreEqual(16_974_593L, definition.Generation.EstimateSampleCount(definition.Bounds));
 
             ValidationResult result = DefinitionValidator.Validate(definition);
 

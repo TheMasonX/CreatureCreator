@@ -82,15 +82,21 @@
       "author": "anonymous",
       "body": "Council follow-up 2026-09-03: expand editor decomposition gates to enumerate body, radius, limb, and placement hot-control owners; result identity versus current DNA; transient limb-drag clone accounting; preview-root/generated-mesh disposal; and domain-reload rediscovery. These remain CC-094/TSK-0104 scope, not a new task family. Markdown active index and older handoffs are frozen historical status.",
       "createdAtUtc": "2026-09-03T22:48:20.4336349Z"
+    },
+    {
+      "id": "c-b25ab4b0f808466da9b3ccc39ff5db39",
+      "author": "anonymous",
+      "body": "Next-agent handoff update 2026-09-03: runtime review is complete for this round. Continue editor health work only after preserving the Unity test-discovery limitation. Recommended next slice remains one focused extraction from CreatureEditorWindow, with preview ownership and stale-result behavior covered by EditMode/manual Unity evidence. Handoff: docs/tasks/handoffs/2026-09-03-runtime-correctness-and-codebase-health-next-agent.md.",
+      "createdAtUtc": "2026-09-03T23:28:18.4230702Z"
     }
   ],
   "epicId": null,
   "parentId": null,
   "dueDateUtc": null,
   "createdAtUtc": "2026-09-01T03:20:52.8300758Z",
-  "updatedAtUtc": "2026-09-03T22:48:20.4336349Z",
+  "updatedAtUtc": "2026-09-03T23:28:18.4230702Z",
   "completedAtUtc": null,
-  "revision": 12,
+  "revision": 13,
   "isArchived": false,
   "hasLoadError": false,
   "loadError": null,

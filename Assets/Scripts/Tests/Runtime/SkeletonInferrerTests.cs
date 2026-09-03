@@ -206,5 +206,46 @@ namespace ProceduralCreature.Tests.Runtime
         {
             Assert.Throws<DomainException>(() => SkeletonInferrer.Infer(null));
         }
+
+        [Test]
+        public void Infer_NullParts_FallsBackToBodyBonesWithoutThrowing()
+        {
+            // CC-089 combined malformed input: Parts == null reaches snapshot
+            // resolution, which throws, so inference must use its documented
+            // defensive fallback (Body bones only) and must not leak that
+            // morphology exception to the caller.
+            var definition = CreatureDefinition.CreateEmpty();
+            definition.Body.Samples.Add(new BodySample { Id = 1, Position = new Vector3(0f, 0f, 0f), Radius = 1f });
+            definition.Body.Samples.Add(new BodySample { Id = 2, Position = new Vector3(0f, 0f, 1f), Radius = 1f });
+            definition.Parts = null;
+
+            Skeleton.Skeleton skeleton = SkeletonInferrer.Infer(definition);
+
+            Assert.IsNotNull(skeleton);
+            Assert.AreEqual(2, skeleton.Bones.Count);
+            Assert.IsNotNull(skeleton.FindBone("body_j1"));
+            Assert.IsNotNull(skeleton.FindBone("body_j2"));
+            Assert.IsFalse(skeleton.Bones.Any(b => b.SourcePartId != CreatureDefinition.BodyId),
+                "Null Parts must not emit authored part bones.");
+        }
+
+        [Test]
+        public void Infer_MissingParent_SkipsOrphanPartWithoutThrowing()
+        {
+            // CC-091 combined malformed input: a part whose ParentId references a
+            // part that does not exist makes snapshot resolution throw, so
+            // inference must use the fallback and skip the orphan instead of
+            // leaking the morphology exception.
+            var definition = CreatureDefinition.CreateEmpty();
+            definition.AddPart(MakePart("part_root", PartType.Body, Vector3.zero));
+            definition.AddPart(MakePart("part_orphan", PartType.Leg, new Vector3(0f, -1f, 0f), "part_ghost"));
+
+            Skeleton.Skeleton skeleton = SkeletonInferrer.Infer(definition);
+
+            Assert.IsNotNull(skeleton);
+            Assert.IsNotNull(skeleton.FindBone("part_root"));
+            Assert.IsNull(skeleton.FindBone("part_orphan"),
+                "A part with a missing parent must be skipped in the fallback.");
+        }
     }
 }
