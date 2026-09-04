@@ -88,15 +88,21 @@
       "author": "anonymous",
       "body": "Next-agent handoff update 2026-09-03: runtime review is complete for this round. Continue editor health work only after preserving the Unity test-discovery limitation. Recommended next slice remains one focused extraction from CreatureEditorWindow, with preview ownership and stale-result behavior covered by EditMode/manual Unity evidence. Handoff: docs/tasks/handoffs/2026-09-03-runtime-correctness-and-codebase-health-next-agent.md.",
       "createdAtUtc": "2026-09-03T23:28:18.4230702Z"
+    },
+    {
+      "id": "c-579a5e91e0984cd99d9d5e8c2bc8991f",
+      "author": "anonymous",
+      "body": "Critical review update 2026-09-04: no editor extraction was made in this round because the current placement path still couples SceneView event capture, collider/stale-result policy, transient drag state, and the existing MutateDefinition boundary. Extracting it without focused gesture coverage would risk duplicate mutation paths or leaked GUIUtility.hotControl. Keep InProgress. Next bounded slice requires EditMode coverage and real Unity SceneView smoke evidence for release, Escape cancellation, stale blocking, accepted-result identity, collider/generated-object cleanup, and domain-reload rediscovery before moving placement ownership.",
+      "createdAtUtc": "2026-09-04T01:59:19.3724396Z"
     }
   ],
   "epicId": null,
   "parentId": null,
   "dueDateUtc": null,
   "createdAtUtc": "2026-09-01T03:20:52.8300758Z",
-  "updatedAtUtc": "2026-09-03T23:28:18.4230702Z",
+  "updatedAtUtc": "2026-09-04T01:59:19.3724396Z",
   "completedAtUtc": null,
-  "revision": 13,
+  "revision": 14,
   "isArchived": false,
   "hasLoadError": false,
   "loadError": null,
