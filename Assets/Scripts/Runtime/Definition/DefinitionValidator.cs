@@ -419,6 +419,15 @@ namespace ProceduralCreature.Definition
                     continue;
                 }
 
+                if (part.Id == CreatureDefinition.BodyId)
+                {
+                    issues.Add(new ValidationIssue(
+                        ValidationSeverity.Error,
+                        ValidationCode.ReservedPartId,
+                        $"Part Id '{CreatureDefinition.BodyId}' is reserved for the implicit Body.",
+                        part.Id));
+                }
+
             }
 
             foreach (string duplicateId in hierarchy.DuplicateIds)

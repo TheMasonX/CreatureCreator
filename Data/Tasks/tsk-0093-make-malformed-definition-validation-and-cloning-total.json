@@ -111,15 +111,21 @@
       "author": "anonymous",
       "body": "PlayMode gate unblocked and full CC-089 evidence, 2026-09-03 (Unity 6000.5.9f1): the prior \u00220 project tests / PlayMode discovery broken\u0022 results were an MCP run_tests filter-format artifact \u2014 bare class names (e.g. DefinitionValidatorTests) match nothing and return the placeholder, while fully-qualified fixture names (namespace.Class, or namespace.Class.Method) discover and run. With fully-qualified names the FULL ProceduralCreature.Tests.Runtime PlayMode suite passes 443/443 (0 failed, 0 skipped, ~3 s). This executes the combined malformed-input coverage the audit required: Parts == null through DefinitionValidator (NullPart, report-only), SkeletonInferrer null-Parts fallback (Infer_NullParts_FallsBackToBodyBonesWithoutThrowing) and missing-parent orphan skip (Infer_MissingParent_SkipsOrphanPartWithoutThrowing), appearance empty-part fallback, and SDF entry-point domain errors. EditMode 115/115. Residual CC-089 items from the 09-03 audit synthesis remain open and are NOT closed here: reserved BodyId rejection, hierarchy read-only aliasing, validator split/context, non-throwing envelope resolution, and authoring-vs-resolved bounds diagnostics. Keep InProgress.",
       "createdAtUtc": "2026-09-03T23:51:05.6261739Z"
+    },
+    {
+      "id": "c-b5373e5b6289427ba5bad95edf9b9f7d",
+      "author": "anonymous",
+      "body": "Implementation/validation update 2026-09-04: closed the reserved BodyId residual in this slice. Added stable ValidationCode.ReservedPartId; DefinitionValidator reports authored part Id == CreatureDefinition.BodyId without rewriting DNA; DefinitionCanonicalizer rejects the same ambiguous identity with DomainException. Added DefinitionValidatorTests.Validate_RejectsReservedBodyPartId and DefinitionCanonicalizerTests.Canonicalize_RejectsReservedBodyPartIdWithDomainException. Focused validation: dotnet build .\\ProceduralCreature.Tests.Runtime.csproj --no-restore passed with 0 errors/warnings; Unity 6000.5.9f1 PlayMode focused fixtures ProceduralCreature.Tests.Runtime.DefinitionValidatorTests and .DefinitionCanonicalizerTests passed 47/47, 0 failed/skipped. Remaining CC-089 residuals: hierarchy read-only aliasing, validator split/context, non-throwing envelope resolution, and authoring-vs-resolved bounds diagnostics.",
+      "createdAtUtc": "2026-09-04T01:03:44.4017276Z"
     }
   ],
   "epicId": null,
   "parentId": null,
   "dueDateUtc": null,
   "createdAtUtc": "2026-09-01T03:20:52.6991944Z",
-  "updatedAtUtc": "2026-09-03T23:51:05.6261739Z",
+  "updatedAtUtc": "2026-09-04T01:03:44.4017276Z",
   "completedAtUtc": "2026-09-02T04:58:18.0043074Z",
-  "revision": 21,
+  "revision": 22,
   "isArchived": false,
   "hasLoadError": false,
   "loadError": null,

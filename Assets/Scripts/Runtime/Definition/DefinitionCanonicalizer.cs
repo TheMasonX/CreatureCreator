@@ -44,6 +44,11 @@ namespace ProceduralCreature.Definition
             {
                 throw new DomainException($"Cannot canonicalize a definition with duplicate part Id '{hierarchy.DuplicateIds[0]}'.");
             }
+            if (hierarchy.TryResolve(CreatureDefinition.BodyId, out _))
+            {
+                throw new DomainException(
+                    $"Cannot canonicalize a definition with reserved part Id '{CreatureDefinition.BodyId}'.");
+            }
             if (hierarchy.HasParentCycle(out List<string> cyclePartIds))
             {
                 throw new DomainException($"Cannot canonicalize a definition with a parent cycle involving part '{cyclePartIds[0]}'.");

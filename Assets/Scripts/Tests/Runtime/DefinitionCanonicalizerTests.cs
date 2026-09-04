@@ -171,5 +171,14 @@ namespace ProceduralCreature.Tests.Runtime
 
             Assert.Throws<DomainException>(() => DefinitionCanonicalizer.Canonicalize(definition));
         }
+
+        [Test]
+        public void Canonicalize_RejectsReservedBodyPartIdWithDomainException()
+        {
+            CreatureDefinition definition = MakeSinglePartDefinition(TransformData.Identity);
+            definition.Parts[0].Id = CreatureDefinition.BodyId;
+
+            Assert.Throws<DomainException>(() => DefinitionCanonicalizer.Canonicalize(definition));
+        }
     }
 }

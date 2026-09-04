@@ -177,6 +177,18 @@ namespace ProceduralCreature.Tests.Runtime
                 "PartType.Body is reserved for the dedicated BodySpline in v2.");
         }
 
+            [Test]
+            public void Validate_RejectsReservedBodyPartId()
+            {
+                CreatureDefinition definition = ValidDefinitionWithBody();
+                definition.AddPart(ValidPart(CreatureDefinition.BodyId));
+
+                ValidationResult result = DefinitionValidator.Validate(definition);
+
+                Assert.IsTrue(HasCode(result, ValidationCode.ReservedPartId),
+                "The implicit Body Id must not be reused by an authored part.");
+            }
+
         [Test]
         public void Validate_RejectsIndependentRootTail()
         {

@@ -9,6 +9,7 @@ namespace ProceduralCreature.Definition
     {
         NullPart,
         DuplicatePartId,
+        ReservedPartId,
         MissingParent,
         ParentCycle,
         UnsupportedPartType,
