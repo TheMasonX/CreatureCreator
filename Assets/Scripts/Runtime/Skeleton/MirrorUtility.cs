@@ -26,6 +26,16 @@ namespace ProceduralCreature.Skeleton
     {
         private static readonly Matrix4x4 ReflectAcrossX = Matrix4x4.Scale(new Vector3(-1f, 1f, 1f));
 
+        public static Vector3 ReflectPointAcrossX(Vector3 point)
+        {
+            return ReflectAcrossX.MultiplyPoint3x4(point);
+        }
+
+        public static Matrix4x4 ReflectTransformAcrossX(Matrix4x4 localToCreatureSpace)
+        {
+            return ReflectAcrossX * localToCreatureSpace;
+        }
+
         public static Matrix4x4 MirrorAcrossXPlane(Matrix4x4 localToCreatureSpace)
         {
             return ReflectAcrossX * localToCreatureSpace * ReflectAcrossX;

@@ -5,6 +5,7 @@ using ProceduralCreature.Definition;
 using ProceduralCreature.Appearance;
 using ProceduralCreature.Morphology.Extraction;
 using ProceduralCreature.Morphology.Sdf;
+using ProceduralCreature.Skeleton;
 using UnityEngine;
 
 namespace ProceduralCreature.Generation
@@ -30,8 +31,6 @@ namespace ProceduralCreature.Generation
         /// compiler's mirrored limb chains — so mirrored mesh-asset geometry lands
         /// on the same side as the mirrored implicit field.
         /// </summary>
-        private static readonly Matrix4x4 ReflectAcrossX = Matrix4x4.Scale(new Vector3(-1f, 1f, 1f));
-
         public static GeneratedCreature Generate(CreatureDefinition definition, out MeshTopologyReport topologyReport, GenerationDiagnostics diagnostics = null)
         {
             return Generate(definition, out topologyReport, diagnostics, meshResolver: null);
@@ -166,7 +165,8 @@ namespace ProceduralCreature.Generation
 
                 if (resolvedPart.MirrorAcrossSymmetryPlane && data.Snapshot.SymmetryMode != SymmetryMode.None)
                 {
-                    generated.Geometry.Add(BuildMeshAssetItem(resolvedPart, sourceMesh, ReflectAcrossX * placement, mirror: true));
+                    generated.Geometry.Add(BuildMeshAssetItem(resolvedPart, sourceMesh,
+                        MirrorUtility.ReflectTransformAcrossX(placement), mirror: true));
                 }
             }
 

@@ -105,6 +105,47 @@ namespace ProceduralCreature.Tests.Runtime
                 "canonicalization must normalize the attachment orientation");
         }
 
+        [Test]
+        public void Canonicalize_EquivalentScaledAttachmentRotationsMatchTransformCanonicalization()
+        {
+            Quaternion rotation = Quaternion.Euler(23f, 41f, -17f);
+            Quaternion transformCanonical = new TransformData
+            {
+                Position = Vector3.zero,
+                Rotation = rotation,
+                Scale = Vector3.one,
+            }.Quantized().Rotation;
+
+            Quaternion[] scaledRotations = { rotation, ScaleQuaternion(rotation, 2f), ScaleQuaternion(rotation, 0.25f) };
+            foreach (Quaternion scaledRotation in scaledRotations)
+            {
+                CreatureDefinition definition = DefinitionWithMeshEye();
+                definition.FindPart("eye").MeshGeometry.Attachment.Orientation = scaledRotation;
+
+                Quaternion attachmentCanonical = DefinitionCanonicalizer.Canonicalize(definition)
+                    .FindPart("eye").MeshGeometry.Attachment.Orientation;
+
+                Assert.AreEqual(transformCanonical, attachmentCanonical);
+            }
+        }
+
+        [Test]
+        public void Canonicalize_QuantizedZeroAttachmentQuaternionUsesIdentity()
+        {
+            CreatureDefinition definition = DefinitionWithMeshEye();
+            definition.FindPart("eye").MeshGeometry.Attachment.Orientation = new Quaternion(0f, 0f, 0f, 0f);
+
+            Quaternion orientation = DefinitionCanonicalizer.Canonicalize(definition)
+                .FindPart("eye").MeshGeometry.Attachment.Orientation;
+
+            Assert.AreEqual(Quaternion.identity, orientation);
+        }
+
+        private static Quaternion ScaleQuaternion(Quaternion value, float scale)
+        {
+            return new Quaternion(value.x * scale, value.y * scale, value.z * scale, value.w * scale);
+        }
+
         private static void AssertVectorClose(Vector3 expected, Vector3 actual, float tolerance, string message = "")
         {
             Assert.IsTrue(Vector3.Distance(expected, actual) <= tolerance,

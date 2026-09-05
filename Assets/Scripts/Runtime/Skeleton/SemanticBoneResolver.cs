@@ -26,8 +26,6 @@ namespace ProceduralCreature.Skeleton
         /// same point reflection the SDF compiler applies to a mirrored limb
         /// chain.
         /// </summary>
-        public static readonly Matrix4x4 ReflectAcrossX = Matrix4x4.Scale(new Vector3(-1f, 1f, 1f));
-
         /// <summary>Appends the mirror suffix when mirrored; returns the id unchanged otherwise.</summary>
         public static string ResolveMirroredBoneId(string boneId, bool mirrored)
         {
@@ -193,7 +191,7 @@ namespace ProceduralCreature.Skeleton
             Vector3 position = part.Limb != null
                 ? world.MultiplyPoint3x4(ResolvedLimb.Resolve(part.Limb).RootSocket)
                 : world.GetColumn(3);
-            if (mirrored) position = ReflectAcrossX.MultiplyPoint3x4(position);
+            if (mirrored) position = MirrorUtility.ReflectPointAcrossX(position);
 
             int nearestIndex = 0;
             float nearestDistance = float.PositiveInfinity;
@@ -230,7 +228,7 @@ namespace ProceduralCreature.Skeleton
             Vector3 position = part.HasLimb
                 ? part.PartFrameToCreatureSpace.MultiplyPoint3x4(part.Limb.RootSocket)
                 : part.PartFrameToCreatureSpace.GetColumn(3);
-            if (mirrored) position = ReflectAcrossX.MultiplyPoint3x4(position);
+            if (mirrored) position = MirrorUtility.ReflectPointAcrossX(position);
 
             int nearestIndex = 0;
             float nearestDistance = float.PositiveInfinity;

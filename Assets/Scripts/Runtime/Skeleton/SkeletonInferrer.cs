@@ -70,7 +70,6 @@ namespace ProceduralCreature.Skeleton
         /// bone sitting at the part origin, but not for a joint offset from that
         /// origin.) Owned by <see cref="SemanticBoneResolver"/>.
         /// </summary>
-        private static readonly Matrix4x4 ReflectAcrossX = SemanticBoneResolver.ReflectAcrossX;
 
         public static Skeleton Infer(CreatureDefinition definition)
         {
@@ -237,7 +236,7 @@ namespace ProceduralCreature.Skeleton
             Vector3 upHint = partMatrix.rotation * Vector3.up;
             if (mirrored)
             {
-                partMatrix = ReflectAcrossX * partMatrix;
+                partMatrix = MirrorUtility.ReflectTransformAcrossX(partMatrix);
                 upHint = Vector3.Scale(upHint, new Vector3(-1f, 1f, 1f));
             }
 

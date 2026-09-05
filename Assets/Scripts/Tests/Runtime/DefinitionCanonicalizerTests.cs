@@ -87,6 +87,45 @@ namespace ProceduralCreature.Tests.Runtime
         }
 
         [Test]
+        public void Canonicalize_EquivalentScaledRotationsHaveEqualTransformOutput()
+        {
+            Quaternion rotation = Quaternion.Euler(23f, 41f, -17f);
+            Quaternion first = MakeSinglePartDefinition(new TransformData
+            {
+                Position = Vector3.zero,
+                Rotation = rotation,
+                Scale = Vector3.one,
+            }).Parts[0].Transform.Quantized().Rotation;
+            Quaternion doubled = MakeSinglePartDefinition(new TransformData
+            {
+                Position = Vector3.zero,
+                Rotation = ScaleQuaternion(rotation, 2f),
+                Scale = Vector3.one,
+            }).Parts[0].Transform.Quantized().Rotation;
+            Quaternion quartered = MakeSinglePartDefinition(new TransformData
+            {
+                Position = Vector3.zero,
+                Rotation = ScaleQuaternion(rotation, 0.25f),
+                Scale = Vector3.one,
+            }).Parts[0].Transform.Quantized().Rotation;
+
+            Assert.AreEqual(first, doubled);
+            Assert.AreEqual(first, quartered);
+        }
+
+        [Test]
+        public void Canonicalize_QuantizedZeroQuaternionUsesIdentity()
+        {
+            Assert.AreEqual(Quaternion.identity,
+                QuantizeUtil.CanonicalizeQuaternion(new Quaternion(0f, 0f, 0f, 0f)));
+        }
+
+        private static Quaternion ScaleQuaternion(Quaternion value, float scale)
+        {
+            return new Quaternion(value.x * scale, value.y * scale, value.z * scale, value.w * scale);
+        }
+
+        [Test]
         public void Canonicalize_ThrowsOnNaNPosition()
         {
             var transform = new TransformData

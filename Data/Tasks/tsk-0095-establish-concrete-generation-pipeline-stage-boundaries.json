@@ -190,15 +190,21 @@
       "author": "anonymous",
       "body": "2026-09-04 regression disposition. User mandate: \u0022Close the regression now and note this as a non-starter, non-improvement, it\u0027s good enough, be quick and don\u0027t overthink\u0022 (STRICT). The spatial operation bucketing experiment is rejected as a non-starter and non-improvement: preview FieldSampling regressed from the prior ~168\u2013212 ms range to ~378\u2013614 ms, with no accepted production benefit. The experimental path was rolled back; the existing strict Cullable and root potential-envelope correctness logic remains. Final checks: ProceduralCreature.Runtime and ProceduralCreature.Tests.Runtime no-restore builds passed; scoped git diff --check passed; SpatialCandidate/SpatialBucket symbols are absent from the runtime files. No additional hot-path logging was added because supplied stage timings were sufficient and per-voxel runtime logging is prohibited. Keep this optimization deferred/rejected; current generation behavior is good enough.",
       "createdAtUtc": "2026-09-05T02:07:01.0455544Z"
+    },
+    {
+      "id": "c-36df911473a2403aa69475b4226819b7",
+      "author": "anonymous",
+      "body": "## Audit synthesis 2026-09-05 (latest-main-audit-26-09-05-01-40-00.md) \u2014 pipeline-stage evidence (F-08/F-09)\n\nF-08 \u2014 the SDF compiler still carries compatibility overloads and both raw/resolved blend-radius helpers after the A3 primitive-emission consolidation. Target invariant: CreatureDefinition -\u003E Resolve -\u003E resolved implementation, with no raw-definition traversal inside the resolved runtime pipeline except in explicitly named compatibility adapters (important for async generation on detached data). Keep resolved correspondence exclusively downstream.\n\nF-09 \u2014 \u0060CreatureMeshGenerator\u0060 and \u0060AppearanceBaker\u0060 remain transitional orchestration modules (validation, resolution, SDF compile, sampling, extraction, appearance compile/bake, mesh-asset generation, Unity assembly). Decompose into concrete stages (ValidateAndResolve / GenerateImplicitField / ExtractMesh / BakeAppearance / GenerateMeshAssetItems / Assemble) with a thin public coordinator. No generic pipeline framework or DI graph.\n\nBoth map to CC-091 (generation pipeline stage boundaries). Keep this task as owner.",
+      "createdAtUtc": "2026-09-05T06:51:03.9934988Z"
     }
   ],
   "epicId": null,
   "parentId": null,
   "dueDateUtc": null,
   "createdAtUtc": "2026-09-01T03:20:52.7496119Z",
-  "updatedAtUtc": "2026-09-05T02:07:01.0455544Z",
+  "updatedAtUtc": "2026-09-05T06:51:03.9934988Z",
   "completedAtUtc": "2026-09-02T03:10:44.2511455Z",
-  "revision": 32,
+  "revision": 33,
   "isArchived": false,
   "hasLoadError": false,
   "loadError": null,

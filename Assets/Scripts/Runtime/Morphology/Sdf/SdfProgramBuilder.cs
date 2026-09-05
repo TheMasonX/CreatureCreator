@@ -5,6 +5,7 @@ using Unity.Mathematics;
 using UnityEngine;
 using ProceduralCreature.Common;
 using ProceduralCreature.Definition;
+using ProceduralCreature.Skeleton;
 
 namespace ProceduralCreature.Morphology.Sdf
 {
@@ -54,8 +55,6 @@ namespace ProceduralCreature.Morphology.Sdf
         /// matrix (the mirror of a composed transform), so the mirrored side lands
         /// across the creature's X plane regardless of where the part is placed.
         /// </summary>
-        private static readonly Matrix4x4 CreatureMirrorAcrossX = Matrix4x4.Scale(new Vector3(-1f, 1f, 1f));
-
         /// <summary>
         /// World-space axis-aligned bounding box used for evaluator culling (CC-062).
         /// </summary>
@@ -644,7 +643,7 @@ namespace ProceduralCreature.Morphology.Sdf
         /// The mirror is a CREATURE-SPACE reflection of the composed transform,
         /// not a per-ball local-X negation: the mirrored ball position must be
         /// <c>S · (localToCreature · localPos)</c>, i.e. the part matrix
-        /// LEFT-multiplied by <see cref="CreatureMirrorAcrossX"/> applied to the
+        /// LEFT-multiplied by <see cref="MirrorUtility.ReflectTransformAcrossX"/> applied to the
         /// ORIGINAL joint position. Negating the joint's local X and reusing the
         /// unmirrored part matrix is wrong whenever the part is placed away from
         /// the creature X plane (the normal limb case — a leg authored at
@@ -664,7 +663,7 @@ namespace ProceduralCreature.Morphology.Sdf
             // Each mirrored ball keeps its ORIGINAL local position and is placed by
             // this mirrored matrix, so its world position equals S · (original world
             // position) — the same result as reflecting the composite field.
-            Matrix4x4 mirroredPartMatrix = CreatureMirrorAcrossX * localToCreature;
+            Matrix4x4 mirroredPartMatrix = MirrorUtility.ReflectTransformAcrossX(localToCreature);
 
             for (int i = 0; i < metaballs.Count; i++)
             {

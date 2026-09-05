@@ -71,23 +71,7 @@ namespace ProceduralCreature.Definition
 
         private static Quaternion NormalizeAndQuantizeRotation(Quaternion q)
         {
-            Quaternion normalized = q.normalized;
-            Quaternion quantized = new Quaternion(
-                GenerationTolerances.Quantize(normalized.x),
-                GenerationTolerances.Quantize(normalized.y),
-                GenerationTolerances.Quantize(normalized.z),
-                GenerationTolerances.Quantize(normalized.w));
-
-            float quantizedMagnitudeSquared = quantized.x * quantized.x
-                + quantized.y * quantized.y
-                + quantized.z * quantized.z
-                + quantized.w * quantized.w;
-            if (quantizedMagnitudeSquared <= 1e-12f)
-            {
-                return Quaternion.identity;
-            }
-
-            return quantized.normalized;
+            return QuantizeUtil.CanonicalizeQuaternion(q);
         }
 
         public readonly bool Equals(TransformData other)

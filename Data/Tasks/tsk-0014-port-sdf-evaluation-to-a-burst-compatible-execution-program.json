@@ -53,15 +53,21 @@
       "author": "anonymous",
       "body": "The post-PR1 handoff was reconciled against the current baseline. Keep this task as the SDF execution owner while TSK-0008 owns the measured preview-performance wave. The current compiler/sampler already preserves exact/reference evaluation and has a separate potential-influence envelope distinct from \u0060Cullable\u0060; do not duplicate that ownership or weaken ellipsoid handling.",
       "createdAtUtc": "2026-09-05T02:36:43.7274109Z"
+    },
+    {
+      "id": "c-05d750d4a9e64f77b359c7841f712edf",
+      "author": "anonymous",
+      "body": "## Audit synthesis 2026-09-05 (deep-dive-audit-2026-09-05.md) \u2014 B2c/B2d evidence\n\nF1/B2c \u2014 \u0060SdfOperation.ConsumerUnionIndex\u0060 confirmed dead (write-only). Verified at HEAD 2a89605: declaration SdfProgram.cs:33, init -1 at :51, reset/assign SdfProgramBuilder.cs:149/:157, 5 write call sites :445/:500/:597/:693/:732; sole read is the parity assertion SdfProgramBuilderTests.cs:100 (not a functional consumer). Remove the field, \u0060SetConsumer\u0060, its 5 call sites, and the parity assertion. Pure deletion; no behavior change.\n\nF2/B2d \u2014 both anonymous influence-radius epsilon sites located: SdfProgramBuilder.cs:183 \u0060return maxBlend \u002B 1e-4f;\u0060 and :274 \u0060float childInfluence = operation.Parameters.x \u002B 1e-4f;\u0060. Same literal \u00601e-4f\u0060; decide whether one shared semantic constant or two independent choices before naming. Do not change the value casually.\n\nThese are in-scope for CC-014 (SDF owner); deep-dive also cites CC-090. Keep this task as owner.",
+      "createdAtUtc": "2026-09-05T06:51:03.9329101Z"
     }
   ],
   "epicId": null,
   "parentId": null,
   "dueDateUtc": null,
   "createdAtUtc": "2026-09-01T03:16:57.7252448Z",
-  "updatedAtUtc": "2026-09-05T02:36:43.7274109Z",
+  "updatedAtUtc": "2026-09-05T06:51:03.9329101Z",
   "completedAtUtc": null,
-  "revision": 6,
+  "revision": 7,
   "isArchived": false,
   "hasLoadError": false,
   "loadError": null,

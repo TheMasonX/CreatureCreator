@@ -246,16 +246,7 @@ namespace ProceduralCreature.Definition
                 GenerationTolerances.Quantize(attachment.Scale.x),
                 GenerationTolerances.Quantize(attachment.Scale.y),
                 GenerationTolerances.Quantize(attachment.Scale.z));
-            attachment.Orientation = NormalizeAndQuantizeQuaternion(attachment.Orientation);
-        }
-
-        private static Quaternion NormalizeAndQuantizeQuaternion(Quaternion q)
-        {
-            return new Quaternion(
-                GenerationTolerances.Quantize(q.x),
-                GenerationTolerances.Quantize(q.y),
-                GenerationTolerances.Quantize(q.z),
-                GenerationTolerances.Quantize(q.w)).normalized;
+            attachment.Orientation = QuantizeUtil.CanonicalizeQuaternion(attachment.Orientation);
         }
 
         private static void AppendChildren(string parentId,

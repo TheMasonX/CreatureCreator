@@ -8,6 +8,25 @@ namespace ProceduralCreature.Tests.Runtime
     public class MirrorUtilityTests
     {
         [Test]
+        public void ReflectPointAcrossX_NegatesOnlyX()
+        {
+            Assert.AreEqual(new Vector3(-2f, 3f, -4f),
+                MirrorUtility.ReflectPointAcrossX(new Vector3(2f, 3f, -4f)));
+        }
+
+        [Test]
+        public void ReflectTransformAcrossX_ReflectsCreatureSpacePlacement()
+        {
+            Matrix4x4 placement = Matrix4x4.TRS(
+                new Vector3(2f, 3f, -1f), Quaternion.identity, Vector3.one);
+
+            Matrix4x4 mirrored = MirrorUtility.ReflectTransformAcrossX(placement);
+
+            Assert.AreEqual(new Vector3(-2f, 3f, -1f),
+                mirrored.MultiplyPoint3x4(Vector3.zero));
+        }
+
+        [Test]
         public void MirrorAcrossXPlane_IsAnInvolution()
         {
             Matrix4x4 original = Matrix4x4.TRS(
