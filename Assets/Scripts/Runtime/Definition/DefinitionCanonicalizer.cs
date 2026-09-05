@@ -124,11 +124,7 @@ namespace ProceduralCreature.Definition
 
         private static void CanonicalizeShape(ref ShapeDefinition shape)
         {
-            float legacySize = shape.PrimarySize;
-            if (shape.Radius <= 0f) shape.Radius = legacySize;
-            if (shape.CapsuleHeight <= 0f) shape.CapsuleHeight = 1f;
-            if (shape.EllipsoidRadii.x <= 0f) shape.EllipsoidRadii = new Vector3(legacySize, legacySize, legacySize);
-            if (shape.BoxHalfExtents.x <= 0f) shape.BoxHalfExtents = new Vector3(legacySize, legacySize, legacySize);
+            shape = shape.WithLegacyDefaults();
             if (shape.CapsuleAxis < ShapeAxis.X || shape.CapsuleAxis > ShapeAxis.Z) shape.CapsuleAxis = ShapeAxis.Y;
         }
 

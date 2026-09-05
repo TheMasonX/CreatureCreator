@@ -40,6 +40,25 @@ namespace ProceduralCreature.Definition
             SmoothBlendRadius = 0.1f,
         };
 
+        /// <summary>
+        /// Applies the v1 fallback semantics shared by deserialization,
+        /// canonicalization, resolved snapshots, and editor presentation.
+        /// PrimarySize is legacy-only; absent legacy size means 0.5 and capsule
+        /// height remains the independent v1 default of 1.
+        /// </summary>
+        public readonly ShapeDefinition WithLegacyDefaults()
+        {
+            float legacySize = PrimarySize > 0f ? PrimarySize : 0.5f;
+            ShapeDefinition result = this;
+            if (result.Radius <= 0f) result.Radius = legacySize;
+            if (result.CapsuleHeight <= 0f) result.CapsuleHeight = 1f;
+            if (result.EllipsoidRadii.x <= 0f)
+                result.EllipsoidRadii = new UnityEngine.Vector3(legacySize, legacySize, legacySize);
+            if (result.BoxHalfExtents.x <= 0f)
+                result.BoxHalfExtents = new UnityEngine.Vector3(legacySize, legacySize, legacySize);
+            return result;
+        }
+
         public readonly bool IsFinite()
         {
             return NumericValidity.IsFinite(PrimarySize)

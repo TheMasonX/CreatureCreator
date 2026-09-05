@@ -120,6 +120,34 @@ namespace ProceduralCreature.Tests.Runtime
                 QuantizeUtil.CanonicalizeQuaternion(new Quaternion(0f, 0f, 0f, 0f)));
         }
 
+        [Test]
+        public void Shape_LegacyDefaults_AreSharedAcrossCanonicalAndResolvedData()
+        {
+            ShapeDefinition legacy = new ShapeDefinition
+            {
+                Type = ShapeType.Capsule,
+                PrimarySize = 0f,
+                Radius = 0f,
+                CapsuleHeight = 0f,
+                EllipsoidRadii = Vector3.zero,
+                BoxHalfExtents = Vector3.zero,
+            };
+
+            ShapeDefinition defaults = legacy.WithLegacyDefaults();
+            CreatureDefinition definition = MakeSinglePartDefinition(TransformData.Identity);
+            definition.Parts[0].Shape = legacy;
+            ShapeDefinition canonical = DefinitionCanonicalizer.Canonicalize(definition).Parts[0].Shape;
+            ResolvedShape resolved = ResolvedShape.Resolve(legacy);
+
+            Assert.AreEqual(0.5f, defaults.Radius);
+            Assert.AreEqual(1f, defaults.CapsuleHeight);
+            Assert.AreEqual(new Vector3(0.5f, 0.5f, 0.5f), defaults.EllipsoidRadii);
+            Assert.AreEqual(defaults.Radius, canonical.Radius);
+            Assert.AreEqual(defaults.CapsuleHeight, resolved.CapsuleHeight);
+            Assert.AreEqual(defaults.EllipsoidRadii, resolved.EllipsoidRadii);
+            Assert.AreEqual(defaults.BoxHalfExtents, resolved.BoxHalfExtents);
+        }
+
         private static Quaternion ScaleQuaternion(Quaternion value, float scale)
         {
             return new Quaternion(value.x * scale, value.y * scale, value.z * scale, value.w * scale);

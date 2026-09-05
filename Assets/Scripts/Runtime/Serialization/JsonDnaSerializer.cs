@@ -442,17 +442,18 @@ namespace ProceduralCreature.Serialization
             float legacySize = obj.ContainsKey("primarySize")
                 ? (float)RequireNumber(obj, "primarySize")
                 : 0.5f;
-            return new ShapeDefinition
+            ShapeDefinition shape = new ShapeDefinition
             {
                 Type = RequireEnum<ShapeType>(obj, "type"),
                 PrimarySize = legacySize,
-                Radius = ReadOptionalNumber(obj, "radius", legacySize),
+                Radius = ReadOptionalNumber(obj, "radius", 0f),
                 CapsuleAxis = ReadOptionalEnum(obj, "capsuleAxis", ShapeAxis.Y),
-                CapsuleHeight = ReadOptionalNumber(obj, "capsuleHeight", 1f),
-                EllipsoidRadii = ReadOptionalVector3(obj, "ellipsoidRadii", new UnityEngine.Vector3(legacySize, legacySize, legacySize)),
-                BoxHalfExtents = ReadOptionalVector3(obj, "boxHalfExtents", new UnityEngine.Vector3(legacySize, legacySize, legacySize)),
+                CapsuleHeight = ReadOptionalNumber(obj, "capsuleHeight", 0f),
+                EllipsoidRadii = ReadOptionalVector3(obj, "ellipsoidRadii", UnityEngine.Vector3.zero),
+                BoxHalfExtents = ReadOptionalVector3(obj, "boxHalfExtents", UnityEngine.Vector3.zero),
                 SmoothBlendRadius = (float)RequireNumber(obj, "smoothBlendRadius"),
             };
+            return shape.WithLegacyDefaults();
         }
 
         private static AppearanceDefinition ReadAppearance(Dictionary<string, object> obj)

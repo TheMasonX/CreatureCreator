@@ -21,17 +21,13 @@ namespace ProceduralCreature.Definition
 
         private ResolvedShape(ShapeDefinition shape)
         {
-            float legacySize = shape.PrimarySize;
+            shape = shape.WithLegacyDefaults();
             Type = shape.Type;
-            Radius = shape.Radius > 0f ? shape.Radius : legacySize;
+            Radius = shape.Radius;
             CapsuleAxis = shape.CapsuleAxis;
-            CapsuleHeight = shape.CapsuleHeight > 0f ? shape.CapsuleHeight : 1f;
-            EllipsoidRadii = shape.EllipsoidRadii.x > 0f
-                ? shape.EllipsoidRadii
-                : new Vector3(legacySize, legacySize, legacySize);
-            BoxHalfExtents = shape.BoxHalfExtents.x > 0f
-                ? shape.BoxHalfExtents
-                : new Vector3(legacySize, legacySize, legacySize);
+            CapsuleHeight = shape.CapsuleHeight;
+            EllipsoidRadii = shape.EllipsoidRadii;
+            BoxHalfExtents = shape.BoxHalfExtents;
             SmoothBlendRadius = shape.SmoothBlendRadius;
         }
 

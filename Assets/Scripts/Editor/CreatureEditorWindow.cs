@@ -1391,15 +1391,7 @@ namespace ProceduralCreature.Editor
             EditorGUI.BeginChangeCheck();
             newShape.Type = (ShapeType)EditorGUILayout.EnumPopup("Shape Type", current.Type);
 
-            float legacySize = current.PrimarySize > 0f ? current.PrimarySize : 0.5f;
-            newShape.Radius = current.Radius > 0f ? current.Radius : legacySize;
-            newShape.CapsuleHeight = current.CapsuleHeight > 0f ? current.CapsuleHeight : 1f;
-            newShape.EllipsoidRadii = current.EllipsoidRadii.x > 0f
-                ? current.EllipsoidRadii
-                : new Vector3(legacySize, legacySize, legacySize);
-            newShape.BoxHalfExtents = current.BoxHalfExtents.x > 0f
-                ? current.BoxHalfExtents
-                : new Vector3(legacySize, legacySize, legacySize);
+            newShape = newShape.WithLegacyDefaults();
 
             switch (newShape.Type)
             {
