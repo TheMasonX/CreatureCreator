@@ -1,0 +1,41 @@
+﻿{
+  "id": "tsk-0107-add-engineering-guardrails",
+  "key": "TSK-0107",
+  "title": "Add engineering guardrails to BeastMaster skills",
+  "description": "## Summary\nAdd firm maintainability and production-readiness guardrails to CreatureCreator agent workflows.\n\n## User Mandate\n\u003E \u0060\u003E-\u0060 needs to be \u0060|\u0060 in the skills, which I fixed in the agent file already (it wasn\u0027t being discovered). I want firm code guidelines involved too like in some of the others. There are agent tasks in one of the repos (ICW I think) about recurring problems like code duplication and reinvention, unclear/unconsolidated ownership, overwrought pre-engineering, etc. I want this repo to be more slimmed down as well, since these are classic pitfalls of agentic development. I had an external agent provide this guidance on common agentic software development pitfalls in order to ensure our repo\u0027s agents are fully capable of avoiding them\n\nSTRICT. Use literal-block descriptions in skills. Add firm guidance against duplication, type evasion, comprehension debt, premature architecture, unclear ownership, and incomplete production behavior. Keep the base agent slim through graduated discovery.",
+  "type": "Task",
+  "status": "Done",
+  "priority": "Medium",
+  "assigneeMode": "Custom",
+  "assigneeDirectoryId": null,
+  "assigneeCustomText": "BeastMaster",
+  "reporter": "anonymous",
+  "labels": [
+    "user-mandated",
+    "agent-customization",
+    "code-quality",
+    "BeastMaster"
+  ],
+  "attachments": [],
+  "externalLinks": [],
+  "linkedPages": [],
+  "comments": [
+    {
+      "id": "c-94c43f2454ca4bf5ba40ba003e185ac0",
+      "author": "anonymous",
+      "body": "Implemented the requested guardrails inside CreatureCreator only. Added \u0060.github/skills/engineering-guardrails/SKILL.md\u0060 with firm rules for type integrity, no blind casts or null-forgiving shortcuts, single-source ownership, duplication and tracker deduplication, intent-before-implementation, bounded scope, and production-readiness checks for invalid input, cancellation, retry, disposal, determinism, stale results, and meaningful observability. Updated \u0060creature-workflow\u0060 to use \u0060description: |\u0060 and load the guardrails for code, refactor, and architecture work. Updated BeastMaster graduated discovery to include the skill. Focused validation passed after removing one trailing whitespace defect: all frontmatter is valid, all relative links resolve, no \u0060\u003E-\u0060 remains, and \u0060git diff --check\u0060 passes. ICW evidence used: canonical task ownership and deduplication in \u0060docs/tasks/active-tasks.md\u0060, explicit speculative-recommendation limits in the ICW council skill, and idempotent cleanup/ownership guidance in ICW handoffs.",
+      "createdAtUtc": "2026-09-05T01:58:11.0719796Z"
+    }
+  ],
+  "epicId": null,
+  "parentId": null,
+  "dueDateUtc": null,
+  "createdAtUtc": "2026-09-05T01:57:26.9008169Z",
+  "updatedAtUtc": "2026-09-05T01:58:12.4958611Z",
+  "completedAtUtc": "2026-09-05T01:58:12.4958611Z",
+  "revision": 3,
+  "isArchived": false,
+  "hasLoadError": false,
+  "loadError": null,
+  "sourceFilePath": "tsk-0107-add-engineering-guardrails.json"
+}

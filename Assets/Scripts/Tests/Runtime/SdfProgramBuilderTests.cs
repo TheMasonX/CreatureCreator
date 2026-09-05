@@ -4,6 +4,7 @@ using Unity.Mathematics;
 using UnityEngine;
 using ProceduralCreature.Common;
 using ProceduralCreature.Definition;
+using ProceduralCreature.Morphology.Extraction;
 using ProceduralCreature.Morphology.Sdf;
 
 namespace ProceduralCreature.Tests.Runtime
@@ -141,6 +142,149 @@ namespace ProceduralCreature.Tests.Runtime
             finally
             {
                 operations.Dispose();
+            }
+        }
+
+        [Test]
+        public void CompilePortable_EllipsoidOutsideAabbStillMatchesReference()
+        {
+            CreatureDefinition definition = CreatureDefinition.CreateEmpty();
+            definition.AddPart(new CreaturePart
+            {
+                Id = "ellipsoid",
+                Transform = TransformData.Identity,
+                Shape = new ShapeDefinition
+                {
+                    Type = ShapeType.Ellipsoid,
+                    PrimarySize = 1f,
+                    EllipsoidRadii = new Vector3(10f, 1f, 1f),
+                    SmoothBlendRadius = 0f,
+                },
+                Appearance = AppearanceDefinition.Default,
+            });
+
+            using (SdfProgram program = SdfProgramBuilder.CompilePortable(definition))
+            {
+                Vector3 point = new Vector3(15f, 5f, 0f);
+                float reference = SdfProgramEvaluator.EvaluateReference(
+                    program, new float3(point.x, point.y, point.z));
+                float fast = Evaluate(program, point);
+
+                Assert.IsTrue(!float.IsNaN(reference) && !float.IsInfinity(reference),
+                    "The approximate ellipsoid SDF must be finite at the regression point.");
+                Assert.AreEqual(reference, fast, 1e-5f,
+                    "An ellipsoid's AABB is not a safe culling proof; fast evaluation must not return +inf here.");
+            }
+        }
+
+        [Test]
+        public void SamplePortable_EllipsoidRoot_RegionShortcutNeverEarlyExits()
+        {
+            CreatureDefinition definition = CreatureDefinition.CreateEmpty();
+            definition.Bounds = new BoundsDefinition { MaxX = 4f, MaxY = 4f, MaxZ = 4f };
+            definition.Generation = new GenerationSettings { VoxelsPerUnit = 1f };
+            definition.AddPart(new CreaturePart
+            {
+                Id = "ellipsoid",
+                Transform = TransformData.Identity,
+                Shape = new ShapeDefinition
+                {
+                    Type = ShapeType.Ellipsoid,
+                    PrimarySize = 1f,
+                    EllipsoidRadii = new Vector3(10f, 1f, 1f),
+                    SmoothBlendRadius = 0f,
+                },
+                Appearance = AppearanceDefinition.Default,
+            });
+
+            using (SdfProgram program = SdfProgramBuilder.CompilePortable(definition))
+            using (DensityGrid grid = DensityGrid.SamplePortable(program, definition.Bounds, definition.Generation))
+            {
+                // The ellipsoid's world AABB is (10,1,1); many sampled corners (for
+                // example (0,3,0)) lie outside that AABB yet carry a finite
+                // approximate SDF. If the root-region shortcut used the AABB alone,
+                // ignoring Cullable, it would pre-fill +inf at those corners and open
+                // a hole. The shortcut must be disabled for a non-Cullable root, so
+                // no sample may be +inf where the reference field is finite.
+                for (int z = 0; z <= grid.CellsZ; z++)
+                for (int y = 0; y <= grid.CellsY; y++)
+                for (int x = 0; x <= grid.CellsX; x++)
+                {
+                    float sample = grid.GetSample(x, y, z);
+                    Vector3 point = grid.CornerPosition(x, y, z);
+                    float reference = SdfProgramEvaluator.EvaluateReference(
+                        program, new float3(point.x, point.y, point.z));
+                    Assert.IsFalse(float.IsInfinity(sample) && !float.IsInfinity(reference),
+                        $"Ellipsoid-root region shortcut early-exited corner ({x},{y},{z}).");
+                }
+            }
+        }
+
+        [Test]
+        public void CompilePortable_CompositeEllipsoid_ProvidesPotentialInfluenceEnvelope()
+        {
+            CreatureDefinition definition = CreatureDefinition.CreateEmpty();
+            definition.AddPart(new CreaturePart
+            {
+                Id = "ellipsoid",
+                Transform = TransformData.Identity,
+                Shape = new ShapeDefinition
+                {
+                    Type = ShapeType.Ellipsoid,
+                    EllipsoidRadii = new Vector3(2f, 1f, 1f),
+                    SmoothBlendRadius = 0.25f,
+                },
+                Appearance = AppearanceDefinition.Default,
+            });
+            definition.AddPart(new CreaturePart
+            {
+                Id = "sphere",
+                Transform = new TransformData { Position = new Vector3(2.5f, 0f, 0f) },
+                Shape = new ShapeDefinition
+                {
+                    Type = ShapeType.Sphere,
+                    Radius = 0.5f,
+                    SmoothBlendRadius = 0.25f,
+                },
+                Appearance = AppearanceDefinition.Default,
+            });
+
+            using (SdfProgram program = SdfProgramBuilder.CompilePortable(definition))
+            {
+                Assert.IsTrue(program.HasPotentialBounds,
+                    "A composite root must expose a conservative potential-influence envelope.");
+
+                float3 outsideOrdinaryEllipsoidAabb = new float3(0f, 1.2f, 0f);
+                float reference = SdfProgramEvaluator.EvaluateReference(program, outsideOrdinaryEllipsoidAabb);
+                Assert.IsTrue(!float.IsNaN(reference) && !float.IsInfinity(reference));
+                Assert.That(outsideOrdinaryEllipsoidAabb.y, Is.GreaterThan(1f));
+                Assert.That(outsideOrdinaryEllipsoidAabb.y, Is.LessThan(program.PotentialMaxBound.y));
+                float fast = SdfProgramEvaluator.Evaluate(program, outsideOrdinaryEllipsoidAabb);
+                Assert.IsTrue(!float.IsNaN(fast) && !float.IsInfinity(fast),
+                    "The exact ellipsoid field must remain evaluable inside the potential envelope.");
+            }
+        }
+
+        [Test]
+        public void DensityGrid_EstimateGradient_UsesOneSidedFiniteDifferenceAtCullBoundary()
+        {
+            using (SdfProgram program = SdfProgramBuilder.CompilePortable(Sphere("sphere", Vector3.zero)))
+            using (DensityGrid grid = DensityGrid.SamplePortable(
+                program,
+                new BoundsDefinition { MaxX = 2f, MaxY = 2f, MaxZ = 2f },
+                new GenerationSettings { VoxelsPerUnit = 2f }))
+            {
+                // DefaultSphere has Radius 0.5, so the finite surface is at x = 0.5.
+                // The neighboring corner at world x = 1.0 lies outside the sphere's
+                // inflated cull AABB and reads +inf. Sampling at the surface therefore
+                // exercises the one-sided finite difference (finite center, +inf next).
+                Vector3 gradient = grid.EstimateGradient(new Vector3(0.5f, 0f, 0f));
+
+                Assert.IsTrue(!float.IsNaN(gradient.x) && !float.IsInfinity(gradient.x));
+                Assert.IsTrue(!float.IsNaN(gradient.y) && !float.IsInfinity(gradient.y));
+                Assert.IsTrue(!float.IsNaN(gradient.z) && !float.IsInfinity(gradient.z));
+                Assert.Greater(gradient.x, 0.5f,
+                    "The finite one-sided derivative at the sphere surface must preserve the outward direction.");
             }
         }
 

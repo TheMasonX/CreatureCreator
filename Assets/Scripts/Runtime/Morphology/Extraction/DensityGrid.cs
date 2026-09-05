@@ -10,30 +10,18 @@ using ProceduralCreature.Morphology.Sdf;
 namespace ProceduralCreature.Morphology.Extraction
 {
     /// <summary>
-    /// A fixed-resolution 3D grid of SDF samples covering a creature's bounds.
-    /// Corner-count-per-axis follows the exact same ceiling formula
-    /// GenerationSettings.EstimateVoxelCount uses for its safety-budget estimate
-    /// (Sprint 3.1), so the estimate a definition was validated against matches
-    /// what actually gets allocated here — callers must have already run that
-    /// budget check via DefinitionValidator before calling SamplePortable.
+    /// A fixed-resolution 3D grid of SDF corner samples covering a creature's
+    /// bounds. Corner-count per axis follows the same ceiling formula as
+    /// <c>GenerationSettings.EstimateVoxelCount</c>; callers must have run the
+    /// corner-sample budget check before calling <see cref="SamplePortable"/>.
     ///
-    /// CC-064 non-finite contract: in Fast culling mode samples may read `+inf`
-    /// ("outside/culled"), never NaN. Consumers that scan the grid (min/max,
-    /// interpolation, normalization) must treat `+inf` as absent rather than a
-    /// giant finite distance.
+    /// CC-064 non-finite contract: fast samples may read <c>+inf</c>
+    /// (outside/culled), never NaN. Grid consumers (min/max, interpolation,
+    /// gradient) must treat <c>+inf</c> as absent, not as a giant finite distance.
     /// </summary>
     public sealed class DensityGrid : IDisposable
     {
         private const int PortableScratchValueBudget = 8 * 1024 * 1024;
-
-        /// <summary>
-        /// Owned native corner samples. Allocated by <see cref="SamplePortable"/>
-        /// (Persistent) and released by <see cref="Dispose"/>. The managed read
-        /// API (<see cref="GetSample"/>, <see cref="CopyCellCornerSamples"/>)
-        /// reads this buffer directly and Burst jobs (sampling, active-cell
-        /// classification) read the same storage, so the grid never round-trips
-        /// through a managed copy.
-        /// </summary>
         private NativeArray<float> _samples;
 
         public int CellsX { get; }
@@ -44,9 +32,9 @@ namespace ProceduralCreature.Morphology.Extraction
         public int SampleCount => _samples.Length;
 
         /// <summary>
-        /// The native corner-sample buffer, exposed for Burst consumers such as
-        /// <see cref="ActiveCellBuilder"/>'s scan job. Read-only for callers;
-        /// the grid owns the buffer's lifetime.
+        /// Native corner samples, exposed for Burst consumers (for example the
+        /// active-cell scan). Read-only for callers; the grid owns the buffer's
+        /// lifetime and releases it in <see cref="Dispose"/>.
         /// </summary>
         public NativeArray<float> Samples => _samples;
 
@@ -64,11 +52,6 @@ namespace ProceduralCreature.Morphology.Extraction
             _samples = samples;
         }
 
-        /// <summary>
-        /// Releases the native sample buffer. Every caller that creates a grid
-        /// via <see cref="SamplePortable"/> must dispose it when done: the
-        /// generator disposes after extraction and tests wrap grids in using.
-        /// </summary>
         public void Dispose()
         {
             if (_samples.IsCreated)
@@ -96,10 +79,6 @@ namespace ProceduralCreature.Morphology.Extraction
                 throw new DomainException("Grid corner count exceeds addressable array size.");
             }
             var origin = new Vector3(-bounds.MaxX, -bounds.MaxY, -bounds.MaxZ);
-
-            // The grid owns this Persistent buffer: handed to the DensityGrid on
-            // success and disposed on every throw path, so a malformed program can
-            // never leak the native allocation (CC-075).
             var samples = new NativeArray<float>((int)cornerCountLong, Allocator.Persistent);
             int operationCount = program.Operations.Length;
             if (operationCount <= 0)
@@ -116,34 +95,17 @@ namespace ProceduralCreature.Morphology.Extraction
                 throw new DomainException("Portable sampler scratch buffer exceeds addressable array size.");
             }
 
-            // One scratch buffer sized for the largest batch, reused across every
-            // batch (each job completes before the next starts, so reuse is safe).
-            // Avoids allocating and freeing the buffer once per batch.
             var scratchValues = new NativeArray<float>((int)scratchLength, Allocator.Persistent);
             try
             {
-                // Fail fast on a malformed program before any batch runs. Without
-                // this, an out-of-range RootIndex reads past Operations and either
-                // crashes (safety checks on) or silently produces garbage (Burst
-                // release). Mirrors the SdfProgramEvaluator.Evaluate guard. Throwing
-                // inside the try also proves the native allocations are disposed on
-                // the exception path (CC-075).
                 if (program.RootIndex < 0 || program.RootIndex >= program.Operations.Length)
                 {
                     throw new DomainException("Portable program root index must identify an operation.");
                 }
 
-                // Slice B region-aware sampling: the root op's world AABB (inflated
-                // by InfluenceRadius inside the job) is the only region where the
-                // field can be finite. The job pre-fills +inf for corners outside it
-                // and skips the per-op loop, which is the bulk of the grid for a
-                // creature whose geometry is much smaller than its bounds.
-                SdfOperation rootOp = program.Operations[program.RootIndex];
-                bool rootHasBounds = rootOp.MinBound.x <= rootOp.MaxBound.x
-                    && rootOp.MinBound.y <= rootOp.MaxBound.y
-                    && rootOp.MinBound.z <= rootOp.MaxBound.z;
-                float3 rootMin = rootHasBounds ? rootOp.MinBound : new float3(0f);
-                float3 rootMax = rootHasBounds ? rootOp.MaxBound : new float3(0f);
+                bool rootHasPotentialBounds = program.HasPotentialBounds;
+                float3 rootMin = program.PotentialMinBound;
+                float3 rootMax = program.PotentialMaxBound;
 
                 for (int sampleStart = 0; sampleStart < (int)cornerCountLong; sampleStart += batchSize)
                 {
@@ -161,16 +123,14 @@ namespace ProceduralCreature.Morphology.Extraction
                         CellSize = cellSize,
                         SampleStartIndex = sampleStart,
                         InfluenceRadius = program.InfluenceRadius,
-                        RootHasBounds = rootHasBounds,
-                        RootMinBound = rootMin,
-                        RootMaxBound = rootMax,
+                        RootHasPotentialBounds = rootHasPotentialBounds,
+                        RootPotentialMinBound = rootMin,
+                        RootPotentialMaxBound = rootMax,
                     };
                     JobHandle handle = job.Schedule(sampleCount, 64);
                     handle.Complete();
                 }
 
-                // Ownership of the native buffer transfers to the grid; the finally
-                // below only disposes it on a throw path (CC-075).
                 var grid = new DensityGrid(cellsX, cellsY, cellsZ, origin, cellSize, samples);
                 samples = default;
                 return grid;
@@ -241,18 +201,35 @@ namespace ProceduralCreature.Morphology.Extraction
             int previousZ = Mathf.Max(z - 1, 0);
             int nextZ = Mathf.Min(z + 1, CellsZ);
 
-            float dx = GetSample(nextX, y, z) - GetSample(previousX, y, z);
-            float dy = GetSample(x, nextY, z) - GetSample(x, previousY, z);
-            float dz = GetSample(x, y, nextZ) - GetSample(x, y, previousZ);
+            float gx = EstimateAxis(GetSample(previousX, y, z), GetSample(x, y, z), GetSample(nextX, y, z),
+                (nextX - previousX) * CellSize);
+            float gy = EstimateAxis(GetSample(x, previousY, z), GetSample(x, y, z), GetSample(x, nextY, z),
+                (nextY - previousY) * CellSize);
+            float gz = EstimateAxis(GetSample(x, y, previousZ), GetSample(x, y, z), GetSample(x, y, nextZ),
+                (nextZ - previousZ) * CellSize);
 
-            float xSpan = (nextX - previousX) * CellSize;
-            float ySpan = (nextY - previousY) * CellSize;
-            float zSpan = (nextZ - previousZ) * CellSize;
+            return new Vector3(gx, gy, gz);
+        }
 
-            return new Vector3(
-                xSpan > 0f ? dx / xSpan : 0f,
-                ySpan > 0f ? dy / ySpan : 0f,
-                zSpan > 0f ? dz / zSpan : 0f);
+        private static float EstimateAxis(float previous, float center, float next, float span)
+        {
+            if (span <= 0f || float.IsNaN(center) || float.IsInfinity(center)) return 0f;
+
+            bool previousFinite = !float.IsNaN(previous) && !float.IsInfinity(previous);
+            bool nextFinite = !float.IsNaN(next) && !float.IsInfinity(next);
+            if (previousFinite && nextFinite)
+            {
+                return (next - previous) / span;
+            }
+            if (previousFinite)
+            {
+                return (center - previous) / (span * 0.5f);
+            }
+            if (nextFinite)
+            {
+                return (next - center) / (span * 0.5f);
+            }
+            return 0f;
         }
 
         private void SetSample(int x, int y, int z, float value)

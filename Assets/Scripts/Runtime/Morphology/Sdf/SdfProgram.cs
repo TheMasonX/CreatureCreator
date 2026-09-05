@@ -27,39 +27,20 @@ namespace ProceduralCreature.Morphology.Sdf
         public float3 Parameters;
         public float4x4 Matrix;
         public float DistanceScale;
-
-        /// <summary>
-        /// World-space AABB of the operation's geometry, used by the evaluator for
-        /// spatial culling (CC-062). Primitives keep an empty AABB (always culled)
-        /// because the wrapping Transform op evaluates the primitive inline and the
-        /// primitive's own value slot is never read.
-        /// </summary>
         public float3 MinBound;
         public float3 MaxBound;
-
-        /// <summary>
-        /// Index of the smooth-union operation that consumes this op as its newly
-        /// added child (the "B" operand). -1 when the op is a chain/root (never
-        /// culled this way). The evaluator uses the consuming union's other child
-        /// (the running chain value); retained as compiler metadata for stable
-        /// program layout.
-        /// </summary>
         public int ConsumerUnionIndex;
 
         /// <summary>
-        /// Whether this op's SDF output is bounded below by the distance to its
-        /// world AABB, which the culling skip relies on. True only for leaves whose
-        /// primitives are true distance fields (sphere, box, capsule). False for
-        /// any subtree containing an ellipsoid, whose approximate SDF can output a
-        /// value smaller than the distance to its bounding box.
+        /// True only when this op's SDF output is bounded below by the distance to
+        /// its world AABB, so the culling skip is safe. False for an ellipsoid or a
+        /// subtree containing one, whose approximate SDF can be smaller than the
+        /// AABB distance. AABB culling sites must check this flag, never bounds alone.
         /// </summary>
         public bool Cullable;
 
         public static SdfOperation Primitive(SdfOperationType type, float3 parameters)
         {
-            // Primitive op slots are dead: the wrapping Transform re-evaluates the
-            // primitive inline, and unions reference transform/symmetry ops, never
-            // primitives. An empty AABB keeps them always-culled in the evaluator.
             return new SdfOperation
             {
                 Type = type,
@@ -77,17 +58,24 @@ namespace ProceduralCreature.Morphology.Sdf
         public int RootIndex { get; }
 
         /// <summary>
-        /// Maximum smooth-blend radius across all unions in the program, plus a
-        /// small epsilon. The evaluator inflates every op's world AABB by this so a
-        /// skipped op is provably farther from the sample than any blend can reach.
+        /// Maximum smooth-blend radius across all unions plus a small epsilon. The
+        /// evaluator inflates each culled op's world AABB by this so a skipped op is
+        /// provably farther from the sample than any blend can reach.
         /// </summary>
         public float InfluenceRadius { get; }
+        public bool HasPotentialBounds { get; }
+        public float3 PotentialMinBound { get; }
+        public float3 PotentialMaxBound { get; }
 
-        internal SdfProgram(NativeArray<SdfOperation> operations, int rootIndex, float influenceRadius)
+        internal SdfProgram(NativeArray<SdfOperation> operations, int rootIndex, float influenceRadius,
+            bool hasPotentialBounds = false, float3 potentialMinBound = default, float3 potentialMaxBound = default)
         {
             Operations = operations;
             RootIndex = rootIndex;
             InfluenceRadius = influenceRadius;
+            HasPotentialBounds = hasPotentialBounds;
+            PotentialMinBound = potentialMinBound;
+            PotentialMaxBound = potentialMaxBound;
         }
 
         public void Dispose()
@@ -102,16 +90,13 @@ namespace ProceduralCreature.Morphology.Sdf
     /// <summary>
     /// Evaluates a compiled portable SDF program at a point (CC-045).
     ///
-    /// NON-FINITE FIELD CONTRACT (CC-064): every consumer of a sampled scalar
-    /// value must treat the field as follows —
-    ///   `+inf` = outside / culled / semantically absent (never a giant valid distance)
-    ///   `NaN`  = always invalid (a bug upstream; sampling must never produce it)
-    ///   `-inf` = invalid for field sampling (interior sentinel only, not a distance)
-    ///   finite = the evaluated field
-    /// Fast culling (CC-063) writes `+inf` for skipped operations; consumers must
-    /// treat `+inf` as "no candidate" (e.g. appearance selection must not let it
-    /// win a nearest decision, and interpolation must clamp to the finite
-    /// endpoint).
+    /// Non-finite field contract (CC-064): <c>+inf</c> means outside/culled/absent;
+    /// NaN is always invalid; finite is the evaluated field. Fast culling writes
+    /// <c>+inf</c> for a skipped operation, so a consumer must treat it as "no
+    /// candidate", never as a giant valid distance. Culling is proof-based: an
+    /// operation is skipped only when it is <see cref="SdfOperation.Cullable"/> and
+    /// its valid AABB, inflated by the influence radius, does not contain the point.
+    /// An AABB alone is not a culling proof for an approximate ellipsoid field.
     /// </summary>
     public static class SdfProgramEvaluator
     {
@@ -127,8 +112,7 @@ namespace ProceduralCreature.Morphology.Sdf
             return Evaluate(program.Operations, program.RootIndex, point, program.InfluenceRadius, allowCulling: false);
         }
 
-        public static float Evaluate(
-            SdfProgram program, float3 point, NativeArray<float> scratchValues)
+        public static float Evaluate(SdfProgram program, float3 point, NativeArray<float> scratchValues)
         {
             if (program == null) throw new DomainException("program must not be null.");
             if (!scratchValues.IsCreated || scratchValues.Length < program.Operations.Length)
@@ -139,20 +123,19 @@ namespace ProceduralCreature.Morphology.Sdf
                 program.InfluenceRadius, allowCulling: true);
         }
 
-        public static float EvaluateReference(
-            SdfProgram program, float3 point, NativeArray<float> scratchValues)
+        public static float EvaluateReference(SdfProgram program, float3 point, NativeArray<float> scratchValues)
         {
             if (program == null) throw new DomainException("program must not be null.");
             if (!scratchValues.IsCreated || scratchValues.Length < program.Operations.Length)
             {
                 throw new DomainException("scratchValues must contain one entry per operation.");
             }
-            return EvaluateInto(program.Operations, program.RootIndex, point, scratchValues, 0, program.InfluenceRadius, allowCulling: false);
+            return EvaluateInto(program.Operations, program.RootIndex, point, scratchValues, 0,
+                program.InfluenceRadius, allowCulling: false);
         }
 
-        public static float Evaluate(
-            NativeArray<SdfOperation> operations, int rootIndex, float3 point, float influenceRadius,
-            bool allowCulling = false)
+        public static float Evaluate(NativeArray<SdfOperation> operations, int rootIndex, float3 point,
+            float influenceRadius, bool allowCulling = false)
         {
             if (!operations.IsCreated) throw new DomainException("operations must be created.");
             if (rootIndex < 0 || rootIndex >= operations.Length)
@@ -166,30 +149,21 @@ namespace ProceduralCreature.Morphology.Sdf
             return result;
         }
 
-        public static float EvaluateReference(
-            NativeArray<SdfOperation> operations, int rootIndex, float3 point, float influenceRadius)
+        public static float EvaluateReference(NativeArray<SdfOperation> operations, int rootIndex,
+            float3 point, float influenceRadius)
         {
             return Evaluate(operations, rootIndex, point, influenceRadius, allowCulling: false);
         }
 
-        internal static float EvaluateInto(
-            NativeArray<SdfOperation> operations, int rootIndex, float3 point,
+        internal static float EvaluateInto(NativeArray<SdfOperation> operations, int rootIndex, float3 point,
             NativeArray<float> values, int valueOffset, float influenceRadius, bool allowCulling)
         {
             for (int i = 0; i <= rootIndex; i++)
             {
                 SdfOperation operation = operations[i];
-                // Fast culling (CC-063): skip any operation whose world AABB,
-                // inflated by the program's max blend radius, does not contain the
-                // sample, writing +inf for the absent operation. Operations without
-                // compiled bounds must still evaluate: a standalone primitive
-                // program legitimately uses its primitive as the root operation.
-                bool hasBounds = operation.MinBound.x <= operation.MaxBound.x
-                    && operation.MinBound.y <= operation.MaxBound.y
-                    && operation.MinBound.z <= operation.MaxBound.z;
-                if (allowCulling && hasBounds && (point.x < operation.MinBound.x - influenceRadius || point.x > operation.MaxBound.x + influenceRadius ||
-                     point.y < operation.MinBound.y - influenceRadius || point.y > operation.MaxBound.y + influenceRadius ||
-                    point.z < operation.MinBound.z - influenceRadius || point.z > operation.MaxBound.z + influenceRadius))
+                bool hasBounds = HasValidBounds(operation.MinBound, operation.MaxBound);
+                if (allowCulling && operation.Cullable && hasBounds
+                    && IsOutsideInflatedBounds(point, operation.MinBound, operation.MaxBound, influenceRadius))
                 {
                     values[valueOffset + i] = float.PositiveInfinity;
                     continue;
@@ -201,9 +175,9 @@ namespace ProceduralCreature.Morphology.Sdf
             return values[valueOffset + rootIndex];
         }
 
-        internal static float EvaluateOperation(
-            SdfOperation operation, NativeArray<float> values, NativeArray<SdfOperation> operations,
-            float3 point, int valueOffset, float influenceRadius = 0f, bool allowCulling = false)
+        internal static float EvaluateOperation(SdfOperation operation, NativeArray<float> values,
+            NativeArray<SdfOperation> operations, float3 point, int valueOffset,
+            float influenceRadius = 0f, bool allowCulling = false)
         {
             switch (operation.Type)
             {
@@ -228,18 +202,13 @@ namespace ProceduralCreature.Morphology.Sdf
             }
         }
 
-        private static float EvaluateSubtree(
-            NativeArray<SdfOperation> operations, int operationIndex, float3 point,
-            float influenceRadius, bool allowCulling)
+        private static float EvaluateSubtree(NativeArray<SdfOperation> operations, int operationIndex,
+            float3 point, float influenceRadius, bool allowCulling)
         {
             SdfOperation operation = operations[operationIndex];
-            bool hasBounds = operation.MinBound.x <= operation.MaxBound.x
-                && operation.MinBound.y <= operation.MaxBound.y
-                && operation.MinBound.z <= operation.MaxBound.z;
-            if (allowCulling && hasBounds
-                && (point.x < operation.MinBound.x - influenceRadius || point.x > operation.MaxBound.x + influenceRadius
-                    || point.y < operation.MinBound.y - influenceRadius || point.y > operation.MaxBound.y + influenceRadius
-                    || point.z < operation.MinBound.z - influenceRadius || point.z > operation.MaxBound.z + influenceRadius))
+            bool hasBounds = HasValidBounds(operation.MinBound, operation.MaxBound);
+            if (allowCulling && operation.Cullable && hasBounds
+                && IsOutsideInflatedBounds(point, operation.MinBound, operation.MaxBound, influenceRadius))
             {
                 return float.PositiveInfinity;
             }
@@ -270,6 +239,18 @@ namespace ProceduralCreature.Morphology.Sdf
                 default:
                     return 0f;
             }
+        }
+
+        private static bool HasValidBounds(float3 minBound, float3 maxBound)
+        {
+            return minBound.x <= maxBound.x && minBound.y <= maxBound.y && minBound.z <= maxBound.z;
+        }
+
+        private static bool IsOutsideInflatedBounds(float3 point, float3 minBound, float3 maxBound, float influenceRadius)
+        {
+            return point.x < minBound.x - influenceRadius || point.x > maxBound.x + influenceRadius ||
+                   point.y < minBound.y - influenceRadius || point.y > maxBound.y + influenceRadius ||
+                   point.z < minBound.z - influenceRadius || point.z > maxBound.z + influenceRadius;
         }
 
         private static float EvaluatePrimitive(SdfOperation operation, float3 point)
@@ -305,10 +286,9 @@ namespace ProceduralCreature.Morphology.Sdf
 
         private static float SmoothMin(float a, float b, float radius)
         {
-            // AABB-culled children read as +inf. math.lerp(b, a, h) computes
-            // b + (a - b) * h, which is NaN when one operand is +inf (inf * 0).
-            // Treat +inf as "absent": the finite child wins, or +inf when both are
-            // absent.
+            // AABB-culled children read as +inf ("absent"): the finite child wins, or
+            // +inf when both are absent. math.lerp(b, a, h) is NaN on inf*0, so +inf
+            // must be short-circuited before blending.
             if (float.IsPositiveInfinity(a) || float.IsPositiveInfinity(b))
             {
                 return math.min(a, b);
@@ -335,18 +315,13 @@ namespace ProceduralCreature.Morphology.Sdf
         public float InfluenceRadius;
 
         /// <summary>
-        /// Slice B region-aware early exit. The root op's world AABB (inflated by
-        /// <see cref="InfluenceRadius"/>) is the only region where the field can be
-        /// finite: a corner outside it makes the evaluator cull the root (CC-063),
-        /// so the result is always +inf. Pre-fill it and skip the whole per-op
-        /// loop. The containment test mirrors the evaluator's per-op test exactly,
-        /// so the field is bit-identical; in-bounds corners run the normal path.
-        /// <c>RootHasBounds</c> is false for standalone-primitive programs whose
-        /// root has no compiled AABB (they never early-exit).
+        /// True when the root has a conservative envelope for all field influence.
+        /// This is distinct from operation Cullable metadata: an ellipsoid can have
+        /// a potential envelope without having an AABB lower-bound culling proof.
         /// </summary>
-        public bool RootHasBounds;
-        public float3 RootMinBound;
-        public float3 RootMaxBound;
+        public bool RootHasPotentialBounds;
+        public float3 RootPotentialMinBound;
+        public float3 RootPotentialMaxBound;
 
         public void Execute(int index)
         {
@@ -356,10 +331,10 @@ namespace ProceduralCreature.Morphology.Sdf
             int z = sampleIndex / (CornersX * CornersY);
             float3 point = Origin + new float3(x, y, z) * CellSize;
 
-            if (RootHasBounds &&
-                (point.x < RootMinBound.x - InfluenceRadius || point.x > RootMaxBound.x + InfluenceRadius ||
-                 point.y < RootMinBound.y - InfluenceRadius || point.y > RootMaxBound.y + InfluenceRadius ||
-                 point.z < RootMinBound.z - InfluenceRadius || point.z > RootMaxBound.z + InfluenceRadius))
+            if (RootHasPotentialBounds &&
+                (point.x < RootPotentialMinBound.x - InfluenceRadius || point.x > RootPotentialMaxBound.x + InfluenceRadius ||
+                 point.y < RootPotentialMinBound.y - InfluenceRadius || point.y > RootPotentialMaxBound.y + InfluenceRadius ||
+                 point.z < RootPotentialMinBound.z - InfluenceRadius || point.z > RootPotentialMaxBound.z + InfluenceRadius))
             {
                 Samples[sampleIndex] = float.PositiveInfinity;
                 return;

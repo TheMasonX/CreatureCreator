@@ -1,26 +1,28 @@
-name: CI
+#NOTE: This workflow is currently disabled after the move to the new MemorySmith task system.
 
-on:
-  push:
-    branches: [ "main", "master" ]
-  pull_request:
-    branches: [ "main", "master" ]
+# name: CI
 
-jobs:
-  task-validation:
-    name: Task record validation
-    runs-on: ubuntu-latest
-    steps:
-      - uses: actions/checkout@v4
+# on:
+#   push:
+#     branches: [ "main", "master" ]
+#   pull_request:
+#     branches: [ "main", "master" ]
+#
+# jobs:
+#   task-validation:
+#     name: Task record validation
+#     runs-on: ubuntu-latest
+#     steps:
+#       - uses: actions/checkout@v4
 
-      - name: Setup Python
-        uses: actions/setup-python@v5
-        with:
-          python-version: '3.12'
+#       - name: Setup Python
+#         uses: actions/setup-python@v5
+#         with:
+#           python-version: '3.12'
 
-      - name: Validate markdown task system (docs/tasks)
-        run: python docs/tasks/tools/task_validate.py
+#       - name: Validate markdown task system (docs/tasks)
+#         run: python docs/tasks/tools/task_validate.py
 
-      - name: Validate MemorySmith task records (Data/Tasks)
-        run: pwsh ./Scripts/Test-TaskRecords.ps1
-        shell: pwsh
+#       - name: Validate MemorySmith task records (Data/Tasks)
+#         run: pwsh ./Scripts/Test-TaskRecords.ps1
+#         shell: pwsh

@@ -1,6 +1,6 @@
 ---
 name: subagent-swarm
-description: >-
+description: |
   Coordinate a focused multi-agent workflow for CreatureCreator work that
   needs parallel investigation, evidence gathering, and staged validation.
   Use when a task spans runtime generation, editor integration, tests, and docs.

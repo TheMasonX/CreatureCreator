@@ -55,6 +55,51 @@ namespace ProceduralCreature.Tests.Runtime
         }
 
         [Test]
+        public void FastCulling_GradientIsFiniteAtCullBoundaries()
+        {
+            var definition = DefinitionWithBodyAndPart();
+            definition.Generation = new GenerationSettings { VoxelsPerUnit = 3f };
+            using (SdfProgram program = SdfProgramBuilder.CompilePortable(definition))
+            using (DensityGrid grid = DensityGrid.SamplePortable(
+                program, definition.Bounds, definition.Generation))
+            {
+                // At a culling boundary one axis neighbor is +inf (absent). The
+                // gradient consumer must fall back to a one-sided finite difference
+                // and never emit NaN/Infinity from +inf - +inf arithmetic.
+                int boundaryPoints = 0;
+                for (int z = 0; z <= grid.CellsZ; z++)
+                for (int y = 0; y <= grid.CellsY; y++)
+                for (int x = 0; x <= grid.CellsX; x++)
+                {
+                    if (float.IsInfinity(grid.GetSample(x, y, z))) continue;
+                    bool hasInfNeighbor =
+                        HasInf(grid, x - 1, y, z) || HasInf(grid, x + 1, y, z) ||
+                        HasInf(grid, x, y - 1, z) || HasInf(grid, x, y + 1, z) ||
+                        HasInf(grid, x, y, z - 1) || HasInf(grid, x, y, z + 1);
+                    if (!hasInfNeighbor) continue;
+
+                    boundaryPoints++;
+                    Vector3 gradient = grid.EstimateGradient(grid.CornerPosition(x, y, z));
+                    Assert.IsFalse(float.IsNaN(gradient.x) || float.IsInfinity(gradient.x),
+                        $"Culling-boundary gradient.x invalid at ({x},{y},{z}).");
+                    Assert.IsFalse(float.IsNaN(gradient.y) || float.IsInfinity(gradient.y),
+                        $"Culling-boundary gradient.y invalid at ({x},{y},{z}).");
+                    Assert.IsFalse(float.IsNaN(gradient.z) || float.IsInfinity(gradient.z),
+                        $"Culling-boundary gradient.z invalid at ({x},{y},{z}).");
+                }
+
+                Assert.Greater(boundaryPoints, 0,
+                    "The coarse fast grid must contain at least one culling boundary to exercise the one-sided path.");
+            }
+        }
+
+        private static bool HasInf(DensityGrid grid, int x, int y, int z)
+        {
+            if (x < 0 || x > grid.CellsX || y < 0 || y > grid.CellsY || z < 0 || z > grid.CellsZ) return false;
+            return float.IsInfinity(grid.GetSample(x, y, z));
+        }
+
+        [Test]
         public void FastCulling_GeneratesFiniteWatertightMesh()
         {
             var definition = DefinitionWithBodyAndPart();

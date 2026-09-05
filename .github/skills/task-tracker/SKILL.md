@@ -1,6 +1,8 @@
 ---
 name: task-tracker
-description: "Track CreatureCreator work through MemorySmith MCP task tools. Use Markdown tickets only as frozen historical source and migration evidence."
+description: |
+   Track CreatureCreator work through MemorySmith MCP task tools. Use Markdown
+   tickets only as frozen historical source and migration evidence.
 argument-hint: "Describe the creature task, scope, status, validation, and related files"
 ---
 

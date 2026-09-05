@@ -1,6 +1,9 @@
 ---
 name: ste-technical-writing
-description: "Write, rewrite, or lint CreatureCreator technical documentation in concise Simplified Technical English. Use for README sections, task records, ADRs, validation notes, and Unity workflow instructions."
+description: |
+  Write, rewrite, or lint CreatureCreator technical documentation in concise
+  Simplified Technical English. Use for README sections, task records, ADRs,
+  validation notes, and Unity workflow instructions.
 argument-hint: "Choose rewrite, generate, or lint, then provide the documentation target"
 ---
 
