@@ -157,15 +157,21 @@
       "author": "anonymous",
       "body": "A0 inventory / B0a gap (2026-09-05): docs/audits/creaturecreator-a0-inventory-2026-09-05.md records that GenerationDiagnostics exposes SdfCompile, FieldSampling, MeshExtraction, AppearanceBake, and total timings, but no dedicated repeatable benchmark currently records stage timings plus samples/mixed-cells/vertices/triangles at multiple VPU settings. Historical 121 ms versus 600-750 ms figures remain context only. No generation code changed in this slice; next performance work must establish a measured baseline before culling optimization.",
       "createdAtUtc": "2026-09-05T07:20:46.5033983Z"
+    },
+    {
+      "id": "c-43966cefa096423db87abb91fee4451d",
+      "author": "anonymous",
+      "body": "B0a implementation slice (2026-09-05): GenerationDiagnostics now records final VertexCount and TriangleCount at the existing MeshExtraction boundary, alongside GridSampleCount, MixedCellCount, and stage timings. CreatureMeshGenerator populates the counters from MeshExtractionResult before assembly; FastCulling_GeneratesFiniteWatertightMesh asserts the counters match the emitted Unity mesh. This is instrumentation-only and does not alter SDF evaluation, culling, extraction, or allocations. Validation: dotnet Runtime and Tests.Runtime builds passed with 0 warnings/errors; static diagnostics are clean; Unity rerun is blocked because no MCP-connected Editor instance is available. Next step is a connected-Unity B0a benchmark over standard and alternate VPU settings.",
+      "createdAtUtc": "2026-09-05T07:22:04.6968259Z"
     }
   ],
   "epicId": null,
   "parentId": null,
   "dueDateUtc": null,
   "createdAtUtc": "2026-09-01T03:16:25.5654277Z",
-  "updatedAtUtc": "2026-09-05T07:20:46.5033983Z",
+  "updatedAtUtc": "2026-09-05T07:22:04.6968259Z",
   "completedAtUtc": null,
-  "revision": 25,
+  "revision": 26,
   "isArchived": false,
   "hasLoadError": false,
   "loadError": null,
