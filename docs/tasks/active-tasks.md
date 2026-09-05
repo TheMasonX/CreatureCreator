@@ -50,11 +50,12 @@
 | CC-081 | One canonical end-to-end morphology verification run | Backlog | P2 |
 | CC-085 | Route the selected-part viewport move through the anchor-aware one-gesture drag | Backlog | P1 |
 | CC-086 | Support placement on the rounded ends (caps) of the Body | Backlog | P1 |
-| CC-089 | Make malformed-definition validation and cloning total | Backlog | P1 |
+| CC-008 | Profile and optimize preview generation hotspots | In Progress | P1 |
 | CC-090 | Consolidate shared runtime utilities and tolerances | Backlog | P2 |
-| CC-091 | Establish concrete generation pipeline stage boundaries | Backlog | P2 |
+| CC-091 | Establish concrete generation pipeline stage boundaries | In Progress | P2 |
 | CC-093 | Adopt MemorySmith task tracking and memory deployment | In Progress | P1 |
 | CC-094 | Decompose CreatureEditorWindow responsibilities | Backlog | P2 |
 | CC-095 | Click the preview mesh in the viewport to select the owning part | Backlog | P1 |
 | CC-096 | Edit any skeleton node with composable move/scale/rotation gizmos (including limb attachment points) | Backlog | P2 |
 | CC-097 | Import all Markdown tasks through the MemorySmith MCP bridge | Backlog | P1 |
+| CC-099 | Harden fast SDF culling and non-finite field consumers | In Progress | P1 |
