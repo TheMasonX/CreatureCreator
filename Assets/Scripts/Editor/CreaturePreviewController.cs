@@ -11,6 +11,7 @@ namespace ProceduralCreature.Editor
         private const string PreviewObjectName = "CreatureCreator Preview";
         private const string PreviewGeometryChildPrefix = "CreatureCreator Preview Geometry ";
         private readonly CreatureGenerationScheduler _scheduler = new CreatureGenerationScheduler();
+        private readonly CreaturePreviewRequestState _requestState = new CreaturePreviewRequestState();
         private readonly Func<Material> _defaultMaterialResolver;
         private readonly Func<string, Material> _materialResolver;
         private readonly List<GameObject> _geometryObjects = new List<GameObject>();
@@ -33,7 +34,9 @@ namespace ProceduralCreature.Editor
 
             CreatureDefinition captured = definition.Clone();
             captured.Generation.VoxelsPerUnit = voxelsPerUnit;
-            return _scheduler.Enqueue(captured, new GenerationDiagnostics(logDiagnostics));
+            long requestId = _scheduler.Enqueue(captured, new GenerationDiagnostics(logDiagnostics));
+            _requestState.BeginRequest(requestId);
+            return requestId;
         }
 
         public void ProcessCompletions(Action<CreatureGenerationResult> onCompleted)
@@ -43,7 +46,12 @@ namespace ProceduralCreature.Editor
 
             while (_scheduler.TryTakeCompleted(out CreatureGenerationResult result))
             {
-                if (!result.IsStale) onCompleted(result);
+                // A7.1: only the current request's result is delivered. A result
+                // superseded by a newer request, or one that completes after the
+                // current request was cleared, is stale and discarded.
+                if (!_requestState.IsCurrentRequest(result.Sequence)) continue;
+                _requestState.Clear(); // the current request has completed; clear in-flight
+                onCompleted(result);
             }
         }
 
@@ -131,6 +139,7 @@ namespace ProceduralCreature.Editor
         {
             if (_disposed) return;
             _disposed = true;
+            _requestState.Clear();
             _scheduler.Dispose();
         }
     }

@@ -100,15 +100,21 @@
       "author": "anonymous",
       "body": "Audit synthesis 2026-09-04: retain editor decomposition ownership and InProgress status. S05/S06 remain the controlling records for gesture hot-control ownership, stale acceptance identity, preview-root/generated-Mesh/Collider disposal, domain reload, and coordinator-only policy. The 9/4 audit found no new editor task family.",
       "createdAtUtc": "2026-09-04T22:46:16.6914503Z"
+    },
+    {
+      "id": "c-86c1c3b519fe40098acf69fbf16cd47f",
+      "author": "anonymous",
+      "body": "Orchestrator Round 3 evidence (2026-09-05, three-round sequential-subagent handoff, A7.1 preview request/state coordinator): premise re-verified on the live board. Mapping of the four A7.1 responsibilities onto existing types: (1) request creation = CreaturePreviewController.Enqueue-\u003ECreatureGenerationScheduler.Enqueue (exists); (2) requested-revision tracking = runtime scheduler sequence, not surfaced at editor layer; (3) in-flight = scheduler LatestSequence, not surfaced; (4) current-vs-stale decision = only reachable through real async mesh generation (runtime/PlayMode), NOT deterministically EditMode-testable; editor controller coupled request handling with scene-object application; the mandated 4-scenario matrix did not exist as EditMode tests. Gap closed: added pure, viewport-free, scene-object-free editor coordinator Assets/Scripts/Editor/CreaturePreviewRequestState.cs (records the monotonic scheduler sequence, HasPendingRequest/CurrentRequestId/BeginRequest/IsCurrentRequest/Clear, rejects negative ids) and routed CreaturePreviewController.Enqueue/ProcessCompletions/Dispose through it with minimal behavior-preserving wiring (Enqueue calls BeginRequest; ProcessCompletions delivers only IsCurrentRequest result then clears; Dispose clears). Ownership cleanly separated: scheduler=execution (its IsStale stays for the runtime preview path), coordinator=editor request lifecycle/current-vs-stale decision, CreaturePreviewAcceptanceState=accepted-result identity (later concern). No second revision scheme (uses scheduler sequence), no viewport rendering change, no CreatureEditorWindow refactor, no runtime change, no A7.2/A7.3/parts-tree scope. New: CreaturePreviewRequestState.cs (\u002Bmeta), CreaturePreviewRequestStateTests.cs (\u002Bmeta) with 8 EditMode tests covering the matrix (A requested-\u003EB requested-\u003EA completes is stale; A-\u003EB-\u003EB completes accepted; clear/cancel makes no completion current; current completion clears in-flight leaving older completions stale; invalid/default/never-issued/negative ids not current; BeginRequest rejects negative). Validation (real Unity via MCP): dotnet build ProceduralCreature.Editor.csproj --no-restore 0/0; ProceduralCreature.Tests.Editor 0/0; Unity EditMode focused CreaturePreviewRequestStateTests 8/8; full ProceduralCreature.Tests.Editor EditMode 123/123 (0 failed/skipped); Unity console no compile errors; git diff --check exit 0. TSK-0098 stays InProgress. Residual risk: editor completion filter now uses coordinator rather than result.IsStale; equivalent for the single-enqueuer editor model, but a future second enqueue path bypassing the controller would need equivalence re-check. SceneView smoke check (regeneration/cancellation) remains broader CC-094 validation, out of this viewport-free round. Remaining TSK-0098 slices: A7.2 result acceptance, A7.3 object ownership, parts-tree/inspector. No Data/Tasks edited by hand; orchestrator committing this slice.",
+      "createdAtUtc": "2026-09-05T16:35:38.3083893Z"
     }
   ],
   "epicId": null,
   "parentId": null,
   "dueDateUtc": null,
   "createdAtUtc": "2026-09-01T03:20:52.8300758Z",
-  "updatedAtUtc": "2026-09-04T22:46:16.6914503Z",
+  "updatedAtUtc": "2026-09-05T16:35:38.3083893Z",
   "completedAtUtc": null,
-  "revision": 15,
+  "revision": 16,
   "isArchived": false,
   "hasLoadError": false,
   "loadError": null,
