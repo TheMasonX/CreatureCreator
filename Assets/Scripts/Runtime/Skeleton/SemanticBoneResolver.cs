@@ -130,7 +130,16 @@ namespace ProceduralCreature.Skeleton
             {
                 bool parentIsAlsoMirrored = parent.MirrorAcrossSymmetryPlane
                     && snapshot.SymmetryMode != SymmetryMode.None;
+                // CC-091: a resolved limb parent is only a real limb parent when
+                // its chain has at least two joints (N joints -> N-1 bones, so the
+                // terminal bone index N-2 must be >= 0). ResolvedLimb permits a
+                // single-joint degenerate chain, and validation
+                // (MinLimbJointCount == 2) is not guaranteed for a direct call, so
+                // guard on the resolved joint count exactly like the definition
+                // overload guards on the authored Joints.Count. This keeps the two
+                // overloads consistent and never fabricates a "_j-1" bone id.
                 string parentBoneBaseId = parent.HasLimb
+                    && parent.Limb.JointPositions.Count >= 2
                     ? ResolveLimbTerminalBoneId(
                         new CreaturePart { Id = parent.Id }, parent.Limb, mirrored: false)
                     : parent.Id;

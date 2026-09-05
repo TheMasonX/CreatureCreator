@@ -638,6 +638,55 @@ namespace ProceduralCreature.Tests.Runtime
                 "the resolved-envelope stage must skip a broken chain without throwing");
         }
 
+        [Test]
+        public void Validate_ResolvedEnvelope_BodyWithNullSample_DoesNotThrow()
+        {
+            // CC-089: a Body spline with a null sample is reported by ValidateBody
+            // as InvalidBodySample. The resolved-envelope stage consumes the shared
+            // ResolvedBody derivation through the non-throwing TryResolve path, so
+            // the unresolved body is skipped without exception-driven control flow.
+            var definition = CreatureDefinition.CreateEmpty();
+            definition.Forward = Vector3.forward;
+            definition.Body.Samples.Add(new BodySample { Id = 1, Position = Vector3.zero, Radius = 0.75f });
+            definition.Body.Samples.Add(null);
+            definition.AddPart(ValidPart("part_leg"));
+
+            ValidationResult result = DefinitionValidator.Validate(definition);
+
+            Assert.IsTrue(HasCode(result, ValidationCode.InvalidBodySample),
+                "the null sample is reported by the local body checks");
+            Assert.IsFalse(HasCode(result, ValidationCode.ResolvedBodySampleOutOfBounds),
+                "the resolved-envelope stage must skip a broken body without throwing");
+        }
+
+        [Test]
+        public void Validate_ResolvedEnvelope_AnchoredChildWithUnprojectableAnchor_DoesNotThrow()
+        {
+            // CC-089/CC-050: an anchored Body child whose anchor cannot project
+            // (it references the terminal sample id) is reported as
+            // InvalidAttachmentAnchor. The world-frame resolver would throw for it;
+            // the envelope stage keeps the report-only, total contract and skips
+            // the unresolved part without leaking a DomainException.
+            CreatureDefinition definition = ValidDefinitionWithBody();
+            CreaturePart anchored = ValidPart("part_anchored");
+            anchored.ParentAttachment = new BodySurfaceAnchor
+            {
+                SegmentStartSampleId = 2u, // terminal sample -> no outgoing segment
+                SegmentT = 0.5f,
+                RadialAngle = 0f,
+                SurfaceOffset = 0f,
+                Roll = 0f,
+            };
+            definition.AddPart(anchored);
+
+            ValidationResult result = DefinitionValidator.Validate(definition);
+
+            Assert.IsTrue(HasCode(result, ValidationCode.InvalidAttachmentAnchor),
+                "the unprojectable anchor is reported");
+            Assert.IsFalse(HasCode(result, ValidationCode.ResolvedPartOutOfBounds),
+                "the resolved-envelope stage must skip the unresolved anchored part without throwing");
+        }
+
         private static bool HasCode(ValidationResult result, ValidationCode code)
         {
             foreach (ValidationIssue issue in result.Issues)

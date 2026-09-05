@@ -117,15 +117,39 @@
       "author": "anonymous",
       "body": "Implementation/validation update 2026-09-04: closed the reserved BodyId residual in this slice. Added stable ValidationCode.ReservedPartId; DefinitionValidator reports authored part Id == CreatureDefinition.BodyId without rewriting DNA; DefinitionCanonicalizer rejects the same ambiguous identity with DomainException. Added DefinitionValidatorTests.Validate_RejectsReservedBodyPartId and DefinitionCanonicalizerTests.Canonicalize_RejectsReservedBodyPartIdWithDomainException. Focused validation: dotnet build .\\ProceduralCreature.Tests.Runtime.csproj --no-restore passed with 0 errors/warnings; Unity 6000.5.9f1 PlayMode focused fixtures ProceduralCreature.Tests.Runtime.DefinitionValidatorTests and .DefinitionCanonicalizerTests passed 47/47, 0 failed/skipped. Remaining CC-089 residuals: hierarchy read-only aliasing, validator split/context, non-throwing envelope resolution, and authoring-vs-resolved bounds diagnostics.",
       "createdAtUtc": "2026-09-04T01:03:44.4017276Z"
+    },
+    {
+      "id": "c-2d7001e5e43d403a8c859778090d4347",
+      "author": "anonymous",
+      "body": "Audit synthesis 2026-09-04: retain InProgress. S03/S04 historical test-discovery and wrong-oracle findings are corrected by later evidence: Runtime PlayMode 443/443 and EditMode 115/115. S06/S05 malformed-definition ownership remains open for reserved BodyId rejection, non-throwing envelope validation, report-only behavior, and documented defensive consumers. The null-Parts implementation evidence remains valid.",
+      "createdAtUtc": "2026-09-04T22:46:16.3891756Z"
+    },
+    {
+      "id": "c-0695ee032fef4f7ba8020a0990d7214e",
+      "author": "anonymous",
+      "body": "Next-round slice (2026-09-04): close the \u0022non-throwing envelope resolution\u0022 residual. Plan: add ResolvedBody.TryResolve (BodySpline \u002B sample-list overloads) and ResolvedLimb.TryResolve that return false instead of throwing on the routine incomplete-authoring states (null/empty/null-entry) that ValidateBody/ValidateLimbChains already report; route DefinitionValidator.ValidateResolvedEnvelope through them. The per-part world-frame resolution keeps totality without exception-driven control flow by pre-checking anchored-Body-child projection validity (unknown/terminal SegmentStartSampleId or degenerate Body) before calling CreaturePartWorldTransformResolver \u2014 the only non-structural throw source in that stage (structural MissingParent/ParentCycle already skip the whole stage). Add unit tests for the TryResolve boundary and envelope regression tests for a Body null sample and an anchored part with an invalid anchor. Behavior-preserving; validate with dotnet build and focused PlayMode DefinitionValidator/ResolvedLimb/ResolvedBody fixtures plus the full runtime suite.",
+      "createdAtUtc": "2026-09-04T22:53:04.3859511Z"
+    },
+    {
+      "id": "c-0c8bf753f02c4b53b8743128ac2c605c",
+      "author": "anonymous",
+      "body": "Implementation/validation update 2026-09-04: closed the \u0022non-throwing envelope resolution\u0022 residual in this slice. Added ResolvedBody.TryResolve (BodySpline \u002B IReadOnlyList\u003CBodySample\u003E overloads) and ResolvedLimb.TryResolve(LimbChain): they return false, never throwing, on the routine incomplete-authoring states (null/empty/null-entry) that ValidateBody/ValidateLimbChains already report. DefinitionValidator.ValidateResolvedEnvelope now consumes them for the Body and limb derivations, removing exception-driven control flow on those paths. The per-part world-frame resolution keeps one DOCUMENTED defensive try/catch: structural MissingParent/ParentCycle issues already skip the whole stage, and the only remaining non-structural throw source is an anchored Body child whose surface frame cannot project (degenerate Body, or anchor referencing a missing/terminal/non-finite sample) \u2014 a genuine authored error reported as MissingBody/InvalidAttachmentAnchor, not routine incomplete authoring, so duplicating projection validity inside the validator was deliberately avoided. New tests: ResolvedBodyTests.TryResolve_NullOrEmptyOrNullSample_ReturnsFalseWithoutThrowing, TryResolve_ValidInput_MatchesResolveAndReturnsTrue; ResolvedLimbTests.TryResolve_NullOrEmptyOrNullJoint_ReturnsFalseWithoutThrowing, TryResolve_ValidAndSingleJointInputs_ResolveLikeResolve; DefinitionValidatorTests.Validate_ResolvedEnvelope_BodyWithNullSample_DoesNotThrow, Validate_ResolvedEnvelope_AnchoredChildWithUnprojectableAnchor_DoesNotThrow. Evidence (Unity 6000.5.9f1): focused PlayMode DefinitionValidatorTests/ResolvedBodyTests/ResolvedLimbTests/SemanticBoneResolverTests 75/75 passed; full ProceduralCreature.Tests.Runtime PlayMode 452/452 (was 445) 0 failed 0 skipped; EditMode 115/115; dotnet build Runtime/Editor 0 warnings/errors; git diff --check clean. Remaining CC-089 residuals: hierarchy read-only aliasing, validator split/context, authoring-vs-resolved bounds diagnostics. Keep InProgress.",
+      "createdAtUtc": "2026-09-04T23:00:58.7252387Z"
+    },
+    {
+      "id": "c-cc28129ff251446696b5acdec2601036",
+      "author": "anonymous",
+      "body": "Implementation/validation update 2026-09-04: closed the \u0022hierarchy read-only aliasing\u0022 residual (audit F-03). CreaturePartHierarchyIndex.Parts previously returned the definition\u0027s live List\u003CCreaturePart\u003E (aliasing), so (a) a downcast caller could mutate the authoritative model through the \u0022read-only\u0022 index view, and (b) the Parts enumeration could drift from the first-wins/children/duplicate maps snapshotted at construction if definition.Parts mutated afterward. The index now detaches at construction: it copies the list into a private array and exposes Array.AsReadOnly (genuinely read-only IList surface), so Parts is never a live alias and the cached maps always agree with the Parts enumeration. Keep the tolerant index as the single graph-mechanics owner; no second path added. New regression tests in CreatureDefinitionTests: HierarchyIndex_Parts_IsDetachedSnapshotOfDefinition (add/remove on definition.Parts after index construction does not change Parts count/content or TryResolve) and HierarchyIndex_Parts_CannotBeMutatedThroughReadOnlyView (Parts is IList.IsReadOnly; indexer set throws NotSupportedException; definition unchanged). Evidence (Unity 6000.5.9f1): focused PlayMode CreatureDefinitionTests 12/12 passed; full ProceduralCreature.Tests.Runtime PlayMode 454/454 (was 452, \u002B2) 0 failed 0 skipped; EditMode 115/115; dotnet build Tests.Runtime 0 warnings/errors; git diff --check clean. Remaining CC-089 residuals: validator split/context and authoring-vs-resolved bounds diagnostics both need a scoping decision before code (per handoff, do not invent a second graph-mechanics path).",
+      "createdAtUtc": "2026-09-04T23:24:24.2925409Z"
     }
   ],
   "epicId": null,
   "parentId": null,
   "dueDateUtc": null,
   "createdAtUtc": "2026-09-01T03:20:52.6991944Z",
-  "updatedAtUtc": "2026-09-04T01:03:44.4017276Z",
+  "updatedAtUtc": "2026-09-04T23:24:24.2925409Z",
   "completedAtUtc": "2026-09-02T04:58:18.0043074Z",
-  "revision": 22,
+  "revision": 26,
   "isArchived": false,
   "hasLoadError": false,
   "loadError": null,

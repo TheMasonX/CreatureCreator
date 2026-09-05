@@ -21,16 +21,23 @@
   "attachments": [],
   "externalLinks": [],
   "linkedPages": [],
-  "comments": [],
+  "comments": [
+    {
+      "id": "c-adfbfc771b174afaa742cca44d25e0ca",
+      "author": "anonymous",
+      "body": "Audit synthesis 2026-09-04: S01 confirms DensityGrid.EstimateGradient subtracts \u002Binf samples even though archived CC-064 defines \u002Binf as absent. Own the extraction-side regression gate with finite, one-sided, and invalid-gradient policy tests; winding must never consume NaN. No implementation is claimed by the synthesis.",
+      "createdAtUtc": "2026-09-04T22:46:16.3366158Z"
+    }
+  ],
   "epicId": null,
   "parentId": null,
   "dueDateUtc": null,
   "createdAtUtc": "2026-09-01T03:20:51.9637005Z",
-  "updatedAtUtc": "2026-09-01T03:20:51.9637005Z",
+  "updatedAtUtc": "2026-09-04T22:46:16.3366158Z",
   "completedAtUtc": null,
-  "revision": 1,
+  "revision": 2,
   "isArchived": false,
   "hasLoadError": false,
   "loadError": null,
-  "sourceFilePath": null
+  "sourceFilePath": "tsk-0065-harden-the-final-mesh-pipeline-independently-of-editor-interaction.json"
 }

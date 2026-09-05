@@ -121,5 +121,36 @@ namespace ProceduralCreature.Morphology
                 thickness,
                 chain.BlendRadius);
         }
+
+        /// <summary>
+        /// Non-throwing resolve for validator-only envelope checks (CC-089).
+        /// Returns false instead of throwing when the chain is null, has no
+        /// joints, or contains a null joint — the routine incomplete-authoring
+        /// states <c>DefinitionValidator.ValidateLimbChains</c> already reports
+        /// separately, so they must not use exceptions for control flow. When it
+        /// returns true the value is exactly what <see cref="Resolve"/> would
+        /// produce. A single-joint (degenerate) chain still resolves; the
+        /// &gt;=2-joint invariant is enforced by validation
+        /// (<c>GenerationTolerances.MinLimbJointCount</c>), not by this
+        /// derivation type.
+        /// </summary>
+        public static bool TryResolve(LimbChain chain, out ResolvedLimb resolved)
+        {
+            if (chain == null || chain.Joints == null || chain.Joints.Count == 0)
+            {
+                resolved = default;
+                return false;
+            }
+            for (int i = 0; i < chain.Joints.Count; i++)
+            {
+                if (chain.Joints[i] == null)
+                {
+                    resolved = default;
+                    return false;
+                }
+            }
+            resolved = Resolve(chain);
+            return true;
+        }
     }
 }

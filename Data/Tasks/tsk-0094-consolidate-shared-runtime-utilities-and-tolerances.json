@@ -82,15 +82,21 @@
       "author": "anonymous",
       "body": "Audit synthesis 2026-09-03, sources S04/S05/S06: retain Done for the validated NumericValidity finite-check scope. Do not represent mirror, keyed-palette, geometry-transform, hierarchy, shape, grid-spec, or ID-policy candidates as completed by that evidence. New keyed palette and geometry/symmetry consolidation is owned by TSK-0105. ResolvedShape effective-parameter consolidation remains an open CC-090/CC-043 follow-up with no implementation claim.",
       "createdAtUtc": "2026-09-03T22:37:37.9122018Z"
+    },
+    {
+      "id": "c-fee51c270621492984a1487095b707a0",
+      "author": "anonymous",
+      "body": "Audit synthesis 2026-09-04: keep Done only for the validated finite-check slice. S02 corrects the stale claim that finite checks remain duplicated. Shape fallback, quaternion canonicalization, and mirror call-site wiring are not closed by this task; they remain assigned to CC-090/TSK-0105 without reopening the completed finite-check scope.",
+      "createdAtUtc": "2026-09-04T22:46:16.464483Z"
     }
   ],
   "epicId": null,
   "parentId": null,
   "dueDateUtc": null,
   "createdAtUtc": "2026-09-01T03:20:52.7198384Z",
-  "updatedAtUtc": "2026-09-03T22:37:37.9122018Z",
+  "updatedAtUtc": "2026-09-04T22:46:16.464483Z",
   "completedAtUtc": "2026-09-02T04:13:17.4527209Z",
-  "revision": 14,
+  "revision": 15,
   "isArchived": false,
   "hasLoadError": false,
   "loadError": null,

@@ -62,24 +62,14 @@ namespace ProceduralCreature.Definition
                 && definition.Body.Samples.Count > 0)
             {
                 // CC-056A increment 3: consume the shared ResolvedBody derivation
-                // instead of iterating authored samples here. A broken spline (a
-                // null sample) is already reported by ValidateBody as
-                // InvalidBodySample; the resolved envelope is undefined for it, so
-                // skip it — the same rule the limb envelope uses.
-                ResolvedBody bodyResolved;
-                bool bodyResolvedOk;
-                try
-                {
-                    bodyResolved = ResolvedBody.Resolve(definition.Body);
-                    bodyResolvedOk = true;
-                }
-                catch (DomainException)
-                {
-                    bodyResolved = default;
-                    bodyResolvedOk = false;
-                }
-
-                if (bodyResolvedOk)
+                // instead of iterating authored samples here. CC-089: the
+                // validator-only envelope check uses the non-throwing TryResolve
+                // path — a broken spline (a null sample) is already reported by
+                // ValidateBody as InvalidBodySample, so routine incomplete
+                // authoring data does not use exceptions for control flow. The
+                // resolved envelope is undefined for such a spline, so skip it —
+                // the same rule the limb envelope uses.
+                if (ResolvedBody.TryResolve(definition.Body, out ResolvedBody bodyResolved))
                 {
                     for (int i = 0; i < bodyResolved.SamplePositions.Count; i++)
                     {
@@ -103,6 +93,17 @@ namespace ProceduralCreature.Definition
                 if (part == null) continue;
                 if (!IsFinite(part.Transform.Position.x) || !IsFinite(part.Transform.Position.y) || !IsFinite(part.Transform.Position.z)) continue;
 
+                // CC-089: the world-frame resolver is a deliberately throwing
+                // contract (CreaturePartWorldTransformResolver throws on DNA that
+                // has not passed validation). Structural parent/cycle defects
+                // already skip this whole stage (HasStructuralParentIssue above);
+                // the one remaining non-structural throw source is an anchored
+                // Body child whose surface frame cannot project (a degenerate
+                // Body, or an anchor referencing a missing/terminal/non-finite
+                // sample). Those are genuine authored errors reported separately
+                // (MissingBody / InvalidAttachmentAnchor), not routine incomplete
+                // authoring, so this single documented defensive boundary stays
+                // exception-based rather than duplicating projection validity here.
                 Matrix4x4 world;
                 try
                 {
@@ -117,18 +118,12 @@ namespace ProceduralCreature.Definition
                 {
                     // CC-056A increment 2: resolve the chain once through the shared
                     // ResolvedLimb derivation instead of iterating LimbChain here.
-                    // Structural errors (a null joint) are already reported by
-                    // ValidateLimbChains; the resolved envelope is undefined for a
-                    // broken chain, so skip it.
-                    ResolvedLimb resolved;
-                    try
-                    {
-                        resolved = ResolvedLimb.Resolve(part.Limb);
-                    }
-                    catch (DomainException)
-                    {
-                        continue;
-                    }
+                    // CC-089: use the non-throwing TryResolve path — a broken chain
+                    // (a null joint) is already reported by ValidateLimbChains, so
+                    // routine incomplete authoring data does not use exceptions for
+                    // control flow. The resolved envelope is undefined for a broken
+                    // chain, so skip it.
+                    if (!ResolvedLimb.TryResolve(part.Limb, out ResolvedLimb resolved)) continue;
 
                     for (int i = 0; i < resolved.JointPositions.Count; i++)
                     {

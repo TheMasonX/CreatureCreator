@@ -168,6 +168,40 @@ namespace ProceduralCreature.Tests.Runtime
         }
 
         [Test]
+        public void TryResolve_NullOrEmptyOrNullJoint_ReturnsFalseWithoutThrowing()
+        {
+            // CC-089: the validator-only resolved-envelope check must not use
+            // exceptions for routine incomplete authoring data. TryResolve reports
+            // the same structural states Resolve throws on, as a false result.
+            Assert.IsFalse(ResolvedLimb.TryResolve(null, out ResolvedLimb result));
+
+            var empty = new LimbChain();
+            Assert.IsFalse(ResolvedLimb.TryResolve(empty, out _));
+
+            var withNull = StraightChain();
+            withNull.Joints.Add(null);
+            Assert.IsFalse(ResolvedLimb.TryResolve(withNull, out _));
+        }
+
+        [Test]
+        public void TryResolve_ValidAndSingleJointInputs_ResolveLikeResolve()
+        {
+            // CC-089: when TryResolve returns true the value is exactly what
+            // Resolve produces. A single-joint (degenerate) chain still resolves;
+            // the >=2-joint invariant is validation's (MinLimbJointCount), not this
+            // derivation type's.
+            Assert.IsTrue(ResolvedLimb.TryResolve(StraightChain(), out ResolvedLimb ok));
+            Assert.AreEqual(1f, ok.TotalLength, 1e-6f);
+            Assert.AreEqual(ResolvedLimb.Resolve(StraightChain()).TerminalSocket, ok.TerminalSocket);
+
+            var single = new LimbChain();
+            single.Joints.Add(new LimbJoint { Id = 1, Position = Vector3.zero });
+            Assert.IsTrue(ResolvedLimb.TryResolve(single, out ResolvedLimb degenerate));
+            Assert.AreEqual(1, degenerate.JointPositions.Count);
+            Assert.AreEqual(Vector3.zero, degenerate.TerminalSocket);
+        }
+
+        [Test]
         public void Resolve_NullThickness_FallsBackToDefaultProfile()
         {
             LimbChain chain = StraightChain();

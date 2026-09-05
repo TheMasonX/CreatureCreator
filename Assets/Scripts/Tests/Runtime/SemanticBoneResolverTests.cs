@@ -334,5 +334,99 @@ namespace ProceduralCreature.Tests.Runtime
                 skeleton.FindBone("part_foot" + SemanticBoneResolver.MirrorSuffix).ParentBoneId,
                 "Inferred skeleton must agree with the snapshot resolver.");
         }
+
+        [Test]
+        public void SnapshotResolver_SingleJointLimbParent_MatchesDefinitionResolver()
+        {
+            // CC-091: a resolved limb parent with fewer than two joints is not a
+            // real limb parent (N joints -> N-1 bones needs N >= 2). ResolvedLimb
+            // permits a single-joint degenerate chain, so the snapshot resolver
+            // must fall back to the parent id exactly like the definition resolver
+            // — never fabricate a "_j-1" per-segment bone id.
+            var definition = CreatureDefinition.CreateEmpty();
+            definition.Forward = Vector3.forward;
+            definition.SymmetryMode = SymmetryMode.MirrorAcrossXAxis;
+            definition.Body.Samples.Add(new BodySample { Id = 1, Position = new Vector3(0f, 0f, -1f), Radius = 0.75f });
+            definition.Body.Samples.Add(new BodySample { Id = 2, Position = new Vector3(0f, 0f, 1f), Radius = 0.9f });
+            definition.AddPart(new CreaturePart
+            {
+                Id = "part_stub",
+                ParentId = CreatureDefinition.BodyId,
+                PartType = PartType.Limb,
+                Transform = TransformData.Identity,
+                Shape = ShapeDefinition.DefaultSphere,
+                Appearance = AppearanceDefinition.Default,
+                MirrorAcrossSymmetryPlane = true,
+                Limb = LimbChainWith(Vector3.zero), // single joint -> degenerate
+            });
+            definition.AddPart(Part("part_tip", "part_stub", TransformData.Identity, mirrored: true));
+
+            ResolvedCreatureSnapshot snapshot = ResolvedCreatureSnapshot.Resolve(definition);
+            Assert.IsTrue(snapshot.TryGetPart("part_tip", out ResolvedPartSnapshot resolvedTip));
+
+            string fromDefinition = SemanticBoneResolver.ResolveParentBoneId(
+                definition, definition.FindPart("part_tip"), mirrored: true);
+            string fromSnapshot = SemanticBoneResolver.ResolveParentBoneId(
+                snapshot, resolvedTip, mirrored: true);
+
+            Assert.AreEqual(fromDefinition, fromSnapshot,
+                "snapshot and definition resolvers must agree for a single-joint limb parent");
+            Assert.IsFalse(fromSnapshot.Contains(SemanticBoneResolver.LimbJointBoneSeparator),
+                "a degenerate limb parent must not fabricate a per-segment bone id");
+        }
+
+        [Test]
+        public void SnapshotResolver_AnchoredBodyChild_KeepsCapturedSocketAfterAuthoredMutation()
+        {
+            // CC-091: the snapshot parent resolver must bind an anchored Body
+            // child to the segment-start socket CAPTURED at snapshot
+            // construction. A later authored mutation of the anchor (or the body)
+            // must not re-bind it — the snapshot is the immutable generation
+            // input, so binding cannot observe later DNA edits.
+            var definition = CreatureDefinition.CreateEmpty();
+            definition.Forward = Vector3.forward;
+            definition.SymmetryMode = SymmetryMode.MirrorAcrossXAxis;
+            definition.Body.Samples.Add(new BodySample { Id = 1, Position = new Vector3(0f, 0f, -1f), Radius = 0.5f });
+            definition.Body.Samples.Add(new BodySample { Id = 2, Position = new Vector3(0f, 0f, 1f), Radius = 0.5f });
+            definition.Body.Samples.Add(new BodySample { Id = 3, Position = new Vector3(0f, 0f, 3f), Radius = 0.5f });
+
+            CreaturePart spine = new CreaturePart
+            {
+                Id = "part_spine",
+                ParentId = CreatureDefinition.BodyId,
+                PartType = PartType.Part,
+                Transform = TransformData.Identity,
+                Shape = ShapeDefinition.DefaultSphere,
+                Appearance = AppearanceDefinition.Default,
+                // Anchored on segment start sample 2 (non-terminal), away from the
+                // nearest-sample fallback that would otherwise bind to sample 1.
+                ParentAttachment = new BodySurfaceAnchor
+                {
+                    SegmentStartSampleId = 2,
+                    SegmentT = 0.9f,
+                    RadialAngle = 0f,
+                    SurfaceOffset = 0f,
+                    Roll = 0f,
+                },
+            };
+            definition.AddPart(spine);
+
+            ResolvedCreatureSnapshot snapshot = ResolvedCreatureSnapshot.Resolve(definition);
+            Assert.IsTrue(snapshot.TryGetPart("part_spine", out ResolvedPartSnapshot resolvedSpine));
+            Assert.IsTrue(resolvedSpine.HasBodySurfaceAnchor);
+            Assert.AreEqual(2u, resolvedSpine.BodySurfaceAnchorSegmentStartSampleId,
+                "The snapshot must capture the authored anchor's segment-start sample.");
+
+            // Mutate the authored anchor after snapshot construction. A resolver
+            // that re-derived binding from live DNA would now report socket 1.
+            spine.ParentAttachment.SegmentStartSampleId = 1;
+            spine.Transform.Position = new Vector3(5f, 0f, 0f);
+
+            string parentBoneId = SemanticBoneResolver.ResolveParentBoneId(
+                snapshot, resolvedSpine, mirrored: false);
+
+            Assert.AreEqual(SemanticBoneResolver.ResolveBodySocketBoneId(2), parentBoneId,
+                "The snapshot resolver must bind to the anchor segment captured at construction, not re-derive from live DNA.");
+        }
     }
 }

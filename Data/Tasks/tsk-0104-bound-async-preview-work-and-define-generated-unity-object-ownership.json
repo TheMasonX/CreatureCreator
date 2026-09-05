@@ -39,15 +39,21 @@
       "author": "anonymous",
       "body": "Critical implementation review 2026-09-03: no async code was changed in the latest commits. Keep Backlog; result identity, request-scoped diagnostics, bounded queueing, Unity-object cleanup, and domain-reload gates remain future scope under this owner.",
       "createdAtUtc": "2026-09-03T23:22:11.3675831Z"
+    },
+    {
+      "id": "c-91faec32cb8343bcb18c14a7a841f6d6",
+      "author": "anonymous",
+      "body": "Audit synthesis 2026-09-04: retain Backlog and existing parent relationship to TSK-0098. S05/S06 findings remain accepted for bounded queueing, one detached capture, request-scoped diagnostics, completion disposition, Unity-object lifetime, late results, and domain reload. No implementation or closure is claimed.",
+      "createdAtUtc": "2026-09-04T22:46:16.6367639Z"
     }
   ],
   "epicId": null,
   "parentId": "tsk-0098-decompose-creatureeditorwindow-responsibilities",
   "dueDateUtc": null,
   "createdAtUtc": "2026-09-03T22:37:19.7381337Z",
-  "updatedAtUtc": "2026-09-03T23:22:11.3675831Z",
+  "updatedAtUtc": "2026-09-04T22:46:16.6367639Z",
   "completedAtUtc": null,
-  "revision": 3,
+  "revision": 4,
   "isArchived": false,
   "hasLoadError": false,
   "loadError": null,

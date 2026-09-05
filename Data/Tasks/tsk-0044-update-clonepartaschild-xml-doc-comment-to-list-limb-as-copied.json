@@ -20,16 +20,23 @@
   "attachments": [],
   "externalLinks": [],
   "linkedPages": [],
-  "comments": [],
+  "comments": [
+    {
+      "id": "c-317930730287446d8cad4dcb17c5f75b",
+      "author": "anonymous",
+      "body": "Audit synthesis 2026-09-04: S02 found CanonicalJsonWriter\u0027s embedded schema example omits current shape parameters and meshGeometry. This is related documentation drift, not a reader/writer behavior bug. Keep CC-042\u0027s ClonePartAsChild scope unchanged and record the writer comment as a low-priority follow-up without creating a duplicate P3 ticket.",
+      "createdAtUtc": "2026-09-04T22:46:16.7251087Z"
+    }
+  ],
   "epicId": null,
   "parentId": null,
   "dueDateUtc": null,
   "createdAtUtc": "2026-09-01T03:20:37.2225461Z",
-  "updatedAtUtc": "2026-09-01T03:20:37.2225461Z",
+  "updatedAtUtc": "2026-09-04T22:46:16.7251087Z",
   "completedAtUtc": null,
-  "revision": 1,
+  "revision": 2,
   "isArchived": false,
   "hasLoadError": false,
   "loadError": null,
-  "sourceFilePath": null
+  "sourceFilePath": "tsk-0044-update-clonepartaschild-xml-doc-comment-to-list-limb-as-copied.json"
 }

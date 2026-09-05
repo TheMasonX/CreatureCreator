@@ -109,6 +109,55 @@ namespace ProceduralCreature.Tests.Runtime
         }
 
         [Test]
+        public void HierarchyIndex_Parts_IsDetachedSnapshotOfDefinition()
+        {
+            // CC-089 read-only aliasing: the tolerant index must be a snapshot of
+            // the parts list taken at construction. Later mutation of the
+            // definition's Parts list must not change what the index's Parts
+            // enumeration, first-wins lookup, or cached maps report.
+            var definition = CreatureDefinition.CreateEmpty();
+            definition.AddPart(MakePart("part_a"));
+            definition.AddPart(MakePart("part_b", "part_a"));
+
+            CreaturePartHierarchyIndex hierarchy = definition.CreateHierarchyIndex();
+
+            definition.Parts.Add(MakePart("part_c"));
+
+            Assert.AreEqual(2, hierarchy.Parts.Count,
+                "A part added to the definition after index construction must not appear in the index snapshot.");
+            Assert.AreEqual("part_a", hierarchy.Parts[0].Id);
+            Assert.AreEqual("part_b", hierarchy.Parts[1].Id);
+            Assert.IsFalse(hierarchy.TryResolve("part_c", out _),
+                "First-wins lookup must not observe a part added after index construction.");
+
+            definition.Parts.RemoveAll(p => p != null && p.Id == "part_a");
+            Assert.IsTrue(hierarchy.TryResolve("part_a", out _),
+                "Removing a part from the definition after construction must not change the index snapshot.");
+            Assert.AreEqual(2, hierarchy.Parts.Count,
+                "Removal from the live definition must not shrink the detached index snapshot.");
+        }
+
+        [Test]
+        public void HierarchyIndex_Parts_CannotBeMutatedThroughReadOnlyView()
+        {
+            // CC-089 read-only aliasing: the Parts surface is a private copy, not
+            // the definition's live list. A caller must not be able to mutate the
+            // definition through the index's read-only view.
+            var definition = CreatureDefinition.CreateEmpty();
+            definition.AddPart(MakePart("part_a"));
+            CreaturePartHierarchyIndex hierarchy = definition.CreateHierarchyIndex();
+
+            var partsView = hierarchy.Parts as System.Collections.Generic.IList<CreaturePart>;
+            Assert.IsNotNull(partsView, "Array.AsReadOnly must expose an IList surface.");
+            Assert.IsTrue(partsView.IsReadOnly, "Parts must be read-only over the private copy.");
+            Assert.Throws<System.NotSupportedException>(() => partsView[0] = MakePart("part_x"));
+
+            Assert.AreEqual(1, definition.Parts.Count,
+                "Definition must be unchanged by an attempted mutation through the index view.");
+            Assert.AreEqual("part_a", definition.Parts[0].Id);
+        }
+
+        [Test]
         public void Clone_PreservesNullPartEntriesWithoutThrowing()
         {
             var definition = CreatureDefinition.CreateEmpty();

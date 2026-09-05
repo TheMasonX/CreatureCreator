@@ -70,15 +70,21 @@
       "author": "anonymous",
       "body": "Council disposition: generated AppearanceBaker now consumes the resolved snapshot for Body appearance/Forward and managed resolver uses captured part appearances in the generation path. Compatibility resolver remains available for standalone mutable-definition callers. Full current-source Unity PlayMode runtime suite passed 437/437, 0 failures, 0 skips. Keep InProgress until performance evidence and compatibility-path scope are explicitly recorded.",
       "createdAtUtc": "2026-09-02T06:05:35.07983Z"
+    },
+    {
+      "id": "c-8c29f682a6f14be19c060227a84e2d82",
+      "author": "anonymous",
+      "body": "Audit synthesis 2026-09-04: S01 identifies the anonymous 1e-4 culling margin and global maximum influence radius as measurable optimization-policy drift. Do not optimize before CC-014 fixes culling correctness. Then name the tolerance or derive measured subtree margins under the existing profiling owner.",
+      "createdAtUtc": "2026-09-04T22:46:16.5981303Z"
     }
   ],
   "epicId": null,
   "parentId": null,
   "dueDateUtc": null,
   "createdAtUtc": "2026-09-01T03:16:25.5654277Z",
-  "updatedAtUtc": "2026-09-02T06:05:35.07983Z",
+  "updatedAtUtc": "2026-09-04T22:46:16.5981303Z",
   "completedAtUtc": null,
-  "revision": 9,
+  "revision": 10,
   "isArchived": false,
   "hasLoadError": false,
   "loadError": null,

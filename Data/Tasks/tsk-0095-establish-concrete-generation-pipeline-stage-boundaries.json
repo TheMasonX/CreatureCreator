@@ -142,15 +142,27 @@
       "author": "anonymous",
       "body": "PlayMode gate unblocked and full CC-091 evidence, 2026-09-03 (Unity 6000.5.9f1): the MCP run_tests filter required fully-qualified fixture names (namespace.Class); bare class names returned 0 tests (placeholder) and were misread as a discovery failure. With fully-qualified names the FULL ProceduralCreature.Tests.Runtime PlayMode suite passes 443/443 (0 failed, 0 skipped). This validates the corrected EstimateSampleCount constant (257^3 = 16,974,593), the new snapshot-authority tests SnapshotResolver_UsesCapturedParentLimbAfterAuthoredMutation and SnapshotResolver_MirroredChildOfMirroredLimbParent_ResolvesToMirroredTerminalBone, and the missing-parent orphan-skip fallback. EditMode 115/115. Residual CC-091 gates still open: canonicalization-equivalent revision/output parity (compare geometry, appearance, deterministic order, source identity, transforms, revision), the MaxVoxelBudget cells-vs-corner-samples semantics decision (editor status bar reports EstimateVoxelCount while the validator gates on EstimateSampleCount), and confirming ResolvedLimb enforces a \u003E=2-joint invariant that the snapshot parent resolver now relies on. Keep InProgress.",
       "createdAtUtc": "2026-09-03T23:51:05.6454153Z"
+    },
+    {
+      "id": "c-ea160f8cbb354d8e88a21c040eda5a01",
+      "author": "anonymous",
+      "body": "Audit synthesis 2026-09-04: keep InProgress as the sole generation-boundary owner. S01 adds confirmed gaps for writable NativeArray views, duplicated SDF primitive emission, raw hierarchy re-resolution after snapshot construction, and (CreaturePart, SdfProgram) live-DNA correspondence. Add read-only buffer, resolved-correspondence, call-site inventory, ConsumerUnionIndex, and canonicalization-equivalent parity gates. Corrected Unity evidence now records Runtime PlayMode 443/443 and EditMode 115/115.",
+      "createdAtUtc": "2026-09-04T22:46:16.5390132Z"
+    },
+    {
+      "id": "c-a49327337a944ab6875d1cad46d90d6a",
+      "author": "anonymous",
+      "body": "Authority-gate update 2026-09-04: closed the single-joint-limb-parent divergence in the snapshot parent resolver. SemanticBoneResolver.ResolveParentBoneId(ResolvedCreatureSnapshot, ...) now guards parent.HasLimb \u0026\u0026 parent.Limb.JointPositions.Count \u003E= 2 before resolving the terminal bone, exactly mirroring the definition-based overload\u0027s authored Joints.Count \u003E= 2 guard. Previously a single-joint (degenerate) parent limb fabricated a \u0022_j-1\u0022 per-segment bone id, diverging from the definition overload\u0027s fallback to the parent id. ResolvedLimb deliberately permits a single-joint chain (documented degenerate case; the \u003E=2 invariant is validation\u0027s MinLimbJointCount), so the resolver guards rather than assumes \u2014 this confirms the \u0022\u003E=2-joint invariant the snapshot parent resolver relies on\u0022 gate from the resolved side. Added SemanticBoneResolverTests.SnapshotResolver_SingleJointLimbParent_MatchesDefinitionResolver asserting definition-vs-snapshot parity and no \u0022_j\u0022 fabrication. Evidence (Unity 6000.5.9f1): full ProceduralCreature.Tests.Runtime PlayMode 452/452 passed 0 failed 0 skipped; EditMode 115/115; focused resolver fixtures included in the 75/75 run; dotnet build Runtime/Editor 0 warnings/errors. Remaining CC-091 gates: canonicalization-equivalent revision/output parity (geometry, appearance, deterministic order, source identity, transforms, revision), MaxVoxelBudget cells-vs-corner-samples semantics decision, and remaining raw-input audit (SemanticBoneResolver compatibility boundaries, SdfProgramBuilder.CompileIndividualPartsPortable). Keep InProgress.",
+      "createdAtUtc": "2026-09-04T23:01:03.2429747Z"
     }
   ],
   "epicId": null,
   "parentId": null,
   "dueDateUtc": null,
   "createdAtUtc": "2026-09-01T03:20:52.7496119Z",
-  "updatedAtUtc": "2026-09-03T23:51:05.6454153Z",
+  "updatedAtUtc": "2026-09-04T23:01:03.2429747Z",
   "completedAtUtc": "2026-09-02T03:10:44.2511455Z",
-  "revision": 24,
+  "revision": 26,
   "isArchived": false,
   "hasLoadError": false,
   "loadError": null,

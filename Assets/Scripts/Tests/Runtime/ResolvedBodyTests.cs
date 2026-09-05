@@ -159,6 +159,53 @@ namespace ProceduralCreature.Tests.Runtime
         }
 
         [Test]
+        public void TryResolve_NullOrEmptyOrNullSample_ReturnsFalseWithoutThrowing()
+        {
+            // CC-089: the validator-only resolved-envelope check must not use
+            // exceptions for routine incomplete authoring data. TryResolve reports
+            // the same structural states Resolve throws on, as a false result.
+            Assert.IsFalse(ResolvedBody.TryResolve((BodySpline)null, out ResolvedBody result));
+            Assert.IsFalse(ResolvedBody.TryResolve((System.Collections.Generic.IReadOnlyList<BodySample>)null, out _));
+
+            var empty = new BodySpline();
+            Assert.IsFalse(ResolvedBody.TryResolve(empty, out _));
+
+            var emptyList = new List<BodySample>();
+            Assert.IsFalse(ResolvedBody.TryResolve(emptyList, out _));
+
+            var withNull = StraightSpline();
+            withNull.Samples.Add(null);
+            Assert.IsFalse(ResolvedBody.TryResolve(withNull, out _));
+
+            var withNullList = new List<BodySample>
+            {
+                new BodySample { Id = 1, Position = Vector3.zero, Radius = 1f },
+                null,
+            };
+            Assert.IsFalse(ResolvedBody.TryResolve(withNullList, out _));
+        }
+
+        [Test]
+        public void TryResolve_ValidInput_MatchesResolveAndReturnsTrue()
+        {
+            // CC-089: when TryResolve returns true the value must be exactly what
+            // Resolve produces, for both the spline and sample-list overloads.
+            BodySpline spline = StraightSpline();
+
+            Assert.IsTrue(ResolvedBody.TryResolve(spline, out ResolvedBody viaSpline));
+            Assert.IsTrue(ResolvedBody.TryResolve(spline.Samples, out ResolvedBody viaList));
+
+            ResolvedBody reference = ResolvedBody.Resolve(spline);
+            Assert.AreEqual(reference.TotalLength, viaSpline.TotalLength, 1e-6f);
+            Assert.AreEqual(reference.TotalLength, viaList.TotalLength, 1e-6f);
+            for (int i = 0; i < reference.SamplePositions.Count; i++)
+            {
+                Assert.AreEqual(reference.SamplePositions[i], viaSpline.SamplePositions[i]);
+                Assert.AreEqual(reference.SamplePositions[i], viaList.SamplePositions[i]);
+            }
+        }
+
+        [Test]
         public void Resolve_DegenerateCoincidentSamples_NormalizedArcAllZero()
         {
             var spline = new BodySpline();

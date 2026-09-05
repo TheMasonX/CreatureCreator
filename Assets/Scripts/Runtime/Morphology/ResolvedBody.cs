@@ -210,5 +210,58 @@ namespace ProceduralCreature.Morphology
                 polyline.TotalLength,
                 polyline.NormalizedArcLengthAtPosition);
         }
+
+        /// <summary>
+        /// Non-throwing resolve for validator-only envelope checks (CC-089).
+        /// Returns false instead of throwing when the spline is null, its sample
+        /// list is null or empty, or it contains a null sample — the routine
+        /// incomplete-authoring states <c>DefinitionValidator.ValidateBody</c>
+        /// already reports separately, so they must not use exceptions for
+        /// control flow. When it returns true the value is exactly what
+        /// <see cref="Resolve(BodySpline)"/> would produce.
+        /// </summary>
+        public static bool TryResolve(BodySpline spline, out ResolvedBody resolved)
+        {
+            if (spline == null || !CanResolve(spline.Samples))
+            {
+                resolved = default;
+                return false;
+            }
+            resolved = Resolve(spline.Samples);
+            return true;
+        }
+
+        /// <summary>
+        /// Non-throwing resolve from a sample list. Same contract as
+        /// <see cref="TryResolve(BodySpline, out ResolvedBody)"/>; delegates to
+        /// <see cref="Resolve(IReadOnlyList{BodySample})"/> when the list can
+        /// resolve.
+        /// </summary>
+        public static bool TryResolve(IReadOnlyList<BodySample> samples, out ResolvedBody resolved)
+        {
+            if (!CanResolve(samples))
+            {
+                resolved = default;
+                return false;
+            }
+            resolved = Resolve(samples);
+            return true;
+        }
+
+        /// <summary>
+        /// True when <paramref name="samples"/> can resolve without throwing:
+        /// non-null, non-empty, and free of null entries. Mirrors exactly the
+        /// structural guards <see cref="Resolve(IReadOnlyList{BodySample})"/>
+        /// checks before it throws.
+        /// </summary>
+        private static bool CanResolve(IReadOnlyList<BodySample> samples)
+        {
+            if (samples == null || samples.Count == 0) return false;
+            for (int i = 0; i < samples.Count; i++)
+            {
+                if (samples[i] == null) return false;
+            }
+            return true;
+        }
     }
 }

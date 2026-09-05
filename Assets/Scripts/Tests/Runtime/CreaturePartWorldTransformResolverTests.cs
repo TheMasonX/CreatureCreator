@@ -1,3 +1,4 @@
+using System.Linq;
 using NUnit.Framework;
 using UnityEngine;
 using ProceduralCreature.Common;
@@ -816,6 +817,166 @@ namespace ProceduralCreature.Tests.Runtime
 
             Assert.That(position, Is.EqualTo(new Vector3(0f, 0.6f, 1.2f)).Within(1e-5f),
                 "GeometryAttachment: mesh placement is the part frame plus the local offset.");
+        }
+
+        // ---- CC-091 canonicalization-equivalent parity ------------------------------
+        // The snapshot's RevisionId is a hash of CANONICAL DNA, so Resolve must
+        // yield the same revision AND the same resolved inputs whether it consumes
+        // the authored definition directly or its canonicalized clone. This pins
+        // that no output-affecting resolved value (part ordering / source
+        // identity, frames, shape, limb, mesh correspondence, anchor, body)
+        // diverges between the two paths for canonical-shaped authored DNA — the
+        // supported flow where mutation boundaries canonicalize before generation.
+
+        /// <summary>
+        /// A valid, canonicalization-safe creature whose authored values are
+        /// already canonical-shaped (quantized) but whose parts are added in
+        /// NON-canonical (unsorted) order, so canonical ordering is genuinely
+        /// exercised. Covers the frame resolver's attachment kinds: a plain Body
+        /// child, an anchored Body child, a limb, a mirrored limb child, and a
+        /// mesh-asset part.
+        /// </summary>
+        private static CreatureDefinition CanonicalizationFixture()
+        {
+            var definition = CreatureDefinition.CreateEmpty();
+            definition.Forward = Vector3.forward;
+            definition.SymmetryMode = SymmetryMode.MirrorAcrossXAxis;
+            definition.Bounds = new BoundsDefinition { MaxX = 2f, MaxY = 2f, MaxZ = 2f };
+            definition.Generation = new GenerationSettings { VoxelsPerUnit = 8f };
+            definition.Body.Samples.Add(new BodySample { Id = 1, Position = new Vector3(0f, 0f, -1f), Radius = 1f });
+            definition.Body.Samples.Add(new BodySample { Id = 2, Position = new Vector3(0f, 0f, 1f), Radius = 1f });
+
+            // Added z-first so canonical ordering (by Id) must reorder to a, limb, m, z.
+            definition.AddPart(new CreaturePart
+            {
+                Id = "part_z",
+                ParentId = CreatureDefinition.BodyId,
+                Transform = new TransformData { Position = new Vector3(0f, 0f, 1.5f), Rotation = Quaternion.identity, Scale = Vector3.one },
+                Shape = ShapeDefinition.DefaultSphere,
+                Appearance = AppearanceDefinition.Default,
+                MeshGeometry = new MeshGeometry
+                {
+                    MeshAssetKey = "eye",
+                    Attachment = new GeometryAttachment
+                    {
+                        Offset = new Vector3(0f, 0.25f, 0f),
+                        Orientation = Quaternion.identity,
+                        Scale = Vector3.one,
+                    },
+                },
+            });
+            definition.AddPart(new CreaturePart
+            {
+                Id = "part_a",
+                ParentId = CreatureDefinition.BodyId,
+                Transform = TransformData.Identity,
+                Shape = ShapeDefinition.DefaultSphere,
+                Appearance = AppearanceDefinition.Default,
+                ParentAttachment = new BodySurfaceAnchor
+                {
+                    SegmentStartSampleId = 1,
+                    SegmentT = 0.5f,
+                    RadialAngle = 0f,
+                    SurfaceOffset = 0f,
+                    Roll = 0f,
+                },
+            });
+            definition.AddPart(new CreaturePart
+            {
+                Id = "part_limb",
+                ParentId = CreatureDefinition.BodyId,
+                PartType = PartType.Limb,
+                Transform = new TransformData { Position = new Vector3(0f, 0.5f, 0f), Rotation = Quaternion.identity, Scale = Vector3.one },
+                Shape = ShapeDefinition.DefaultSphere,
+                Appearance = AppearanceDefinition.Default,
+                Limb = LimbChainWith(Vector3.zero, new Vector3(0f, -1f, 0f)),
+            });
+            definition.AddPart(new CreaturePart
+            {
+                Id = "part_m",
+                ParentId = "part_limb",
+                Transform = new TransformData { Position = new Vector3(0f, 0f, 0.5f), Rotation = Quaternion.identity, Scale = Vector3.one },
+                Shape = ShapeDefinition.DefaultSphere,
+                Appearance = AppearanceDefinition.Default,
+                MirrorAcrossSymmetryPlane = true,
+            });
+            return definition;
+        }
+
+        [Test]
+        public void ResolvedCreatureSnapshot_CanonicalizationParity_MatchesCanonicalizedResolve()
+        {
+            CreatureDefinition definition = CanonicalizationFixture();
+            CreatureDefinition canonical = DefinitionCanonicalizer.Canonicalize(definition);
+
+            ResolvedCreatureSnapshot raw = ResolvedCreatureSnapshot.Resolve(definition);
+            ResolvedCreatureSnapshot canon = ResolvedCreatureSnapshot.Resolve(canonical);
+
+            Assert.AreEqual(raw.RevisionId, canon.RevisionId,
+                "Canonicalizing the input must not change the snapshot revision.");
+            Assert.AreEqual(raw.Bounds, canon.Bounds);
+            Assert.AreEqual(raw.Generation, canon.Generation);
+            Assert.AreEqual(raw.SymmetryMode, canon.SymmetryMode);
+            Assert.AreEqual(raw.Forward, canon.Forward);
+
+            // Deterministic order + source identity.
+            CollectionAssert.AreEqual(
+                raw.PartsById.Values.Select(p => p.Id).ToList(),
+                canon.PartsById.Values.Select(p => p.Id).ToList(),
+                "Canonicalization must not change resolved part ordering or source identity.");
+
+            // Body parity.
+            Assert.AreEqual(raw.Body.SamplePositions.Count, canon.Body.SamplePositions.Count);
+            for (int i = 0; i < raw.Body.SamplePositions.Count; i++)
+            {
+                Assert.AreEqual(raw.Body.SamplePositions[i], canon.Body.SamplePositions[i]);
+                Assert.AreEqual(raw.Body.SampleRadii[i], canon.Body.SampleRadii[i]);
+            }
+
+            foreach (ResolvedPartSnapshot expected in canon.PartsById.Values)
+            {
+                Assert.IsTrue(raw.TryGetPart(expected.Id, out ResolvedPartSnapshot actual),
+                    $"Raw resolve must contain every canonicalized part id '{expected.Id}'.");
+                Assert.AreEqual(actual.ParentId, expected.ParentId);
+                Assert.AreEqual(actual.PartFrameToCreatureSpace, expected.PartFrameToCreatureSpace,
+                    $"Part frame for '{expected.Id}' must be canonicalization-equivalent.");
+                Assert.AreEqual(actual.ChildFrameToCreatureSpace, expected.ChildFrameToCreatureSpace,
+                    $"Child frame for '{expected.Id}' must be canonicalization-equivalent.");
+                Assert.AreEqual(actual.Appearance, expected.Appearance,
+                    $"Appearance for '{expected.Id}' must be canonicalization-equivalent.");
+                Assert.AreEqual(actual.MirrorAcrossSymmetryPlane, expected.MirrorAcrossSymmetryPlane,
+                    $"Mirror flag for '{expected.Id}' must be canonicalization-equivalent.");
+                Assert.AreEqual(actual.Shape.Type, expected.Shape.Type);
+                Assert.AreEqual(actual.Shape.Radius, expected.Shape.Radius);
+                Assert.AreEqual(actual.Shape.CapsuleHeight, expected.Shape.CapsuleHeight);
+                Assert.AreEqual(actual.Shape.EllipsoidRadii, expected.Shape.EllipsoidRadii);
+                Assert.AreEqual(actual.Shape.BoxHalfExtents, expected.Shape.BoxHalfExtents);
+                Assert.AreEqual(actual.Shape.SmoothBlendRadius, expected.Shape.SmoothBlendRadius);
+
+                if (expected.HasLimb)
+                {
+                    Assert.AreEqual(actual.Limb.JointPositions.Count, expected.Limb.JointPositions.Count);
+                    for (int j = 0; j < expected.Limb.JointPositions.Count; j++)
+                    {
+                        Assert.AreEqual(actual.Limb.JointPositions[j], expected.Limb.JointPositions[j]);
+                    }
+                }
+
+                Assert.AreEqual(actual.HasMeshGeometry, expected.HasMeshGeometry);
+                if (expected.HasMeshGeometry)
+                {
+                    Assert.AreEqual(actual.MeshAssetKey, expected.MeshAssetKey);
+                    Assert.AreEqual(actual.GeometryPlacementToCreatureSpace,
+                        expected.GeometryPlacementToCreatureSpace);
+                }
+
+                Assert.AreEqual(actual.HasBodySurfaceAnchor, expected.HasBodySurfaceAnchor);
+                if (expected.HasBodySurfaceAnchor)
+                {
+                    Assert.AreEqual(actual.BodySurfaceAnchorSegmentStartSampleId,
+                        expected.BodySurfaceAnchorSegmentStartSampleId);
+                }
+            }
         }
     }
 }
