@@ -151,15 +151,21 @@
       "author": "anonymous",
       "body": "Round 2 audit evidence: CC-099 remains a migration/evidence gap, not independently closed by the supplied audit. Existing TSK-0008 scope owns the related culling and non-finite field evidence. Do not claim CC-099 closure until the ff4650a behavior is independently verified against current source and tests.",
       "createdAtUtc": "2026-09-05T07:09:17.6081233Z"
+    },
+    {
+      "id": "c-c983525b78b6474599c5695bfc05d26a",
+      "author": "anonymous",
+      "body": "A0 inventory / B0a gap (2026-09-05): docs/audits/creaturecreator-a0-inventory-2026-09-05.md records that GenerationDiagnostics exposes SdfCompile, FieldSampling, MeshExtraction, AppearanceBake, and total timings, but no dedicated repeatable benchmark currently records stage timings plus samples/mixed-cells/vertices/triangles at multiple VPU settings. Historical 121 ms versus 600-750 ms figures remain context only. No generation code changed in this slice; next performance work must establish a measured baseline before culling optimization.",
+      "createdAtUtc": "2026-09-05T07:20:46.5033983Z"
     }
   ],
   "epicId": null,
   "parentId": null,
   "dueDateUtc": null,
   "createdAtUtc": "2026-09-01T03:16:25.5654277Z",
-  "updatedAtUtc": "2026-09-05T07:09:17.6081233Z",
+  "updatedAtUtc": "2026-09-05T07:20:46.5033983Z",
   "completedAtUtc": null,
-  "revision": 24,
+  "revision": 25,
   "isArchived": false,
   "hasLoadError": false,
   "loadError": null,

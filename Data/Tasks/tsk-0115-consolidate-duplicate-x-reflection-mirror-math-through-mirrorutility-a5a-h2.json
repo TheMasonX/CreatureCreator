@@ -4,7 +4,7 @@
   "title": "Consolidate duplicate X-reflection mirror math through MirrorUtility (A5a/H2)",
   "description": "## Summary\n\nFour independent \u0060Matrix4x4.Scale(new Vector3(-1,1,1))\u0060 X-reflection definitions exist and are not routed through a single shared utility:\n- \u0060MirrorUtility.cs:27\u0060 ReflectAcrossX (used once)\n- \u0060SdfProgramBuilder.cs:57\u0060 CreatureMirrorAcrossX (used once)\n- \u0060SemanticBoneResolver.cs:29\u0060 ReflectAcrossX (public, aliased by SkeletonInferrer.cs:73)\n- \u0060CreatureMeshGenerator.cs:33\u0060 ReflectAcrossX (used once)\n\nSource: docs/audits/creaturecreator-latest-main-audit-26-09-05-01-40-00.md (H2 carried) and docs/audits/creaturecreator-deep-dive-audit-2026-09-05.md F4. Re-verified at HEAD 2a89605 (duplication unchanged). Former owner CC-090\u0027s MemorySmith task TSK-0094 is Done for finite-check scope only and does NOT cover this mirror slice; no active owner exists. NOTE: MirrorUtility is not uniquely the least-referenced (three private copies tie at one in-file usage each) \u2014 justify consolidation by duplication, not by a reference-count ranking.\n\n## Scope\n\n- Route the duplicate X-reflection matrix math through the existing \u0060MirrorUtility.ReflectAcrossX\u0060.\n- Keep domain decisions (e.g. \u0022this limb is mirrored\u0022) outside the utility.\n- Pure reference swap; no semantic change.\n- Cover SdfProgramBuilder, SemanticBoneResolver, and CreatureMeshGenerator sites; keep SkeletonInferrer delegating to the shared resolver.\n\n## Acceptance Criteria\n\n- One X-reflection matrix definition is referenced by all sites.\n- Deterministic/canonicalization, SDF parity, and mesh output are unchanged.\n- No new raw-DNA or derivation path is introduced.\n\n## Validation\n\n- \u0060dotnet build\u0060 Runtime \u002B Tests.Runtime pass 0 errors/warnings.\n- Existing SDF parity, canonicalization, mirrored-limb, and mesh suites stay green.\n- \u0060git diff --check\u0060 passes.\n\n## Findings\n\n- H2 confirmed unchanged at HEAD; 4 independent definitions; consolidation is a cheap, low-risk reference swap.\n\n## Blockers\n\n- None identified. Related to TSK-0105 (active geometry-utility consolidation) and TSK-0094 (CC-090, Done for finite checks only).\n\n## Next Step\n\n- Consolidate the four X-reflection definitions onto MirrorUtility.ReflectAcrossX; run parity/canonicalization/mesh validation.",
   "type": "Task",
-  "status": "Ready",
+  "status": "Done",
   "priority": "Medium",
   "assigneeMode": "Custom",
   "assigneeDirectoryId": null,
@@ -20,16 +20,23 @@
   "attachments": [],
   "externalLinks": [],
   "linkedPages": [],
-  "comments": [],
+  "comments": [
+    {
+      "id": "c-15234e97be2f4c96b3af2da50b8005c2",
+      "author": "anonymous",
+      "body": "A0 inventory correction (2026-09-05): targeted current-source search finds exactly one X-reflection matrix definition, in MirrorUtility.cs. CreatureMeshGenerator and SemanticBoneResolver use MirrorUtility helpers; SdfProgramBuilder uses MirrorUtility.ReflectTransformAcrossX; SkeletonInferrer delegates through the shared resolver/utility. The source already satisfies the task\u0027s one-definition acceptance criterion, so no code edit was made. Existing pushed commit ffff9d3 had Runtime 475/475 and Editor 115/115 Unity suites passing; current revalidation could not start because no MCP-connected Unity Editor instance is running. Both affected dotnet builds currently pass with 0 warnings/errors.",
+      "createdAtUtc": "2026-09-05T07:20:46.4677738Z"
+    }
+  ],
   "epicId": null,
   "parentId": null,
   "dueDateUtc": null,
   "createdAtUtc": "2026-09-05T06:50:54.6762749Z",
-  "updatedAtUtc": "2026-09-05T06:50:54.6762749Z",
-  "completedAtUtc": null,
-  "revision": 1,
+  "updatedAtUtc": "2026-09-05T07:20:46.5369484Z",
+  "completedAtUtc": "2026-09-05T07:20:46.5369484Z",
+  "revision": 3,
   "isArchived": false,
   "hasLoadError": false,
   "loadError": null,
-  "sourceFilePath": null
+  "sourceFilePath": "tsk-0115-consolidate-duplicate-x-reflection-mirror-math-through-mirrorutility-a5a-h2.json"
 }
