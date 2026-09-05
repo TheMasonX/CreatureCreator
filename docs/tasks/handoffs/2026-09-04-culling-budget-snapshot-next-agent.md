@@ -3,20 +3,20 @@
 **Date:** 2026-09-04
 **Branch:** `agent/2026-09-04-culling-budget-snapshot-hardening`
 **Base:** `48ffccd97fb89d2aa27032a78fd6718daeff8fc3`
-**Latest implementation commit:** `ca6daf8e596e4574b155b88ea1bd85abe2a497fa`
+**Latest implementation/handoff commit:** `af6f02a73ea61bddbcaa53ac9f9ee63e04e652d2`
 
 ## Current state
 
 This round reviewed the latest implementation commits and the prior agent's final
 response. The prior response's “no Runtime defect” conclusion was superseded by a
-source-level review of the fast SDF contract: the repository retains `Cullable` safety
+source-level review of the fast SDF contract: the repository retained `Cullable` safety
 metadata but the evaluator and root sampling shortcut did not consume it.
 
 CC-089 is now marked Done in the Markdown task surface. Its latest implementation
 uses `TryResolve` for routine malformed body/limb envelope cases and detaches the
-hierarchy index's parts view.
+hierarchy index's parts view. No second graph-mechanics task is needed.
 
-CC-091 remains In Progress. Its product decisions are now explicit:
+CC-091 remains In Progress. Its product/architecture decisions are now explicit:
 
 - `MaxVoxelBudget` is a **corner-sample allocation budget**, because
   `DensityGrid.SamplePortable` actually allocates `(cellsX+1)*(cellsY+1)*(cellsZ+1)`
@@ -24,6 +24,13 @@ CC-091 remains In Progress. Its product decisions are now explicit:
 - The authoritative generation snapshot must represent the **same canonicalized input**
   whose canonical representation supplies `RevisionId`. Generation should canonicalize a
   detached copy before resolving; the authored `CreatureDefinition` must not be mutated.
+- Keep `DefinitionValidator.Validate(...)` as the single public validation façade. If
+  validation context is later factored, use one concrete context/index passed through the
+  existing checks; do not create a generic validator/service framework.
+- Keep both authoring-local and resolved-world envelope diagnostics. They answer different
+  questions: local authoring constraints versus actual generation-domain reachability.
+  They must have distinct validation codes/messages and must not silently collapse into
+  one ambiguous “out of bounds” diagnostic.
 - No second snapshot task may be created.
 
 ## Work already implemented on this branch
@@ -51,11 +58,11 @@ Regression tests were added for:
 - an elongated ellipsoid outside its AABB with a finite approximate field value;
 - a culling-boundary sphere gradient using one-sided finite differences.
 
-## Important follow-up
+## Important validation state
 
-The branch has not been Unity-validated after the CC-099 edits in this session. The next
-agent MUST run focused SDF tests and then the full runtime/editor suites before claiming
-completion.
+The branch has **not** been Unity-validated after the CC-099 edits in this session. Do
+not claim a test pass from source inspection or from the earlier base-commit validation.
+The next agent MUST run focused SDF tests and then the full runtime/editor suites.
 
 ## Next implementation wave
 
@@ -75,7 +82,9 @@ completion.
 5. Audit `SdfProgramBuilder` for duplicate primitive emission between whole-creature and
    individual-part paths and consolidate mechanically identical code into small concrete
    helpers. Do not introduce generic compiler/service interfaces.
-6. Re-run deterministic generation, topology, appearance, mesh-placement, and scheduler
+6. Align the editor budget display with the decision: show corner samples against
+   `MaxVoxelBudget`, optionally showing cell count separately as a diagnostic.
+7. Re-run deterministic generation, topology, appearance, mesh-placement, and scheduler
    parity after the authority changes.
 
 ## Do not do
@@ -85,6 +94,7 @@ completion.
 - Do not remove `Cullable`; it is the correct proof-bearing safety gate.
 - Do not use AABB bounds alone as a culling proof.
 - Do not canonicalize/mutate the editor's authoritative object in place.
+- Do not turn local and resolved bounds validation into one ambiguous rule.
 - Do not add a generic abstraction framework.
 - Do not claim PlayMode validation from build-only or source-only evidence.
 
@@ -118,8 +128,12 @@ construct the canonical/resolved boundary and delegate to the same implementatio
 ## Prompt for the next agent
 
 Review this handoff and the current branch, then continue implementation without asking
-for clarification. Start by validating CC-099. Fix any regression you discover. Once
-CC-099 is green, implement the next smallest reversible CC-091 authority slice described
-above. Use existing task ownership; create no duplicate CC ticket. Update the relevant
-Markdown task/handoff evidence, commit each coherent slice, and leave the branch in a
-buildable/testable state.
+for clarification. Start by validating CC-099 on the current source. Treat failures as
+real until disproven. Once CC-099 is green, implement the next smallest reversible CC-091
+authority slice: canonicalize a detached generation input before snapshot resolution,
+make the snapshot/revision correspond to that exact canonical input, and close any raw-DNA
+bypass discovered in downstream stages. Preserve the one-snapshot rule and existing public
+compatibility behavior. Keep validation as one façade and retain distinct local-vs-resolved
+bounds diagnostics. Use existing task ownership; create no duplicate CC ticket beyond the
+already-created CC-099 correctness task. Update the task/handoff evidence, commit each
+coherent slice, and leave the branch buildable/testable.
