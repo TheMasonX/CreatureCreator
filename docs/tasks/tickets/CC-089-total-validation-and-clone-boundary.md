@@ -2,7 +2,7 @@
 id: creature-task-089
 key: CC-089
 title: Make malformed-definition validation and cloning total
-status: Backlog
+status: Done
 type: Bug Fix
 authority: BeastMaster
 priority: P1
@@ -44,13 +44,36 @@ Make malformed definitions produce stable validation or domain errors instead of
 - Canonical JSON preserves null or blank display-name intent according to the chosen documented contract.
 - Validation remains report-only and does not silently rewrite DNA.
 
-## Validation
+## Completion Evidence
 
-Run focused DefinitionValidator, CreatureDefinition, canonicalizer, and JSON round-trip tests in Unity. Include malformed object-graph fixtures and inspect the console.
+Implemented across the 2026-09-01 through 2026-09-04 waves:
+
+- Concrete tolerant `CreaturePartHierarchyIndex` with detached read-only Parts,
+  first-wins lookup, child lookup, duplicate diagnostics, and terminating cycle analysis.
+- `CreatureDefinition` lookup/cycle and canonicalizer hierarchy paths converge on the
+  same index contract; canonicalizer no longer builds a duplicate child dictionary.
+- Null-safe clone/remove behavior is covered by malformed-definition fixtures.
+- `DefinitionValidator.ValidateResolvedEnvelope` now uses `ResolvedBody.TryResolve`
+  and `ResolvedLimb.TryResolve`; one defensive anchored-Body-child catch remains only
+  at the explicit projection boundary where authored attachment errors are surfaced.
+- Reserved `BodyId`/hierarchy residuals and snapshot resolver boundary regressions were
+  added and validated.
+
+Validation evidence from the latest implementation wave:
+
+- Unity 6000.5.9f1 full `ProceduralCreature.Tests.Runtime` PlayMode: 456/456, 0 failed, 0 skipped.
+- Full `ProceduralCreature.Tests.Editor` EditMode: 115/115, 0 failed, 0 skipped.
+- `dotnet build` Tests.Runtime: 0 errors / 0 warnings.
+- `git diff --check`: clean.
+
+The latest commit `48ffccd97fb89d2aa27032a78fd6718daeff8fc3` records the closing
+non-throwing envelope/read-only hierarchy residuals and the final CC-091 regressions.
 
 ## Findings
 
-The audit series confirms a throwing `HasParentCycle` dictionary path and broader null-entry risks. It also corrects the original CC-083 diagnosis: the existing validator rule is present, but the test helper cannot express an explicit null parent.
+The original task's malformed-input and exception-control-flow goals are now satisfied.
+Residual generation/canonicalization authority work is owned by CC-091, not this task.
+No additional graph-mechanics ticket should be created from the old audit series.
 
 ## Blockers
 
@@ -58,4 +81,5 @@ None.
 
 ## Next Step
 
-Choose the tolerant-index contract, then add the malformed graph fixtures before changing validation implementation.
+No further CC-089 implementation is required. Preserve its regression suite while
+continuing generation authority work under CC-091.
