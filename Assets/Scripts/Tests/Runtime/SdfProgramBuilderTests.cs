@@ -4,6 +4,7 @@ using Unity.Mathematics;
 using UnityEngine;
 using ProceduralCreature.Common;
 using ProceduralCreature.Definition;
+using ProceduralCreature.Morphology.Extraction;
 using ProceduralCreature.Morphology.Sdf;
 
 namespace ProceduralCreature.Tests.Runtime
@@ -141,6 +142,57 @@ namespace ProceduralCreature.Tests.Runtime
             finally
             {
                 operations.Dispose();
+            }
+        }
+
+        [Test]
+        public void CompilePortable_EllipsoidOutsideAabbStillMatchesReference()
+        {
+            CreatureDefinition definition = CreatureDefinition.CreateEmpty();
+            definition.AddPart(new CreaturePart
+            {
+                Id = "ellipsoid",
+                Transform = TransformData.Identity,
+                Shape = new ShapeDefinition
+                {
+                    Type = ShapeType.Ellipsoid,
+                    PrimarySize = 1f,
+                    EllipsoidRadii = new Vector3(10f, 1f, 1f),
+                    SmoothBlendRadius = 0f,
+                },
+                Appearance = AppearanceDefinition.Default,
+            });
+
+            using (SdfProgram program = SdfProgramBuilder.CompilePortable(definition))
+            {
+                Vector3 point = new Vector3(15f, 5f, 0f);
+                float reference = SdfProgramEvaluator.EvaluateReference(
+                    program, new float3(point.x, point.y, point.z));
+                float fast = Evaluate(program, point);
+
+                Assert.IsTrue(!float.IsNaN(reference) && !float.IsInfinity(reference),
+                    "The approximate ellipsoid SDF must be finite at the regression point.");
+                Assert.AreEqual(reference, fast, 1e-5f,
+                    "An ellipsoid's AABB is not a safe culling proof; fast evaluation must not return +inf here.");
+            }
+        }
+
+        [Test]
+        public void DensityGrid_EstimateGradient_UsesOneSidedFiniteDifferenceAtCullBoundary()
+        {
+            using (SdfProgram program = SdfProgramBuilder.CompilePortable(Sphere("sphere", Vector3.zero)))
+            using (DensityGrid grid = DensityGrid.SamplePortable(
+                program,
+                new BoundsDefinition { MaxX = 2f, MaxY = 2f, MaxZ = 2f },
+                new GenerationSettings { VoxelsPerUnit = 2f }))
+            {
+                Vector3 gradient = grid.EstimateGradient(new Vector3(1f, 0f, 0f));
+
+                Assert.IsTrue(!float.IsNaN(gradient.x) && !float.IsInfinity(gradient.x));
+                Assert.IsTrue(!float.IsNaN(gradient.y) && !float.IsInfinity(gradient.y));
+                Assert.IsTrue(!float.IsNaN(gradient.z) && !float.IsInfinity(gradient.z));
+                Assert.Greater(gradient.x, 0.5f,
+                    "The finite one-sided derivative at the sphere surface must preserve the outward direction.");
             }
         }
 
