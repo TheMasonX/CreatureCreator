@@ -30,6 +30,13 @@ namespace ProceduralCreature.Morphology.Sdf
         public float3 MinBound;
         public float3 MaxBound;
         public int ConsumerUnionIndex;
+
+        /// <summary>
+        /// True only when this op's SDF output is bounded below by the distance to
+        /// its world AABB, so the culling skip is safe. False for an ellipsoid or a
+        /// subtree containing one, whose approximate SDF can be smaller than the
+        /// AABB distance. AABB culling sites must check this flag, never bounds alone.
+        /// </summary>
         public bool Cullable;
 
         public static SdfOperation Primitive(SdfOperationType type, float3 parameters)
@@ -49,6 +56,12 @@ namespace ProceduralCreature.Morphology.Sdf
     {
         public NativeArray<SdfOperation> Operations { get; }
         public int RootIndex { get; }
+
+        /// <summary>
+        /// Maximum smooth-blend radius across all unions plus a small epsilon. The
+        /// evaluator inflates each culled op's world AABB by this so a skipped op is
+        /// provably farther from the sample than any blend can reach.
+        /// </summary>
         public float InfluenceRadius { get; }
 
         internal SdfProgram(NativeArray<SdfOperation> operations, int rootIndex, float influenceRadius)
@@ -67,6 +80,17 @@ namespace ProceduralCreature.Morphology.Sdf
         }
     }
 
+    /// <summary>
+    /// Evaluates a compiled portable SDF program at a point (CC-045).
+    ///
+    /// Non-finite field contract (CC-064): <c>+inf</c> means outside/culled/absent;
+    /// NaN is always invalid; finite is the evaluated field. Fast culling writes
+    /// <c>+inf</c> for a skipped operation, so a consumer must treat it as "no
+    /// candidate", never as a giant valid distance. Culling is proof-based: an
+    /// operation is skipped only when it is <see cref="SdfOperation.Cullable"/> and
+    /// its valid AABB, inflated by the influence radius, does not contain the point.
+    /// An AABB alone is not a culling proof for an approximate ellipsoid field.
+    /// </summary>
     public static class SdfProgramEvaluator
     {
         public static float Evaluate(SdfProgram program, float3 point)
@@ -255,6 +279,9 @@ namespace ProceduralCreature.Morphology.Sdf
 
         private static float SmoothMin(float a, float b, float radius)
         {
+            // AABB-culled children read as +inf ("absent"): the finite child wins, or
+            // +inf when both are absent. math.lerp(b, a, h) is NaN on inf*0, so +inf
+            // must be short-circuited before blending.
             if (float.IsPositiveInfinity(a) || float.IsPositiveInfinity(b))
             {
                 return math.min(a, b);
@@ -279,6 +306,12 @@ namespace ProceduralCreature.Morphology.Sdf
         public float CellSize;
         public int SampleStartIndex;
         public float InfluenceRadius;
+
+        /// <summary>
+        /// True only when the root operation is Cullable with valid bounds. When
+        /// false (for example an ellipsoid root), the region shortcut is disabled so
+        /// a finite approximate field is never early-exited to <c>+inf</c>.
+        /// </summary>
         public bool RootCanCull;
         public float3 RootMinBound;
         public float3 RootMaxBound;

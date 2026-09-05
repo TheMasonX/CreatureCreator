@@ -9,6 +9,16 @@ using ProceduralCreature.Morphology.Sdf;
 
 namespace ProceduralCreature.Morphology.Extraction
 {
+    /// <summary>
+    /// A fixed-resolution 3D grid of SDF corner samples covering a creature's
+    /// bounds. Corner-count per axis follows the same ceiling formula as
+    /// <c>GenerationSettings.EstimateVoxelCount</c>; callers must have run the
+    /// corner-sample budget check before calling <see cref="SamplePortable"/>.
+    ///
+    /// CC-064 non-finite contract: fast samples may read <c>+inf</c>
+    /// (outside/culled), never NaN. Grid consumers (min/max, interpolation,
+    /// gradient) must treat <c>+inf</c> as absent, not as a giant finite distance.
+    /// </summary>
     public sealed class DensityGrid : IDisposable
     {
         private const int PortableScratchValueBudget = 8 * 1024 * 1024;
@@ -20,6 +30,12 @@ namespace ProceduralCreature.Morphology.Extraction
         public Vector3 Origin { get; }
         public float CellSize { get; }
         public int SampleCount => _samples.Length;
+
+        /// <summary>
+        /// Native corner samples, exposed for Burst consumers (for example the
+        /// active-cell scan). Read-only for callers; the grid owns the buffer's
+        /// lifetime and releases it in <see cref="Dispose"/>.
+        /// </summary>
         public NativeArray<float> Samples => _samples;
 
         private int CornersX => CellsX + 1;

@@ -178,6 +178,49 @@ namespace ProceduralCreature.Tests.Runtime
         }
 
         [Test]
+        public void SamplePortable_EllipsoidRoot_RegionShortcutNeverEarlyExits()
+        {
+            CreatureDefinition definition = CreatureDefinition.CreateEmpty();
+            definition.Bounds = new BoundsDefinition { MaxX = 4f, MaxY = 4f, MaxZ = 4f };
+            definition.Generation = new GenerationSettings { VoxelsPerUnit = 1f };
+            definition.AddPart(new CreaturePart
+            {
+                Id = "ellipsoid",
+                Transform = TransformData.Identity,
+                Shape = new ShapeDefinition
+                {
+                    Type = ShapeType.Ellipsoid,
+                    PrimarySize = 1f,
+                    EllipsoidRadii = new Vector3(10f, 1f, 1f),
+                    SmoothBlendRadius = 0f,
+                },
+                Appearance = AppearanceDefinition.Default,
+            });
+
+            using (SdfProgram program = SdfProgramBuilder.CompilePortable(definition))
+            using (DensityGrid grid = DensityGrid.SamplePortable(program, definition.Bounds, definition.Generation))
+            {
+                // The ellipsoid's world AABB is (10,1,1); many sampled corners (for
+                // example (0,3,0)) lie outside that AABB yet carry a finite
+                // approximate SDF. If the root-region shortcut used the AABB alone,
+                // ignoring Cullable, it would pre-fill +inf at those corners and open
+                // a hole. The shortcut must be disabled for a non-Cullable root, so
+                // no sample may be +inf where the reference field is finite.
+                for (int z = 0; z <= grid.CellsZ; z++)
+                for (int y = 0; y <= grid.CellsY; y++)
+                for (int x = 0; x <= grid.CellsX; x++)
+                {
+                    float sample = grid.GetSample(x, y, z);
+                    Vector3 point = grid.CornerPosition(x, y, z);
+                    float reference = SdfProgramEvaluator.EvaluateReference(
+                        program, new float3(point.x, point.y, point.z));
+                    Assert.IsFalse(float.IsInfinity(sample) && !float.IsInfinity(reference),
+                        $"Ellipsoid-root region shortcut early-exited corner ({x},{y},{z}).");
+                }
+            }
+        }
+
+        [Test]
         public void DensityGrid_EstimateGradient_UsesOneSidedFiniteDifferenceAtCullBoundary()
         {
             using (SdfProgram program = SdfProgramBuilder.CompilePortable(Sphere("sphere", Vector3.zero)))
@@ -186,7 +229,11 @@ namespace ProceduralCreature.Tests.Runtime
                 new BoundsDefinition { MaxX = 2f, MaxY = 2f, MaxZ = 2f },
                 new GenerationSettings { VoxelsPerUnit = 2f }))
             {
-                Vector3 gradient = grid.EstimateGradient(new Vector3(1f, 0f, 0f));
+                // DefaultSphere has Radius 0.5, so the finite surface is at x = 0.5.
+                // The neighboring corner at world x = 1.0 lies outside the sphere's
+                // inflated cull AABB and reads +inf. Sampling at the surface therefore
+                // exercises the one-sided finite difference (finite center, +inf next).
+                Vector3 gradient = grid.EstimateGradient(new Vector3(0.5f, 0f, 0f));
 
                 Assert.IsTrue(!float.IsNaN(gradient.x) && !float.IsInfinity(gradient.x));
                 Assert.IsTrue(!float.IsNaN(gradient.y) && !float.IsInfinity(gradient.y));

@@ -154,15 +154,21 @@
       "author": "anonymous",
       "body": "Authority-gate update 2026-09-04: closed the single-joint-limb-parent divergence in the snapshot parent resolver. SemanticBoneResolver.ResolveParentBoneId(ResolvedCreatureSnapshot, ...) now guards parent.HasLimb \u0026\u0026 parent.Limb.JointPositions.Count \u003E= 2 before resolving the terminal bone, exactly mirroring the definition-based overload\u0027s authored Joints.Count \u003E= 2 guard. Previously a single-joint (degenerate) parent limb fabricated a \u0022_j-1\u0022 per-segment bone id, diverging from the definition overload\u0027s fallback to the parent id. ResolvedLimb deliberately permits a single-joint chain (documented degenerate case; the \u003E=2 invariant is validation\u0027s MinLimbJointCount), so the resolver guards rather than assumes \u2014 this confirms the \u0022\u003E=2-joint invariant the snapshot parent resolver relies on\u0022 gate from the resolved side. Added SemanticBoneResolverTests.SnapshotResolver_SingleJointLimbParent_MatchesDefinitionResolver asserting definition-vs-snapshot parity and no \u0022_j\u0022 fabrication. Evidence (Unity 6000.5.9f1): full ProceduralCreature.Tests.Runtime PlayMode 452/452 passed 0 failed 0 skipped; EditMode 115/115; focused resolver fixtures included in the 75/75 run; dotnet build Runtime/Editor 0 warnings/errors. Remaining CC-091 gates: canonicalization-equivalent revision/output parity (geometry, appearance, deterministic order, source identity, transforms, revision), MaxVoxelBudget cells-vs-corner-samples semantics decision, and remaining raw-input audit (SemanticBoneResolver compatibility boundaries, SdfProgramBuilder.CompileIndividualPartsPortable). Keep InProgress.",
       "createdAtUtc": "2026-09-04T23:01:03.2429747Z"
+    },
+    {
+      "id": "c-06d41bf39cdb4c6cbcc5d0e33c4db5fb",
+      "author": "anonymous",
+      "body": "## PR-1 review \u002B Unity validation (2026-09-04, BeastMaster)\n\nReviewed PR-1 (agent/2026-09-04-culling-budget-snapshot-hardening, 11 commits vs main) and ran the Unity validation that was unavailable to the external agent.\n\nUnity version: 6000.5.9f1.\n- ProceduralCreature.Tests.Runtime (PlayMode): 460/460 passed, 0 failed, 0 skipped.\n- ProceduralCreature.Tests.Editor (EditMode): 115/115 passed.\n- Unity console: no errors/warnings after compile; git diff --check clean.\n\nCAUTION: the first two runs after checkout reported 456/456 and 115/115 against STALE (main) assemblies. After refresh_unity(compile) the real branch code ran (460 total) and exposed a genuine failure in the external regression DensityGrid_EstimateGradient_UsesOneSidedFiniteDifferenceAtCullBoundary: it sampled EstimateGradient at (1,0,0), but DefaultSphere Radius = 0.5, so that point is fully culled (\u002Binf) and the gradient is legitimately 0. Fixed the point to (0.5,0,0) (the finite surface adjacent to the culled corner at x=1.0); test now passes and genuinely exercises the one-sided finite-difference path.\n\nFixes added on the branch (uncommitted pending coordinating agent):\n- SdfProgramBuilderTests: new SamplePortable_EllipsoidRoot_RegionShortcutNeverEarlyExits (grid-level parity proving an ellipsoid root is never early-exited by the region shortcut; closes the CC-099 root-shortcut acceptance gap). Fixed the gradient-boundary test geometry above.\n- SdfCullingModeTests: new FastCulling_GradientIsFiniteAtCullBoundaries (sweeps all culling-boundary corners, asserts no NaN/Infinity gradient).\n- Restored concise proof-bearing doc (non-finite contract CC-064, Cullable proof gate, InfluenceRadius rationale, region-shortcut guard, SmoothMin \u002Binf handling) in SdfProgram.cs and DensityGrid.cs that the PR had deleted; loss of these comments is what caused the CC-063 regression.\n\nRuntime source logic was reviewed and is correct (Cullable-gated EvaluateInto/EvaluateSubtree, RootCanCull region shortcut, finite-aware EstimateAxis). CC-099 regression wave is now complete and Unity-validated. Next slice: CC-091 authority boundary (detached canonicalization before snapshot resolution; RevisionId from exact canonical input; read-only generated-buffer views; raw-input closure).",
+      "createdAtUtc": "2026-09-05T00:40:33.048024Z"
     }
   ],
   "epicId": null,
   "parentId": null,
   "dueDateUtc": null,
   "createdAtUtc": "2026-09-01T03:20:52.7496119Z",
-  "updatedAtUtc": "2026-09-04T23:01:03.2429747Z",
+  "updatedAtUtc": "2026-09-05T00:40:33.048024Z",
   "completedAtUtc": "2026-09-02T03:10:44.2511455Z",
-  "revision": 26,
+  "revision": 27,
   "isArchived": false,
   "hasLoadError": false,
   "loadError": null,
