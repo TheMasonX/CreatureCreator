@@ -202,15 +202,21 @@
       "author": "anonymous",
       "body": "A6 stage-boundary slice (2026-09-05): extracted validation and resolved snapshot creation from CreatureMeshGenerator.GenerateData into the private ValidateAndResolve helper. Public Generate/GenerateData APIs, DefinitionValidator diagnostics, Validation failure stage marking, snapshot authority, and all generation stages remain unchanged. Validation: Runtime and Tests.Runtime dotnet builds passed with 0 warnings/errors; static diagnostics are clean. Unity runtime/editor reruns remain blocked because no MCP-connected Editor instance is available. Next A6 slice can extract implicit SDF compile/sampling only after connected-Unity parity validation.",
       "createdAtUtc": "2026-09-05T07:23:26.3531461Z"
+    },
+    {
+      "id": "c-1d6e78d7c7fd44fab199c573c9cb56f3",
+      "author": "anonymous",
+      "body": "## A6 stage-boundary slice (2026-09-05) \u2014 full GenerateData/Assemble decomposition\n\nDecomposed CreatureMeshGenerator into concrete, separately owned stages matching the CC-091/A6 target shape (ValidateAndResolve / GenerateImplicitField / ExtractMesh / ValidateMesh / BakeAppearance / AppendMeshAssetItems / Assemble-as-orchestration). Pure behavior-preserving method extraction; no public API, diagnostics, disposal, or stage-order change.\n\n- GenerateData is now a thin orchestrator: ValidateAndResolve -\u003E GenerateImplicitField (compile\u002Bsample) -\u003E ExtractMesh -\u003E ValidateMesh -\u003E BakeAppearance -\u003E new GeneratedCreatureData.\n- GenerateImplicitField owns the transient SdfProgram (compile \u002B dispose after sampling); returns the DensityGrid whose native sample buffer ownership transfers to ExtractMesh.\n- ExtractMesh takes ownership of the grid and disposes it in finally (even on throw) \u2014 preserving the previous Persistent-allocation leak guard exactly once.\n- ValidateMesh validates topology from the plain-data MeshExtractionResult (no native resources).\n- BakeAppearance compiles the individual-part and Body appearance programs from the resolved snapshot, bakes, and disposes them; it does not re-derive morphology from raw DNA.\n- Assemble remains thin orchestration; mesh-asset placement extracted into AppendMeshAssetItems (snapshot-driven, deterministic SourcePartId order, mirroring preserved).\n\nEvidence: ProceduralCreature.Runtime and ProceduralCreature.Tests.Runtime dotnet builds --no-restore 0 warnings/0 errors; static diagnostics clean; git diff --check clean (only pre-existing LF/CRLF notice on untouched ProjectSettings file). Unity 6000.5.9f1 (connected): full ProceduralCreature.Tests.Runtime PlayMode 475/475 passed (0 failed, 0 skipped); ProceduralCreature.Tests.Editor EditMode 115/115 passed. Worktree contains only CreatureMeshGenerator.cs.\n\nResidual: the AppearanceBaker.Bake API still receives \u0060definition\u0060 for part-appearance lookups (unchanged pre-existing contract); this slice introduces no new raw-DNA morphology reinterpretation. Remaining CC-091 gates (canonicalization-equivalent output parity, MaxVoxelBudget cells-vs-corner semantics) are outside this stage-decomposition slice.",
+      "createdAtUtc": "2026-09-05T15:24:02.7238346Z"
     }
   ],
   "epicId": null,
   "parentId": null,
   "dueDateUtc": null,
   "createdAtUtc": "2026-09-01T03:20:52.7496119Z",
-  "updatedAtUtc": "2026-09-05T07:23:26.3531461Z",
+  "updatedAtUtc": "2026-09-05T15:24:02.7238346Z",
   "completedAtUtc": "2026-09-02T03:10:44.2511455Z",
-  "revision": 34,
+  "revision": 35,
   "isArchived": false,
   "hasLoadError": false,
   "loadError": null,
