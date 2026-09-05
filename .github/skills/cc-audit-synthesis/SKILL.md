@@ -1,6 +1,10 @@
 ---
 name: cc-audit-synthesis
-description: "Reconcile CreatureCreator codebase audits into verified, de-duplicated findings and synchronized CC-### Markdown tasks. Use for audit synthesis, external audit review, task-board cleanup, task supersession, archival, provenance correction, and follow-up planning."
+description: |
+  Reconcile CreatureCreator codebase audits into verified, de-duplicated
+  findings and synchronized CC-### Markdown tasks. Use for audit synthesis,
+  external audit review, task-board cleanup, task supersession, archival,
+  provenance correction, and follow-up planning.
 argument-hint: "List the audit files, review mode, fixed point, and whether to create or update CC tasks"
 user-invocable: true
 disable-model-invocation: false

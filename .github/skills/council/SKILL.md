@@ -1,6 +1,6 @@
 ---
 name: council
-description: >-
+description: |
   Run a multi-seat peer review for high-impact CreatureCreator decisions.
   Use when evaluating requirement-to-task coverage, architecture plans, audit
   reconciliation, generation strategy, editor workflow, or migration scope.

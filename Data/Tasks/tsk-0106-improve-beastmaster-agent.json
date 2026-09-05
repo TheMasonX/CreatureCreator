@@ -1,0 +1,40 @@
+﻿{
+  "id": "tsk-0106-improve-beastmaster-agent",
+  "key": "TSK-0106",
+  "title": "Improve BeastMaster agent with graduated skill discovery",
+  "description": "## Summary\nImprove the BeastMaster custom agent using patterns from reference agents and local customization guidance.\n\n## User Mandate\n\u003E Improve your own beastmaster agent using what you can learn from these other agent files to create a consice and dense, yet full featured and useful agent. You can /create-skill or update skills as needed within this repo and point our agent file at them (no touching outside non-creaturecreator repos). Keep in mind that we don\u0027t want to bloat the main agent file and use graduated discovery to allow the agents to peruse the most useful skills and only load into context what is actually needed\n\nSTRICT. Keep all edits inside CreatureCreator. Keep BeastMaster concise and full featured. Use graduated discovery through skills. Do not modify the external reference repositories.",
+  "type": "Task",
+  "status": "Done",
+  "priority": "Medium",
+  "assigneeMode": "Custom",
+  "assigneeDirectoryId": null,
+  "assigneeCustomText": "BeastMaster",
+  "reporter": "anonymous",
+  "labels": [
+    "user-mandated",
+    "agent-customization",
+    "BeastMaster"
+  ],
+  "attachments": [],
+  "externalLinks": [],
+  "linkedPages": [],
+  "comments": [
+    {
+      "id": "c-009a48721fd24fc99108d1acd68a0aa2",
+      "author": "anonymous",
+      "body": "Implemented the BeastMaster customization inside CreatureCreator only. Replaced the 172-line agent prompt with a 90-line role, invariant, graduated-discovery, workflow, and response-contract prompt. Added \u0060.github/skills/creature-workflow/SKILL.md\u0060 with the reusable inspect, track, edit, validate, and handoff loop. Focused validation passed: both files exist, frontmatter has name and description, relative skill links resolve, and \u0060git diff --check\u0060 passed. Final sanity check showed only the intended agent and new skill were changed by this work; unrelated pre-existing worktree changes remain in DensityGrid.cs, SdfProgram.cs, an existing task JSON, and an audit handoff.",
+      "createdAtUtc": "2026-09-05T01:41:01.1457709Z"
+    }
+  ],
+  "epicId": null,
+  "parentId": null,
+  "dueDateUtc": null,
+  "createdAtUtc": "2026-09-05T01:39:23.3036994Z",
+  "updatedAtUtc": "2026-09-05T01:41:02.5854712Z",
+  "completedAtUtc": "2026-09-05T01:41:02.5854712Z",
+  "revision": 3,
+  "isArchived": false,
+  "hasLoadError": false,
+  "loadError": null,
+  "sourceFilePath": "tsk-0106-improve-beastmaster-agent.json"
+}

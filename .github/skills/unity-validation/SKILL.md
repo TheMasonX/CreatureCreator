@@ -1,6 +1,10 @@
 ---
 name: unity-validation
-description: "Validate CreatureCreator changes in Unity. Use for Unity C# compilation, EditMode and PlayMode tests, assembly definitions, editor scripts, procedural mesh topology, deterministic DNA serialization, SDF generation, appearance baking, skeleton inference, and IK."
+description: |
+   Validate CreatureCreator changes in Unity. Use for Unity C# compilation,
+   EditMode and PlayMode tests, assembly definitions, editor scripts, procedural
+   mesh topology, deterministic DNA serialization, SDF generation, appearance
+   baking, skeleton inference, and IK.
 argument-hint: "Name the changed slice, focused test, Unity check, or known environment limitation"
 ---
 

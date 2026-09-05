@@ -1,0 +1,42 @@
+﻿{
+  "id": "tsk-0108-review-task-history-guardrails",
+  "key": "TSK-0108",
+  "title": "Review CreatureCreator task history for recurring guardrail patterns",
+  "description": "## Summary\nReview CreatureCreator task history and encode recurring repository-specific bug patterns in the agent guardrails.\n\n## User Mandate\n\u003E Review our tasks for histories of bug patterns or things specific to our repo that should be noted like this\n\nSTRICT. Use active and historical task evidence. Add only repeated or high-signal CreatureCreator-specific guidance. Keep it in graduated skills, not the base agent prompt, unless it is a universal invariant.",
+  "type": "Task",
+  "status": "Done",
+  "priority": "Medium",
+  "assigneeMode": "Custom",
+  "assigneeDirectoryId": null,
+  "assigneeCustomText": "BeastMaster",
+  "reporter": "anonymous",
+  "labels": [
+    "user-mandated",
+    "agent-customization",
+    "task-history",
+    "code-quality",
+    "BeastMaster"
+  ],
+  "attachments": [],
+  "externalLinks": [],
+  "linkedPages": [],
+  "comments": [
+    {
+      "id": "c-938892c914b44efaaafa411f6f7227e6",
+      "author": "anonymous",
+      "body": "Reviewed the full task inventory and highest-signal task records. Repeated CreatureCreator-specific patterns are: raw-DNA re-derivation after canonical resolved snapshots, broad generation/editor policy hubs, duplicate async definition capture and implicit generated-object ownership, stale-result and domain-reload cleanup gaps, partial malformed-DNA handling that throws or returns garbage, parity drift across managed/Burst and sync/async paths, premature generic utility layers, native allocation leaks on exception paths, and implicit non-finite SDF/culling contracts. Added these as a local recurring-traps section to \u0060.github/skills/engineering-guardrails/SKILL.md\u0060, with evidence references to TSK-0043, TSK-0066 through TSK-0068, TSK-0079, TSK-0086, TSK-0088, TSK-0091 through TSK-0095, and TSK-0098 through TSK-0105. Also normalized all nine CreatureCreator customization files, including BeastMaster, to literal \u0060description: |\u0060 frontmatter. Direct validation passed: all files have \u0060name:\u0060 and \u0060description: |\u0060, no \u0060description: \u003E-\u0060 remains, and \u0060git diff --check\u0060 passes.",
+      "createdAtUtc": "2026-09-05T02:05:12.6884481Z"
+    }
+  ],
+  "epicId": null,
+  "parentId": null,
+  "dueDateUtc": null,
+  "createdAtUtc": "2026-09-05T02:01:24.9008096Z",
+  "updatedAtUtc": "2026-09-05T02:05:14.3805905Z",
+  "completedAtUtc": "2026-09-05T02:05:14.3805905Z",
+  "revision": 3,
+  "isArchived": false,
+  "hasLoadError": false,
+  "loadError": null,
+  "sourceFilePath": "tsk-0108-review-task-history-guardrails.json"
+}
