@@ -128,7 +128,7 @@ namespace ProceduralCreature.Tests.Runtime
         private static void AssertExtractMatchesReference(DensityGrid grid, string label)
         {
             MeshExtractionResult actual = MarchingCubesExtractor.Extract(grid);
-            MeshExtractionResult reference = MarchingCubesExtractor.ExtractLegacy(grid);
+            MeshExtractionResult reference = MarchingCubesReferenceExtractor.Extract(grid);
 
             Assert.AreEqual(reference.MixedCellCount, actual.MixedCellCount, $"{label}: mixed cell count");
             Assert.AreEqual(reference.TriangleCount, actual.TriangleCount, $"{label}: triangle count");

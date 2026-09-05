@@ -103,15 +103,45 @@
       "author": "anonymous",
       "body": "## Regression Recovery Evidence\n- User reported preview FieldSampling regressions of 1576-2294 ms with stable mesh/extraction timings.\n- Root cause confirmed in \u0060SdfProgramBuilder.CreateProgram\u0060: the prior ellipsoid fallback cleared \u0060Cullable\u0060 on every operation whenever one approximate ellipsoid existed, forcing full-program evaluation at every grid corner.\n- Removed that global disable. Ellipsoid operations remain non-cullable, while bounded union branches use their recorded \u0060ConsumerUnionIndex\u0060 and the consuming smooth-union blend radius to cull only when their AABB lower bound cannot change the already-evaluated chain result.\n- The root potential-envelope path remains disabled for approximate ellipsoid subtrees because finite ellipsoid fields cannot safely be represented as finite absence envelopes.\n\n## Validation Evidence\n- \u0060dotnet build ProceduralCreature.Tests.Runtime.csproj --no-restore\u0060: passed with no diagnostics.\n- \u0060dotnet build CreatureCreator.slnx --no-restore\u0060: passed; all 6 projects compiled with 0 errors and 0 warnings.\n- \u0060git diff --check\u0060: passed.\n- Unity PlayMode validation was attempted but blocked: the Unity bridge reported \u0060No Unity Editor instances found\u0060. No runtime pass or timing claim is made for this recovery yet.\n\n## Residual Risk\n- The consumer-aware evaluator change needs the focused \u0060SdfProgramBuilderTests\u0060 and a real editor preview benchmark once Unity reconnects. The intended recovery is bounded-branch culling in mixed ellipsoid programs; measured FieldSampling improvement remains unverified.",
       "createdAtUtc": "2026-09-05T03:46:01.6177719Z"
+    },
+    {
+      "id": "c-9c052e2910fb4dfdb020601b727ae0de",
+      "author": "anonymous",
+      "body": "## User Mandate\n\u003E Carefully review the latest work and this external audit/task plan and implement the next set of tasks\n\nSTRICT. The implementation remains scoped to the handoff\u0027s next verified slice, preserves ellipsoid support and the Cullable proof, and must include executable validation evidence.",
+      "createdAtUtc": "2026-09-05T05:11:22.2867091Z"
+    },
+    {
+      "id": "c-3d91acd8b4bc483fb0b40b7580caeefd",
+      "author": "anonymous",
+      "body": "## User Disposition\nThe B0 ellipsoid-envelope optimization direction is rejected and is a non-starter. Do not implement B0b/B0c/B0d, do not add further ellipsoid culling regressions, and do not weaken the current ellipsoid behavior or Cullable rules. The current ellipsoid rendering/performance behavior is accepted as the baseline. TSK-0008 remains InProgress only for its broader profiling/optimization responsibilities outside B0; any future performance work must be separately justified and must not reopen this rejected direction.",
+      "createdAtUtc": "2026-09-05T05:19:29.4544383Z"
+    },
+    {
+      "id": "c-d28879b1d7184923889bb676d9ceb250",
+      "author": "anonymous",
+      "body": "## Next Slice Authorization\nProceeding with handoff A4 only: remove the obsolete production \u0060ExtractLegacy\u0060 path after preserving its parity oracle in test-only code. This is unrelated to rejected B0 and will not change ellipsoid, culling, or field-sampling behavior.",
+      "createdAtUtc": "2026-09-05T05:21:09.2300269Z"
+    },
+    {
+      "id": "c-1064a2a653754e3498b1e21ecf44fd78",
+      "author": "anonymous",
+      "body": "## A4 Implementation Evidence\nRemoved the obsolete production \u0060MarchingCubesExtractor.ExtractLegacy\u0060 path and its \u0060.meta\u0060 file. Moved the dense reference oracle into test-only \u0060Assets/Scripts/Tests/Runtime/MarchingCubesReferenceExtractor.cs\u0060; parity tests now compare the optimized extractor against that helper. No SDF, ellipsoid, culling, or generation behavior was changed.\n\n## A4 Validation Evidence\n- \u0060dotnet build ProceduralCreature.Tests.Runtime.csproj --no-restore\u0060: passed, 0 errors, 0 warnings.\n- \u0060dotnet build CreatureCreator.slnx --no-restore\u0060: passed, 0 errors, 0 warnings.\n- Static diagnostics on changed C# files: no errors.\n- \u0060git diff --check\u0060: passed.\n- Unity refresh/compile completed with an empty error/warning console.\n- Focused PlayMode filter initialized but discovered 0 actual tests and only returned the wrapper result; not counted as parity evidence.\n- Full \u0060ProceduralCreature.Tests.Runtime\u0060 PlayMode retry timed out during Unity test initialization before any tests started; no runtime pass is claimed.\n\n## Residual Risk\nThe test-only parity oracle still needs a successful Unity runtime execution after the editor/test-runner initialization issue clears. The runtime production path now has one extractor implementation.",
+      "createdAtUtc": "2026-09-05T05:27:51.0496232Z"
+    },
+    {
+      "id": "c-1d3fad06b82e4302940a3d4bcedb4ddc",
+      "author": "anonymous",
+      "body": "## A4 Follow-up Validation\nUnity was available and the accepted baseline was restored after an initial compile/test pass exposed rejected B0 potential-envelope changes in the dirty SDF files. The A4 extraction change now validates cleanly:\n\n- \u0060dotnet build CreatureCreator.slnx --no-restore\u0060: 0 errors, 0 warnings.\n- Unity refresh/compile: no product errors; only the existing Persistent allocation leak warning before the run.\n- Full \u0060ProceduralCreature.Tests.Runtime\u0060 PlayMode: 463/463 passed, 0 failed, 0 skipped.\n- Unity post-run console: only test-result save and Performance Testing cleanup messages.\n- \u0060git diff --check\u0060: passed.\n- No \u0060ExtractLegacy\u0060 references remain under \u0060Assets/Scripts\u0060; the reference oracle exists only in \u0060Assets/Scripts/Tests/Runtime/MarchingCubesReferenceExtractor.cs\u0060.\n\nB0 remains rejected and was not extended. The worktree is ready for review/commit; no commit or push was performed.",
+      "createdAtUtc": "2026-09-05T05:51:25.3442168Z"
     }
   ],
   "epicId": null,
   "parentId": null,
   "dueDateUtc": null,
   "createdAtUtc": "2026-09-01T03:16:25.5654277Z",
-  "updatedAtUtc": "2026-09-05T03:46:01.6177719Z",
+  "updatedAtUtc": "2026-09-05T05:51:25.3442168Z",
   "completedAtUtc": null,
-  "revision": 16,
+  "revision": 21,
   "isArchived": false,
   "hasLoadError": false,
   "loadError": null,
