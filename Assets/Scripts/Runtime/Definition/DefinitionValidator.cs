@@ -709,6 +709,17 @@ namespace ProceduralCreature.Definition
                         $"(found {limb.Joints.Count}).", part.Id));
                 }
 
+                if (part.PartType == PartType.Leg && limb.Joints.Count == 2 &&
+                    HasDirectFootChild(definition, part.Id))
+                {
+                    issues.Add(new ValidationIssue(
+                        ValidationSeverity.Warning,
+                        ValidationCode.LegFootChainMissingAnkleJoint,
+                        $"Part '{part.Id}' has a direct Foot child but only two limb joints; " +
+                        "add an authored intermediate ankle joint to create a distinct lower-leg-to-foot node.",
+                        part.Id));
+                }
+
                 var jointIds = new HashSet<uint>();
                 for (int i = 0; i < limb.Joints.Count; i++)
                 {
@@ -813,6 +824,19 @@ namespace ProceduralCreature.Definition
                         $"Part '{part.Id}' limb blend radius must not be negative.", part.Id));
                 }
             }
+        }
+
+        private static bool HasDirectFootChild(CreatureDefinition definition, string parentId)
+        {
+            foreach (CreaturePart child in definition.CreateHierarchyIndex().Parts)
+            {
+                if (child != null && child.ParentId == parentId && child.PartType == PartType.Foot)
+                {
+                    return true;
+                }
+            }
+
+            return false;
         }
     }
 }

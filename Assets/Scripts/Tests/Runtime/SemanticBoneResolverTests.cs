@@ -133,8 +133,8 @@ namespace ProceduralCreature.Tests.Runtime
             }
 
             string terminalId = SemanticBoneResolver.ResolveLimbTerminalBoneId(arm, mirrored: false);
-            Assert.AreEqual("part_arm" + SemanticBoneResolver.LimbJointBoneSeparator + (arm.Limb.Joints.Count - 2), terminalId);
-            Assert.IsNotNull(skeleton.FindBone(terminalId), "Terminal limb bone must exist in the inferred skeleton.");
+            Assert.AreEqual("part_arm" + SemanticBoneResolver.LimbJointBoneSeparator + (arm.Limb.Joints.Count - 1), terminalId);
+            Assert.IsNotNull(skeleton.FindBone(terminalId), "Terminal limb joint must exist in the inferred skeleton.");
         }
 
         [Test]
@@ -167,7 +167,7 @@ namespace ProceduralCreature.Tests.Runtime
             string parentId = SemanticBoneResolver.ResolveParentBoneId(
                 snapshot, resolvedHand, mirrored: false);
 
-            Assert.AreEqual("part_arm_j1", parentId);
+            Assert.AreEqual("part_arm_j2", parentId);
         }
 
         [Test]
@@ -324,7 +324,7 @@ namespace ProceduralCreature.Tests.Runtime
                 snapshot, resolvedFoot, mirrored: true);
 
             Assert.AreEqual(
-                "part_leg" + SemanticBoneResolver.LimbJointBoneSeparator + 1 + SemanticBoneResolver.MirrorSuffix,
+                "part_leg" + SemanticBoneResolver.LimbJointBoneSeparator + 2 + SemanticBoneResolver.MirrorSuffix,
                 parentId,
                 "A mirrored child of a mirrored limb binds to the mirrored terminal bone.");
 

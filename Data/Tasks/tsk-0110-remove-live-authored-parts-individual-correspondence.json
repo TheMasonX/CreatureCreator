@@ -1,0 +1,43 @@
+﻿{
+  "id": "tsk-0110-remove-live-authored-parts-individual-correspondence",
+  "key": "TSK-0110",
+  "title": "Remove live authored parts from individual-part generation correspondence",
+  "description": "## Summary\nImplement outside-handoff A2 so individual-part compiled generation data carries resolved part snapshots instead of live \u0060CreaturePart\u0060 references.\n\n## User Mandate\n\u003E Continue\n\nSTRICT. Binding constraints: continue the outside-audit-ordered implementation wave; preserve \u0060CreatureDefinition\u0060 as authoring authority; keep generated correspondence detached from later authored mutation; retain raw-definition overloads only as outer compatibility boundaries; record focused validation evidence.\n\n## Scope\n- Add one concrete \u0060ResolvedPartProgram\u0060 value containing \u0060ResolvedPartSnapshot\u0060 and \u0060SdfProgram\u0060.\n- Make \u0060CompileIndividualPartsPortable\u0060 return the concrete correspondence in stable ID order.\n- Migrate appearance and generation consumers and disposal paths.\n- Add snapshot mutation regression coverage.\n- Do not add generic result hierarchies, service locators, or a second snapshot architecture.\n\n## Acceptance Criteria\n- No live \u0060CreaturePart\u0060 reference survives in individual-part generation results.\n- Stable part identity and appearance data remain available from the resolved correspondence.\n- Mutating authored DNA after correspondence creation does not change generated correspondence data.\n- Managed and Burst appearance paths continue to compile and produce existing output.\n- Focused build, Unity runtime tests, console inspection, and diff validation pass.\n\n## Validation\nPending task closure evidence.\n\n## Findings\nThe handoff identifies A2 as the next slice after A1. The prior compiler returned tuples containing \u0060CreaturePart\u0060, obtained through \u0060definition.FindPart\u0060, which crossed the snapshot boundary.\n\n## Blockers\nA first Unity test attempt may require retry if the editor test job does not initialize; this is an environment risk, not a code acceptance criterion.\n\n## Next Step\nRecord implementation and validation evidence, then proceed to the next handoff dependency-ready slice.",
+  "type": "Task",
+  "status": "Done",
+  "priority": "High",
+  "assigneeMode": "Custom",
+  "assigneeDirectoryId": null,
+  "assigneeCustomText": "Unassigned",
+  "reporter": "GitHub Copilot",
+  "labels": [
+    "user-mandated",
+    "CC-091",
+    "handoff-2026-09-05",
+    "runtime",
+    "snapshot",
+    "A2"
+  ],
+  "attachments": [],
+  "externalLinks": [],
+  "linkedPages": [],
+  "comments": [
+    {
+      "id": "c-05f31a0f74014f9fbd57cb9629a4e031",
+      "author": "anonymous",
+      "body": "## Implementation Evidence\n- Added concrete \u0060ResolvedPartProgram\u0060 in \u0060SdfProgram.cs\u0060, containing detached \u0060ResolvedPartSnapshot\u0060 data and the owned \u0060SdfProgram\u0060.\n- Changed \u0060SdfProgramBuilder.CompileIndividualPartsPortable\u0060 to return stable ID-ordered \u0060List\u003CResolvedPartProgram\u003E\u0060 and removed the \u0060definition.FindPart\u0060 lookup from the generated correspondence.\n- Migrated \u0060AppearanceBaker\u0060, \u0060AppearanceResolveBurst\u0060, \u0060PartAppearanceSampler\u0060, and \u0060CreatureMeshGenerator\u0060 to consume the resolved correspondence and preserve program disposal ownership.\n- Added \u0060CompileIndividualPartsPortable_CapturesResolvedAppearanceAfterAuthoredMutation\u0060 to prove authored appearance mutation does not alter generated correspondence data.\n\n## Validation Evidence\n- \u0060dotnet build ProceduralCreature.Tests.Runtime.csproj --no-restore\u0060: passed, 0 errors, 0 warnings.\n- Unity 6000.5.9f1 PlayMode assembly \u0060ProceduralCreature.Tests.Runtime\u0060: 465/465 passed, 0 failed, 0 skipped.\n- Unity console after the successful run: no product errors or warnings; only test-result save and post-build cleanup logs.\n- Editor diagnostics: no errors in all seven changed source/test files.\n- \u0060git diff --check\u0060: passed; only existing line-ending normalization warnings were reported.\n- The first Unity attempt timed out before test discovery; the immediate retry succeeded and is the authoritative runtime result.\n\n## Findings\nThe A2 boundary is now concrete: generated individual-part data retains stable identity and resolved appearance without retaining an authored \u0060CreaturePart\u0060 reference. Raw-definition overloads still resolve a snapshot at the outer compatibility boundary.\n\n## Residual Risk\nThe appearance files already contained unrelated pre-existing worktree changes, so their combined diff should be reviewed carefully before commit. No new managed copy, generic result hierarchy, or alternative snapshot path was introduced.\n\n## Next Step\nProceed to the next audit dependency-ready slice, likely A3 primitive SDF emission consolidation or B1 canonical snapshot/revision authority.",
+      "createdAtUtc": "2026-09-05T02:55:46.1709261Z"
+    }
+  ],
+  "epicId": null,
+  "parentId": null,
+  "dueDateUtc": null,
+  "createdAtUtc": "2026-09-05T02:55:40.9910887Z",
+  "updatedAtUtc": "2026-09-05T02:55:48.4259405Z",
+  "completedAtUtc": "2026-09-05T02:55:48.4259405Z",
+  "revision": 3,
+  "isArchived": false,
+  "hasLoadError": false,
+  "loadError": null,
+  "sourceFilePath": "tsk-0110-remove-live-authored-parts-individual-correspondence.json"
+}

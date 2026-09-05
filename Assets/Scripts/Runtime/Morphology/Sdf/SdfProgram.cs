@@ -4,6 +4,7 @@ using Unity.Collections;
 using Unity.Jobs;
 using Unity.Mathematics;
 using ProceduralCreature.Common;
+using ProceduralCreature.Definition;
 
 namespace ProceduralCreature.Morphology.Sdf
 {
@@ -52,9 +53,28 @@ namespace ProceduralCreature.Morphology.Sdf
         }
     }
 
+    /// <summary>
+    /// Compiled correspondence for one resolved part. The generated result keeps
+    /// detached snapshot data for downstream consumers instead of an authored
+    /// CreaturePart reference.
+    /// </summary>
+    public readonly struct ResolvedPartProgram
+    {
+        public readonly ResolvedPartSnapshot Part;
+        public readonly SdfProgram Program;
+
+        public ResolvedPartProgram(ResolvedPartSnapshot part, SdfProgram program)
+        {
+            Part = part;
+            Program = program;
+        }
+    }
+
     public sealed class SdfProgram : IDisposable
     {
-        public NativeArray<SdfOperation> Operations { get; }
+        private readonly NativeArray<SdfOperation> _operations;
+
+        public NativeArray<SdfOperation>.ReadOnly Operations => _operations.AsReadOnly();
         public int RootIndex { get; }
 
         /// <summary>
@@ -63,14 +83,17 @@ namespace ProceduralCreature.Morphology.Sdf
         /// provably farther from the sample than any blend can reach.
         /// </summary>
         public float InfluenceRadius { get; }
+
         public bool HasPotentialBounds { get; }
         public float3 PotentialMinBound { get; }
         public float3 PotentialMaxBound { get; }
 
+        internal NativeArray<SdfOperation> MutableOperations => _operations;
+
         internal SdfProgram(NativeArray<SdfOperation> operations, int rootIndex, float influenceRadius,
             bool hasPotentialBounds = false, float3 potentialMinBound = default, float3 potentialMaxBound = default)
         {
-            Operations = operations;
+            _operations = operations;
             RootIndex = rootIndex;
             InfluenceRadius = influenceRadius;
             HasPotentialBounds = hasPotentialBounds;
@@ -80,9 +103,9 @@ namespace ProceduralCreature.Morphology.Sdf
 
         public void Dispose()
         {
-            if (Operations.IsCreated)
+            if (_operations.IsCreated)
             {
-                Operations.Dispose();
+                _operations.Dispose();
             }
         }
     }
@@ -134,7 +157,7 @@ namespace ProceduralCreature.Morphology.Sdf
                 program.InfluenceRadius, allowCulling: false);
         }
 
-        public static float Evaluate(NativeArray<SdfOperation> operations, int rootIndex, float3 point,
+        public static float Evaluate(NativeArray<SdfOperation>.ReadOnly operations, int rootIndex, float3 point,
             float influenceRadius, bool allowCulling = false)
         {
             if (!operations.IsCreated) throw new DomainException("operations must be created.");
@@ -149,13 +172,13 @@ namespace ProceduralCreature.Morphology.Sdf
             return result;
         }
 
-        public static float EvaluateReference(NativeArray<SdfOperation> operations, int rootIndex,
+        public static float EvaluateReference(NativeArray<SdfOperation>.ReadOnly operations, int rootIndex,
             float3 point, float influenceRadius)
         {
             return Evaluate(operations, rootIndex, point, influenceRadius, allowCulling: false);
         }
 
-        internal static float EvaluateInto(NativeArray<SdfOperation> operations, int rootIndex, float3 point,
+        internal static float EvaluateInto(NativeArray<SdfOperation>.ReadOnly operations, int rootIndex, float3 point,
             NativeArray<float> values, int valueOffset, float influenceRadius, bool allowCulling)
         {
             for (int i = 0; i <= rootIndex; i++)
@@ -176,7 +199,7 @@ namespace ProceduralCreature.Morphology.Sdf
         }
 
         internal static float EvaluateOperation(SdfOperation operation, NativeArray<float> values,
-            NativeArray<SdfOperation> operations, float3 point, int valueOffset,
+            NativeArray<SdfOperation>.ReadOnly operations, float3 point, int valueOffset,
             float influenceRadius = 0f, bool allowCulling = false)
         {
             switch (operation.Type)
@@ -202,7 +225,7 @@ namespace ProceduralCreature.Morphology.Sdf
             }
         }
 
-        private static float EvaluateSubtree(NativeArray<SdfOperation> operations, int operationIndex,
+        private static float EvaluateSubtree(NativeArray<SdfOperation>.ReadOnly operations, int operationIndex,
             float3 point, float influenceRadius, bool allowCulling)
         {
             SdfOperation operation = operations[operationIndex];
@@ -302,7 +325,7 @@ namespace ProceduralCreature.Morphology.Sdf
     [BurstCompile]
     public struct SdfSamplingJob : IJobParallelFor
     {
-        [ReadOnly] public NativeArray<SdfOperation> Operations;
+        [ReadOnly] public NativeArray<SdfOperation>.ReadOnly Operations;
         [NativeDisableParallelForRestriction] public NativeArray<float> ScratchValues;
         [NativeDisableParallelForRestriction] public NativeArray<float> Samples;
         public int RootIndex;
@@ -315,9 +338,9 @@ namespace ProceduralCreature.Morphology.Sdf
         public float InfluenceRadius;
 
         /// <summary>
-        /// True when the root has a conservative envelope for all field influence.
-        /// This is distinct from operation Cullable metadata: an ellipsoid can have
-        /// a potential envelope without having an AABB lower-bound culling proof.
+        /// True when the root has a conservative potential-influence envelope.
+        /// This is separate from operation Cullable metadata because an approximate
+        /// ellipsoid may need exact evaluation outside its ordinary AABB.
         /// </summary>
         public bool RootHasPotentialBounds;
         public float3 RootPotentialMinBound;

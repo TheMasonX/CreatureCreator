@@ -128,7 +128,7 @@ namespace ProceduralCreature.Generation
             }
             finally
             {
-                foreach ((CreaturePart part, SdfProgram program) in compiledParts) program.Dispose();
+                foreach (ResolvedPartProgram partProgram in compiledParts) partProgram.Program.Dispose();
                 bodyProgram.Dispose();
             }
 

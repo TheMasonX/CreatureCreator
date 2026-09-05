@@ -60,7 +60,7 @@ namespace ProceduralCreature.Appearance
             }
             finally
             {
-                foreach ((CreaturePart part, SdfProgram program) in compiledParts) program.Dispose();
+                foreach (ResolvedPartProgram partProgram in compiledParts) partProgram.Program.Dispose();
                 bodyProgram.Dispose();
             }
         }
@@ -68,7 +68,7 @@ namespace ProceduralCreature.Appearance
         internal static Color[] Bake(
             CreatureDefinition definition, MeshExtractionResult mesh,
             GenerationDiagnostics diagnostics,
-            System.Collections.Generic.List<(CreaturePart Part, SdfProgram Program)> compiledParts,
+            System.Collections.Generic.List<ResolvedPartProgram> compiledParts,
             SdfProgram bodyProgram, ResolvedBody body)
         {
             return Bake(definition, mesh, diagnostics, compiledParts, bodyProgram, body, null);
@@ -77,7 +77,7 @@ namespace ProceduralCreature.Appearance
         internal static Color[] Bake(
             CreatureDefinition definition, MeshExtractionResult mesh,
             GenerationDiagnostics diagnostics,
-            System.Collections.Generic.List<(CreaturePart Part, SdfProgram Program)> compiledParts,
+            System.Collections.Generic.List<ResolvedPartProgram> compiledParts,
             SdfProgram bodyProgram, ResolvedBody body, ResolvedCreatureSnapshot snapshot)
         {
             if (definition == null) throw new DomainException("definition must not be null.");
@@ -132,14 +132,14 @@ namespace ProceduralCreature.Appearance
         /// </summary>
         private static void BakeBurst(
             CreatureDefinition definition, MeshExtractionResult mesh, Color[] colors,
-            System.Collections.Generic.List<(CreaturePart Part, SdfProgram Program)> compiledParts,
+            System.Collections.Generic.List<ResolvedPartProgram> compiledParts,
             SdfProgram bodyProgram, ResolvedBody body, ResolvedCreatureSnapshot snapshot)
         {
                 int programCount = compiledParts.Count + 1;
                 int maxOps = 1;
-                foreach ((CreaturePart part, SdfProgram program) in compiledParts)
+                foreach (ResolvedPartProgram partProgram in compiledParts)
                 {
-                    maxOps = Mathf.Max(maxOps, program.Operations.IsCreated ? program.Operations.Length : 1);
+                    maxOps = Mathf.Max(maxOps, partProgram.Program.Operations.IsCreated ? partProgram.Program.Operations.Length : 1);
                 }
                 if (bodyProgram != null && bodyProgram.Operations.IsCreated)
                 {

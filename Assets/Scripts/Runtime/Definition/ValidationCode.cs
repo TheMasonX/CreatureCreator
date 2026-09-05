@@ -33,6 +33,7 @@ namespace ProceduralCreature.Definition
         NonFiniteBodyAppearance,
         InvalidLimbChain,
         LimbJointCountOutOfRange,
+        LegFootChainMissingAnkleJoint,
         DuplicateLimbJointId,
         LimbJointOrderNotDeterministic,
         NonFiniteLimbJoint,

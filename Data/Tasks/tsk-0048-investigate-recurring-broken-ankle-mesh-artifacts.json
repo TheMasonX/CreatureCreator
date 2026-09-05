@@ -4,11 +4,11 @@
   "title": "Investigate recurring broken-ankle mesh artifacts",
   "description": "Source: docs/tasks/tickets/CC-046-review-broken-ankle-quality-12-dino.md\nSource key: CC-046\nSource status: Backlog\nSource priority: P1\n\n## Summary\r\n\r\nInvestigate the recurring broken-ankle artifact seen in generated creature\r\nmeshes. The saved quality-12 dino fixture is the initial reproduction case;\r\nthe review must determine the shared failure mode and whether it affects other\r\nparts, creatures, or preview qualities.\r\n\r\n## Scope\r\n\r\n- Reproduce the issue from the saved JSON at the same quality setting and\r\n  collect at least one comparison quality when practical.\r\n- Determine whether the same artifact occurs on other generated creatures or\r\n  anatomical parts.\r\n- Inspect the ankle part and its parent/limb chain, resolved transforms, and\r\n  generated geometry.\r\n- Compare managed and portable/Burst generation where both paths are available.\r\n- Check mesh topology, symmetry, normals, and skeleton attachment near the\r\n  ankle before changing production code.\r\n- Preserve the saved JSON as the review fixture and do not silently repair it.\r\n\r\n## Acceptance Criteria\r\n\r\n- The broken ankle is reproduced or the reproduction conditions are documented.\r\n- The responsible layer and a minimal root-cause explanation are recorded.\r\n- If the fixture contains invalid DNA, validation reports it without rewriting\r\n  the definition.\r\n- If the defect is generated geometry or rig behavior, a focused regression\r\n  test or manual Unity check is identified before implementation.\r\n- Any fix preserves deterministic output, watertightness, symmetry behavior,\r\n  and the authoritative DNA boundary.\r\n\r\n## Validation\r\n\r\n- Unity manual check: load the fixture, set preview quality to 12, regenerate,\r\n  and inspect the ankle in the editor and preview.\r\n- Capture triangle and vertex counts plus boundary/non-manifold edge results.\r\n- Run focused validator, SDF/generation, extraction, and skeleton checks after\r\n  the cause is isolated.\r\n- Compare repeated generation output for determinism.\r\n\r\n## 2026-08-24 audit revision - instrumented architectural probe\r\nTreat the broken ankle as evidence for CC-050/051, not a mesh-vs-screenshot diff. Measure:\r\nresolved joint positions, voxel bounds, local field values, limb blend radius, SDF samples\r\nnear the ankle, connected component count, and non-manifold edges. If the fixture exposes a\r\nbounds failure, limb blending failure, voxel cropping, or attachment-resolution error, move\r\nCC-046 ahead of CC-056 as supporting evidence for the placement contract.\r\n\r\n## Findings\r\n\r\nThe user identified the broken ankle as a common mesh-generation issue and\r\nsupplied \u0060dino_creature_broken_ankle_at_12_quality.json\u0060 on 2026-08-23 as a\r\nsaved reproduction artifact. The cause has not been diagnosed yet. The fixture\r\nis currently untracked with its Unity \u0060.meta\u0060 file and should remain available\r\nas the first regression case while broader examples are collected.\r\n\r\n## Blockers\r\n\r\nNo blocker is known. Unity reproduction and a representative sample of the\r\nrecurring artifact still require a focused review in the editor.\r\n\r\n## Next Step\r\n\r\nLoad the fixture in Unity at quality 12, record the ankle part hierarchy and\r\ngeneration diagnostics, then compare other qualities and fixtures. Classify\r\nthe shared failure as authored DNA, transform/attachment, SDF, extraction,\r\nskeleton, or preview-only behavior before implementing a fix.",
   "type": "Bug",
-  "status": "Backlog",
-  "priority": "High",
+  "status": "InProgress",
+  "priority": "Critical",
   "assigneeMode": "Custom",
   "assigneeDirectoryId": null,
-  "assigneeCustomText": "Unassigned",
+  "assigneeCustomText": "Agent",
   "reporter": "cc-markdown-import",
   "labels": [
     "source-cc",
@@ -18,21 +18,49 @@
     "generation",
     "topology",
     "extraction",
-    "creature-review"
+    "creature-review",
+    "user-mandated",
+    "ankle",
+    "skeleton"
   ],
   "attachments": [],
   "externalLinks": [],
   "linkedPages": [],
-  "comments": [],
+  "comments": [
+    {
+      "id": "c-3b8cd736555e444aaed87a94a866cd07",
+      "author": "anonymous",
+      "body": "## User Mandate\n\u003E There is a task to capture if not already in the task system, where there is no skeleton node between the end of the leg and the foot in this dino creature (e.g. no ankle node between lower leg \u002B foot). This needs to be captured and potentially fixed ASAP if easy. Then carefully review the latest work and this external audit/task plan and implement the next set of tasks. Here is the prior agent\u0027s end report\n\nSTRICT. Binding constraints: capture the missing ankle-node issue in the existing task system; fix it now when the owning change is small and safe; review the latest B1 work and the supplied post-PR1 handoff; preserve the authoritative CreatureDefinition/resolved snapshot boundaries; do not introduce duplicate skeleton or animation authorities; validate the change with focused executable checks and record evidence.",
+      "createdAtUtc": "2026-09-05T03:11:55.3359879Z"
+    },
+    {
+      "id": "c-e0382a9943c64b13883e391b91e6a47d",
+      "author": "anonymous",
+      "body": "## Implementation Evidence\n- Confirmed the owning gap is authored anatomy: \u0060SkeletonInferrer\u0060 emits N-1 segment bones and \u0060SemanticBoneResolver\u0060 attaches a direct Foot child to the leg\u0027s terminal segment. A two-joint leg therefore has no distinct intermediate ankle joint to infer.\n- Added \u0060ValidationCode.LegFootChainMissingAnkleJoint\u0060 and a non-mutating warning in \u0060DefinitionValidator\u0060 for a two-joint \u0060PartType.Leg\u0060 with a direct \u0060PartType.Foot\u0060 child. The warning directs authors to add an authored intermediate ankle joint; no DNA repair or second skeleton path was introduced.\n- Added \u0060DefinitionValidatorLimbTests.Validate_LegWithDirectFootAndTwoJoints_WarnsThatAnkleJointIsMissing\u0060.\n\n## Validation Evidence\n- Unity \u00606000.5.9f1\u0060 focused PlayMode test: \u0060Validate_LegWithDirectFootAndTwoJoints_WarnsThatAnkleJointIsMissing\u0060, 1/1 passed.\n- Unity full Runtime PlayMode assembly: 467/467 passed, 0 failed, 0 skipped.\n- \u0060dotnet build CreatureCreator.slnx --no-restore\u0060: passed, 0 errors.\n- \u0060dotnet build ProceduralCreature.Tests.Runtime.csproj --no-restore\u0060: passed, 0 errors, 0 warnings.\n- \u0060git diff --check\u0060: passed.\n\n## Findings and Residual Risk\n- The supplied saved dino fixture is not present in this checkout, so the original quality-12 mesh artifact was not reproduced and no claim is made about its geometry/topology root cause.\n- The warning is intentionally not an automatic ankle insertion: inventing a joint would violate the authoritative CreatureDefinition boundary and can create zero-length IK links for an identity foot attachment.\n- Unity console after the test run contained no product error; only the test-result save entry and the known Performance Testing cleanup warning.\n\n## Next Step\nLoad the saved dino fixture when available, verify whether its leg chains have two or more authored joints, and perform the mandated quality-12 geometry/topology review before considering a deeper skeleton or extraction change.",
+      "createdAtUtc": "2026-09-05T03:14:20.0460114Z"
+    },
+    {
+      "id": "c-e3f9f32585fe4d1c9b98b72535a56acb",
+      "author": "anonymous",
+      "body": "## Terminal-Node Fix Evidence\n- Parsed \u0060Assets/Creatures/dino_creature.json\u0060: the dino has a direct Leg -\u003E Foot relationship and a three-joint leg. The prior model represented the final ankle only as the last segment\u0027s \u0060EndPosition\u0060, so no Transform/bone node existed at that authored terminal joint.\n- \u0060SkeletonInferrer\u0060 now emits N-1 segment bones plus an explicit terminal joint node at \u0060Joints[N-1]\u0060 (for the fixture, \u0060part_779a59c5_j2\u0060). \u0060SemanticBoneResolver\u0060 and mirrored/nested child attachment now resolve Foot parents through that terminal node. CreatureDefinition remains authoritative; no joints are invented or written back.\n- Updated skeleton and semantic resolver regression coverage for terminal positions, parent links, mirrored limbs, and nested limb children.\n\n## Validation Evidence\n- Focused \u0060SkeletonInferrerLimbTests\u0060: 13/13 passed after forcing Unity script refresh.\n- Full Runtime PlayMode assembly: 467/467 passed, 0 failed, 0 skipped.\n- \u0060dotnet build CreatureCreator.slnx --no-restore\u0060: passed, 0 errors, 0 warnings.\n- \u0060git diff --check\u0060: passed.\n\n## Residual Risk\n- The supplied image\u0027s quality-12 mesh artifact has not been manually reproduced in the editor; this change addresses the missing authored terminal skeleton node, not a claim about mesh extraction, SDF bounds, or topology.\n- Existing unrelated worktree changes were preserved. Editor EditMode tests were not rerun because no editor code changed.",
+      "createdAtUtc": "2026-09-05T03:23:06.6437332Z"
+    },
+    {
+      "id": "c-55a0d55e245f487685be1d8a3eec762d",
+      "author": "anonymous",
+      "body": "Clarification: the terminal-node implementation is generic Limb logic, not Leg-specific. \u0060SkeletonInferrer\u0060 emits the explicit terminal joint for any \u0060LimbChain\u0060; \u0060SemanticBoneResolver\u0060 routes child parts through it. The arm/hand regression now explicitly verifies \u0060part_arm_j2\u0060 as the wrist node and the hand\u0027s parent.",
+      "createdAtUtc": "2026-09-05T03:25:09.4233491Z"
+    }
+  ],
   "epicId": null,
   "parentId": null,
   "dueDateUtc": null,
   "createdAtUtc": "2026-09-01T03:20:44.743624Z",
-  "updatedAtUtc": "2026-09-01T03:20:44.743624Z",
+  "updatedAtUtc": "2026-09-05T03:25:09.4233491Z",
   "completedAtUtc": null,
-  "revision": 1,
+  "revision": 8,
   "isArchived": false,
   "hasLoadError": false,
   "loadError": null,
-  "sourceFilePath": null
+  "sourceFilePath": "tsk-0048-investigate-recurring-broken-ankle-mesh-artifacts.json"
 }

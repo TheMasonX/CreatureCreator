@@ -74,7 +74,7 @@ namespace ProceduralCreature.Appearance
 
         internal static Resolver CreateResolver(
             CreatureDefinition definition,
-            System.Collections.Generic.List<(CreaturePart Part, SdfProgram Program)> compiledParts,
+            System.Collections.Generic.List<ResolvedPartProgram> compiledParts,
             SdfProgram bodyProgram)
         {
             if (definition == null) throw new DomainException("definition must not be null.");
@@ -83,7 +83,7 @@ namespace ProceduralCreature.Appearance
 
         internal static Resolver CreateResolver(
             CreatureDefinition definition,
-            System.Collections.Generic.List<(CreaturePart Part, SdfProgram Program)> compiledParts,
+            System.Collections.Generic.List<ResolvedPartProgram> compiledParts,
             SdfProgram bodyProgram, ResolvedCreatureSnapshot snapshot)
         {
             if (definition == null) throw new DomainException("definition must not be null.");
@@ -94,7 +94,7 @@ namespace ProceduralCreature.Appearance
         public sealed class Resolver : System.IDisposable
         {
             private readonly CreatureDefinition _definition;
-            private readonly System.Collections.Generic.List<(CreaturePart Part, SdfProgram Program)> _compiledParts;
+            private readonly System.Collections.Generic.List<ResolvedPartProgram> _compiledParts;
             private PartBounds[] _partBounds;
             private SdfProgram _bodyProgram;
             private readonly ResolvedBody _body;
@@ -124,7 +124,7 @@ namespace ProceduralCreature.Appearance
 
             internal Resolver(
                 CreatureDefinition definition,
-                System.Collections.Generic.List<(CreaturePart Part, SdfProgram Program)> compiledParts,
+                System.Collections.Generic.List<ResolvedPartProgram> compiledParts,
                 SdfProgram bodyProgram,
                 bool ownsPrograms = false)
             {
@@ -145,7 +145,7 @@ namespace ProceduralCreature.Appearance
 
             internal Resolver(
                 CreatureDefinition definition,
-                System.Collections.Generic.List<(CreaturePart Part, SdfProgram Program)> compiledParts,
+                System.Collections.Generic.List<ResolvedPartProgram> compiledParts,
                 SdfProgram bodyProgram, ResolvedCreatureSnapshot snapshot)
             {
                 _definition = definition;
@@ -173,9 +173,9 @@ namespace ProceduralCreature.Appearance
                 }
                 _bodyProgram = bodyProgram ?? throw new DomainException("bodyProgram must not be null.");
                 int scratchLength = _bodyProgram.Operations.Length;
-                foreach ((CreaturePart part, SdfProgram program) in _compiledParts)
+                foreach (ResolvedPartProgram partProgram in _compiledParts)
                 {
-                    scratchLength = Mathf.Max(scratchLength, program.Operations.Length);
+                    scratchLength = Mathf.Max(scratchLength, partProgram.Program.Operations.Length);
                 }
                 _scratchValues = new NativeArray<float>(Mathf.Max(scratchLength, 1), Allocator.Persistent);
             }
@@ -184,9 +184,9 @@ namespace ProceduralCreature.Appearance
             {
                 if (_ownsPrograms)
                 {
-                    foreach ((CreaturePart part, SdfProgram program) in _compiledParts)
+                    foreach (ResolvedPartProgram partProgram in _compiledParts)
                     {
-                        program.Dispose();
+                        partProgram.Program.Dispose();
                     }
                     _bodyProgram.Dispose();
                 }
@@ -207,7 +207,7 @@ namespace ProceduralCreature.Appearance
                     return new ResolvedAppearance(AppearanceDefinition.Default.BaseColor, 0, 1f);
                 }
 
-                CreaturePart nearestPart = null;
+                bool hasNearestPart = false;
                 int nearestPartIndex = -1;
                 float nearestAbsDistance = float.PositiveInfinity;
                 float nearestAbsDistanceSq = float.PositiveInfinity;
@@ -229,7 +229,7 @@ namespace ProceduralCreature.Appearance
                         continue;
                     }
 
-                    CreaturePart part = _compiledParts[i].Part;
+                    ResolvedPartSnapshot part = _compiledParts[i].Part;
                     SdfProgram program = _compiledParts[i].Program;
                     // CC-064 non-finite contract: a culled/outside sample reads +inf,
                     // which means "no candidate here" — never a giant valid distance.
@@ -241,7 +241,7 @@ namespace ProceduralCreature.Appearance
                     {
                         nearestAbsDistance = distance;
                         nearestAbsDistanceSq = distance * distance;
-                        nearestPart = part;
+                        hasNearestPart = true;
                         nearestPartIndex = i;
                     }
                 }
@@ -263,7 +263,7 @@ namespace ProceduralCreature.Appearance
                     return new ResolvedAppearance(bodyColor, 0, 1f);
                 }
 
-                if (nearestPart == null)
+                if (!hasNearestPart)
                 {
                     return new ResolvedAppearance(AppearanceDefinition.Default.BaseColor, 0, 1f);
                 }

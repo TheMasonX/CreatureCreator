@@ -37,7 +37,7 @@ namespace ProceduralCreature.Morphology.Extraction
             {
                 var job = new ActiveCellScanJob
                 {
-                    Samples = grid.Samples,
+                    Samples = grid.MutableSamples,
                     CellsX = grid.CellsX,
                     CellsY = grid.CellsY,
                     CellsZ = grid.CellsZ,

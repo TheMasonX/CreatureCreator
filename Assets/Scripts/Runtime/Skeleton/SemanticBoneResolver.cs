@@ -46,11 +46,7 @@ namespace ProceduralCreature.Skeleton
             return ResolveMirroredBoneId(part.Id + LimbJointBoneSeparator + segmentIndex, mirrored);
         }
 
-        /// <summary>
-        /// A limb's TERMINAL bone id — the last segment bone. A chain of N joints
-        /// produces N-1 bones (indices 0..N-2); the terminal joint at index N-2 is
-        /// the stable semantic child-attachment point (ADR-001 §3).
-        /// </summary>
+        /// <summary>A limb's explicit terminal joint node id.</summary>
         public static string ResolveLimbTerminalBoneId(CreaturePart limb, bool mirrored)
         {
             return ResolveLimbTerminalBoneId(limb, ResolvedLimb.Resolve(limb.Limb), mirrored);
@@ -60,8 +56,14 @@ namespace ProceduralCreature.Skeleton
         public static string ResolveLimbTerminalBoneId(
             CreaturePart limb, ResolvedLimb resolvedLimb, bool mirrored)
         {
-            return ResolveLimbSegmentBoneId(
-                limb, resolvedLimb.JointPositions.Count - 2, mirrored);
+            return ResolveLimbJointBoneId(
+                limb, resolvedLimb.JointPositions.Count - 1, mirrored);
+        }
+
+        /// <summary>Resolves a limb joint node, including the terminal joint.</summary>
+        public static string ResolveLimbJointBoneId(CreaturePart limb, int jointIndex, bool mirrored)
+        {
+            return ResolveMirroredBoneId(limb.Id + LimbJointBoneSeparator + jointIndex, mirrored);
         }
 
         /// <summary>The Body bone id for a Body sample: body_j&lt;sampleId&gt;.</summary>
@@ -96,8 +98,7 @@ namespace ProceduralCreature.Skeleton
                 && parentPart.Limb.Joints != null
                 && parentPart.Limb.Joints.Count >= 2)
             {
-                // The child of a limb attaches to the limb's TERMINAL bone
-                // (N joints -> N-1 bones, so the last bone is index N-2).
+                // The child of a limb attaches to its explicit terminal joint node.
                 parentBoneBaseId = ResolveLimbTerminalBoneId(
                     parentPart, ResolvedLimb.Resolve(parentPart.Limb), mirrored: false);
             }

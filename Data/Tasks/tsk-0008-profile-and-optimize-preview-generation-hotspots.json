@@ -11,13 +11,10 @@
   "assigneeCustomText": "Unassigned",
   "reporter": "cc-markdown-import",
   "labels": [
-    "source-cc",
-    "cc-008",
-    "runtime",
-    "editor",
-    "preview",
-    "performance",
-    "profiling"
+    "user-mandated",
+    "CC-008",
+    "CC-099",
+    "TSK-0008"
   ],
   "attachments": [],
   "externalLinks": [],
@@ -76,15 +73,45 @@
       "author": "anonymous",
       "body": "Audit synthesis 2026-09-04: S01 identifies the anonymous 1e-4 culling margin and global maximum influence radius as measurable optimization-policy drift. Do not optimize before CC-014 fixes culling correctness. Then name the tolerance or derive measured subtree margins under the existing profiling owner.",
       "createdAtUtc": "2026-09-04T22:46:16.5981303Z"
+    },
+    {
+      "id": "c-fc51a4c51cc24c768b49c92288573ce2",
+      "author": "anonymous",
+      "body": "## User Mandate\n\u003E Carefully review this external agent\u0027s review of the current status and plan for the next phases of tasks. Make the necessary task updates in the MS task system, then implement the first full wave dilligently\n\nSTRICT. Binding constraints: preserve the handoff\u0027s culling correctness rules, do not weaken \u0060Cullable\u0060, do not use an ordinary AABB as an ellipsoid proof, keep exact/reference evaluation available, update the canonical MS task before implementation, and record focused validation evidence.\n\n## Reconciliation\nThe 2026-09-05 post-PR1 handoff makes B0 the first implementation priority. The current baseline already contains the conservative potential-influence envelope and root sampler shortcut, but coverage is incomplete: the parity matrix lacks mirrored ellipsoid, high-blend/narrow ellipsoid, and explicit no-safe-envelope fallback cases. This task remains the canonical owner for the performance slice; no duplicate task is created.\n\n## First wave scope\nComplete B0c evidence hardening on the existing implementation: add deterministic parity tests for sphere, box, capsule, ellipsoid, composite ellipsoid, mirrored ellipsoid, high-blend/narrow ellipsoid, and no-safe-envelope fallback. Run the focused Unity Runtime tests, inspect the Unity console, and capture timing/output-count diagnostics where the available fixture exposes them. Do not claim the historical 100-200 ms target without a real warmed-up editor benchmark.\n\n## Acceptance\nFast/reference agreement across the parity matrix; no premature \u002Binf inside a conservative potential envelope; safe fallback when no envelope can be proven; deterministic output and no new mutable/generated-DNA path. Residual benchmark risk is recorded if editor timing cannot be captured in this wave.",
+      "createdAtUtc": "2026-09-05T02:36:43.694453Z"
+    },
+    {
+      "id": "c-3faba3daf4b8461a867a719aaca4ddf1",
+      "author": "anonymous",
+      "body": "## Implementation Evidence\nAdded focused parity coverage in \u0060Assets/Scripts/Tests/Runtime/SdfProgramBuilderTests.cs\u0060 for sphere, box, capsule, mirrored ellipsoid, high-blend/narrow ellipsoid fallback, and fast evaluator/grid consistency. No production runtime code or culling rule was changed.\n\n## Validation Evidence\n- \u0060dotnet build ProceduralCreature.Tests.Runtime.csproj --no-restore\u0060: passed, 0 errors.\n- Unity 6000.5.9f1 Runtime PlayMode assembly: 464/464 passed.\n- Unity console after the run: no product errors or warnings; only test-result cleanup messages.\n- \u0060dotnet build CreatureCreator.slnx --no-restore\u0060: passed, all six projects.\n- \u0060git diff --check\u0060: passed.\n- Live preview console samples: 10,330 triangles, 5,167 vertices; TotalGeneration observed at 271.4, 277.4, 284.1, 284.7, 304.3, 409.6, 575.5, 735.9, and 742.1 ms. These are total-generation observations, not a warmed-up FieldSampling-only benchmark.\n\n## Findings\nThe MCP filter API returned zero discovered tests for direct fixture and assembly filters, but the full Runtime PlayMode assembly path discovered and passed all 464 tests. The new helper intentionally compares DensityGrid against the fast evaluator because safe \u0060Cullable\u0060 operations may return semantic \u0060\u002Binf\u0060 where the unc culled reference remains finite; ellipsoid-specific unsafe-culling coverage remains explicit in the existing tests.\n\n## Blockers / Residual Risk\nB0a\u0027s requested stable SdfCompile/FieldSampling/MeshExtraction/AppearanceBake timing breakdown and before/after benchmark are not complete from the available console sample. Keep TSK-0008 InProgress until a warmed Burst editor benchmark records those stage timings and output counts at standard and alternate VPU settings.",
+      "createdAtUtc": "2026-09-05T02:39:51.7581009Z"
+    },
+    {
+      "id": "c-47b68084f14f4ae08579327ef19123de",
+      "author": "anonymous",
+      "body": "## B0a Benchmark Evidence\nControlled live-editor benchmark completed against the current Creature Editor definition through \u0060CreatureMeshGenerator.GenerateData\u0060, using cloned definitions and a warm-up run before four measured runs per VPU. Unity editor: 6000.5.9f1.\n\nColumns: total_ms, sdf_ms, field_ms, extract_ms, validate_ms, appearance_ms, samples, mixed_cells, vertices, triangles.\n\n- VPU 10: runs 163.5/0.3/93.1/35.3/1.7/33.1, 166.1/0.3/91.4/37.6/1.8/34.9, 170.6/1.7/95.8/35.4/3.4/34.3, 157.5/0.3/88.8/34.5/1.7/32.2. Average: 164.4 ms total, 92.3 ms FieldSampling, 35.7 ms MeshExtraction, 33.6 ms AppearanceBake. Output: 531,441 samples, 3,724 mixed cells, 3,624 vertices, 7,244 triangles.\n- VPU 12: runs 239.3/0.3/144.0/54.6/2.5/37.9, 241.0/0.3/147.6/51.7/2.4/38.9, 238.7/0.3/144.6/53.1/2.5/38.3, 244.3/0.3/151.2/52.5/3.8/36.6. Average: 240.8 ms total, 146.9 ms FieldSampling, 53.0 ms MeshExtraction, 37.9 ms AppearanceBake. Output: 912,673 samples, 5,334 mixed cells, 5,167 vertices, 10,330 triangles.\n- VPU 14: runs 339.9/0.3/205.4/85.3/3.7/45.2, 334.4/0.3/210.6/76.7/3.5/43.5, 330.5/0.3/207.8/76.3/3.6/42.6, 320.3/0.3/196.7/76.9/3.4/43.0. Average: 331.3 ms total, 205.1 ms FieldSampling, 78.8 ms MeshExtraction, 43.6 ms AppearanceBake. Output: 1,442,897 samples, 7,300 mixed cells, 7,060 vertices, 14,116 triangles.\n\nThe user\u0027s four latest editor-preview logs at the current VPU produced 247.2-267.0 ms total and 152.9-167.1 ms FieldSampling, with the same 5,167 vertices and 10,330 triangles. The controlled runtime benchmark is lower because it excludes editor preview scheduling/application overhead; both measurements are retained.\n\n## Result\nB0a measured baseline is complete. The benchmark confirms the ellipsoid-containing path is currently around 147 ms FieldSampling at VPU 12, within the handoff\u0027s 100-200 ms target range, while preserving deterministic output counts. TSK-0008 remains InProgress for B0c/B0d comparison against a pre-regression baseline and any further optimization decision.",
+      "createdAtUtc": "2026-09-05T02:42:28.3477916Z"
+    },
+    {
+      "id": "c-7f41f8783a9142b59d75a60b4d8aaad8",
+      "author": "anonymous",
+      "body": "## Implementation Evidence\n- Added reference-parity coverage for composite smooth unions containing an approximate ellipsoid.\n- Found and corrected the unsafe optimization: approximate ellipsoid fields remain finite outside finite envelopes, and per-operation culling can still affect a smooth union when the ellipsoid is positive but within the blend radius. Programs containing an ellipsoid now disable root potential-envelope and operation culling, preserving exact field output; bounded primitive programs retain existing culling.\n- The test helper now compares exact managed reference output only for ellipsoid fixtures and preserves the existing fast-evaluator/grid contract for bounded primitive roots.\n\n## Validation Evidence\n- Focused Unity PlayMode tests: 2/2 passed: \u0060CompilePortable_CompositeEllipsoid_FallsBackFromPotentialInfluenceEnvelope\u0060, \u0060SamplePortable_SmoothUnionWithEllipsoidMatchesReference\u0060.\n- Full Unity PlayMode assembly \u0060ProceduralCreature.Tests.Runtime\u0060: 468/468 passed, 0 failed, 0 skipped, Unity \u00606000.5.9f1\u0060.\n- \u0060dotnet build ProceduralCreature.Tests.Runtime.csproj --no-restore\u0060: passed with 0 errors and 0 warnings.\n- \u0060dotnet build CreatureCreator.slnx --no-restore\u0060: passed with 0 errors and 0 warnings.\n- \u0060git diff --check\u0060: passed; only existing line-ending normalization warnings were reported.\n\n## Findings\nThe attempted finite ellipsoid potential envelope was not output-safe: it produced \u0060\u002Binf\u0060 where the reference field was finite, and smooth-union blending exposed a second per-operation culling mismatch. The conservative fallback is required until a proof preserves exact/reference semantics.\n\n## Residual Risk\nEllipsoid-containing programs continue to pay the slower exact sampling path. Recovering their performance remains open under B0 and requires a proven output-preserving envelope or a parity-defined absence contract; this slice intentionally does not weaken ellipsoid support or \u0060Cullable\u0060 semantics.",
+      "createdAtUtc": "2026-09-05T03:38:53.9128835Z"
+    },
+    {
+      "id": "c-fbc61f8a3c8c446c8951f1a9c2d1fa52",
+      "author": "anonymous",
+      "body": "## Regression Recovery Evidence\n- User reported preview FieldSampling regressions of 1576-2294 ms with stable mesh/extraction timings.\n- Root cause confirmed in \u0060SdfProgramBuilder.CreateProgram\u0060: the prior ellipsoid fallback cleared \u0060Cullable\u0060 on every operation whenever one approximate ellipsoid existed, forcing full-program evaluation at every grid corner.\n- Removed that global disable. Ellipsoid operations remain non-cullable, while bounded union branches use their recorded \u0060ConsumerUnionIndex\u0060 and the consuming smooth-union blend radius to cull only when their AABB lower bound cannot change the already-evaluated chain result.\n- The root potential-envelope path remains disabled for approximate ellipsoid subtrees because finite ellipsoid fields cannot safely be represented as finite absence envelopes.\n\n## Validation Evidence\n- \u0060dotnet build ProceduralCreature.Tests.Runtime.csproj --no-restore\u0060: passed with no diagnostics.\n- \u0060dotnet build CreatureCreator.slnx --no-restore\u0060: passed; all 6 projects compiled with 0 errors and 0 warnings.\n- \u0060git diff --check\u0060: passed.\n- Unity PlayMode validation was attempted but blocked: the Unity bridge reported \u0060No Unity Editor instances found\u0060. No runtime pass or timing claim is made for this recovery yet.\n\n## Residual Risk\n- The consumer-aware evaluator change needs the focused \u0060SdfProgramBuilderTests\u0060 and a real editor preview benchmark once Unity reconnects. The intended recovery is bounded-branch culling in mixed ellipsoid programs; measured FieldSampling improvement remains unverified.",
+      "createdAtUtc": "2026-09-05T03:46:01.6177719Z"
     }
   ],
   "epicId": null,
   "parentId": null,
   "dueDateUtc": null,
   "createdAtUtc": "2026-09-01T03:16:25.5654277Z",
-  "updatedAtUtc": "2026-09-04T22:46:16.5981303Z",
+  "updatedAtUtc": "2026-09-05T03:46:01.6177719Z",
   "completedAtUtc": null,
-  "revision": 10,
+  "revision": 16,
   "isArchived": false,
   "hasLoadError": false,
   "loadError": null,

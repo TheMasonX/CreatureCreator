@@ -36,7 +36,9 @@ namespace ProceduralCreature.Morphology.Extraction
         /// active-cell scan). Read-only for callers; the grid owns the buffer's
         /// lifetime and releases it in <see cref="Dispose"/>.
         /// </summary>
-        public NativeArray<float> Samples => _samples;
+        public NativeArray<float>.ReadOnly Samples => _samples.AsReadOnly();
+
+        internal NativeArray<float> MutableSamples => _samples;
 
         private int CornersX => CellsX + 1;
         private int CornersY => CellsY + 1;

@@ -86,7 +86,7 @@ namespace ProceduralCreature.Tests.Runtime
 
             Skeleton.Skeleton skeleton = SkeletonInferrer.Infer(definition);
 
-            Assert.AreEqual(2, skeleton.Bones.Count, "body + 1 leg bone");
+            Assert.AreEqual(3, skeleton.Bones.Count, "body + 1 leg segment + terminal joint");
             Bone bone = skeleton.FindBone("part_leg_j0");
             Assert.IsNotNull(bone);
             Assert.AreEqual("part_body", bone.ParentBoneId, "Bone 0 attaches through the normal parent rule.");
@@ -106,16 +106,20 @@ namespace ProceduralCreature.Tests.Runtime
 
             Skeleton.Skeleton skeleton = SkeletonInferrer.Infer(definition);
 
-            Assert.AreEqual(4, skeleton.Bones.Count, "body + 3 leg bones");
+            Assert.AreEqual(5, skeleton.Bones.Count, "body + 3 leg segments + terminal joint");
             Bone b0 = skeleton.FindBone("part_leg_j0");
             Bone b1 = skeleton.FindBone("part_leg_j1");
             Bone b2 = skeleton.FindBone("part_leg_j2");
+            Bone terminal = skeleton.FindBone("part_leg_j3");
             Assert.IsNotNull(b0);
             Assert.IsNotNull(b1);
             Assert.IsNotNull(b2);
+            Assert.IsNotNull(terminal);
             Assert.AreEqual("part_body", b0.ParentBoneId);
             Assert.AreEqual("part_leg_j0", b1.ParentBoneId);
             Assert.AreEqual("part_leg_j1", b2.ParentBoneId);
+            Assert.AreEqual("part_leg_j2", terminal.ParentBoneId);
+            Assert.AreEqual(new Vector3(0.5f, -2f, 0f), terminal.Position);
         }
 
         [Test]
@@ -190,8 +194,8 @@ namespace ProceduralCreature.Tests.Runtime
 
             Skeleton.Skeleton skeleton = SkeletonInferrer.Infer(definition);
 
-            Assert.AreEqual(7, skeleton.Bones.Count, "body + 3 leg bones + 3 mirrored leg bones");
-            for (int i = 0; i < 3; i++)
+            Assert.AreEqual(9, skeleton.Bones.Count, "body + 4 leg segment/joint nodes + 4 mirrored leg segment/joint nodes");
+            for (int i = 0; i < 4; i++)
             {
                 Bone original = skeleton.FindBone("part_leg_j" + i);
                 Bone mirrored = skeleton.FindBone("part_leg_j" + i + SkeletonInferrer.MirrorSuffix);
@@ -208,6 +212,7 @@ namespace ProceduralCreature.Tests.Runtime
             Assert.AreEqual("part_body", skeleton.FindBone("part_leg_j0_mirror").ParentBoneId);
             Assert.AreEqual("part_leg_j0_mirror", skeleton.FindBone("part_leg_j1_mirror").ParentBoneId);
             Assert.AreEqual("part_leg_j1_mirror", skeleton.FindBone("part_leg_j2_mirror").ParentBoneId);
+            Assert.AreEqual("part_leg_j2_mirror", skeleton.FindBone("part_leg_j3_mirror").ParentBoneId);
         }
 
         [Test]
@@ -248,11 +253,11 @@ namespace ProceduralCreature.Tests.Runtime
 
             Skeleton.Skeleton skeleton = SkeletonInferrer.Infer(definition);
 
-            // 3 joints -> 2 bones (_j0, _j1); the child attaches to the terminal
-            // bone _j1 (index N-2 = 1), NOT to the part id, and its bone sits at
+            // 3 joints -> 2 segment bones plus terminal joint _j2; the child
+            // attaches to the terminal joint, NOT to the part id, and its bone sits at
             // the terminal joint's creature-space position.
             Bone foot = skeleton.FindBone("part_foot");
-            Assert.AreEqual("part_leg_j1", foot.ParentBoneId);
+            Assert.AreEqual("part_leg_j2", foot.ParentBoneId);
 
             Matrix4x4 legWorld =
                 CreaturePartWorldTransformResolver.ResolveLocalToCreatureSpace(definition, definition.FindPart("part_leg"));
@@ -276,7 +281,7 @@ namespace ProceduralCreature.Tests.Runtime
 
             Bone mirroredFoot = skeleton.FindBone("part_foot" + SkeletonInferrer.MirrorSuffix);
             Assert.IsNotNull(mirroredFoot);
-            Assert.AreEqual("part_leg_j1" + SkeletonInferrer.MirrorSuffix, mirroredFoot.ParentBoneId,
+            Assert.AreEqual("part_leg_j2" + SkeletonInferrer.MirrorSuffix, mirroredFoot.ParentBoneId,
                 "A mirrored child of a mirrored limb attaches to the mirrored terminal bone.");
         }
 
@@ -296,9 +301,9 @@ namespace ProceduralCreature.Tests.Runtime
             // Only one foot bone exists (the foot is not mirrored), and it must
             // attach to the UNmirrored terminal bone (there is no mirrored chain
             // to attach to beyond the leg's mirrored bones).
-            Assert.AreEqual(6, skeleton.Bones.Count, "body + leg x2 + foot x1");
+            Assert.AreEqual(8, skeleton.Bones.Count, "body + mirrored leg chains + foot x1");
             Bone foot = skeleton.FindBone("part_foot");
-            Assert.AreEqual("part_leg_j1", foot.ParentBoneId);
+            Assert.AreEqual("part_leg_j2", foot.ParentBoneId);
         }
 
         [Test]
@@ -316,9 +321,11 @@ namespace ProceduralCreature.Tests.Runtime
             Skeleton.Skeleton skeleton = SkeletonInferrer.Infer(definition);
 
             Bone handBone0 = skeleton.FindBone("part_hand_j0");
+            Bone wrist = skeleton.FindBone("part_arm_j2");
             Assert.IsNotNull(handBone0);
-            Assert.AreEqual("part_arm_j1", handBone0.ParentBoneId,
-                "A limb child of a limb attaches to the parent's terminal bone.");
+            Assert.IsNotNull(wrist, "The arm's authored terminal joint must be an explicit wrist node.");
+            Assert.AreEqual("part_arm_j2", handBone0.ParentBoneId,
+                "A limb child of a limb attaches to the parent's terminal joint node.");
         }
 
         [Test]

@@ -47,15 +47,21 @@
       "author": "anonymous",
       "body": "Audit synthesis 2026-09-04, report docs/audits/creaturecreator-audit-synthesis-2026-09-04.md: S01/S02 confirm a P1 culling-contract regression risk. SdfProgramEvaluator, subtree evaluation, and the DensityGrid root shortcut use bounds without requiring SdfOperation.Cullable, despite archived CC-063 evidence requiring that guard for ellipsoid-containing fields. Keep this task InProgress and add reference-vs-fast ellipsoid/composite/root parity fixtures. CC-063/CC-064 remain historical Done evidence, not proof of the uncovered paths.",
       "createdAtUtc": "2026-09-04T22:46:16.0961102Z"
+    },
+    {
+      "id": "c-7c12c742e4ae460e8991b57bde4695d1",
+      "author": "anonymous",
+      "body": "The post-PR1 handoff was reconciled against the current baseline. Keep this task as the SDF execution owner while TSK-0008 owns the measured preview-performance wave. The current compiler/sampler already preserves exact/reference evaluation and has a separate potential-influence envelope distinct from \u0060Cullable\u0060; do not duplicate that ownership or weaken ellipsoid handling.",
+      "createdAtUtc": "2026-09-05T02:36:43.7274109Z"
     }
   ],
   "epicId": null,
   "parentId": null,
   "dueDateUtc": null,
   "createdAtUtc": "2026-09-01T03:16:57.7252448Z",
-  "updatedAtUtc": "2026-09-04T22:46:16.0961102Z",
+  "updatedAtUtc": "2026-09-05T02:36:43.7274109Z",
   "completedAtUtc": null,
-  "revision": 5,
+  "revision": 6,
   "isArchived": false,
   "hasLoadError": false,
   "loadError": null,

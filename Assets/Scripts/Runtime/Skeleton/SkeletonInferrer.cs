@@ -17,17 +17,15 @@ namespace ProceduralCreature.Skeleton
     /// touching the mesh at all).
     ///
     /// LIMB PARTS (CC-018 Phase 6): a part with a non-null <see cref="CreaturePart.Limb"/>
-    /// emits N-1 bones, one per consecutive joint pair (N joints → N-1 bones),
-    /// NOT one bone per part. Bone i spans Joints[i] → Joints[i+1]; its position
-    /// is the resolved creature-space joint position, its rotation points along
-    /// the segment, and its id is <c>part.Id + "_j" + i</c>. The skeleton is
+    /// emits N-1 segment bones plus an explicit terminal joint node. Bone i spans
+    /// Joints[i] → Joints[i+1]; the terminal node sits at Joints[N-1]. The skeleton is
     /// derived from the AUTHORED joints, never from the derived metaball samples,
     /// so render-geometry density can change without changing the rig.
     ///
     /// LIMB PARENT CHAIN: bone 0 of a limb attaches through ResolveParentBoneId.
     /// A child of a limb part (Foot, Hand, Claw, Decoration, another limb)
-    /// attaches to that limb's TERMINAL bone (index N-2) — the terminal joint is
-    /// the stable semantic child-attachment point (ADR-001 §3). A child's LOCAL
+    /// attaches to that limb's explicit terminal joint node — the stable semantic
+    /// child-attachment point (ADR-001 §3). A child's LOCAL
     /// SPACE is the limb's terminal joint (CC-018 child-at-tip frame in
     /// CreaturePartWorldTransformResolver), so a child authored at local (0,0,0)
     /// physically sits at the limb's tip and its bone lands on the terminal
@@ -273,6 +271,22 @@ namespace ProceduralCreature.Skeleton
                 });
                 previousBoneId = boneId;
             }
+
+            int terminalIndex = resolved.JointPositions.Count - 1;
+            Vector3 terminalPosition = partMatrix.MultiplyPoint3x4(
+                resolved.JointPositions[terminalIndex]);
+            skeleton.Bones.Add(new Bone
+            {
+                Id = SemanticBoneResolver.ResolveLimbJointBoneId(part, terminalIndex, mirrored),
+                ParentBoneId = previousBoneId,
+                SourcePartId = part.Id,
+                PartType = part.PartType,
+                IsMirrored = mirrored,
+                Position = terminalPosition,
+                Rotation = previousBoneId == null
+                    ? Quaternion.identity
+                    : skeleton.FindBone(previousBoneId).Rotation,
+            });
         }
 
         /// <summary>

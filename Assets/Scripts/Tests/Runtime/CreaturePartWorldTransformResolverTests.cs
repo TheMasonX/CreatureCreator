@@ -907,6 +907,13 @@ namespace ProceduralCreature.Tests.Runtime
         public void ResolvedCreatureSnapshot_CanonicalizationParity_MatchesCanonicalizedResolve()
         {
             CreatureDefinition definition = CanonicalizationFixture();
+            CreaturePart firstPart = definition.FindPart("part_z");
+            firstPart.Transform = new TransformData
+            {
+                Position = new Vector3(0.1234567f, 0.5f, 1.5f),
+                Rotation = Quaternion.Euler(13.4567f, -22.3456f, 7.8912f),
+                Scale = new Vector3(1.00006f, 0.99994f, 1.00004f),
+            };
             CreatureDefinition canonical = DefinitionCanonicalizer.Canonicalize(definition);
 
             ResolvedCreatureSnapshot raw = ResolvedCreatureSnapshot.Resolve(definition);

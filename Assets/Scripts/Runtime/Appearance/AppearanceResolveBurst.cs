@@ -38,7 +38,7 @@ namespace ProceduralCreature.Appearance
         /// PartCount), then the merge job resolves each vertex.
         /// </summary>
         public static void ResolveAll(
-            List<(CreaturePart Part, SdfProgram Program)> compiledParts,
+            List<ResolvedPartProgram> compiledParts,
             SdfProgram bodyProgram,
             NativeArray<float3> vertices,
             int programCount,
@@ -154,7 +154,7 @@ namespace ProceduralCreature.Appearance
     [BurstCompile]
     public struct PartSdfDistanceJob : IJobParallelFor
     {
-        [ReadOnly] public NativeArray<SdfOperation> Operations;
+        [ReadOnly] public NativeArray<SdfOperation>.ReadOnly Operations;
         [ReadOnly] public NativeArray<float3> Vertices;
         [NativeDisableParallelForRestriction] public NativeArray<float> Distances;
         [NativeDisableParallelForRestriction] public NativeArray<float> ScratchValues;

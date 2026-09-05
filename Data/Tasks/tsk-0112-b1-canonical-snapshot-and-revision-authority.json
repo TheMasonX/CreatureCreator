@@ -1,0 +1,44 @@
+﻿{
+  "id": "tsk-0112-b1-canonical-snapshot-and-revision-authority",
+  "key": "TSK-0112",
+  "title": "B1 canonical snapshot and revision authority",
+  "description": "## Summary\nImplement outside-handoff B1 so resolved generation snapshots and revision IDs derive from one detached canonical definition.\n\n## User Mandate\n\u003E Carefully review the latest work and this external audit/task plan and implement the next set of tasks. Here is the prior agent\u0027s end report\n\nSTRICT. Binding constraints: use the 2026-09-05 post-PR1 outside handoff as the primary sprint reference; implement the next dependency-ready wave; preserve CreatureDefinition as authoring authority; keep generated data detached from later authored mutation; retain raw-definition overloads only at outer compatibility boundaries; record focused validation evidence; do not introduce a second snapshot architecture, generic service framework, generic SDF IR, or generic animation framework.\n\n## Scope\n- Canonicalize a detached input copy before snapshot resolution.\n- Derive RevisionId from exactly that canonical input.\n- Resolve all snapshot data from that same canonical input.\n- Keep authoring DNA unmodified.\n- Add focused canonical-equivalence and post-snapshot mutation regression coverage.\n- Keep the existing resolved snapshot as the single runtime boundary.\n\n## Acceptance Criteria\n- Canonicalization-equivalent definitions have equal revision IDs and equivalent resolved output.\n- Mutating authored DNA after snapshot creation cannot mutate snapshot data or revision.\n- Stable source identity and ordering remain preserved.\n- Existing generation and compatibility overloads continue to work.\n- Focused runtime build and Unity validation pass.\n\n## Validation\nPending focused test, runtime build, Unity console inspection, and diff review.\n\n## Findings\nThe current resolver computes the revision through serializer canonicalization but resolves morphology from the original definition. This can make revision authority and resolved data derive from different representations.\n\n## Blockers\nNone known.\n\n## Next Step\nUpdate the resolver and add focused regression coverage, then record evidence before closing the task.",
+  "type": "Task",
+  "status": "Done",
+  "priority": "High",
+  "assigneeMode": "Custom",
+  "assigneeDirectoryId": null,
+  "assigneeCustomText": "Agent",
+  "reporter": "GitHub Copilot",
+  "labels": [
+    "user-mandated",
+    "handoff-2026-09-05",
+    "CC-091",
+    "runtime",
+    "snapshot",
+    "revision",
+    "B1"
+  ],
+  "attachments": [],
+  "externalLinks": [],
+  "linkedPages": [],
+  "comments": [
+    {
+      "id": "c-0a6a8314f3fa4ab6b3dd6ab0043ab215",
+      "author": "anonymous",
+      "body": "## Implementation Evidence\n- Updated \u0060ResolvedCreatureSnapshot.Resolve\u0060 to canonicalize a detached \u0060CreatureDefinition\u0060 once and use that canonical input for revision hashing, body resolution, ordered parts, frame resolution, appearance, bounds, generation settings, forward, and symmetry.\n- Changed revision hashing to write the already-canonical definition directly, avoiding a second canonicalization path.\n- Extended \u0060ResolvedCreatureSnapshot_CanonicalizationParity_MatchesCanonicalizedResolve\u0060 with quantization-sensitive position, rotation, and scale values.\n- Preserved the existing snapshot type, raw-definition compatibility entry points, and authoritative authored DNA ownership.\n\n## Validation Evidence\n- \u0060dotnet build ProceduralCreature.Tests.Runtime.csproj --no-restore\u0060: passed, 0 errors, 0 warnings.\n- Focused Unity PlayMode test \u0060ResolvedCreatureSnapshot_CanonicalizationParity_MatchesCanonicalizedResolve\u0060: 1/1 passed.\n- Full Unity PlayMode assembly \u0060ProceduralCreature.Tests.Runtime\u0060: 466/466 passed, 0 failed, 0 skipped.\n- Unity console after focused and full runs: no product errors or warnings; only test-result and cleanup logs.\n- \u0060dotnet build CreatureCreator.slnx --no-restore\u0060: passed, 0 errors, 0 warnings.\n- \u0060git diff --check\u0060: passed; only existing line-ending normalization warnings were reported.\n\n## Findings\nThe original resolver hashed serializer-canonicalized data but resolved morphology from the authored definition. B1 now gives revision and resolved output one canonical source of truth while leaving the authored definition unmodified.\n\n## Residual Risk\nUnity editor EditMode tests were not rerun because this slice changes runtime snapshot resolution only. Existing unrelated worktree changes remain untouched and are outside TSK-0112.",
+      "createdAtUtc": "2026-09-05T03:08:44.1349267Z"
+    }
+  ],
+  "epicId": null,
+  "parentId": null,
+  "dueDateUtc": null,
+  "createdAtUtc": "2026-09-05T03:06:23.9573922Z",
+  "updatedAtUtc": "2026-09-05T03:08:46.1768156Z",
+  "completedAtUtc": "2026-09-05T03:08:46.1768156Z",
+  "revision": 3,
+  "isArchived": false,
+  "hasLoadError": false,
+  "loadError": null,
+  "sourceFilePath": "tsk-0112-b1-canonical-snapshot-and-revision-authority.json"
+}

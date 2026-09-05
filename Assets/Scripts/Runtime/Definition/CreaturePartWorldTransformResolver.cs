@@ -141,17 +141,18 @@ namespace ProceduralCreature.Definition
                 throw new DomainException("Cannot resolve a CreatureDefinition with null Parts.");
             }
 
-            string revisionId = ComputeRevisionId(definition);
+            CreatureDefinition canonical = DefinitionCanonicalizer.Canonicalize(definition);
+            string revisionId = ComputeRevisionId(canonical);
 
-            bool hasBody = definition.Body != null
-                && definition.Body.Samples != null
-                && definition.Body.Samples.Count > 0;
+            bool hasBody = canonical.Body != null
+                && canonical.Body.Samples != null
+                && canonical.Body.Samples.Count > 0;
             ResolvedBody body = default;
-            if (hasBody) body = ResolvedBody.Resolve(definition.Body);
+            if (hasBody) body = ResolvedBody.Resolve(canonical.Body);
 
             var resolvedParts = new Dictionary<string, ResolvedPartSnapshot>(
                 StringComparer.Ordinal);
-            var orderedParts = new List<CreaturePart>(definition.Parts);
+            var orderedParts = new List<CreaturePart>(canonical.Parts);
             orderedParts.Sort((left, right) => string.CompareOrdinal(left?.Id, right?.Id));
             for (int i = 0; i < orderedParts.Count; i++)
             {
@@ -169,7 +170,7 @@ namespace ProceduralCreature.Definition
                 if (part.Limb != null) limb = ResolvedLimb.Resolve(part.Limb);
 
                 Matrix4x4 partFrame = CreaturePartWorldTransformResolver
-                    .ResolvePartFrameToCreatureSpace(definition, part);
+                    .ResolvePartFrameToCreatureSpace(canonical, part);
                 Matrix4x4 childFrame = partFrame;
                 if (part.Limb != null)
                 {
@@ -183,18 +184,18 @@ namespace ProceduralCreature.Definition
             return new ResolvedCreatureSnapshot(
                 hasBody,
                 body,
-                definition.Body?.Appearance?.Clone(),
-                definition.Forward,
-                definition.Bounds,
-                definition.Generation,
-                definition.SymmetryMode,
+                canonical.Body?.Appearance?.Clone(),
+                canonical.Forward,
+                canonical.Bounds,
+                canonical.Generation,
+                canonical.SymmetryMode,
                 new System.Collections.ObjectModel.ReadOnlyDictionary<string, ResolvedPartSnapshot>(resolvedParts),
                 revisionId);
         }
 
         private static string ComputeRevisionId(CreatureDefinition definition)
         {
-            string canonicalJson = new JsonDnaSerializer().Serialize(definition);
+            string canonicalJson = CanonicalJsonWriter.Write(definition);
             byte[] hash;
             using (SHA256 sha256 = SHA256.Create())
             {

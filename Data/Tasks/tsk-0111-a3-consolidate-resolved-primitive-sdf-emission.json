@@ -1,0 +1,44 @@
+﻿{
+  "id": "tsk-0111-a3-consolidate-resolved-primitive-sdf-emission",
+  "key": "TSK-0111",
+  "title": "A3 consolidate resolved primitive SDF emission",
+  "description": "## User Mandate\n\n\u003E \u0022Carefully review the latest work and this external audit/task plan and implement the next set of tasks.\u0022\n\nSTRICT. Binding constraints:\n- Keep one concrete implementation for resolved shape to primitive, transform, bounds, cullability, and symmetry emission.\n- Preserve the authoritative CreatureDefinition and detached resolved snapshot boundary.\n- Preserve deterministic operation data and documented ellipsoid culling behavior.\n- Do not introduce a generic SDF compiler framework or new IR.\n\n## Summary\n\nConsolidate the mechanically duplicated resolved primitive emission used by whole-creature and individual-part portable SDF compilation.\n\n## Scope\n\n- Extract one small concrete helper for resolved shape mapping, parameter packing, primitive creation, transform wrapping, bounds, cullability, and symmetry wrapping.\n- Keep limb chain emission separate.\n- Compare whole-creature and individual-part operation data for Sphere, Capsule, Box, Ellipsoid, and mirrored variants.\n- Preserve native disposal and existing public APIs.\n\n## Acceptance Criteria\n\n- Whole-creature and individual-part compilation use the same resolved primitive emission implementation.\n- Operation parameters, transforms, bounds, cullability, symmetry, and deterministic order remain unchanged.\n- Ellipsoid operations remain non-cullable while ordinary primitives remain cullable.\n- Focused parity tests pass.\n\n## Validation\n\nRun the focused runtime SDF builder tests, affected runtime build, Unity PlayMode tests when available, and git diff --check.\n\n## Findings\n\nA3 inventory found duplicate primitive blocks in SdfProgramBuilder.CompilePortable and CompilePortablePart. Both independently map ResolvedShape to SdfOperationType and parameters, append Transform, set bounds/cullability, and append Symmetry.\n\n## Blockers\n\nNone known.\n\n## Next Step\n\nExtract the concrete helper, add operation-data parity coverage, and validate the touched runtime slice.",
+  "type": "Cleanup",
+  "status": "Done",
+  "priority": "Medium",
+  "assigneeMode": "Custom",
+  "assigneeDirectoryId": null,
+  "assigneeCustomText": "Agent",
+  "reporter": "anonymous",
+  "labels": [
+    "audit-synthesis",
+    "user-mandated",
+    "a3",
+    "sdf",
+    "deduplication",
+    "runtime",
+    "cc-091"
+  ],
+  "attachments": [],
+  "externalLinks": [],
+  "linkedPages": [],
+  "comments": [
+    {
+      "id": "c-d5aedcc56fba4623a3b887247a4902fc",
+      "author": "anonymous",
+      "body": "Implementation evidence (2026-09-05): SdfProgramBuilder now has one concrete AppendResolvedPrimitive helper for ResolvedShape -\u003E primitive type/parameters, transform, distance scale, world bounds, cullability, and optional symmetry. CompilePortable and CompilePortablePart delegate to it; limb chain emission remains separate. No public API or snapshot boundary changes.\n\nValidation evidence: focused Unity PlayMode parity test CompilePortable_AndIndividualPartCompilationSharePrimitiveOperationData passed 1/1. Existing SdfProgramBuilderTests fixture passed 19/19 in PlayMode. Unity console had no product errors or warnings. dotnet build ProceduralCreature.Tests.Runtime.csproj --no-restore passed with 0 warnings/errors. git diff --check passed. Source inventory confirms one ShapeType mapping switch and one transform/symmetry metadata emission block.\n\nResidual risk: broader full runtime/editor suites were not rerun because this slice is runtime-local; operation parity is covered for Sphere, Capsule, Box, Ellipsoid, mirrored rotated/scaled transforms.",
+      "createdAtUtc": "2026-09-05T03:03:13.1069721Z"
+    }
+  ],
+  "epicId": null,
+  "parentId": null,
+  "dueDateUtc": null,
+  "createdAtUtc": "2026-09-05T03:00:53.8596815Z",
+  "updatedAtUtc": "2026-09-05T03:03:13.1330274Z",
+  "completedAtUtc": "2026-09-05T03:03:13.1330274Z",
+  "revision": 4,
+  "isArchived": false,
+  "hasLoadError": false,
+  "loadError": null,
+  "sourceFilePath": "tsk-0111-a3-consolidate-resolved-primitive-sdf-emission.json"
+}

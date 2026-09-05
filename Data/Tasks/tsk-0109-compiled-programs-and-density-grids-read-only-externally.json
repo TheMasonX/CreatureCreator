@@ -1,0 +1,43 @@
+﻿{
+  "id": "tsk-0109-compiled-programs-and-density-grids-read-only-externally",
+  "key": "TSK-0109",
+  "title": "Make compiled programs and density grids read-only externally",
+  "description": "## Summary\nImplement handoff A1 so compiled SDF programs and sampled density grids expose read-only native views to ordinary consumers while retaining producer-owned mutable handles internally.\n\n## User Mandate\n\u003E implement the next set of tasks in the next wave of the larger tasklist (with the outside audit as the primary reference for upcoming sprint tasks)\n\nSTRICT. Binding constraints: use the 2026-09-05 post-PR1 outside handoff as the primary sprint reference; implement the next dependency-ready wave; preserve native ownership and disposal semantics; keep the change small and evidence-backed; do not introduce managed copies or a competing snapshot/generation architecture.\n\n## Scope\n- Change \u0060SdfProgram.Operations\u0060 to \u0060NativeArray\u003CSdfOperation\u003E.ReadOnly\u0060.\n- Change \u0060DensityGrid.Samples\u0060 to \u0060NativeArray\u003Cfloat\u003E.ReadOnly\u0060.\n- Retain private native buffers and internal producer access for jobs and disposal.\n- Update only the direct runtime consumers required by the type boundary.\n- Preserve evaluator behavior, output data, and exactly-once disposal.\n\n## Acceptance Criteria\n- Ordinary consumers cannot receive mutable native handles from \u0060SdfProgram\u0060 or \u0060DensityGrid\u0060.\n- Burst sampling and active-cell consumers still compile and run using read-only operation/sample views.\n- Generated output is unchanged.\n- No managed copies or new generic ownership abstraction are introduced.\n- Focused build and Unity runtime validation pass.\n\n## Validation\nPending focused build, Unity runtime tests, console inspection, and diff review.\n\n## Findings\nThe outside audit identifies A1 as the next concrete ownership slice after the measured B0 wave. Existing public properties returned mutable \u0060NativeArray\u003CT\u003E\u0060 handles.\n\n## Blockers\nNone known.\n\n## Next Step\nRun Unity runtime validation, inspect the console, and record evidence before closing the slice.",
+  "type": "Task",
+  "status": "Done",
+  "priority": "High",
+  "assigneeMode": "Custom",
+  "assigneeDirectoryId": null,
+  "assigneeCustomText": "Unassigned",
+  "reporter": "GitHub Copilot",
+  "labels": [
+    "user-mandated",
+    "CC-091",
+    "handoff-2026-09-05",
+    "runtime",
+    "ownership",
+    "A1"
+  ],
+  "attachments": [],
+  "externalLinks": [],
+  "linkedPages": [],
+  "comments": [
+    {
+      "id": "c-bd81dd8023664243925ff37d66996ada",
+      "author": "anonymous",
+      "body": "## Implementation Evidence\nImplemented A1 in the owning runtime types:\n- \u0060SdfProgram\u0060 now stores its native operation buffer privately and exposes only \u0060NativeArray\u003CSdfOperation\u003E.ReadOnly\u0060 publicly; internal producer access remains available for evaluator/job ownership and disposal.\n- \u0060DensityGrid\u0060 now exposes only \u0060NativeArray\u003Cfloat\u003E.ReadOnly\u0060 publicly; active-cell construction uses an internal mutable handle while the grid retains disposal ownership.\n- \u0060SdfSamplingJob\u0060 and \u0060PartSdfDistanceJob\u0060 consume read-only operation views. No managed copies, IR, or new ownership abstraction were introduced.\n\n## Validation Evidence\n- \u0060dotnet build ProceduralCreature.Tests.Runtime.csproj --no-restore\u0060: passed, 0 errors, 0 warnings.\n- Unity 6000.5.9f1 PlayMode assembly \u0060ProceduralCreature.Tests.Runtime\u0060: 464/464 passed, 0 failed, 0 skipped.\n- Unity console after the run: no product errors or warnings; only test-result save and post-build cleanup logs.\n- Editor diagnostics: no errors in all four changed runtime files.\n- \u0060git diff --check\u0060: passed. Existing unrelated worktree changes were preserved.\n\n## Findings\nThe outside handoff A1 requirement was a real API ownership gap: both public properties previously returned mutable native handles. The read-only view preserves direct Burst/job reads and exactly-once owner disposal without changing generated output.\n\n## Residual Risk\nThe compile-level boundary is validated by the runtime build and source API shape; no separate negative compilation fixture was added because attempting to mutate a read-only view would intentionally make the test assembly uncompilable. The next handoff-ready slice is A2 generated individual-part correspondence, followed by B1 canonical snapshot/revision authority as dependencies permit.",
+      "createdAtUtc": "2026-09-05T02:46:50.0934669Z"
+    }
+  ],
+  "epicId": null,
+  "parentId": null,
+  "dueDateUtc": null,
+  "createdAtUtc": "2026-09-05T02:46:09.2407216Z",
+  "updatedAtUtc": "2026-09-05T02:46:52.3272273Z",
+  "completedAtUtc": "2026-09-05T02:46:52.3272273Z",
+  "revision": 3,
+  "isArchived": false,
+  "hasLoadError": false,
+  "loadError": null,
+  "sourceFilePath": "tsk-0109-compiled-programs-and-density-grids-read-only-externally.json"
+}

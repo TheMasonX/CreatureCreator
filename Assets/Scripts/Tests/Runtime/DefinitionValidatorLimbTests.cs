@@ -53,6 +53,27 @@ namespace ProceduralCreature.Tests.Runtime
         }
 
         [Test]
+        public void Validate_LegWithDirectFootAndTwoJoints_WarnsThatAnkleJointIsMissing()
+        {
+            CreatureDefinition definition = DefinitionWith(StraightChain());
+            definition.FindPart("part_leg").PartType = PartType.Leg;
+            definition.AddPart(new CreaturePart
+            {
+                Id = "part_foot",
+                ParentId = "part_leg",
+                PartType = PartType.Foot,
+                Transform = TransformData.Identity,
+                Shape = ShapeDefinition.DefaultSphere,
+                Appearance = AppearanceDefinition.Default,
+            });
+
+            ValidationResult result = DefinitionValidator.Validate(definition);
+
+            Assert.IsTrue(result.IsValid, "A two-joint leg remains valid, but should expose the missing authored ankle as a warning.");
+            Assert.IsTrue(HasCode(result, ValidationCode.LegFootChainMissingAnkleJoint));
+        }
+
+        [Test]
         public void Validate_LimbWithNoJoints_ReportsInvalidLimbChain()
         {
             var chain = new LimbChain(); // no joints
