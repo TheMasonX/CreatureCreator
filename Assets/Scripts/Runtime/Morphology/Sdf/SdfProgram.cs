@@ -63,12 +63,19 @@ namespace ProceduralCreature.Morphology.Sdf
         /// provably farther from the sample than any blend can reach.
         /// </summary>
         public float InfluenceRadius { get; }
+        public bool HasPotentialBounds { get; }
+        public float3 PotentialMinBound { get; }
+        public float3 PotentialMaxBound { get; }
 
-        internal SdfProgram(NativeArray<SdfOperation> operations, int rootIndex, float influenceRadius)
+        internal SdfProgram(NativeArray<SdfOperation> operations, int rootIndex, float influenceRadius,
+            bool hasPotentialBounds = false, float3 potentialMinBound = default, float3 potentialMaxBound = default)
         {
             Operations = operations;
             RootIndex = rootIndex;
             InfluenceRadius = influenceRadius;
+            HasPotentialBounds = hasPotentialBounds;
+            PotentialMinBound = potentialMinBound;
+            PotentialMaxBound = potentialMaxBound;
         }
 
         public void Dispose()
@@ -308,13 +315,13 @@ namespace ProceduralCreature.Morphology.Sdf
         public float InfluenceRadius;
 
         /// <summary>
-        /// True only when the root operation is Cullable with valid bounds. When
-        /// false (for example an ellipsoid root), the region shortcut is disabled so
-        /// a finite approximate field is never early-exited to <c>+inf</c>.
+        /// True when the root has a conservative envelope for all field influence.
+        /// This is distinct from operation Cullable metadata: an ellipsoid can have
+        /// a potential envelope without having an AABB lower-bound culling proof.
         /// </summary>
-        public bool RootCanCull;
-        public float3 RootMinBound;
-        public float3 RootMaxBound;
+        public bool RootHasPotentialBounds;
+        public float3 RootPotentialMinBound;
+        public float3 RootPotentialMaxBound;
 
         public void Execute(int index)
         {
@@ -324,10 +331,10 @@ namespace ProceduralCreature.Morphology.Sdf
             int z = sampleIndex / (CornersX * CornersY);
             float3 point = Origin + new float3(x, y, z) * CellSize;
 
-            if (RootCanCull &&
-                (point.x < RootMinBound.x - InfluenceRadius || point.x > RootMaxBound.x + InfluenceRadius ||
-                 point.y < RootMinBound.y - InfluenceRadius || point.y > RootMaxBound.y + InfluenceRadius ||
-                 point.z < RootMinBound.z - InfluenceRadius || point.z > RootMaxBound.z + InfluenceRadius))
+            if (RootHasPotentialBounds &&
+                (point.x < RootPotentialMinBound.x - InfluenceRadius || point.x > RootPotentialMaxBound.x + InfluenceRadius ||
+                 point.y < RootPotentialMinBound.y - InfluenceRadius || point.y > RootPotentialMaxBound.y + InfluenceRadius ||
+                 point.z < RootPotentialMinBound.z - InfluenceRadius || point.z > RootPotentialMaxBound.z + InfluenceRadius))
             {
                 Samples[sampleIndex] = float.PositiveInfinity;
                 return;

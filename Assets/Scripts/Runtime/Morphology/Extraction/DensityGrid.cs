@@ -103,13 +103,9 @@ namespace ProceduralCreature.Morphology.Extraction
                     throw new DomainException("Portable program root index must identify an operation.");
                 }
 
-                SdfOperation rootOp = program.Operations[program.RootIndex];
-                bool rootCanCull = rootOp.Cullable
-                    && rootOp.MinBound.x <= rootOp.MaxBound.x
-                    && rootOp.MinBound.y <= rootOp.MaxBound.y
-                    && rootOp.MinBound.z <= rootOp.MaxBound.z;
-                float3 rootMin = rootCanCull ? rootOp.MinBound : new float3(0f);
-                float3 rootMax = rootCanCull ? rootOp.MaxBound : new float3(0f);
+                bool rootHasPotentialBounds = program.HasPotentialBounds;
+                float3 rootMin = program.PotentialMinBound;
+                float3 rootMax = program.PotentialMaxBound;
 
                 for (int sampleStart = 0; sampleStart < (int)cornerCountLong; sampleStart += batchSize)
                 {
@@ -127,9 +123,9 @@ namespace ProceduralCreature.Morphology.Extraction
                         CellSize = cellSize,
                         SampleStartIndex = sampleStart,
                         InfluenceRadius = program.InfluenceRadius,
-                        RootCanCull = rootCanCull,
-                        RootMinBound = rootMin,
-                        RootMaxBound = rootMax,
+                        RootHasPotentialBounds = rootHasPotentialBounds,
+                        RootPotentialMinBound = rootMin,
+                        RootPotentialMaxBound = rootMax,
                     };
                     JobHandle handle = job.Schedule(sampleCount, 64);
                     handle.Complete();

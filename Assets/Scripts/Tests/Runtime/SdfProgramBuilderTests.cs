@@ -221,6 +221,51 @@ namespace ProceduralCreature.Tests.Runtime
         }
 
         [Test]
+        public void CompilePortable_CompositeEllipsoid_ProvidesPotentialInfluenceEnvelope()
+        {
+            CreatureDefinition definition = CreatureDefinition.CreateEmpty();
+            definition.AddPart(new CreaturePart
+            {
+                Id = "ellipsoid",
+                Transform = TransformData.Identity,
+                Shape = new ShapeDefinition
+                {
+                    Type = ShapeType.Ellipsoid,
+                    EllipsoidRadii = new Vector3(2f, 1f, 1f),
+                    SmoothBlendRadius = 0.25f,
+                },
+                Appearance = AppearanceDefinition.Default,
+            });
+            definition.AddPart(new CreaturePart
+            {
+                Id = "sphere",
+                Transform = new TransformData { Position = new Vector3(2.5f, 0f, 0f) },
+                Shape = new ShapeDefinition
+                {
+                    Type = ShapeType.Sphere,
+                    Radius = 0.5f,
+                    SmoothBlendRadius = 0.25f,
+                },
+                Appearance = AppearanceDefinition.Default,
+            });
+
+            using (SdfProgram program = SdfProgramBuilder.CompilePortable(definition))
+            {
+                Assert.IsTrue(program.HasPotentialBounds,
+                    "A composite root must expose a conservative potential-influence envelope.");
+
+                float3 outsideOrdinaryEllipsoidAabb = new float3(0f, 1.2f, 0f);
+                float reference = SdfProgramEvaluator.EvaluateReference(program, outsideOrdinaryEllipsoidAabb);
+                Assert.IsTrue(!float.IsNaN(reference) && !float.IsInfinity(reference));
+                Assert.That(outsideOrdinaryEllipsoidAabb.y, Is.GreaterThan(1f));
+                Assert.That(outsideOrdinaryEllipsoidAabb.y, Is.LessThan(program.PotentialMaxBound.y));
+                float fast = SdfProgramEvaluator.Evaluate(program, outsideOrdinaryEllipsoidAabb);
+                Assert.IsTrue(!float.IsNaN(fast) && !float.IsInfinity(fast),
+                    "The exact ellipsoid field must remain evaluable inside the potential envelope.");
+            }
+        }
+
+        [Test]
         public void DensityGrid_EstimateGradient_UsesOneSidedFiniteDifferenceAtCullBoundary()
         {
             using (SdfProgram program = SdfProgramBuilder.CompilePortable(Sphere("sphere", Vector3.zero)))

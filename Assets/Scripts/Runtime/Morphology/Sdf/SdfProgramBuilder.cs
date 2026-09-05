@@ -188,6 +188,115 @@ namespace ProceduralCreature.Morphology.Sdf
             return maxBlend + 1e-4f;
         }
 
+        private static SdfProgram CreateProgram(List<SdfOperation> operations, int root)
+        {
+            float influenceRadius = ComputeInfluenceRadius(operations);
+            Aabb potentialBounds = default;
+            bool hasPotentialBounds = CanUseRootPotentialBounds(operations, root) &&
+                TryComputePotentialBounds(operations, root, influenceRadius, out potentialBounds);
+            return new SdfProgram(
+                new NativeArray<SdfOperation>(operations.ToArray(), Allocator.Persistent),
+                root,
+                influenceRadius,
+                hasPotentialBounds,
+                hasPotentialBounds ? potentialBounds.Min : default,
+                hasPotentialBounds ? potentialBounds.Max : default);
+        }
+
+        private static bool CanUseRootPotentialBounds(List<SdfOperation> operations, int index)
+        {
+            if (index < 0 || index >= operations.Count) return false;
+
+            SdfOperation operation = operations[index];
+            switch (operation.Type)
+            {
+                case SdfOperationType.SmoothUnion:
+                    return true;
+                case SdfOperationType.Symmetry:
+                    return CanUseRootPotentialBounds(operations, operation.A);
+                case SdfOperationType.Transform:
+                    return operation.A >= 0 && operation.A < operations.Count &&
+                        operations[operation.A].Type != SdfOperationType.Ellipsoid;
+                default:
+                    return false;
+            }
+        }
+
+        private static bool TryComputePotentialBounds(List<SdfOperation> operations, int index,
+            float influenceRadius, out Aabb bounds)
+        {
+            if (index < 0 || index >= operations.Count)
+            {
+                bounds = default;
+                return false;
+            }
+
+            SdfOperation operation = operations[index];
+            switch (operation.Type)
+            {
+                case SdfOperationType.Transform:
+                    if (operation.A < 0 || operation.A >= operations.Count)
+                    {
+                        bounds = default;
+                        return false;
+                    }
+
+                    SdfOperation primitive = operations[operation.A];
+                    if (primitive.Type == SdfOperationType.Ellipsoid)
+                    {
+                        float rMin = math.cmin(primitive.Parameters);
+                        float distanceScale = Mathf.Abs(operation.DistanceScale);
+                        float localInfluence = distanceScale > Mathf.Epsilon
+                            ? influenceRadius / distanceScale
+                            : float.PositiveInfinity;
+                        if (!(rMin > localInfluence))
+                        {
+                            bounds = default;
+                            return false;
+                        }
+
+                        float expansion = rMin / (rMin - localInfluence);
+                        float3 expandedRadii = primitive.Parameters * expansion;
+                        bounds = TransformToWorld(
+                            new Aabb(-expandedRadii, expandedRadii),
+                            ToMatrix4x4(operation.Matrix).inverse);
+                        return true;
+                    }
+
+                    bounds = ReadAabb(operations, index);
+                    return HasValidBounds(bounds);
+
+                case SdfOperationType.Symmetry:
+                    if (!TryComputePotentialBounds(operations, operation.A, influenceRadius, out Aabb child))
+                    {
+                        bounds = default;
+                        return false;
+                    }
+                    bounds = Aabb.Union(child, Aabb.MirrorAcrossX(child));
+                    return true;
+
+                case SdfOperationType.SmoothUnion:
+                    float childInfluence = operation.Parameters.x + 1e-4f;
+                    if (!TryComputePotentialBounds(operations, operation.A, childInfluence, out Aabb left) ||
+                        !TryComputePotentialBounds(operations, operation.B, childInfluence, out Aabb right))
+                    {
+                        bounds = default;
+                        return false;
+                    }
+                    bounds = Aabb.Union(left, right);
+                    return true;
+
+                default:
+                    bounds = default;
+                    return false;
+            }
+        }
+
+        private static bool HasValidBounds(Aabb bounds)
+        {
+            return bounds.Min.x <= bounds.Max.x && bounds.Min.y <= bounds.Max.y && bounds.Min.z <= bounds.Max.z;
+        }
+
         /// <summary>
         /// The blend radius used to unite a part into the creature field
         /// (CC-049). For a limb part, <see cref="ShapeDefinition.SmoothBlendRadius"/>
@@ -232,7 +341,7 @@ namespace ProceduralCreature.Morphology.Sdf
             if (orderedParts.Count == 0 && !hasBodySamples)
             {
                 operations.Add(SdfOperation.Primitive(SdfOperationType.Empty, float3.zero));
-                return new SdfProgram(new NativeArray<SdfOperation>(operations.ToArray(), Allocator.Persistent), 0, 0f);
+                return CreateProgram(operations, 0);
             }
 
             int root = -1;
@@ -389,7 +498,7 @@ namespace ProceduralCreature.Morphology.Sdf
                 }
             }
 
-            return new SdfProgram(new NativeArray<SdfOperation>(operations.ToArray(), Allocator.Persistent), root, ComputeInfluenceRadius(operations));
+            return CreateProgram(operations, root);
         }
 
         public static SdfProgram CompilePortableBodyField(CreatureDefinition definition)
@@ -413,7 +522,7 @@ namespace ProceduralCreature.Morphology.Sdf
                 root = 0;
             }
 
-            return new SdfProgram(new NativeArray<SdfOperation>(operations.ToArray(), Allocator.Persistent), root, ComputeInfluenceRadius(operations));
+            return CreateProgram(operations, root);
         }
 
         public static List<(CreaturePart Part, SdfProgram Program)> CompileIndividualPartsPortable(CreatureDefinition definition)
@@ -556,7 +665,7 @@ namespace ProceduralCreature.Morphology.Sdf
                 }
             }
 
-            return new SdfProgram(new NativeArray<SdfOperation>(operations.ToArray(), Allocator.Persistent), root, ComputeInfluenceRadius(operations));
+            return CreateProgram(operations, root);
         }
 
         private static float4x4 ToFloat4x4(Matrix4x4 matrix)
@@ -567,6 +676,15 @@ namespace ProceduralCreature.Morphology.Sdf
                 new float4(matrix.m02, matrix.m12, matrix.m22, matrix.m32),
                 new float4(matrix.m03, matrix.m13, matrix.m23, matrix.m33));
         }
+
+            private static Matrix4x4 ToMatrix4x4(float4x4 matrix)
+            {
+                return new Matrix4x4(
+                new Vector4(matrix.c0.x, matrix.c0.y, matrix.c0.z, matrix.c0.w),
+                new Vector4(matrix.c1.x, matrix.c1.y, matrix.c1.z, matrix.c1.w),
+                new Vector4(matrix.c2.x, matrix.c2.y, matrix.c2.z, matrix.c2.w),
+                new Vector4(matrix.c3.x, matrix.c3.y, matrix.c3.z, matrix.c3.w));
+            }
 
         /// <summary>
         /// Appends the portable operations for a limb chain: one sphere primitive
