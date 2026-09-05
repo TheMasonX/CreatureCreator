@@ -61,15 +61,21 @@
       "author": "anonymous",
       "body": "Implemented the legacy shape fallback consolidation slice (A5c). \u0060ShapeDefinition.WithLegacyDefaults()\u0060 is now the single owner of v1 fallback semantics: missing/non-positive legacy size resolves to 0.5, primitive dimensions inherit that size, and capsule height independently defaults to 1. Routed \u0060ResolvedShape\u0060, \u0060DefinitionCanonicalizer\u0060, \u0060JsonDnaSerializer\u0060, and \u0060CreatureEditorWindow\u0060 through the helper. Added \u0060DefinitionCanonicalizerTests.Shape_LegacyDefaults_AreSharedAcrossCanonicalAndResolvedData\u0060 covering zero/legacy input and canonical/resolved parity. Validation: \u0060dotnet build ProceduralCreature.Runtime.csproj --no-restore\u0060 passed with 0 warnings/errors; \u0060dotnet build ProceduralCreature.Editor.csproj --no-restore\u0060 passed with 0 warnings/errors; Unity PlayMode runtime assembly 472/472 passed; Unity EditMode editor assembly 115/115 passed; script validation reported 0 warnings/0 errors; \u0060git diff --check\u0060 passed. B0/ellipsoid culling behavior was untouched. TSK-0105 remains open for its separately scoped geometry-transform/palette follow-up.",
       "createdAtUtc": "2026-09-05T07:01:47.0351972Z"
+    },
+    {
+      "id": "c-f86b80938fce46b686a8d89867e0a1f0",
+      "author": "anonymous",
+      "body": "Orchestrator Round 1 evidence (2026-09-05, three-round sequential-subagent handoff): the sole Round-1 subagent performed a genuine inventory of the remaining geometry-transform mechanics (determinant handling, mirrored winding, normal transforms, bounds transforms, submesh preservation) across the mesh/extraction/appearance path and found no live duplication to merge. Each operation already has exactly one live owner: mirrored winding = CreatureMeshGenerator.CopyTriangles (only reversal site); normal transforms = two semantically distinct single owners (mesh-asset RecalculateNormals after reversal vs. implicit ComputeAngleWeightedNormals \u002B SetNormals); bounds = two single-line Unity calls in distinct output contracts; submesh preservation = BuildMeshAssetItem only. Reflection math is centralized in MirrorUtility (ReflectPointAcrossX / ReflectTransformAcrossX / MirrorAcrossXPlane) with no second reflection matrix anywhere; TSK-0115 wiring not redone. Independent orchestrator re-check confirmed: tracked diff empty, single ReflectAcrossX creator at MirrorUtility.cs:27 with all callers routed through MirrorUtility, RecalculateNormals only at the two stated owners. No code changed because merging would violate the round\u0027s own rules (no generic GeometryUtils grab-bag, semantics/invariants/failure must match, output unchanged) and engineering-guardrails. Validation: dotnet build ProceduralCreature.Runtime.csproj --no-restore clean (0/0); git diff --check clean. Unity PlayMode not rerun (no code change =\u003E no regression surface); existing parity tests (GeneratedCreatureTests mirrored winding/bounds, MirrorUtilityTests proper-rotation involution) remain the guard. Task stays InProgress: the remaining TSK-0105 scope item is the disposition of the \u0027review remaining mechanically identical ID policy, tolerance, grid-spec, finite-check candidates\u0027 bullet, which was not re-run this round. No B0, no SDF symmetry/binding-identity/mesh-output policy touched.",
+      "createdAtUtc": "2026-09-05T16:20:27.9397686Z"
     }
   ],
   "epicId": null,
   "parentId": null,
   "dueDateUtc": null,
   "createdAtUtc": "2026-09-03T22:37:27.6890853Z",
-  "updatedAtUtc": "2026-09-05T07:01:47.0351972Z",
+  "updatedAtUtc": "2026-09-05T16:20:27.9397686Z",
   "completedAtUtc": null,
-  "revision": 8,
+  "revision": 9,
   "isArchived": false,
   "hasLoadError": false,
   "loadError": null,
