@@ -30,7 +30,6 @@ namespace ProceduralCreature.Morphology.Sdf
         public float DistanceScale;
         public float3 MinBound;
         public float3 MaxBound;
-        public int ConsumerUnionIndex;
 
         /// <summary>
         /// True only when this op's SDF output is bounded below by the distance to
@@ -48,7 +47,6 @@ namespace ProceduralCreature.Morphology.Sdf
                 Parameters = parameters,
                 MinBound = new float3(float.PositiveInfinity),
                 MaxBound = new float3(float.NegativeInfinity),
-                ConsumerUnionIndex = -1,
             };
         }
     }

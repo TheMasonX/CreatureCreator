@@ -145,16 +145,8 @@ namespace ProceduralCreature.Morphology.Sdf
             SdfOperation op = operations[index];
             op.MinBound = aabb.Min;
             op.MaxBound = aabb.Max;
-            op.ConsumerUnionIndex = -1;
             op.Cullable = false;
             operations[index] = op;
-        }
-
-        private static void SetConsumer(List<SdfOperation> operations, int childIndex, int unionIndex)
-        {
-            SdfOperation op = operations[childIndex];
-            op.ConsumerUnionIndex = unionIndex;
-            operations[childIndex] = op;
         }
 
         private static void SetCullable(List<SdfOperation> operations, int index, bool cullable)
@@ -441,7 +433,6 @@ namespace ProceduralCreature.Morphology.Sdf
                         });
                         SetWorldAabb(operations, unionIndex, Aabb.Union(ReadAabb(operations, root), ReadAabb(operations, bodyNode)));
                         SetCullable(operations, unionIndex, ReadCullable(operations, root) && ReadCullable(operations, bodyNode));
-                        SetConsumer(operations, bodyNode, unionIndex);
                         root = unionIndex;
                     }
                     else
@@ -496,7 +487,6 @@ namespace ProceduralCreature.Morphology.Sdf
                     });
                     SetWorldAabb(operations, unionIndex, Aabb.Union(ReadAabb(operations, previousRoot), ReadAabb(operations, root)));
                     SetCullable(operations, unionIndex, ReadCullable(operations, previousRoot) && ReadCullable(operations, root));
-                    SetConsumer(operations, root, unionIndex);
                     root = unionIndex;
                 }
             }
@@ -593,7 +583,6 @@ namespace ProceduralCreature.Morphology.Sdf
                 });
                 SetWorldAabb(operations, unionIndex, Aabb.Union(ReadAabb(operations, root), ReadAabb(operations, bodyNode)));
                 SetCullable(operations, unionIndex, ReadCullable(operations, root) && ReadCullable(operations, bodyNode));
-                SetConsumer(operations, bodyNode, unionIndex);
                 root = unionIndex;
             }
 
@@ -689,7 +678,6 @@ namespace ProceduralCreature.Morphology.Sdf
             });
             SetWorldAabb(operations, unionIndex, Aabb.Union(ReadAabb(operations, originalRoot), ReadAabb(operations, mirroredRoot)));
             SetCullable(operations, unionIndex, ReadCullable(operations, originalRoot) && ReadCullable(operations, mirroredRoot));
-            SetConsumer(operations, mirroredRoot, unionIndex);
             return unionIndex;
         }
 
@@ -728,7 +716,6 @@ namespace ProceduralCreature.Morphology.Sdf
             });
             SetWorldAabb(operations, unionIndex, Aabb.Union(ReadAabb(operations, root), ReadAabb(operations, ball)));
             SetCullable(operations, unionIndex, ReadCullable(operations, root) && ReadCullable(operations, ball));
-            SetConsumer(operations, ball, unionIndex);
             return unionIndex;
         }
 

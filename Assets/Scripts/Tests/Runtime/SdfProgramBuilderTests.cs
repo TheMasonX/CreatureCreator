@@ -97,7 +97,6 @@ namespace ProceduralCreature.Tests.Runtime
                         Assert.AreEqual(whole.MinBound, part.MinBound);
                         Assert.AreEqual(whole.MaxBound, part.MaxBound);
                         Assert.AreEqual(whole.Cullable, part.Cullable);
-                        Assert.AreEqual(whole.ConsumerUnionIndex, part.ConsumerUnionIndex);
                     }
                 }
                 finally

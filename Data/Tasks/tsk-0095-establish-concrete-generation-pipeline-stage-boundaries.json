@@ -214,15 +214,33 @@
       "author": "anonymous",
       "body": "## CC-091 canonicalization-equivalent OUTPUT parity gate (2026-09-05)\n\nClosed the recurring full-pipeline parity gate that snapshot-level parity did not reach. Added \u0060Generate_CanonicalizationEquivalentDefinitions_ProduceEqualOutput\u0060 to \u0060Assets/Scripts/Tests/Runtime/GeneratedCreatureTests.cs\u0060 (\u002B55). It builds a valid creature whose mesh-asset parts are authored in reverse-sorted order with \u0060MirrorAcrossXAxis\u0060 and one mirrored part, generates from the raw definition and from \u0060DefinitionCanonicalizer.Canonicalize(definition)\u0060, and asserts equal snapshot \u0060RevisionId\u0060 plus full output parity per item: count, deterministic source identity/order (\u0060eye_a\u0060, \u0060eye_z\u0060, \u0060eye_z\u0060\u002Bmirror suffix after implicit), geometry type, vertex count, triangle count, and mesh bounds center/size.\n\nHypothesis: canonicalization-equivalent inputs (differing only by part insertion order, which canonicalization sorts by Id and which \u0060ResolvedCreatureSnapshot.Resolve\u0060 also canonicalizes) produce byte-identical generated output. Discriminating check: the new regression asserts revision \u002B geometry \u002B order \u002B transform equality across the two generation paths.\n\nValidation (Unity 6000.5.9f1, connected):\n- Focused PlayMode \u0060...GeneratedCreatureTests.Generate_CanonicalizationEquivalentDefinitions_ProduceEqualOutput\u0060: 1/1 passed.\n- Full \u0060ProceduralCreature.Tests.Runtime\u0060 PlayMode suite: 476/476 passed (0 failed, 0 skipped) \u2014 prior baseline 475 \u002B this new test.\n- \u0060dotnet build ProceduralCreature.Tests.Runtime.csproj --no-restore\u0060: 0 errors / 0 warnings.\n- Unity console after run: no product errors or warnings.\n- \u0060git diff --check\u0060: clean; only the test file changed.\n\nKept TSK-0095 InProgress: historical raw-input audit residuals (B2 small SDF seams / ConsumerUnionIndex note) remain separate; this closes the specific output-parity gate that the A6 handoff flagged as the remaining CC-091 parity requirement.",
       "createdAtUtc": "2026-09-05T15:39:10.2338222Z"
+    },
+    {
+      "id": "c-4e39703160004151a69982afe7e7f586",
+      "author": "anonymous",
+      "body": "Peer review \u002B plan reconciliation (2026-09-05, plan PLAN-CC-20260905-A6C3-7B91). Verified directly against main @ f56b880 and the live task board, not from report text:\n\n- A6 stage decomposition and the CC-091 canonicalization-equivalent OUTPUT parity gate are BOTH closed with evidence on main (f56b880 added Generate_CanonicalizationEquivalentDefinitions_ProduceEqualOutput; Runtime PlayMode 476/476). Do not reopen.\n- Plan Phase 1 (small cleanup closure) residuals confirmed present in current source, all owned here:\n  (1) SdfOperation.ConsumerUnionIndex is write-only dead state: field def (SdfProgram.cs:33), default init (Primitive, :51), redundant -1 init (SdfProgramBuilder.SetWorldAabb :148), SetConsumer (:153) \u002B 5 call sites (:444 :499 :596 :692 :731), and one read-only parity assertion in SdfProgramBuilderTests.cs:100. No production reader anywhere (verified by grep incl. shaders/compute).\n  (2) DensityGrid.SetSample (Extraction/DensityGrid.cs:237) is private with zero callers in file or tree. CornersZ is LIVE \u2014 must not be touched.\n  (3) MaxVoxelBudget cells-vs-corner-samples semantics still needs a recorded disposition (confirm against EstimateSampleCount).\n- Next scope for this task: implement (1) and (2) as pure deletions, record (3), then validate with focused SDF/density tests \u002B runtime build \u002B full runtime PlayMode. TSK-0073/0105/0008 remain separate owners; no parallel tasks created for items already Done.",
+      "createdAtUtc": "2026-09-05T15:55:05.7098231Z"
+    },
+    {
+      "id": "c-eb48027b129546cb82b2a974ff914951",
+      "author": "anonymous",
+      "body": "MaxVoxelBudget semantics disposition (2026-09-05) \u2014 CONFIRMED CORRECT, documentation gap only, no code change. Verified against source: GenerationSettings.EstimateSampleCount returns corner samples (cells\u002B1)^3 (GenerationSettings.cs) while EstimateVoxelCount returns cells^3 (diagnostics only); GenerationSettings doc comment states the safety budget must use EstimateSampleCount because the sampler allocates one corner sample beyond each cell axis. DefinitionValidator (DefinitionValidator.cs:376) guards estimated corner samples against GenerationTolerances.MaxVoxelBudget = 16_777_216 (= 256^3). Behavior pinned by GenerationBudgetEstimateTests (EditMode), DefinitionValidatorTests (Runtime), and the GenerationSettings comment. Budget is measured in corner samples, not cells. No mismatch found; no repair needed.",
+      "createdAtUtc": "2026-09-05T15:57:18.6242046Z"
+    },
+    {
+      "id": "c-0276438956544e29b81843d60ebf2b73",
+      "author": "anonymous",
+      "body": "Phase-1 cleanup closure implemented and validated (2026-09-05). Deleted write-only SdfOperation.ConsumerUnionIndex (field \u002B default init \u002B redundant -1 in SetWorldAabb \u002B SetConsumer helper \u002B all 5 call sites in SdfProgramBuilder.cs) and the removed read-only parity assertion in SdfProgramBuilderTests.cs. Deleted private dead DensityGrid.SetSample (zero callers); CornersZ untouched. Files: SdfProgram.cs, SdfProgramBuilder.cs, DensityGrid.cs, SdfProgramBuilderTests.cs. Pure deletion, no behavior change.\n\nHypothesis: ConsumerUnionIndex is write-only dead state and SetSample has no callers; removing both leaves compiled operation data and generation output identical. Discriminating check: SdfProgramBuilderTests \u002B DensityGridTests and the full generation determinism suite stay green.\n\nValidation (Unity 6000.5.9f1, connected): focused PlayMode SdfProgramBuilderTests \u002B DensityGridTests 23/23 passed; full ProceduralCreature.Tests.Runtime PlayMode 476/476 passed (0 failed, 0 skipped); dotnet build ProceduralCreature.Tests.Runtime.csproj --no-restore 0 errors/0 warnings; Unity console clean; git diff --check clean.\n\nMaxVoxelBudget semantics disposition separately recorded (confirmed correct corner-sample semantics; documentation only).",
+      "createdAtUtc": "2026-09-05T15:57:22.919662Z"
     }
   ],
   "epicId": null,
   "parentId": null,
   "dueDateUtc": null,
   "createdAtUtc": "2026-09-01T03:20:52.7496119Z",
-  "updatedAtUtc": "2026-09-05T15:39:10.2338222Z",
+  "updatedAtUtc": "2026-09-05T15:57:22.919662Z",
   "completedAtUtc": "2026-09-02T03:10:44.2511455Z",
-  "revision": 36,
+  "revision": 39,
   "isArchived": false,
   "hasLoadError": false,
   "loadError": null,

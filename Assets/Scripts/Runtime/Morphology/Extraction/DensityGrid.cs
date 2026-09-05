@@ -234,11 +234,6 @@ namespace ProceduralCreature.Morphology.Extraction
             return 0f;
         }
 
-        private void SetSample(int x, int y, int z, float value)
-        {
-            _samples[Index(x, y, z)] = value;
-        }
-
         private int Index(int x, int y, int z)
         {
             return (z * CornersY + y) * CornersX + x;
