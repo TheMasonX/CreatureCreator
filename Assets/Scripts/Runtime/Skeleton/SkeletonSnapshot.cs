@@ -74,21 +74,74 @@ namespace ProceduralCreature.Skeleton
                 }
             }
 
-            var bones = new BoneSnapshot[skeleton.Bones.Count];
+            var childrenById = new Dictionary<string, List<Bone>>(StringComparer.Ordinal);
+            var roots = new List<Bone>();
+            for (int i = 0; i < skeleton.Bones.Count; i++)
+            {
+                Bone bone = skeleton.Bones[i];
+                if (bone.ParentBoneId == null)
+                {
+                    roots.Add(bone);
+                    continue;
+                }
+
+                if (!indices.ContainsKey(bone.ParentBoneId))
+                {
+                    throw new DomainException(
+                        $"Bone '{bone.Id}' references missing parent '{bone.ParentBoneId}'.");
+                }
+
+                if (!childrenById.TryGetValue(bone.ParentBoneId, out List<Bone> childrenOfParent))
+                {
+                    childrenOfParent = new List<Bone>();
+                    childrenById.Add(bone.ParentBoneId, childrenOfParent);
+                }
+                childrenOfParent.Add(bone);
+            }
+
+            roots.Sort(CompareBonesById);
+            foreach (List<Bone> childrenList in childrenById.Values)
+            {
+                childrenList.Sort(CompareBonesById);
+            }
+
+            var orderedBones = new List<Bone>(skeleton.Bones.Count);
+            var pending = new List<Bone>(roots);
+            while (pending.Count > 0)
+            {
+                Bone bone = pending[0];
+                pending.RemoveAt(0);
+                orderedBones.Add(bone);
+
+                if (childrenById.TryGetValue(bone.Id, out List<Bone> boneChildren))
+                {
+                    pending.AddRange(boneChildren);
+                    pending.Sort(CompareBonesById);
+                }
+            }
+
+            if (orderedBones.Count != skeleton.Bones.Count)
+            {
+                throw new DomainException("Skeleton contains a parent cycle.");
+            }
+
+            var orderedIndices = new Dictionary<string, int>(StringComparer.Ordinal);
+            for (int i = 0; i < orderedBones.Count; i++)
+            {
+                orderedIndices.Add(orderedBones[i].Id, i);
+            }
+
+            var bones = new BoneSnapshot[orderedBones.Count];
             var children = new List<int>[bones.Length];
             for (int i = 0; i < bones.Length; i++) children[i] = new List<int>();
 
             for (int i = 0; i < bones.Length; i++)
             {
-                Bone bone = skeleton.Bones[i];
+                Bone bone = orderedBones[i];
                 int parentIndex = -1;
                 if (bone.ParentBoneId != null)
                 {
-                    if (!indices.TryGetValue(bone.ParentBoneId, out parentIndex))
-                    {
-                        throw new DomainException(
-                            $"Bone '{bone.Id}' references missing parent '{bone.ParentBoneId}'.");
-                    }
+                    parentIndex = orderedIndices[bone.ParentBoneId];
                     children[parentIndex].Add(i);
                 }
                 bones[i] = new BoneSnapshot(bone, i, parentIndex);
@@ -99,7 +152,12 @@ namespace ProceduralCreature.Skeleton
             {
                 readOnlyChildren[i] = new ReadOnlyCollection<int>(children[i]);
             }
-            return new SkeletonSnapshot(bones, indices, readOnlyChildren);
+            return new SkeletonSnapshot(bones, orderedIndices, readOnlyChildren);
+        }
+
+        private static int CompareBonesById(Bone left, Bone right)
+        {
+            return StringComparer.Ordinal.Compare(left.Id, right.Id);
         }
 
         public int GetIndex(string boneId)

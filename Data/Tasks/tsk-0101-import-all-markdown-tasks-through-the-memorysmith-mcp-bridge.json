@@ -22,16 +22,29 @@
   "attachments": [],
   "externalLinks": [],
   "linkedPages": [],
-  "comments": [],
+  "comments": [
+    {
+      "id": "c-4730289de67a407eae7ad43b8a32bee7",
+      "author": "anonymous",
+      "body": "Round 2 audit correction: the bulk CC-to-TSK migration is substantially complete, but the source audit reports 100 of 101 CC keys mapped and CC-099 lacks a dedicated TSK record. The task description\u0027s original import plan is stale. Keep the migration mandate and narrow the remaining work to resolving CC-099 and planning decommissioning of frozen docs/tasks after authoritative evidence is complete.",
+      "createdAtUtc": "2026-09-05T07:09:17.6859717Z"
+    },
+    {
+      "id": "c-2354aad6359a441db876cd9dd069fa8e",
+      "author": "anonymous",
+      "body": "Round 2 audit synthesis evidence (2026-09-05): docs/audits/creaturecreator-audit-synthesis-2026-09-05-round2.md records the migration ledger and confirms CC-099 remains the sole unresolved CC-to-TSK gap. Local task search returns frozen CC-099 as In Progress with no dedicated TSK record. Do not decommission docs/tasks until CC-099 is independently dispositioned.",
+      "createdAtUtc": "2026-09-05T07:16:57.6845881Z"
+    }
+  ],
   "epicId": null,
   "parentId": null,
   "dueDateUtc": null,
   "createdAtUtc": "2026-09-01T03:20:52.9538742Z",
-  "updatedAtUtc": "2026-09-01T03:20:52.9538742Z",
+  "updatedAtUtc": "2026-09-05T07:16:57.6845881Z",
   "completedAtUtc": null,
-  "revision": 1,
+  "revision": 3,
   "isArchived": false,
   "hasLoadError": false,
   "loadError": null,
-  "sourceFilePath": null
+  "sourceFilePath": "tsk-0101-import-all-markdown-tasks-through-the-memorysmith-mcp-bridge.json"
 }

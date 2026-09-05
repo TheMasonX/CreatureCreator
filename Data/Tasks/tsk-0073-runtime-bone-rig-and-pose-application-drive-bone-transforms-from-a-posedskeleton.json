@@ -40,15 +40,21 @@
       "author": "anonymous",
       "body": "## Audit synthesis 2026-09-05 \u2014 resolution \u002B residual provenance\n\nCross-validated both 2026-09-05 audits (latest-main-audit and deep-dive-audit, fixed points 20392e2) against HEAD 2a89605, which is this task\u0027s C0/C1 SkeletonSnapshot slice.\n\nRESOLVED under this task (do not re-file): latest-main F-04 (mutable rest skeleton) and F-11 (indexed runtime foundation) \u2014 \u0060SkeletonSnapshot\u0060/\u0060BoneSnapshot\u0060 are now immutable \u002B indexed and captured by \u0060CreatureRig\u0060 and \u0060PoseRotationResolver\u0060. Only \u0022indexed consumers beyond CreatureRig/pose\u0022 and geometry binding remain deferred (per the existing residual note).\n\nNEW residuals filed as separate tasks (rig robustness has no coverage in this task\u0027s remaining geometry-binding scope):\n- TSK-0113 \u2014 PoseRotationResolver branch/rotation determinism (F-03).\n- TSK-0114 \u2014 parent-before-child skeleton ordering invariant (F-02).\n- TSK-0116 \u2014 transactional CreatureRig.Build (F-01 residual: preserve previous valid rig; remove redundant dup check at CreatureRig.cs:33).\n\nKeep this task InProgress for its geometry-binding scope; the three residuals are owned by the new tasks above.",
       "createdAtUtc": "2026-09-05T06:51:09.9587719Z"
+    },
+    {
+      "id": "c-2adbd68612be4560a4c9e986eb35c811",
+      "author": "anonymous",
+      "body": "Round 2 audit correction: the mutable-Skeleton-at-CreatureRig-boundary claim is stale. Current CreatureRig captures SkeletonSnapshot, and indexed child lookup is precomputed. F-04/F-11 remain resolved under this task. Residual robustness defects are separately owned by TSK-0113, TSK-0114, and TSK-0116.",
+      "createdAtUtc": "2026-09-05T07:09:17.6632788Z"
     }
   ],
   "epicId": null,
   "parentId": null,
   "dueDateUtc": null,
   "createdAtUtc": "2026-09-01T03:20:52.1648146Z",
-  "updatedAtUtc": "2026-09-05T06:51:09.9587719Z",
+  "updatedAtUtc": "2026-09-05T07:09:17.6632788Z",
   "completedAtUtc": null,
-  "revision": 4,
+  "revision": 5,
   "isArchived": false,
   "hasLoadError": false,
   "loadError": null,

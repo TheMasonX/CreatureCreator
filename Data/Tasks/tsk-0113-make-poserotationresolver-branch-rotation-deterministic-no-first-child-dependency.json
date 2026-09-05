@@ -4,7 +4,7 @@
   "title": "Make PoseRotationResolver branch rotation deterministic (no first-child dependency)",
   "description": "## Summary\n\n\u0060PoseRotationResolver.Resolve\u0060 derives a non-terminal bone\u0027s rotation from the direction to \u0060children[0]\u0060 \u2014 the first child in skeleton order (Assets/Scripts/Runtime/Animation/Ik/PoseRotationResolver.cs:39-47). For a branched parent with children A and B, reordering A/B changes the parent\u0027s derived pose rotation. This hidden data-order dependency makes the pose contract non-deterministic and unsuitable as an animation hot path.\n\nSource: docs/audits/creaturecreator-latest-main-audit-26-09-05-01-40-00.md, F-03. Fixed point 20392e2; re-verified at HEAD 2a89605 (still children[0], unresolved).\n\n## Scope\n\n- Segment bones derive direction from their own \u0060EndPosition\u0060 (segment endpoint), not from an arbitrary first child.\n- Terminal joint nodes (no segment) keep rest rotation unless an explicit orientation is part of the pose model.\n- Do not use \u0060FindFirstChild\u0060 / \u0060children[0]\u0060 as a general animation contract.\n- If branched-node orientation needs a semantic primary child, make that rule explicit and deterministic.\n- Pure math only; no scene, editor, or mutable-generated-state dependency.\n\n## Acceptance Criteria\n\n- A branched-skeleton regression proves the parent\u0027s derived rotation does not change when child list order changes.\n- Segment bones use their own segment endpoint for direction.\n- Terminal joint nodes keep rest rotation.\n- Existing rest-pose and unknown-ID coverage stays green.\n\n## Validation\n\n- Focused \u0060PoseRotationResolver\u0060 runtime tests (branching-order regression \u002B existing rig/pose suite).\n- \u0060dotnet build ProceduralCreature.Runtime.csproj\u0060 and \u0060ProceduralCreature.Tests.Runtime.csproj\u0060 pass 0 errors/warnings.\n- Unity PlayMode focused rig/pose run green.\n\n## Findings\n\n- F-03 confirmed at HEAD: PoseRotationResolver.cs:46 uses \u0060pose.GetPosition(children[0])\u0060. Peer review confirms no existing coverage.\n\n## Blockers\n\n- None identified. Related to TSK-0073 (CC-069 rig/pose) and CC-073 geometry binding foundation.\n\n## Next Step\n\n- Implement segment/terminal rotation semantics and add the branching-order regression; validate with the focused PlayMode suite.",
   "type": "Task",
-  "status": "Ready",
+  "status": "Done",
   "priority": "High",
   "assigneeMode": "Custom",
   "assigneeDirectoryId": null,
@@ -21,16 +21,23 @@
   "attachments": [],
   "externalLinks": [],
   "linkedPages": [],
-  "comments": [],
+  "comments": [
+    {
+      "id": "c-0f7757caf08944dda2de0085ec9a4d6d",
+      "author": "anonymous",
+      "body": "Implementation evidence (2026-09-05): PoseRotationResolver now uses a segment bone\u0027s own EndPosition for direction and selects the lowest stable child ID for non-segment branches, removing children[0] order dependence. Added Resolve_SegmentUsesEndpointRegardlessOfChildOrder in Assets/Scripts/Tests/Runtime/PoseRotationResolverTests.cs. Validation: Unity ProceduralCreature.Tests.Runtime PlayMode 475/475 passed after forced script refresh; dotnet build ProceduralCreature.Runtime.csproj and ProceduralCreature.Tests.Runtime.csproj passed with 0 warnings/errors. Final diff/console review remains before Done.",
+      "createdAtUtc": "2026-09-05T07:16:57.588539Z"
+    }
+  ],
   "epicId": null,
   "parentId": null,
   "dueDateUtc": null,
   "createdAtUtc": "2026-09-05T06:50:54.3880974Z",
-  "updatedAtUtc": "2026-09-05T06:50:54.3880974Z",
-  "completedAtUtc": null,
-  "revision": 1,
+  "updatedAtUtc": "2026-09-05T07:17:34.9730021Z",
+  "completedAtUtc": "2026-09-05T07:17:34.9730021Z",
+  "revision": 4,
   "isArchived": false,
   "hasLoadError": false,
   "loadError": null,
-  "sourceFilePath": null
+  "sourceFilePath": "tsk-0113-make-poserotationresolver-branch-rotation-deterministic-no-first-child-dependency.json"
 }

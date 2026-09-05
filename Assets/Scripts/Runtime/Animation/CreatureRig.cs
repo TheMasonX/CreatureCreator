@@ -24,25 +24,40 @@ namespace ProceduralCreature.Animation
         {
             if (restSkeleton == null) throw new DomainException("restSkeleton must not be null.");
 
-            Clear();
-            _restSkeleton = SkeletonSnapshot.Capture(restSkeleton);
-
-            for (int i = 0; i < _restSkeleton.Count; i++)
+            SkeletonSnapshot nextSkeleton = SkeletonSnapshot.Capture(restSkeleton);
+            var nextBones = new Dictionary<string, Transform>(nextSkeleton.Count);
+            var nextGeneratedObjects = new List<GameObject>(nextSkeleton.Count);
+            try
             {
-                BoneSnapshot bone = _restSkeleton[i];
-                if (_bones.ContainsKey(bone.Id))
+                for (int i = 0; i < nextSkeleton.Count; i++)
                 {
-                    throw new DomainException($"Skeleton contains duplicate bone id '{bone.Id}'.");
+                    BoneSnapshot bone = nextSkeleton[i];
+                    var boneObject = new GameObject(BoneObjectPrefix + bone.Id);
+                    Transform parent = bone.ParentIndex < 0
+                        ? transform
+                        : nextBones[nextSkeleton[bone.ParentIndex].Id];
+                    boneObject.transform.SetParent(parent, worldPositionStays: false);
+                    boneObject.transform.position = bone.Position;
+                    boneObject.transform.rotation = bone.Rotation;
+                    nextBones.Add(bone.Id, boneObject.transform);
+                    nextGeneratedObjects.Add(boneObject);
                 }
-
-                var boneObject = new GameObject(BoneObjectPrefix + bone.Id);
-                Transform parent = bone.ParentIndex < 0 ? transform : ResolveParent(_restSkeleton[bone.ParentIndex].Id);
-                boneObject.transform.SetParent(parent, worldPositionStays: false);
-                boneObject.transform.position = bone.Position;
-                boneObject.transform.rotation = bone.Rotation;
-                _bones.Add(bone.Id, boneObject.transform);
-                _generatedObjects.Add(boneObject);
             }
+            catch
+            {
+                DestroyGeneratedObjects(nextGeneratedObjects);
+                throw;
+            }
+
+            DestroyGeneratedObjects(_generatedObjects);
+            _bones.Clear();
+            _generatedObjects.Clear();
+            foreach (KeyValuePair<string, Transform> bone in nextBones)
+            {
+                _bones.Add(bone.Key, bone.Value);
+            }
+            _generatedObjects.AddRange(nextGeneratedObjects);
+            _restSkeleton = nextSkeleton;
         }
 
         public void ApplyPose(PosedSkeleton pose)
@@ -62,25 +77,21 @@ namespace ProceduralCreature.Animation
 
         public void Clear()
         {
-            for (int i = _generatedObjects.Count - 1; i >= 0; i--)
-            {
-                GameObject generatedObject = _generatedObjects[i];
-                if (generatedObject == null) continue;
-                if (Application.isPlaying) Destroy(generatedObject);
-                else DestroyImmediate(generatedObject);
-            }
+            DestroyGeneratedObjects(_generatedObjects);
             _generatedObjects.Clear();
             _bones.Clear();
             _restSkeleton = null;
         }
 
-        private Transform ResolveParent(string parentBoneId)
+        private static void DestroyGeneratedObjects(List<GameObject> generatedObjects)
         {
-            if (!_bones.TryGetValue(parentBoneId, out Transform parent))
+            for (int i = generatedObjects.Count - 1; i >= 0; i--)
             {
-                throw new DomainException($"Bone '{parentBoneId}' must be created before its child.");
+                GameObject generatedObject = generatedObjects[i];
+                if (generatedObject == null) continue;
+                if (Application.isPlaying) UnityEngine.Object.Destroy(generatedObject);
+                else UnityEngine.Object.DestroyImmediate(generatedObject);
             }
-            return parent;
         }
     }
 }

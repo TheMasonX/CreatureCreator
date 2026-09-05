@@ -55,15 +55,21 @@
       "author": "anonymous",
       "body": "Correction and follow-up evidence (2026-09-05): revised the quaternion slice per review feedback. The shared helper now owns the complete \u0060normalize -\u003E quantize -\u003E post-quantization zero-magnitude guard -\u003E normalize\u0060 algorithm as \u0060QuantizeUtil.CanonicalizeQuaternion\u0060; both \u0060TransformData\u0060 and \u0060GeometryAttachment\u0060 use it. Added regressions proving \u0060q\u0060, \u00602q\u0060, and \u00600.25q\u0060 canonicalize identically, transform and attachment outputs agree for a normal Euler rotation, and zero/quantized-zero orientations become identity. The earlier partial post-normalization helper was removed. Unity PlayMode focused run passed 18/18 (\u0060DefinitionCanonicalizerTests\u0060 \u002B \u0060JsonDnaSerializerMeshGeometryTests\u0060). Runtime test build passed with 0 warnings/errors; \u0060git diff --check\u0060 passed. B0 remains out of scope; mirror consolidation remains in the same task slice and passed its earlier 33/33 focused run.",
       "createdAtUtc": "2026-09-05T06:54:00.8376018Z"
+    },
+    {
+      "id": "c-b19fd1bba0334005a4eea83a52f437fd",
+      "author": "anonymous",
+      "body": "Implemented the legacy shape fallback consolidation slice (A5c). \u0060ShapeDefinition.WithLegacyDefaults()\u0060 is now the single owner of v1 fallback semantics: missing/non-positive legacy size resolves to 0.5, primitive dimensions inherit that size, and capsule height independently defaults to 1. Routed \u0060ResolvedShape\u0060, \u0060DefinitionCanonicalizer\u0060, \u0060JsonDnaSerializer\u0060, and \u0060CreatureEditorWindow\u0060 through the helper. Added \u0060DefinitionCanonicalizerTests.Shape_LegacyDefaults_AreSharedAcrossCanonicalAndResolvedData\u0060 covering zero/legacy input and canonical/resolved parity. Validation: \u0060dotnet build ProceduralCreature.Runtime.csproj --no-restore\u0060 passed with 0 warnings/errors; \u0060dotnet build ProceduralCreature.Editor.csproj --no-restore\u0060 passed with 0 warnings/errors; Unity PlayMode runtime assembly 472/472 passed; Unity EditMode editor assembly 115/115 passed; script validation reported 0 warnings/0 errors; \u0060git diff --check\u0060 passed. B0/ellipsoid culling behavior was untouched. TSK-0105 remains open for its separately scoped geometry-transform/palette follow-up.",
+      "createdAtUtc": "2026-09-05T07:01:47.0351972Z"
     }
   ],
   "epicId": null,
   "parentId": null,
   "dueDateUtc": null,
   "createdAtUtc": "2026-09-03T22:37:27.6890853Z",
-  "updatedAtUtc": "2026-09-05T06:54:00.8376018Z",
+  "updatedAtUtc": "2026-09-05T07:01:47.0351972Z",
   "completedAtUtc": null,
-  "revision": 7,
+  "revision": 8,
   "isArchived": false,
   "hasLoadError": false,
   "loadError": null,

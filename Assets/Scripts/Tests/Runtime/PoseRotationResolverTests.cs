@@ -101,6 +101,51 @@ namespace ProceduralCreature.Tests.Runtime
         }
 
         [Test]
+        public void Resolve_SegmentUsesEndpointRegardlessOfChildOrder()
+        {
+            Skeleton.Skeleton first = BuildSegmentBranch(reverseChildren: false);
+            Skeleton.Skeleton second = BuildSegmentBranch(reverseChildren: true);
+
+            Quaternion firstRotation = PoseRotationResolver.Resolve(
+                first, PosedSkeleton.FromRestPose(first))["root"];
+            Quaternion secondRotation = PoseRotationResolver.Resolve(
+                second, PosedSkeleton.FromRestPose(second))["root"];
+
+            Assert.Less(Quaternion.Angle(firstRotation, secondRotation), 1e-5f);
+            Assert.Greater(Vector3.Dot(firstRotation * Vector3.forward, Vector3.forward), 0.999f);
+        }
+
+        private static Skeleton.Skeleton BuildSegmentBranch(bool reverseChildren)
+        {
+            var skeleton = new Skeleton.Skeleton();
+            skeleton.Bones.Add(new Bone
+            {
+                Id = "root",
+                Position = Vector3.zero,
+                EndPosition = Vector3.forward,
+                HasSegment = true,
+                Rotation = Quaternion.identity,
+            });
+            Bone first = new Bone
+            {
+                Id = "child_a",
+                ParentBoneId = "root",
+                Position = Vector3.right,
+                Rotation = Quaternion.identity,
+            };
+            Bone second = new Bone
+            {
+                Id = "child_b",
+                ParentBoneId = "root",
+                Position = Vector3.left,
+                Rotation = Quaternion.identity,
+            };
+            skeleton.Bones.Add(reverseChildren ? second : first);
+            skeleton.Bones.Add(reverseChildren ? first : second);
+            return skeleton;
+        }
+
+        [Test]
         public void Snapshot_DetachesRestDataAndIndexesChildren()
         {
             Skeleton.Skeleton skeleton = BuildChain();

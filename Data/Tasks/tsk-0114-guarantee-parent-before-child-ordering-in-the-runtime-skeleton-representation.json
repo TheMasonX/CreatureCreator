@@ -4,7 +4,7 @@
   "title": "Guarantee parent-before-child ordering in the runtime skeleton representation",
   "description": "## Summary\n\n\u0060SkeletonSnapshot.Capture\u0060 iterates bones in input order and never requires or enforces \u0060ParentIndex \u003C ChildIndex\u0060 (Assets/Scripts/Runtime/Skeleton/SkeletonSnapshot.cs:64-94). \u0060CreatureRig.Build\u0060 still requires the parent Transform to already exist when creating a child (ResolveParent throws at CreatureRig.cs:77-83 if the parent was not created first). Because \u0060SkeletonInferrer\u0060 orders by ID, a valid hierarchy whose child ID sorts before its parent ID can fail rig construction. The parent-before-child invariant is therefore only implicit, not guaranteed by the skeleton representation.\n\nSource: docs/audits/creaturecreator-latest-main-audit-26-09-05-01-40-00.md, F-02. Re-verified at HEAD 2a89605 (still input-order only; no reorder/topological invariant).\n\n## Scope\n\n- Make parent-before-child ordering an explicit invariant of the skeleton representation.\n- Prefer deterministic topological traversal with stable ID tie-breaking, not incidental authoring/ID order or dictionary enumeration.\n- Guarantee \u0060ParentIndex \u003C ChildIndex\u0060 for the indexed runtime skeleton.\n- Do not introduce an animation framework or generic interfaces.\n\n## Acceptance Criteria\n\n- A fixture where a child ID sorts before its parent ID builds the rig successfully (topologically ordered), not by coincidental authoring order.\n- The runtime skeleton representation guarantees ParentIndex \u003C ChildIndex deterministically.\n- Ordering is stable across identical inputs.\n\n## Validation\n\n- Focused runtime/PlayMode test with child-before-parent fixture proving the rig builds.\n- \u0060dotnet build\u0060 Runtime \u002B Tests.Runtime pass 0 errors/warnings.\n- Existing rig/pose and skeleton suites stay green.\n\n## Findings\n\n- F-02 open at HEAD: SkeletonSnapshot captures input order only; no ParentIndex\u003CChildIndex enforcement; CreatureRig.ResolveParent still order-dependent.\n\n## Blockers\n\n- None identified. Related to TSK-0073 (CC-069 rig \u0026 pose) and downstream animation traversals.\n\n## Next Step\n\n- Add deterministic topological ordering to the snapshot/skeleton contract with stable ID tie-breaking and a child-before-parent regression.",
   "type": "Task",
-  "status": "Ready",
+  "status": "Done",
   "priority": "High",
   "assigneeMode": "Custom",
   "assigneeDirectoryId": null,
@@ -20,16 +20,23 @@
   "attachments": [],
   "externalLinks": [],
   "linkedPages": [],
-  "comments": [],
+  "comments": [
+    {
+      "id": "c-7c3e873762d9409aac5f497e8711feb9",
+      "author": "anonymous",
+      "body": "Implementation evidence (2026-09-05): SkeletonSnapshot.Capture now performs deterministic stable ID ordering, validates parent references/cycles, and guarantees parent-before-child indices. Added child-first input regression in Assets/Scripts/Tests/Runtime/CreatureRigTests.cs. Validation: Unity ProceduralCreature.Tests.Runtime PlayMode 475/475 passed after forced script refresh; dotnet build ProceduralCreature.Runtime.csproj and ProceduralCreature.Tests.Runtime.csproj passed with 0 warnings/errors. Final diff/console review remains before Done.",
+      "createdAtUtc": "2026-09-05T07:16:57.6310471Z"
+    }
+  ],
   "epicId": null,
   "parentId": null,
   "dueDateUtc": null,
   "createdAtUtc": "2026-09-05T06:50:54.489109Z",
-  "updatedAtUtc": "2026-09-05T06:50:54.489109Z",
-  "completedAtUtc": null,
-  "revision": 1,
+  "updatedAtUtc": "2026-09-05T07:17:35.0005482Z",
+  "completedAtUtc": "2026-09-05T07:17:35.0005482Z",
+  "revision": 4,
   "isArchived": false,
   "hasLoadError": false,
   "loadError": null,
-  "sourceFilePath": null
+  "sourceFilePath": "tsk-0114-guarantee-parent-before-child-ordering-in-the-runtime-skeleton-representation.json"
 }

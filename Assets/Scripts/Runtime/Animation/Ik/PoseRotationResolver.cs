@@ -43,11 +43,35 @@ namespace ProceduralCreature.Animation.Ik
                     continue;
                 }
 
-                Vector3 childPosition = pose.GetPosition(children[0]);
-                Vector3 direction = childPosition - position;
+                Vector3 targetPosition;
+                if (bone.HasSegment)
+                {
+                    targetPosition = position + (bone.EndPosition - bone.Position);
+                }
+                else
+                {
+                    int primaryChild = FindPrimaryChild(restSkeleton, children);
+                    targetPosition = pose.GetPosition(primaryChild);
+                }
+
+                Vector3 direction = targetPosition - position;
                 rotations[bone.Id] = ResolveLookRotation(direction, bone.Rotation);
             }
             return rotations;
+        }
+
+        private static int FindPrimaryChild(SkeletonSnapshot skeleton, IReadOnlyList<int> children)
+        {
+            int primaryChild = children[0];
+            for (int i = 1; i < children.Count; i++)
+            {
+                int candidate = children[i];
+                if (string.CompareOrdinal(skeleton[candidate].Id, skeleton[primaryChild].Id) < 0)
+                {
+                    primaryChild = candidate;
+                }
+            }
+            return primaryChild;
         }
 
         private static Quaternion ResolveLookRotation(Vector3 direction, Quaternion restRotation)

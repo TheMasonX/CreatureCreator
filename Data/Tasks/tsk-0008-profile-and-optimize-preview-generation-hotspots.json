@@ -145,15 +145,21 @@
       "author": "anonymous",
       "body": "## Audit synthesis 2026-09-05 (latest-main-audit-26-09-05-01-40-00.md) \u2014 measured-performance evidence\n\nF-05 \u2014 \u0060DensityGrid.SamplePortable\u0060 schedules each batch then calls \u0060handle.Complete()\u0060 before the next (DensityGrid.cs:132-133, verified at HEAD 2a89605). Safe (one reused scratch buffer) but adds a sync point per batch. Benchmark a small multi-in-flight-batch scheme with independent scratch regions vs current; only change if profiling shows a meaningful win. Measurement belongs to this task (CC-008), not a speculative refactor.\n\nF-06 \u2014 potential-envelope correctness needs a permanent parity/proof matrix (sphere, box, capsule, elongated ellipsoid, ellipsoid\u002Bsmooth union, mirrored ellipsoid, non-uniform ellipsoid, nested smooth unions, small rMin\u002Bhigh blend, no-safe-envelope fallback) at inside/boundary/just-outside/well-outside. Purpose: make unsafe broad-phase changes mechanically hard to reintroduce. Keep ellipsoid support; do not weaken Cullable.\n\nF-07 \u2014 potential bounds may receive redundant influence padding (bounds expanded by proof threshold, then sampling does an extra \u0060PotentialBounds \u00B1 InfluenceRadius\u0060). Conservative, not a correctness defect; may reduce broad-phase payoff. Define the contract (raw \u002B generic padding vs already-expanded per-subtree envelope) and benchmark before changing.\n\nF-12 (P3, opportunistic) \u2014 \u0060DensityGrid.CornersZ\u0060 private property (:45) and \u0060SetSample\u0060 (:237) are dead in production (zero callers). Remove opportunistically with nearby DensityGrid cleanup; do not open a separate architecture task.",
       "createdAtUtc": "2026-09-05T06:51:03.9624139Z"
+    },
+    {
+      "id": "c-4141e6e5903c49b5b11b942f50b46174",
+      "author": "anonymous",
+      "body": "Round 2 audit evidence: CC-099 remains a migration/evidence gap, not independently closed by the supplied audit. Existing TSK-0008 scope owns the related culling and non-finite field evidence. Do not claim CC-099 closure until the ff4650a behavior is independently verified against current source and tests.",
+      "createdAtUtc": "2026-09-05T07:09:17.6081233Z"
     }
   ],
   "epicId": null,
   "parentId": null,
   "dueDateUtc": null,
   "createdAtUtc": "2026-09-01T03:16:25.5654277Z",
-  "updatedAtUtc": "2026-09-05T06:51:03.9624139Z",
+  "updatedAtUtc": "2026-09-05T07:09:17.6081233Z",
   "completedAtUtc": null,
-  "revision": 23,
+  "revision": 24,
   "isArchived": false,
   "hasLoadError": false,
   "loadError": null,
