@@ -117,6 +117,8 @@ namespace ProceduralCreature.Tests.Runtime
             }
             Assert.IsTrue(report.IsWatertight, "Fast mesh must be watertight.");
             Assert.Greater(generated.MainMesh.triangles.Length / 3, 0, "Fast mesh must emit triangles.");
+            Assert.AreEqual(generated.MainMesh.vertexCount, diagnostics.VertexCount);
+            Assert.AreEqual(generated.MainMesh.triangles.Length / 3, diagnostics.TriangleCount);
         }
 
         [Test]

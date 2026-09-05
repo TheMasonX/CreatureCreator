@@ -63,6 +63,8 @@ namespace ProceduralCreature.Generation
         public int GridSampleCount { get; private set; }
         public int MixedCellCount { get; private set; }
         public int GradientEvaluationCount { get; private set; }
+        public int VertexCount { get; private set; }
+        public int TriangleCount { get; private set; }
 
         public IReadOnlyList<StageTiming> Timings => _timings;
         public IReadOnlyList<ValidationIssue> Issues => _issues;
@@ -81,6 +83,12 @@ namespace ProceduralCreature.Generation
         {
             MixedCellCount = mixedCellCount;
             GradientEvaluationCount = gradientEvaluationCount;
+        }
+
+        public void RecordMeshStatistics(int vertexCount, int triangleCount)
+        {
+            VertexCount = vertexCount;
+            TriangleCount = triangleCount;
         }
 
         public void RecordExtractionTiming(

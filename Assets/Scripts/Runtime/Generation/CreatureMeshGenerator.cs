@@ -93,6 +93,8 @@ namespace ProceduralCreature.Generation
                         grid, diagnostics?.CollectTimings == true));
                 diagnostics?.RecordExtractionStatistics(
                     meshResult.MixedCellCount, meshResult.GradientEvaluationCount);
+                diagnostics?.RecordMeshStatistics(
+                    meshResult.Positions.Count, meshResult.TriangleCount);
                 diagnostics?.RecordExtractionTiming(
                     meshResult.ActiveCellConstructionTime,
                     meshResult.ContourResolutionTime,
