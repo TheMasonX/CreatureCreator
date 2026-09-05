@@ -51,17 +51,7 @@ namespace ProceduralCreature.Generation
             CreatureDefinition definition,
             GenerationDiagnostics diagnostics = null)
         {
-            if (definition == null) throw new DomainException("definition must not be null.");
-
-            ValidationResult validation = DefinitionValidator.Validate(definition);
-            diagnostics?.RecordIssues(validation.Issues);
-            if (!validation.IsValid)
-            {
-                diagnostics?.MarkFailed(GenerationStage.Validation);
-                throw new DomainException("CreatureDefinition is invalid and cannot be generated.");
-            }
-
-            ResolvedCreatureSnapshot snapshot = ResolvedCreatureSnapshot.Resolve(definition);
+            ResolvedCreatureSnapshot snapshot = ValidateAndResolve(definition, diagnostics);
 
             SdfProgram portableProgram = null;
             Time(diagnostics, GenerationStage.SdfCompile, () =>
@@ -134,6 +124,23 @@ namespace ProceduralCreature.Generation
             }
 
             return new GeneratedCreatureData(definition, snapshot, meshResult, colors, generatedTopologyReport);
+        }
+
+        private static ResolvedCreatureSnapshot ValidateAndResolve(
+            CreatureDefinition definition,
+            GenerationDiagnostics diagnostics)
+        {
+            if (definition == null) throw new DomainException("definition must not be null.");
+
+            ValidationResult validation = DefinitionValidator.Validate(definition);
+            diagnostics?.RecordIssues(validation.Issues);
+            if (!validation.IsValid)
+            {
+                diagnostics?.MarkFailed(GenerationStage.Validation);
+                throw new DomainException("CreatureDefinition is invalid and cannot be generated.");
+            }
+
+            return ResolvedCreatureSnapshot.Resolve(definition);
         }
 
         public static GeneratedCreature Assemble(GeneratedCreatureData data, Func<string, Mesh> meshResolver = null)

@@ -196,15 +196,21 @@
       "author": "anonymous",
       "body": "## Audit synthesis 2026-09-05 (latest-main-audit-26-09-05-01-40-00.md) \u2014 pipeline-stage evidence (F-08/F-09)\n\nF-08 \u2014 the SDF compiler still carries compatibility overloads and both raw/resolved blend-radius helpers after the A3 primitive-emission consolidation. Target invariant: CreatureDefinition -\u003E Resolve -\u003E resolved implementation, with no raw-definition traversal inside the resolved runtime pipeline except in explicitly named compatibility adapters (important for async generation on detached data). Keep resolved correspondence exclusively downstream.\n\nF-09 \u2014 \u0060CreatureMeshGenerator\u0060 and \u0060AppearanceBaker\u0060 remain transitional orchestration modules (validation, resolution, SDF compile, sampling, extraction, appearance compile/bake, mesh-asset generation, Unity assembly). Decompose into concrete stages (ValidateAndResolve / GenerateImplicitField / ExtractMesh / BakeAppearance / GenerateMeshAssetItems / Assemble) with a thin public coordinator. No generic pipeline framework or DI graph.\n\nBoth map to CC-091 (generation pipeline stage boundaries). Keep this task as owner.",
       "createdAtUtc": "2026-09-05T06:51:03.9934988Z"
+    },
+    {
+      "id": "c-e9720fe4b7f14f2b93e20585cd51613a",
+      "author": "anonymous",
+      "body": "A6 stage-boundary slice (2026-09-05): extracted validation and resolved snapshot creation from CreatureMeshGenerator.GenerateData into the private ValidateAndResolve helper. Public Generate/GenerateData APIs, DefinitionValidator diagnostics, Validation failure stage marking, snapshot authority, and all generation stages remain unchanged. Validation: Runtime and Tests.Runtime dotnet builds passed with 0 warnings/errors; static diagnostics are clean. Unity runtime/editor reruns remain blocked because no MCP-connected Editor instance is available. Next A6 slice can extract implicit SDF compile/sampling only after connected-Unity parity validation.",
+      "createdAtUtc": "2026-09-05T07:23:26.3531461Z"
     }
   ],
   "epicId": null,
   "parentId": null,
   "dueDateUtc": null,
   "createdAtUtc": "2026-09-01T03:20:52.7496119Z",
-  "updatedAtUtc": "2026-09-05T06:51:03.9934988Z",
+  "updatedAtUtc": "2026-09-05T07:23:26.3531461Z",
   "completedAtUtc": "2026-09-02T03:10:44.2511455Z",
-  "revision": 33,
+  "revision": 34,
   "isArchived": false,
   "hasLoadError": false,
   "loadError": null,
