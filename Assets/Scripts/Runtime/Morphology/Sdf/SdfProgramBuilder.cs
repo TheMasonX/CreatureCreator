@@ -114,8 +114,6 @@ namespace ProceduralCreature.Morphology.Sdf
                 case SdfOperationType.Ellipsoid:
                     return new Aabb(-op.Parameters, op.Parameters);
                 default:
-                    // Empty and non-primitive ops carry no geometry; an empty AABB
-                    // means always culled (slot reads +inf).
                     return new Aabb(new float3(float.PositiveInfinity), new float3(float.NegativeInfinity));
             }
         }
@@ -153,9 +151,6 @@ namespace ProceduralCreature.Morphology.Sdf
             operations[index] = op;
         }
 
-        /// <summary>Marks <paramref name="childIndex"/> as the newly-added (B) child
-        /// of the union at <paramref name="unionIndex"/>, so the evaluator can
-        /// cull it against the union's already-evaluated chain value (CC-062).</summary>
         private static void SetConsumer(List<SdfOperation> operations, int childIndex, int unionIndex)
         {
             SdfOperation op = operations[childIndex];
@@ -315,6 +310,70 @@ namespace ProceduralCreature.Morphology.Sdf
             return part.HasLimb ? part.Limb.BlendRadius : part.Shape.SmoothBlendRadius;
         }
 
+        private static int AppendResolvedPrimitive(List<SdfOperation> operations,
+            ResolvedPartSnapshot part, Matrix4x4 localToCreature, float distanceScale,
+            bool shouldMirror)
+        {
+            SdfOperationType primitiveType;
+            switch (part.Shape.Type)
+            {
+                case ShapeType.Sphere:
+                    primitiveType = SdfOperationType.Sphere;
+                    break;
+                case ShapeType.Ellipsoid:
+                    primitiveType = SdfOperationType.Ellipsoid;
+                    break;
+                case ShapeType.Box:
+                    primitiveType = SdfOperationType.Box;
+                    break;
+                case ShapeType.Capsule:
+                    primitiveType = SdfOperationType.Capsule;
+                    break;
+                default:
+                    throw new DomainException($"No portable SDF primitive mapping exists for ShapeType.{part.Shape.Type}.");
+            }
+
+            ResolvedShape shape = part.Shape;
+            float radius = shape.Radius;
+            float height = shape.CapsuleHeight;
+            float3 boxHalfExtents = new float3(shape.BoxHalfExtents.x, shape.BoxHalfExtents.y, shape.BoxHalfExtents.z);
+            float3 parameters = primitiveType == SdfOperationType.Box
+                ? boxHalfExtents
+                : primitiveType == SdfOperationType.Capsule
+                    ? new float3(radius, height, (int)shape.CapsuleAxis)
+                    : primitiveType == SdfOperationType.Ellipsoid
+                        ? new float3(shape.EllipsoidRadii.x, shape.EllipsoidRadii.y, shape.EllipsoidRadii.z)
+                        : new float3(radius, 0f, 0f);
+
+            int primitiveIndex = operations.Count;
+            operations.Add(SdfOperation.Primitive(primitiveType, parameters));
+
+            int transformIndex = operations.Count;
+            operations.Add(new SdfOperation
+            {
+                Type = SdfOperationType.Transform,
+                A = primitiveIndex,
+                Matrix = ToFloat4x4(localToCreature.inverse),
+                DistanceScale = distanceScale,
+            });
+            SetWorldAabb(operations, transformIndex,
+                TransformToWorld(PrimitiveLocalAabb(operations[primitiveIndex]), localToCreature));
+            SetCullable(operations, transformIndex, primitiveType != SdfOperationType.Ellipsoid);
+
+            int root = transformIndex;
+            if (!shouldMirror)
+            {
+                return root;
+            }
+
+            int symmetryIndex = operations.Count;
+            operations.Add(new SdfOperation { Type = SdfOperationType.Symmetry, A = root });
+            Aabb child = ReadAabb(operations, root);
+            SetWorldAabb(operations, symmetryIndex, Aabb.Union(child, Aabb.MirrorAcrossX(child)));
+            SetCullable(operations, symmetryIndex, ReadCullable(operations, root));
+            return symmetryIndex;
+        }
+
         public static SdfProgram CompilePortable(CreatureDefinition definition)
         {
             if (definition == null) throw new DomainException("Cannot compile a null CreatureDefinition.");
@@ -422,62 +481,7 @@ namespace ProceduralCreature.Morphology.Sdf
                 }
                 else
                 {
-                    SdfOperationType primitiveType;
-                    switch (part.Shape.Type)
-                    {
-                        case ShapeType.Sphere:
-                            primitiveType = SdfOperationType.Sphere;
-                            break;
-                        case ShapeType.Ellipsoid:
-                            primitiveType = SdfOperationType.Ellipsoid;
-                            break;
-                        case ShapeType.Box:
-                            primitiveType = SdfOperationType.Box;
-                            break;
-                        case ShapeType.Capsule:
-                            primitiveType = SdfOperationType.Capsule;
-                            break;
-                        default:
-                            throw new DomainException($"No portable SDF primitive mapping exists for ShapeType.{part.Shape.Type}.");
-                    }
-
-                    ResolvedShape shape = part.Shape;
-                    float radius = shape.Radius;
-                    float height = shape.CapsuleHeight;
-                    float3 boxHalfExtents = new float3(shape.BoxHalfExtents.x, shape.BoxHalfExtents.y, shape.BoxHalfExtents.z);
-                    float3 parameters = primitiveType == SdfOperationType.Box
-                        ? boxHalfExtents
-                        : primitiveType == SdfOperationType.Capsule
-                            ? new float3(radius, height, (int)shape.CapsuleAxis)
-                            : primitiveType == SdfOperationType.Ellipsoid
-                                ? new float3(shape.EllipsoidRadii.x, shape.EllipsoidRadii.y, shape.EllipsoidRadii.z)
-                                : new float3(radius, 0f, 0f);
-                    primitive = operations.Count;
-                    operations.Add(SdfOperation.Primitive(primitiveType, parameters));
-                    int primitiveIndex = primitive;
-
-                    Matrix4x4 worldToLocal = localToCreature.inverse;
-                    int transformIndex = operations.Count;
-                    operations.Add(new SdfOperation
-                    {
-                        Type = SdfOperationType.Transform,
-                        A = primitiveIndex,
-                        Matrix = ToFloat4x4(worldToLocal),
-                        DistanceScale = distanceScale,
-                    });
-                    SetWorldAabb(operations, transformIndex, TransformToWorld(PrimitiveLocalAabb(operations[primitiveIndex]), localToCreature));
-                    SetCullable(operations, transformIndex, primitiveType != SdfOperationType.Ellipsoid);
-                    primitive = transformIndex;
-
-                    if (shouldMirror)
-                    {
-                        int symmetryIndex = operations.Count;
-                        operations.Add(new SdfOperation { Type = SdfOperationType.Symmetry, A = primitive });
-                        Aabb child = ReadAabb(operations, primitive);
-                        SetWorldAabb(operations, symmetryIndex, Aabb.Union(child, Aabb.MirrorAcrossX(child)));
-                        SetCullable(operations, symmetryIndex, ReadCullable(operations, primitive));
-                        primitive = symmetryIndex;
-                    }
+                    primitive = AppendResolvedPrimitive(operations, part, localToCreature, distanceScale, shouldMirror);
                 }
                 root = primitive;
 
@@ -525,14 +529,14 @@ namespace ProceduralCreature.Morphology.Sdf
             return CreateProgram(operations, root);
         }
 
-        public static List<(CreaturePart Part, SdfProgram Program)> CompileIndividualPartsPortable(CreatureDefinition definition)
+        public static List<ResolvedPartProgram> CompileIndividualPartsPortable(CreatureDefinition definition)
         {
             if (definition == null) throw new DomainException("Cannot compile a null CreatureDefinition.");
 
             return CompileIndividualPartsPortable(definition, ResolvedCreatureSnapshot.Resolve(definition));
         }
 
-        public static List<(CreaturePart Part, SdfProgram Program)> CompileIndividualPartsPortable(
+        public static List<ResolvedPartProgram> CompileIndividualPartsPortable(
             CreatureDefinition definition, ResolvedCreatureSnapshot snapshot)
         {
             if (definition == null) throw new DomainException("Cannot compile a null CreatureDefinition.");
@@ -541,11 +545,7 @@ namespace ProceduralCreature.Morphology.Sdf
             return snapshot.PartsById.Values
                 .OrderBy(part => part.Id, System.StringComparer.Ordinal)
                 .Where(part => !part.HasMeshGeometry)
-                .Select(part =>
-                {
-                    CreaturePart sourcePart = definition.FindPart(part.Id);
-                    return (sourcePart, CompilePortablePart(snapshot, part));
-                })
+                .Select(part => new ResolvedPartProgram(part, CompilePortablePart(snapshot, part)))
                 .ToList();
         }
 
@@ -617,52 +617,7 @@ namespace ProceduralCreature.Morphology.Sdf
             }
             else
             {
-                SdfOperationType primitiveType;
-                switch (part.Shape.Type)
-                {
-                    case ShapeType.Sphere: primitiveType = SdfOperationType.Sphere; break;
-                    case ShapeType.Ellipsoid: primitiveType = SdfOperationType.Ellipsoid; break;
-                    case ShapeType.Box: primitiveType = SdfOperationType.Box; break;
-                    case ShapeType.Capsule: primitiveType = SdfOperationType.Capsule; break;
-                    default: throw new DomainException($"No portable SDF primitive mapping exists for ShapeType.{part.Shape.Type}.");
-                }
-
-                ResolvedShape shape = part.Shape;
-                float radius = shape.Radius;
-                float height = shape.CapsuleHeight;
-                float3 boxHalfExtents = new float3(shape.BoxHalfExtents.x, shape.BoxHalfExtents.y, shape.BoxHalfExtents.z);
-                float3 parameters = primitiveType == SdfOperationType.Box
-                    ? boxHalfExtents
-                    : primitiveType == SdfOperationType.Capsule
-                        ? new float3(radius, height, (int)shape.CapsuleAxis)
-                        : primitiveType == SdfOperationType.Ellipsoid
-                            ? new float3(shape.EllipsoidRadii.x, shape.EllipsoidRadii.y, shape.EllipsoidRadii.z)
-                            : new float3(radius, 0f, 0f);
-                int primitive = operations.Count;
-                operations.Add(SdfOperation.Primitive(primitiveType, parameters));
-                int primitiveIndex = primitive;
-
-                int transformIndex = operations.Count;
-                operations.Add(new SdfOperation
-                {
-                    Type = SdfOperationType.Transform,
-                    A = primitiveIndex,
-                    Matrix = ToFloat4x4(localToCreature.inverse),
-                    DistanceScale = distanceScale,
-                });
-                SetWorldAabb(operations, transformIndex, TransformToWorld(PrimitiveLocalAabb(operations[primitiveIndex]), localToCreature));
-                SetCullable(operations, transformIndex, primitiveType != SdfOperationType.Ellipsoid);
-                root = transformIndex;
-
-                if (shouldMirror)
-                {
-                    int symmetryIndex = operations.Count;
-                    operations.Add(new SdfOperation { Type = SdfOperationType.Symmetry, A = root });
-                    Aabb child = ReadAabb(operations, root);
-                    SetWorldAabb(operations, symmetryIndex, Aabb.Union(child, Aabb.MirrorAcrossX(child)));
-                    SetCullable(operations, symmetryIndex, ReadCullable(operations, root));
-                    root = symmetryIndex;
-                }
+                root = AppendResolvedPrimitive(operations, part, localToCreature, distanceScale, shouldMirror);
             }
 
             return CreateProgram(operations, root);
@@ -677,24 +632,15 @@ namespace ProceduralCreature.Morphology.Sdf
                 new float4(matrix.m03, matrix.m13, matrix.m23, matrix.m33));
         }
 
-            private static Matrix4x4 ToMatrix4x4(float4x4 matrix)
-            {
+        private static Matrix4x4 ToMatrix4x4(float4x4 matrix)
+        {
                 return new Matrix4x4(
                 new Vector4(matrix.c0.x, matrix.c0.y, matrix.c0.z, matrix.c0.w),
                 new Vector4(matrix.c1.x, matrix.c1.y, matrix.c1.z, matrix.c1.w),
                 new Vector4(matrix.c2.x, matrix.c2.y, matrix.c2.z, matrix.c2.w),
                 new Vector4(matrix.c3.x, matrix.c3.y, matrix.c3.z, matrix.c3.w));
-            }
+        }
 
-        /// <summary>
-        /// Appends the portable operations for a limb chain: one sphere primitive
-        /// plus a baked local-space transform per derived metaball, smooth-united
-        /// in chain order. When <paramref name="includeMirror"/> is true, a second
-        /// copy of the chain is emitted under the creature-space X mirror and the
-        /// two sides are hard-unioned (blend 0). This reproduces
-        /// <c>min(chain(x), chain(-x))</c> exactly without a separate symmetry
-        /// operation wrapping a composite subtree.
-        ///
         /// The mirror is a CREATURE-SPACE reflection of the composed transform,
         /// not a per-ball local-X negation: the mirrored ball position must be
         /// <c>S · (localToCreature · localPos)</c>, i.e. the part matrix

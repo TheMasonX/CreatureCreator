@@ -72,6 +72,43 @@ namespace ProceduralCreature.Tests.Runtime
         }
 
         [Test]
+        public void CompilePortable_AndIndividualPartCompilationSharePrimitiveOperationData()
+        {
+            CreatureDefinition definition = Sphere("part", new Vector3(2f, 0f, 0f));
+            using (SdfProgram wholeProgram = SdfProgramBuilder.CompilePortable(definition))
+            {
+                var individualPrograms = SdfProgramBuilder.CompileIndividualPartsPortable(definition);
+                try
+                {
+                    Assert.AreEqual(1, individualPrograms.Count);
+                    SdfProgram partProgram = individualPrograms[0].Program;
+                    Assert.AreEqual(wholeProgram.Operations.Length, partProgram.Operations.Length);
+
+                    for (int i = 0; i < wholeProgram.Operations.Length; i++)
+                    {
+                        SdfOperation whole = wholeProgram.Operations[i];
+                        SdfOperation part = partProgram.Operations[i];
+                        Assert.AreEqual(whole.Type, part.Type);
+                        Assert.AreEqual(whole.A, part.A);
+                        Assert.AreEqual(whole.B, part.B);
+                        Assert.AreEqual(whole.Parameters, part.Parameters);
+                        Assert.AreEqual(whole.Matrix, part.Matrix);
+                        Assert.AreEqual(whole.DistanceScale, part.DistanceScale);
+                        Assert.AreEqual(whole.MinBound, part.MinBound);
+                        Assert.AreEqual(whole.MaxBound, part.MaxBound);
+                        Assert.AreEqual(whole.Cullable, part.Cullable);
+                        Assert.AreEqual(whole.ConsumerUnionIndex, part.ConsumerUnionIndex);
+                    }
+                }
+                finally
+                {
+                    foreach (ResolvedPartProgram partProgram in individualPrograms)
+                        partProgram.Program.Dispose();
+                }
+            }
+        }
+
+        [Test]
         public void CompilePortable_ChildInheritsParentTransform()
         {
             CreatureDefinition definition = Sphere("root", new Vector3(10f, 0f, 0f));
@@ -136,7 +173,7 @@ namespace ProceduralCreature.Tests.Runtime
             try
             {
                 float mirrored = SdfProgramEvaluator.Evaluate(
-                    operations, 5, new float3(-4f, 0f, 0f), 0f, allowCulling: false);
+                    operations.AsReadOnly(), 5, new float3(-4f, 0f, 0f), 0f, allowCulling: false);
                 Assert.Less(mirrored, 0f);
             }
             finally
