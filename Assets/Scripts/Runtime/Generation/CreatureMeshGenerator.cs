@@ -51,77 +51,27 @@ namespace ProceduralCreature.Generation
             CreatureDefinition definition,
             GenerationDiagnostics diagnostics = null)
         {
+            // CC-091: generation is a concrete sequence of separately owned stages.
+            // Each stage consumes the resolved/generated data produced by the previous
+            // one and owns any native buffer it allocates. ValidateAndResolve is the
+            // single authority that turns authored DNA into the one resolved snapshot
+            // used by every downstream stage; no stage re-derives morphology from raw
+            // DNA.
             ResolvedCreatureSnapshot snapshot = ValidateAndResolve(definition, diagnostics);
 
-            SdfProgram portableProgram = null;
-            Time(diagnostics, GenerationStage.SdfCompile, () =>
-            {
-                portableProgram = SdfProgramBuilder.CompilePortable(definition, snapshot);
-            });
+            // Stage 1 — compile the portable SDF program and sample it over the grid.
+            // The returned DensityGrid owns its native sample buffer; that ownership
+            // transfers to ExtractMesh, which releases it.
+            DensityGrid grid = GenerateImplicitField(definition, snapshot, diagnostics);
 
-            DensityGrid grid = null;
-            Time(diagnostics, GenerationStage.FieldSampling,
-                () =>
-                {
-                    try
-                    {
-                        grid = DensityGrid.SamplePortable(portableProgram, snapshot.Bounds, snapshot.Generation);
-                    }
-                    finally
-                    {
-                        portableProgram.Dispose();
-                        portableProgram = null;
-                    }
-                });
-            diagnostics?.RecordGridDimensions(grid.CellsX, grid.CellsY, grid.CellsZ, grid.SampleCount);
+            // Stage 2 — extract the implicit surface mesh from the sampled grid.
+            MeshExtractionResult meshResult = ExtractMesh(grid, diagnostics);
 
-            MeshExtractionResult meshResult = null;
-            try
-            {
-                Time(diagnostics, GenerationStage.MeshExtraction,
-                    () => meshResult = MarchingCubesExtractor.Extract(
-                        grid, diagnostics?.CollectTimings == true));
-                diagnostics?.RecordExtractionStatistics(
-                    meshResult.MixedCellCount, meshResult.GradientEvaluationCount);
-                diagnostics?.RecordMeshStatistics(
-                    meshResult.Positions.Count, meshResult.TriangleCount);
-                diagnostics?.RecordExtractionTiming(
-                    meshResult.ActiveCellConstructionTime,
-                    meshResult.ContourResolutionTime,
-                    meshResult.VertexWeldingTime,
-                    meshResult.TriangleEmissionTime);
-            }
-            finally
-            {
-                // The grid's native sample buffer is no longer needed after
-                // extraction (validation, appearance, and assembly consume the
-                // plain-data MeshExtractionResult). Release it even when
-                // extraction throws so the Persistent allocation cannot leak.
-                if (grid != null)
-                {
-                    grid.Dispose();
-                    grid = null;
-                }
-            }
+            // Stage 3 — validate the extracted mesh topology (watertight/manifold).
+            MeshTopologyReport generatedTopologyReport = ValidateMesh(meshResult, diagnostics);
 
-            MeshTopologyReport generatedTopologyReport = null;
-            Time(diagnostics, GenerationStage.MeshValidation,
-                () => generatedTopologyReport = MeshTopologyValidator.Validate(meshResult));
-
-            Color[] colors = null;
-            var compiledParts = SdfProgramBuilder.CompileIndividualPartsPortable(definition, snapshot);
-            SdfProgram bodyProgram = SdfProgramBuilder.CompilePortableBodyField(definition, snapshot);
-            try
-            {
-                Time(diagnostics, GenerationStage.AppearanceBake,
-                    () => colors = AppearanceBaker.Bake(
-                        definition, meshResult, null, compiledParts, bodyProgram, snapshot.Body, snapshot));
-            }
-            finally
-            {
-                foreach (ResolvedPartProgram partProgram in compiledParts) partProgram.Program.Dispose();
-                bodyProgram.Dispose();
-            }
+            // Stage 4 — bake per-vertex appearance colors from resolved part data.
+            Color[] colors = BakeAppearance(definition, snapshot, meshResult, diagnostics);
 
             return new GeneratedCreatureData(definition, snapshot, meshResult, colors, generatedTopologyReport);
         }
@@ -143,6 +93,123 @@ namespace ProceduralCreature.Generation
             return ResolvedCreatureSnapshot.Resolve(definition);
         }
 
+        /// <summary>
+        /// Stage: compile the creature's portable SDF program and sample it over the
+        /// resolved density grid. The compiled program is transient — it is disposed
+        /// immediately after sampling. The returned <see cref="DensityGrid"/> owns its
+        /// native sample buffer; ownership transfers to <see cref="ExtractMesh"/>,
+        /// which is responsible for releasing it.
+        /// </summary>
+        private static DensityGrid GenerateImplicitField(
+            CreatureDefinition definition,
+            ResolvedCreatureSnapshot snapshot,
+            GenerationDiagnostics diagnostics)
+        {
+            SdfProgram portableProgram = null;
+            Time(diagnostics, GenerationStage.SdfCompile, () =>
+            {
+                portableProgram = SdfProgramBuilder.CompilePortable(definition, snapshot);
+            });
+
+            DensityGrid grid = null;
+            Time(diagnostics, GenerationStage.FieldSampling,
+                () =>
+                {
+                    try
+                    {
+                        grid = DensityGrid.SamplePortable(portableProgram, snapshot.Bounds, snapshot.Generation);
+                    }
+                    finally
+                    {
+                        portableProgram.Dispose();
+                        portableProgram = null;
+                    }
+                });
+            diagnostics?.RecordGridDimensions(grid.CellsX, grid.CellsY, grid.CellsZ, grid.SampleCount);
+            return grid;
+        }
+
+        /// <summary>
+        /// Stage: extract the implicit surface mesh from the sampled grid. This stage
+        /// takes ownership of <paramref name="grid"/> and releases its native sample
+        /// buffer after extraction — validation, appearance, and assembly consume the
+        /// plain-data <see cref="MeshExtractionResult"/>, so the grid is no longer
+        /// needed. It is disposed even when extraction throws so the Persistent
+        /// allocation cannot leak.
+        /// </summary>
+        private static MeshExtractionResult ExtractMesh(DensityGrid grid, GenerationDiagnostics diagnostics)
+        {
+            MeshExtractionResult meshResult = null;
+            try
+            {
+                Time(diagnostics, GenerationStage.MeshExtraction,
+                    () => meshResult = MarchingCubesExtractor.Extract(
+                        grid, diagnostics?.CollectTimings == true));
+                diagnostics?.RecordExtractionStatistics(
+                    meshResult.MixedCellCount, meshResult.GradientEvaluationCount);
+                diagnostics?.RecordMeshStatistics(
+                    meshResult.Positions.Count, meshResult.TriangleCount);
+                diagnostics?.RecordExtractionTiming(
+                    meshResult.ActiveCellConstructionTime,
+                    meshResult.ContourResolutionTime,
+                    meshResult.VertexWeldingTime,
+                    meshResult.TriangleEmissionTime);
+            }
+            finally
+            {
+                if (grid != null)
+                {
+                    grid.Dispose();
+                    grid = null;
+                }
+            }
+            return meshResult;
+        }
+
+        /// <summary>
+        /// Stage: validate the extracted mesh topology. Consumes only the plain-data
+        /// <see cref="MeshExtractionResult"/>; it owns no native resources.
+        /// </summary>
+        private static MeshTopologyReport ValidateMesh(
+            MeshExtractionResult meshResult,
+            GenerationDiagnostics diagnostics)
+        {
+            MeshTopologyReport generatedTopologyReport = null;
+            Time(diagnostics, GenerationStage.MeshValidation,
+                () => generatedTopologyReport = MeshTopologyValidator.Validate(meshResult));
+            return generatedTopologyReport;
+        }
+
+        /// <summary>
+        /// Stage: bake per-vertex colors from resolved part appearance. Compiles the
+        /// individual-part and Body appearance programs from the resolved snapshot,
+        /// bakes against the extracted mesh, and disposes those programs. It never
+        /// re-derives morphology from raw DNA; it only builds the appearance programs
+        /// this stage itself needs.
+        /// </summary>
+        private static Color[] BakeAppearance(
+            CreatureDefinition definition,
+            ResolvedCreatureSnapshot snapshot,
+            MeshExtractionResult meshResult,
+            GenerationDiagnostics diagnostics)
+        {
+            Color[] colors = null;
+            var compiledParts = SdfProgramBuilder.CompileIndividualPartsPortable(definition, snapshot);
+            SdfProgram bodyProgram = SdfProgramBuilder.CompilePortableBodyField(definition, snapshot);
+            try
+            {
+                Time(diagnostics, GenerationStage.AppearanceBake,
+                    () => colors = AppearanceBaker.Bake(
+                        definition, meshResult, null, compiledParts, bodyProgram, snapshot.Body, snapshot));
+            }
+            finally
+            {
+                foreach (ResolvedPartProgram partProgram in compiledParts) partProgram.Program.Dispose();
+                bodyProgram.Dispose();
+            }
+            return colors;
+        }
+
         public static GeneratedCreature Assemble(GeneratedCreatureData data, Func<string, Mesh> meshResolver = null)
         {
             if (data == null) throw new DomainException("generation data must not be null.");
@@ -159,8 +226,25 @@ namespace ProceduralCreature.Generation
                 RigBinding = new RigBindingMetadata(),
             });
 
-            // Items 1..n: mesh-asset parts, ordered by SourcePartId for a
-            // deterministic output independent of authoring order.
+            // Items 1..n: mesh-asset parts, resolved and placed from the snapshot.
+            AppendMeshAssetItems(generated, data, meshResolver);
+
+            return generated;
+        }
+
+        /// <summary>
+        /// Stage: place mesh-asset parts into the generated creature. Mesh-asset parts
+        /// are ordered by SourcePartId for deterministic output independent of
+        /// authoring order; each source mesh is resolved through the injected resolver
+        /// and placed at its captured creature-space transform, mirroring when the
+        /// part is mirrored. Placement comes from the resolved snapshot, never raw
+        /// DNA.
+        /// </summary>
+        private static void AppendMeshAssetItems(
+            GeneratedCreature generated,
+            GeneratedCreatureData data,
+            Func<string, Mesh> meshResolver)
+        {
             var meshParts = data.Snapshot.PartsById.Values
                 .Where(p => p.HasMeshGeometry)
                 .OrderBy(p => p.Id, StringComparer.Ordinal);
@@ -178,8 +262,6 @@ namespace ProceduralCreature.Generation
                         MirrorUtility.ReflectTransformAcrossX(placement), mirror: true));
                 }
             }
-
-            return generated;
         }
 
         private static Mesh ResolveMesh(string partId, string meshAssetKey, Func<string, Mesh> meshResolver)
