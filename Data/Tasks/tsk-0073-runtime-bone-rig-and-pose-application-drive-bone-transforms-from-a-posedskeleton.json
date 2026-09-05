@@ -22,16 +22,29 @@
   "attachments": [],
   "externalLinks": [],
   "linkedPages": [],
-  "comments": [],
+  "comments": [
+    {
+      "id": "c-3f49a024150244138245438c09e969fd",
+      "author": "anonymous",
+      "body": "## User Mandate\n\n\u003E \u0022Carefully review the latest work and this external audit/task plan and implement the next set of tasks.\u0022\n\nSTRICT. This slice follows the handoff\u0027s C0/C1 direction: stabilize runtime skeleton data and index pose storage without introducing an animation framework or changing locomotion ownership.\n\nImplementation hypothesis: the current per-frame string dictionary and child-list scan are the remaining CC-069 hot-path costs; a concrete immutable SkeletonSnapshot plus indexed PosedSkeleton can remove them while preserving the existing public boundary adapters. Disconfirming check: focused CreatureRig and PoseRotationResolver tests, plus rest-pose/unknown-ID coverage, must pass unchanged.",
+      "createdAtUtc": "2026-09-05T06:23:52.3997687Z"
+    },
+    {
+      "id": "c-bf2909a4d7664a75880018d5987c2ca9",
+      "author": "anonymous",
+      "body": "## C0/C1 Implementation Evidence (2026-09-05)\n\nAdded \u0060Assets/Scripts/Runtime/Skeleton/SkeletonSnapshot.cs\u0060 with immutable \u0060BoneSnapshot\u0060 values, stable input-order indices, parent indices, and precomputed read-only child lists. \u0060CreatureRig\u0060 captures this snapshot once per build; \u0060PoseRotationResolver\u0060 uses indexed child access instead of scanning \u0060Skeleton.Bones\u0060 for every bone.\n\n\u0060PosedSkeleton\u0060 now stores positions in an indexed array. String bone IDs remain boundary adapters for \u0060GetPosition\u0060, sparse updates, and unknown-ID validation. Rest-pose construction supports both authored \u0060Skeleton\u0060 and detached \u0060SkeletonSnapshot\u0060 inputs. Snapshot detachment and indexed sparse-update tests were added to \u0060PoseRotationResolverTests\u0060.\n\nValidation:\n- \u0060dotnet build ProceduralCreature.Runtime.csproj --no-restore\u0060: passed, 0 errors/warnings.\n- \u0060dotnet build ProceduralCreature.Tests.Runtime.csproj --no-restore\u0060: passed, 0 errors/warnings.\n- Focused Unity PlayMode rig/pose suite: 8/8 passed.\n- Full \u0060ProceduralCreature.Tests.Runtime\u0060 PlayMode suite: 465/465 passed, 0 failed, 0 skipped.\n- Unity console after run: no product errors or warnings.\n- \u0060git diff --check\u0060: passed.\n\nResidual risk: \u0060Bone\u0060, \u0060Skeleton\u0060, and \u0060PoseRotationResolver\u0060 string-returning compatibility APIs remain at the outer boundary; indexed consumers beyond CreatureRig/pose rotation are deferred. Geometry binding and the C4/C5 renderer contract remain intentionally unresolved under this task.",
+      "createdAtUtc": "2026-09-05T06:27:10.7997531Z"
+    }
+  ],
   "epicId": null,
   "parentId": null,
   "dueDateUtc": null,
   "createdAtUtc": "2026-09-01T03:20:52.1648146Z",
-  "updatedAtUtc": "2026-09-01T03:20:52.1648146Z",
+  "updatedAtUtc": "2026-09-05T06:27:10.7997531Z",
   "completedAtUtc": null,
-  "revision": 1,
+  "revision": 3,
   "isArchived": false,
   "hasLoadError": false,
   "loadError": null,
-  "sourceFilePath": null
+  "sourceFilePath": "tsk-0073-runtime-bone-rig-and-pose-application-drive-bone-transforms-from-a-posedskeleton.json"
 }

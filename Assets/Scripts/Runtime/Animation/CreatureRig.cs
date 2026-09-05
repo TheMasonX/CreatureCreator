@@ -16,7 +16,7 @@ namespace ProceduralCreature.Animation
         private const string BoneObjectPrefix = "Bone_";
         private readonly Dictionary<string, Transform> _bones = new Dictionary<string, Transform>();
         private readonly List<GameObject> _generatedObjects = new List<GameObject>();
-        private Skeleton.Skeleton _restSkeleton;
+        private SkeletonSnapshot _restSkeleton;
 
         public IReadOnlyDictionary<string, Transform> Bones => _bones;
 
@@ -25,21 +25,18 @@ namespace ProceduralCreature.Animation
             if (restSkeleton == null) throw new DomainException("restSkeleton must not be null.");
 
             Clear();
-            _restSkeleton = restSkeleton;
+            _restSkeleton = SkeletonSnapshot.Capture(restSkeleton);
 
-            foreach (Bone bone in restSkeleton.Bones)
+            for (int i = 0; i < _restSkeleton.Count; i++)
             {
-                if (bone == null || string.IsNullOrEmpty(bone.Id))
-                {
-                    throw new DomainException("A runtime rig cannot contain a null bone or empty bone id.");
-                }
+                BoneSnapshot bone = _restSkeleton[i];
                 if (_bones.ContainsKey(bone.Id))
                 {
                     throw new DomainException($"Skeleton contains duplicate bone id '{bone.Id}'.");
                 }
 
                 var boneObject = new GameObject(BoneObjectPrefix + bone.Id);
-                Transform parent = bone.ParentBoneId == null ? transform : ResolveParent(bone.ParentBoneId);
+                Transform parent = bone.ParentIndex < 0 ? transform : ResolveParent(_restSkeleton[bone.ParentIndex].Id);
                 boneObject.transform.SetParent(parent, worldPositionStays: false);
                 boneObject.transform.position = bone.Position;
                 boneObject.transform.rotation = bone.Rotation;
@@ -54,10 +51,11 @@ namespace ProceduralCreature.Animation
             if (pose == null) throw new DomainException("pose must not be null.");
 
             Dictionary<string, Quaternion> rotations = Ik.PoseRotationResolver.Resolve(_restSkeleton, pose);
-            foreach (Bone bone in _restSkeleton.Bones)
+            for (int i = 0; i < _restSkeleton.Count; i++)
             {
+                BoneSnapshot bone = _restSkeleton[i];
                 Transform boneTransform = _bones[bone.Id];
-                boneTransform.position = pose.GetPosition(bone.Id);
+                boneTransform.position = pose.GetPosition(i);
                 boneTransform.rotation = rotations[bone.Id];
             }
         }

@@ -1,7 +1,7 @@
 using System.Collections.Generic;
-using System.Linq;
 using UnityEngine;
 using ProceduralCreature.Common;
+using ProceduralCreature.Skeleton;
 
 namespace ProceduralCreature.Animation.Ik
 {
@@ -16,31 +16,54 @@ namespace ProceduralCreature.Animation.Ik
     /// </summary>
     public sealed class PosedSkeleton
     {
-        private readonly Dictionary<string, Vector3> _positions;
+        private readonly SkeletonSnapshot _skeleton;
+        private readonly Vector3[] _positions;
 
-        private PosedSkeleton(Dictionary<string, Vector3> positions)
+        private PosedSkeleton(SkeletonSnapshot skeleton, Vector3[] positions)
         {
+            _skeleton = skeleton;
             _positions = positions;
         }
+
+        internal SkeletonSnapshot Skeleton => _skeleton;
 
         public static PosedSkeleton FromRestPose(Skeleton.Skeleton skeleton)
         {
             if (skeleton == null) throw new DomainException("skeleton must not be null.");
-            return new PosedSkeleton(skeleton.Bones.ToDictionary(b => b.Id, b => b.Position));
+            return FromRestPose(SkeletonSnapshot.Capture(skeleton));
+        }
+
+        public static PosedSkeleton FromRestPose(SkeletonSnapshot skeleton)
+        {
+            if (skeleton == null) throw new DomainException("skeleton must not be null.");
+            var positions = new Vector3[skeleton.Count];
+            for (int i = 0; i < positions.Length; i++) positions[i] = skeleton[i].Position;
+            return new PosedSkeleton(skeleton, positions);
         }
 
         public Vector3 GetPosition(string boneId)
         {
-            if (!_positions.TryGetValue(boneId, out Vector3 position))
-            {
-                throw new DomainException($"Bone '{boneId}' has no position in this pose.");
-            }
-            return position;
+            return GetPosition(_skeleton.GetIndex(boneId));
         }
 
         public bool TryGetPosition(string boneId, out Vector3 position)
         {
-            return _positions.TryGetValue(boneId, out position);
+            if (!_skeleton.TryGetIndex(boneId, out int index))
+            {
+                position = default;
+                return false;
+            }
+            position = _positions[index];
+            return true;
+        }
+
+        public Vector3 GetPosition(int boneIndex)
+        {
+            if (boneIndex < 0 || boneIndex >= _positions.Length)
+            {
+                throw new DomainException("boneIndex must identify a bone in the pose.");
+            }
+            return _positions[boneIndex];
         }
 
         /// <summary>Returns a new PosedSkeleton with the given bones' positions replaced; all other bones keep their current position.</summary>
@@ -48,16 +71,16 @@ namespace ProceduralCreature.Animation.Ik
         {
             if (updates == null) throw new DomainException("updates must not be null.");
 
-            var merged = new Dictionary<string, Vector3>(_positions);
+            var merged = (Vector3[])_positions.Clone();
             foreach (KeyValuePair<string, Vector3> update in updates)
             {
-                if (!_positions.ContainsKey(update.Key))
+                if (!_skeleton.TryGetIndex(update.Key, out int index))
                 {
                     throw new DomainException($"Bone '{update.Key}' has no position in the rest skeleton.");
                 }
-                merged[update.Key] = update.Value;
+                merged[index] = update.Value;
             }
-            return new PosedSkeleton(merged);
+            return new PosedSkeleton(_skeleton, merged);
         }
     }
 }

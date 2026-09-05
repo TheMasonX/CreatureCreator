@@ -133,15 +133,21 @@
       "author": "anonymous",
       "body": "## A4 Follow-up Validation\nUnity was available and the accepted baseline was restored after an initial compile/test pass exposed rejected B0 potential-envelope changes in the dirty SDF files. The A4 extraction change now validates cleanly:\n\n- \u0060dotnet build CreatureCreator.slnx --no-restore\u0060: 0 errors, 0 warnings.\n- Unity refresh/compile: no product errors; only the existing Persistent allocation leak warning before the run.\n- Full \u0060ProceduralCreature.Tests.Runtime\u0060 PlayMode: 463/463 passed, 0 failed, 0 skipped.\n- Unity post-run console: only test-result save and Performance Testing cleanup messages.\n- \u0060git diff --check\u0060: passed.\n- No \u0060ExtractLegacy\u0060 references remain under \u0060Assets/Scripts\u0060; the reference oracle exists only in \u0060Assets/Scripts/Tests/Runtime/MarchingCubesReferenceExtractor.cs\u0060.\n\nB0 remains rejected and was not extended. The worktree is ready for review/commit; no commit or push was performed.",
       "createdAtUtc": "2026-09-05T05:51:25.3442168Z"
+    },
+    {
+      "id": "c-818a4689c29f49bd84d5f17335046ac7",
+      "author": "anonymous",
+      "body": "Disposition note (2026-09-05): user explicitly directed that B0 was a misstep and must be stricken from active scope and ignored. The existing committed root potential-influence envelope implementation was briefly removed during review, which caused a measured FieldSampling regression, then restored unchanged. Current work does not extend B0; the existing optimization remains as baseline behavior pending separate product direction. Runtime PlayMode assembly validation after restoration passed 462/462.",
+      "createdAtUtc": "2026-09-05T06:19:26.0349923Z"
     }
   ],
   "epicId": null,
   "parentId": null,
   "dueDateUtc": null,
   "createdAtUtc": "2026-09-01T03:16:25.5654277Z",
-  "updatedAtUtc": "2026-09-05T05:51:25.3442168Z",
+  "updatedAtUtc": "2026-09-05T06:19:26.0349923Z",
   "completedAtUtc": null,
-  "revision": 21,
+  "revision": 22,
   "isArchived": false,
   "hasLoadError": false,
   "loadError": null,

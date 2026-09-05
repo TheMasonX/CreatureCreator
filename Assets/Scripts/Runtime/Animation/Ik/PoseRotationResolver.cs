@@ -18,34 +18,36 @@ namespace ProceduralCreature.Animation.Ik
             Skeleton.Skeleton restSkeleton, PosedSkeleton pose)
         {
             if (restSkeleton == null) throw new DomainException("restSkeleton must not be null.");
-            if (pose == null) throw new DomainException("pose must not be null.");
+            return Resolve(SkeletonSnapshot.Capture(restSkeleton), pose);
+        }
 
-            var rotations = new Dictionary<string, Quaternion>(restSkeleton.Bones.Count);
-            foreach (Bone bone in restSkeleton.Bones)
+        public static Dictionary<string, Quaternion> Resolve(
+            SkeletonSnapshot restSkeleton, PosedSkeleton pose)
+        {
+            if (restSkeleton == null) throw new DomainException("restSkeleton must not be null.");
+            if (pose == null) throw new DomainException("pose must not be null.");
+            if (!restSkeleton.HasSameBoneOrder(pose.Skeleton))
             {
-                if (bone == null) continue;
-                Vector3 position = pose.GetPosition(bone.Id);
-                Bone child = FindFirstChild(restSkeleton, bone.Id);
-                if (child == null)
+                throw new DomainException("pose must use the same bone order as restSkeleton.");
+            }
+
+            var rotations = new Dictionary<string, Quaternion>(restSkeleton.Count);
+            for (int i = 0; i < restSkeleton.Count; i++)
+            {
+                BoneSnapshot bone = restSkeleton[i];
+                Vector3 position = pose.GetPosition(i);
+                IReadOnlyList<int> children = restSkeleton.GetChildren(i);
+                if (children.Count == 0)
                 {
                     rotations[bone.Id] = bone.Rotation;
                     continue;
                 }
 
-                Vector3 childPosition = pose.GetPosition(child.Id);
+                Vector3 childPosition = pose.GetPosition(children[0]);
                 Vector3 direction = childPosition - position;
                 rotations[bone.Id] = ResolveLookRotation(direction, bone.Rotation);
             }
             return rotations;
-        }
-
-        private static Bone FindFirstChild(Skeleton.Skeleton skeleton, string parentId)
-        {
-            foreach (Bone bone in skeleton.Bones)
-            {
-                if (bone != null && bone.ParentBoneId == parentId) return bone;
-            }
-            return null;
         }
 
         private static Quaternion ResolveLookRotation(Vector3 direction, Quaternion restRotation)

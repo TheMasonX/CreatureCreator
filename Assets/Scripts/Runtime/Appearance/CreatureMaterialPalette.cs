@@ -1,6 +1,7 @@
 using System;
 using System.Collections.Generic;
 using System.Linq;
+using ProceduralCreature.Common;
 using UnityEngine;
 
 namespace ProceduralCreature.Appearance
@@ -45,15 +46,11 @@ namespace ProceduralCreature.Appearance
 
         public bool TryResolve(string key, out Material material)
         {
-            material = null;
-            if (string.IsNullOrWhiteSpace(key)) return false;
-
-            Entry match = entries.FirstOrDefault(entry =>
-                entry != null && string.Equals(entry.Key, key, StringComparison.Ordinal));
-            if (match == null || match.Material == null) return false;
-
-            material = match.Material;
-            return true;
+            Entry match;
+            bool resolved = KeyedPaletteLookup.TryResolve(
+                entries, key, entry => entry.Key, entry => entry.Material != null, out match);
+            material = resolved ? match.Material : null;
+            return resolved;
         }
 
         /// <summary>
@@ -70,12 +67,9 @@ namespace ProceduralCreature.Appearance
 
         public string[] GetUsableKeys()
         {
-            return entries
-                .Where(entry => entry != null && !string.IsNullOrWhiteSpace(entry.Key) && entry.Material != null)
-                .Select(entry => entry.Key)
-                .Distinct(StringComparer.Ordinal)
-                .OrderBy(key => key, StringComparer.Ordinal)
-                .ToArray();
+            return KeyedPaletteLookup.GetUsableKeys(
+                entries, entry => entry.Key,
+                entry => !string.IsNullOrWhiteSpace(entry.Key) && entry.Material != null);
         }
 
         public string GetDisplayName(string key)
@@ -88,14 +82,7 @@ namespace ProceduralCreature.Appearance
 
         public bool HasDuplicateKeys(out string duplicateKey)
         {
-            duplicateKey = entries
-                .Where(entry => entry != null && !string.IsNullOrWhiteSpace(entry.Key))
-                .GroupBy(entry => entry.Key, StringComparer.Ordinal)
-                .Where(group => group.Count() > 1)
-                .Select(group => group.Key)
-                .OrderBy(key => key, StringComparer.Ordinal)
-                .FirstOrDefault();
-            return duplicateKey != null;
+            return KeyedPaletteLookup.HasDuplicateKeys(entries, entry => entry.Key, out duplicateKey);
         }
     }
 }

@@ -99,5 +99,36 @@ namespace ProceduralCreature.Tests.Runtime
             Assert.AreEqual(restRotation, skeleton.FindBone("root").Rotation);
             Assert.AreEqual(Vector3.zero, pose.GetPosition("root"));
         }
+
+        [Test]
+        public void Snapshot_DetachesRestDataAndIndexesChildren()
+        {
+            Skeleton.Skeleton skeleton = BuildChain();
+            SkeletonSnapshot snapshot = SkeletonSnapshot.Capture(skeleton);
+
+            skeleton.Bones[1].Position = Vector3.left;
+
+            Assert.AreEqual(3, snapshot.Count);
+            Assert.AreEqual("root", snapshot[0].Id);
+            Assert.AreEqual(-1, snapshot[0].ParentIndex);
+            Assert.AreEqual(0, snapshot[1].ParentIndex);
+            Assert.AreEqual(Vector3.right, snapshot[1].Position);
+            Assert.AreEqual(1, snapshot.GetChildren(0).Count);
+            Assert.AreEqual(1, snapshot.GetChildren(0)[0]);
+        }
+
+        [Test]
+        public void IndexedPose_SupportsSparseUpdatesAndRejectsUnknownIds()
+        {
+            SkeletonSnapshot snapshot = SkeletonSnapshot.Capture(BuildChain());
+            PosedSkeleton pose = PosedSkeleton.FromRestPose(snapshot).WithUpdatedPositions(
+                new Dictionary<string, Vector3> { ["mid"] = Vector3.up });
+
+            Assert.AreEqual(Vector3.zero, pose.GetPosition(0));
+            Assert.AreEqual(Vector3.up, pose.GetPosition(1));
+            Assert.AreEqual(Vector3.right * 2f, pose.GetPosition(2));
+            Assert.Throws<DomainException>(() => pose.WithUpdatedPositions(
+                new Dictionary<string, Vector3> { ["unknown"] = Vector3.one }));
+        }
     }
 }
