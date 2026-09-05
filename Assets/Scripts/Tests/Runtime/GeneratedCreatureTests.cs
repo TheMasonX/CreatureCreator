@@ -158,6 +158,61 @@ namespace ProceduralCreature.Tests.Runtime
         }
 
         [Test]
+        public void Generate_CanonicalizationEquivalentDefinitions_ProduceEqualOutput()
+        {
+            // CC-091 output-parity gate. Generation always canonicalizes inside
+            // ResolvedCreatureSnapshot.Resolve, so two definitions that differ only
+            // by part insertion order (which canonicalization sorts by Id) must yield
+            // identical generated output — same revision, deterministic item order and
+            // source identity, geometry, transforms, and mirrored copies. This pins the
+            // full-pipeline half of canonicalization-equivalent parity that the
+            // snapshot-level test (CreaturePartWorldTransformResolverTests) does not
+            // reach.
+            CreatureDefinition definition = DefinitionWithBody();
+            definition.SymmetryMode = SymmetryMode.MirrorAcrossXAxis;
+            // Added in reverse-sorted order so canonicalization must reorder by Id.
+            CreaturePart eyeZ = MeshEyePart("eye_z", new Vector3(0f, 0.5f, 1.5f), EyeGeometry("eye", Vector3.zero));
+            eyeZ.MirrorAcrossSymmetryPlane = true;
+            definition.AddPart(eyeZ);
+            definition.AddPart(MeshEyePart("eye_a", new Vector3(0f, 0.5f, -1.5f), EyeGeometry("eye", Vector3.zero)));
+
+            CreatureDefinition canonical = DefinitionCanonicalizer.Canonicalize(definition);
+
+            Assert.AreEqual(
+                ResolvedCreatureSnapshot.Resolve(definition).RevisionId,
+                ResolvedCreatureSnapshot.Resolve(canonical).RevisionId,
+                "canonicalization must not change the snapshot revision");
+
+            GeneratedCreature raw = GenerateWithResolver(definition, _ => UnitCube());
+            GeneratedCreature canon = GenerateWithResolver(canonical, _ => UnitCube());
+
+            Assert.AreEqual(raw.Count, canon.Count,
+                "canonicalization-equivalent inputs must produce the same item count (implicit + originals + mirrored)");
+
+            for (int i = 0; i < raw.Count; i++)
+            {
+                Assert.AreEqual(raw.Geometry[i].SourcePartId, canon.Geometry[i].SourcePartId,
+                    $"item {i}: source identity / deterministic order parity");
+                Assert.AreEqual(raw.Geometry[i].GeometryType, canon.Geometry[i].GeometryType,
+                    $"item {i}: geometry type parity");
+                Assert.AreEqual(raw.Geometry[i].Mesh.vertexCount, canon.Geometry[i].Mesh.vertexCount,
+                    $"item {i}: vertex count parity");
+                Assert.AreEqual(raw.Geometry[i].Mesh.triangles.Length, canon.Geometry[i].Mesh.triangles.Length,
+                    $"item {i}: triangle count parity");
+                AssertVectorClose(raw.Geometry[i].Mesh.bounds.center, canon.Geometry[i].Mesh.bounds.center, 0.001f,
+                    $"item {i}: bounds center parity");
+                AssertVectorClose(raw.Geometry[i].Mesh.bounds.size, canon.Geometry[i].Mesh.bounds.size, 0.001f,
+                    $"item {i}: bounds size parity");
+            }
+
+            // Reordered + mirrored fixture emits: implicit, eye_a, eye_z, eye_z_mirrored.
+            Assert.AreEqual(GeneratedCreature.ImplicitSurfaceSourceId, raw.Geometry[0].SourcePartId);
+            Assert.AreEqual("eye_a", raw.Geometry[1].SourcePartId);
+            Assert.AreEqual("eye_z", raw.Geometry[2].SourcePartId);
+            Assert.AreEqual("eye_z" + GeneratedCreature.MirrorSuffix, raw.Geometry[3].SourcePartId);
+        }
+
+        [Test]
         public void Generate_MirroredMeshPart_EmitsMirroredCopy()
         {
             CreatureDefinition definition = DefinitionWithBody();
