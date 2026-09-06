@@ -287,10 +287,13 @@ namespace ProceduralCreature.Editor
             SceneView.duringSceneGui += OnSceneGUI;
             EditorApplication.update += ProcessAutoRegeneration;
 
-            _previewGameObject = GameObject.Find("CreatureCreator Preview");
             _previewController = new CreaturePreviewController(
                 ResolveDefaultMaterial,
                 key => MaterialResolver.Resolve(EffectiveMaterialPalette, key));
+            // Recover a preview root left by a previous controller instance across
+            // a domain reload by its structural instance handle, not by name, so
+            // an unrelated same-named object is never adopted (TSK-0122).
+            _previewGameObject = _previewController.RecoverExistingPreview();
         }
 
         private void OnDisable()

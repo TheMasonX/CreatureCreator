@@ -3,19 +3,44 @@ using System.Collections.Generic;
 using ProceduralCreature.Common;
 using ProceduralCreature.Definition;
 using ProceduralCreature.Generation;
+using UnityEditor;
 using UnityEngine;
 
 namespace ProceduralCreature.Editor
 {
+    /// <summary>
+    /// Owns the editor preview root and its generated geometry children, and the
+    /// runtime generation lifecycle that produces them.
+    ///
+    /// Ownership is structural, not name-based (TSK-0122). The controller records
+    /// the preview root's entity identity and each owned geometry child's entity
+    /// identity in <see cref="SessionState"/> (the editor store that survives
+    /// domain reload). A reloaded controller recovers its root by that recorded
+    /// handle via <see cref="EditorUtility.EntityIdToObject"/> and destroys
+    /// exactly the children it registered — never an unrelated object that merely
+    /// shares the preview display name or a geometry name prefix.
+    /// </summary>
     internal sealed class CreaturePreviewController : IDisposable
     {
+        /// <summary>
+        /// Display-only name for a freshly created preview root. Identity and
+        /// ownership are structural (an entity handle persisted in
+        /// <see cref="SessionState"/>), never derived from this name.
+        /// </summary>
         private const string PreviewObjectName = "CreatureCreator Preview";
-        private const string PreviewGeometryChildPrefix = "CreatureCreator Preview Geometry ";
+
+        // Structural ownership handles. These persist across domain reload so a
+        // reloaded controller recovers its preview by the recorded entity
+        // identity instead of by a human-readable scene name. EntityId is Unity
+        // 6000's stable object identity (the instance-ID successor) and round-trips
+        // through ulong for storage in SessionState.
+        internal const string RootEntityKey = "ProceduralCreature.Editor.Preview.RootEntityId";
+        internal const string GeometryEntityIdsKey = "ProceduralCreature.Editor.Preview.GeometryEntityIds";
+
         private readonly CreatureGenerationScheduler _scheduler = new CreatureGenerationScheduler();
         private readonly CreaturePreviewRequestState _requestState = new CreaturePreviewRequestState();
         private readonly Func<Material> _defaultMaterialResolver;
         private readonly Func<string, Material> _materialResolver;
-        private readonly List<GameObject> _geometryObjects = new List<GameObject>();
         private bool _disposed;
 
         public CreaturePreviewController(
@@ -88,25 +113,61 @@ namespace ProceduralCreature.Editor
             for (int i = 1; i < generated.Geometry.Count; i++)
             {
                 GeometryItem item = generated.Geometry[i];
-                var child = new GameObject(PreviewGeometryChildPrefix + i);
+                // The child name is display-only; ownership is carried by the
+                // registered entity handle, so cleanup never depends on a name
+                // prefix.
+                var child = new GameObject("Preview Mesh " + i);
                 child.transform.SetParent(PreviewGameObject.transform, worldPositionStays: false);
                 child.AddComponent<MeshFilter>().sharedMesh = item.Mesh;
                 MeshRenderer renderer = child.AddComponent<MeshRenderer>();
                 AssignMaterials(renderer, item);
-                _geometryObjects.Add(child);
+                RegisterOwnedGeometry(child);
             }
+        }
+
+        /// <summary>
+        /// Recovers an existing preview root left in the scene by a previous
+        /// controller instance (for example across a domain reload). Discovery is
+        /// by the recorded structural entity handle, never by object name, so an
+        /// unrelated object that merely shares the display name is never adopted.
+        /// Returns null when no recoverable owned root exists.
+        /// </summary>
+        public GameObject RecoverExistingPreview()
+        {
+            if (PreviewGameObject != null) return PreviewGameObject;
+
+            EntityId handle = ReadRootEntity();
+            if (!handle.IsValid()) return null;
+
+            GameObject root = EditorUtility.EntityIdToObject(handle) as GameObject;
+            if (root == null)
+            {
+                // Stale handle: the recorded root no longer exists. Drop it so a
+                // later create registers a fresh identity.
+                SessionState.EraseString(RootEntityKey);
+                return null;
+            }
+
+            PreviewGameObject = root;
+            return PreviewGameObject;
+        }
+
+        private void EnsurePreviewRoot()
+        {
+            if (PreviewGameObject != null) return;
+            RecoverExistingPreview();
+            if (PreviewGameObject != null) return;
+
+            PreviewGameObject = new GameObject(PreviewObjectName);
+            PreviewGameObject.AddComponent<MeshFilter>();
+            PreviewGameObject.AddComponent<MeshRenderer>();
+            PreviewGameObject.AddComponent<MeshCollider>();
+            PersistRootEntity(PreviewGameObject.GetEntityId());
         }
 
         private void ApplyPreviewMesh(Mesh mesh)
         {
-            if (PreviewGameObject == null) PreviewGameObject = GameObject.Find(PreviewObjectName);
-            if (PreviewGameObject == null)
-            {
-                PreviewGameObject = new GameObject(PreviewObjectName);
-                PreviewGameObject.AddComponent<MeshFilter>();
-                PreviewGameObject.AddComponent<MeshRenderer>();
-                PreviewGameObject.AddComponent<MeshCollider>();
-            }
+            EnsurePreviewRoot();
 
             PreviewGameObject.GetComponent<MeshFilter>().sharedMesh = mesh;
             MeshRenderer renderer = PreviewGameObject.GetComponent<MeshRenderer>();
@@ -140,21 +201,54 @@ namespace ProceduralCreature.Editor
 
         private void ClearGeometryObjects()
         {
-            for (int i = _geometryObjects.Count - 1; i >= 0; i--)
+            // Destroy only children this controller explicitly created and
+            // registered. Ownership is the recorded entity handle, never inferred
+            // from a child's display name, so an unrelated prefixed object
+            // survives (TSK-0122).
+            List<ulong> owned = ReadOwnedGeometryEntities();
+            for (int i = owned.Count - 1; i >= 0; i--)
             {
-                if (_geometryObjects[i] != null) UnityEngine.Object.DestroyImmediate(_geometryObjects[i]);
+                GameObject child = EditorUtility.EntityIdToObject(EntityId.FromULong(owned[i])) as GameObject;
+                if (child != null) UnityEngine.Object.DestroyImmediate(child);
             }
-            _geometryObjects.Clear();
+            PersistOwnedGeometryEntities(new List<ulong>());
+        }
 
-            if (PreviewGameObject == null) return;
-            for (int i = PreviewGameObject.transform.childCount - 1; i >= 0; i--)
+        private static void RegisterOwnedGeometry(GameObject child)
+        {
+            List<ulong> owned = ReadOwnedGeometryEntities();
+            ulong id = EntityId.ToULong(child.GetEntityId());
+            if (!owned.Contains(id)) owned.Add(id);
+            PersistOwnedGeometryEntities(owned);
+        }
+
+        private static List<ulong> ReadOwnedGeometryEntities()
+        {
+            var ids = new List<ulong>();
+            string raw = SessionState.GetString(GeometryEntityIdsKey, string.Empty);
+            if (string.IsNullOrEmpty(raw)) return ids;
+            string[] parts = raw.Split(',');
+            for (int i = 0; i < parts.Length; i++)
             {
-                Transform child = PreviewGameObject.transform.GetChild(i);
-                if (child.name.StartsWith(PreviewGeometryChildPrefix, StringComparison.Ordinal))
-                {
-                    UnityEngine.Object.DestroyImmediate(child.gameObject);
-                }
+                if (ulong.TryParse(parts[i], out ulong id) && !ids.Contains(id)) ids.Add(id);
             }
+            return ids;
+        }
+
+        private static void PersistOwnedGeometryEntities(List<ulong> ids)
+        {
+            SessionState.SetString(GeometryEntityIdsKey, string.Join(",", ids));
+        }
+
+        private static void PersistRootEntity(EntityId entity)
+        {
+            SessionState.SetString(RootEntityKey, entity.IsValid() ? EntityId.ToULong(entity).ToString() : string.Empty);
+        }
+
+        private static EntityId ReadRootEntity()
+        {
+            string raw = SessionState.GetString(RootEntityKey, string.Empty);
+            return ulong.TryParse(raw, out ulong value) ? EntityId.FromULong(value) : EntityId.None;
         }
 
         public void Dispose()
