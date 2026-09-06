@@ -1,3 +1,4 @@
+using System.Collections.Generic;
 using NUnit.Framework;
 using UnityEngine;
 using ProceduralCreature.Common;
@@ -368,10 +369,112 @@ namespace ProceduralCreature.Tests.Runtime
 
         private static void AssertMaterialRegion(GeometryItem item, string expectedKey, string message)
         {
-            Assert.AreEqual(1, item.MaterialRegions.Count, $"{message}: one region per mesh-asset item");
+            Assert.AreEqual(1, item.MaterialRegions.Count, $"{message}: one region per single-submesh mesh-asset item");
             Assert.AreEqual(expectedKey, item.MaterialRegions[0].MaterialKey, $"{message}: region carries the part's key");
+            Assert.AreEqual(0, item.MaterialRegions[0].SubmeshIndex, $"{message}: single-submesh item addresses submesh 0");
             Assert.AreEqual(0, item.MaterialRegions[0].StartIndex, $"{message}: region starts at the first index");
             Assert.Greater(item.MaterialRegions[0].IndexCount, 0, $"{message}: region covers the item's indices");
+        }
+
+        [Test]
+        public void GeneratedCreature_ExposesReadOnlyGeometryCollection()
+        {
+            GeneratedCreature generated = GenerateWithResolver(DefinitionWithBody(), _ => UnitCube());
+
+            // TSK-0125: the collection is exposed read-only; a caller cannot mutate it.
+            Assert.IsTrue(generated.Geometry is IReadOnlyList<GeometryItem>,
+                "Geometry must be exposed as IReadOnlyList, not a mutable List.");
+            Assert.AreEqual(1, generated.Count);
+        }
+
+        [Test]
+        public void GeneratedCreature_AddGeometry_NullItem_ThrowsDomainException()
+        {
+            var generated = new GeneratedCreature();
+            Assert.Throws<DomainException>(() => generated.AddGeometry(null),
+                "a null geometry item must never enter the collection.");
+        }
+
+        [Test]
+        public void GeometryItem_CannotBeConstructedWithNullMesh()
+        {
+            // TSK-0125 construction boundary: a malformed item (null mesh) cannot be
+            // built through the internal constructor the generator factory uses.
+            Assert.Throws<DomainException>(() => new GeometryItem(
+                sourcePartId: "eye",
+                geometryType: GeometryType.MeshAsset,
+                mesh: null,
+                sourceMesh: null,
+                restPlacement: Matrix4x4.identity,
+                materialRegions: null,
+                rigBinding: new RigBindingMetadata("eye", null, false)));
+        }
+
+        [Test]
+        public void GeneratedCreature_TryGetImplicitSurface_ReturnsSemanticImplicitItem()
+        {
+            GeneratedCreature generated = GenerateWithResolver(DefinitionWithBody(), _ => UnitCube());
+
+            // New code locates the implicit surface semantically, never by
+            // positional Geometry[0].
+            Assert.IsTrue(generated.TryGetImplicitSurface(out GeometryItem implicitItem));
+            Assert.AreEqual(GeometryType.Implicit, implicitItem.GeometryType);
+            Assert.AreEqual(GeneratedCreature.ImplicitSurfaceSourceId, implicitItem.SourcePartId);
+            Assert.IsNotNull(implicitItem.Mesh);
+            Assert.IsNotNull(generated.MainMesh);
+            Assert.AreSame(implicitItem.Mesh, generated.MainMesh);
+        }
+
+        [Test]
+        public void Generate_MultiSubmeshMeshPart_EmitsOneRegionPerSubmesh()
+        {
+            // ADR-009 submesh-index range model: a keyed mesh-asset part with several
+            // submeshes yields one explicit region per submesh, each covering that
+            // submesh's full index range — no ambiguity about which indices a region
+            // addresses.
+            CreatureDefinition definition = DefinitionWithBody();
+            CreaturePart eye = MeshEyePart("eye", new Vector3(0.5f, 0.5f, 0f), EyeGeometry("eye", Vector3.zero));
+            eye.Appearance = new AppearanceDefinition { BaseColor = Color.white, NoiseSeed = 0, NoiseScale = 1f, MaterialKey = "eye_white" };
+            definition.AddPart(eye);
+
+            GeneratedCreature generated = GenerateWithResolver(definition, _ => TwoSubmeshCube());
+
+            Assert.IsTrue(generated.TryFindGeometryForPart("eye", out GeometryItem item),
+                "the mesh-asset item is found by part id");
+            Assert.AreEqual(2, item.MaterialRegions.Count, "one region per submesh of the two-submesh asset");
+            Assert.AreEqual(0, item.MaterialRegions[0].SubmeshIndex);
+            Assert.AreEqual(0, item.MaterialRegions[0].StartIndex);
+            Assert.AreEqual(item.Mesh.GetTriangles(0).Length, item.MaterialRegions[0].IndexCount,
+                "region 0 covers submesh 0's full index range");
+            Assert.AreEqual("eye_white", item.MaterialRegions[0].MaterialKey);
+            Assert.AreEqual(1, item.MaterialRegions[1].SubmeshIndex);
+            Assert.AreEqual(0, item.MaterialRegions[1].StartIndex);
+            Assert.AreEqual(item.Mesh.GetTriangles(1).Length, item.MaterialRegions[1].IndexCount,
+                "region 1 covers submesh 1's full index range");
+            Assert.AreEqual("eye_white", item.MaterialRegions[1].MaterialKey);
+        }
+
+        /// <summary>An eight-vertex cube split into two submeshes of equal index count.</summary>
+        private static Mesh TwoSubmeshCube()
+        {
+            Mesh source = UnitCube();
+            int[] triangles = source.triangles;
+            int half = triangles.Length / 2;
+            var mesh = new Mesh { name = "two-submesh-cube" };
+            mesh.SetVertices(source.vertices);
+            mesh.subMeshCount = 2;
+            mesh.SetTriangles(Slice(triangles, 0, half), 0);
+            mesh.SetTriangles(Slice(triangles, half, triangles.Length), 1);
+            mesh.RecalculateNormals();
+            mesh.RecalculateBounds();
+            return mesh;
+        }
+
+        private static int[] Slice(int[] array, int start, int end)
+        {
+            var slice = new int[end - start];
+            System.Array.Copy(array, start, slice, 0, end - start);
+            return slice;
         }
 
         [Test]

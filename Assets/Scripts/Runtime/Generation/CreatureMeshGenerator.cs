@@ -1,4 +1,5 @@
 using System;
+using System.Collections.Generic;
 using System.Linq;
 using ProceduralCreature.Common;
 using ProceduralCreature.Definition;
@@ -217,14 +218,19 @@ namespace ProceduralCreature.Generation
             Mesh mesh = data.MeshResult.ToUnityMesh();
             mesh.SetColors(data.Colors);
 
+            // The implicit combined surface is added first, then mesh-asset items in
+            // ascending SourcePartId order. AddGeometry is the single construction
+            // path (TSK-0125); a GeneratedCreature is immutable to consumers.
             var generated = new GeneratedCreature();
-            generated.Geometry.Add(new GeometryItem
-            {
-                SourcePartId = GeneratedCreature.ImplicitSurfaceSourceId,
-                GeometryType = GeometryType.Implicit,
-                Mesh = mesh,
-                RigBinding = new RigBindingMetadata(),
-            });
+            generated.AddGeometry(new GeometryItem(
+                sourcePartId: GeneratedCreature.ImplicitSurfaceSourceId,
+                geometryType: GeometryType.Implicit,
+                mesh: mesh,
+                sourceMesh: null,
+                restPlacement: Matrix4x4.identity,
+                materialRegions: null,
+                rigBinding: new RigBindingMetadata(
+                    GeneratedCreature.ImplicitSurfaceSourceId, parentPartId: null, isMirrored: false)));
 
             // Items 1..n: mesh-asset parts, resolved and placed from the snapshot.
             AppendMeshAssetItems(generated, data, meshResolver);
@@ -254,11 +260,11 @@ namespace ProceduralCreature.Generation
                 Mesh sourceMesh = ResolveMesh(resolvedPart.Id, resolvedPart.MeshAssetKey, meshResolver);
                 Matrix4x4 placement = resolvedPart.GeometryPlacementToCreatureSpace;
 
-                generated.Geometry.Add(BuildMeshAssetItem(resolvedPart, sourceMesh, placement, mirror: false));
+                generated.AddGeometry(BuildMeshAssetItem(resolvedPart, sourceMesh, placement, mirror: false));
 
                 if (resolvedPart.MirrorAcrossSymmetryPlane && data.Snapshot.SymmetryMode != SymmetryMode.None)
                 {
-                    generated.Geometry.Add(BuildMeshAssetItem(resolvedPart, sourceMesh,
+                    generated.AddGeometry(BuildMeshAssetItem(resolvedPart, sourceMesh,
                         MirrorUtility.ReflectTransformAcrossX(placement), mirror: true));
                 }
             }
@@ -326,39 +332,40 @@ namespace ProceduralCreature.Generation
             // sampling — never from the Body's implicit gradient.
             mesh.SetColors(AppearanceBaker.BakePart(part.Appearance, mesh.vertices, mesh.normals));
 
-            var item = new GeometryItem
-            {
-                SourcePartId = mirror ? part.Id + GeneratedCreature.MirrorSuffix : part.Id,
-                GeometryType = GeometryType.MeshAsset,
-                Mesh = mesh,
-                    SourceMesh = source,
-                    RestPlacement = placement,
-                    RigBinding = new RigBindingMetadata
-                    {
-                        SourcePartId = part.Id,
-                        ParentPartId = part.ParentId,
-                        IsMirrored = mirror,
-                    },
-            };
-
-            // CC-028: a part with a submaterial override carries it as a key on its
-            // geometry item. V1 emits one region covering submesh 0 — the whole item
-            // in the common single-material case. Resolution of the key to a
-            // UnityEngine.Material is a render-layer concern (MaterialResolver), so
-            // the generator output stays key-only and the domain stays portable.
-            // The implicit combined item (item 0) deliberately gets no regions — the
-            // single-mesh vertex-color bake remains the default path (CC-028 scope).
+            // CC-028 + ADR-009 (submesh-index range model): a part with a submaterial
+            // override carries it as a key on its geometry item. We emit one
+            // MaterialRegion per submesh of the baked mesh, each covering that
+            // submesh's full index range, so multi-submesh material coverage is
+            // deterministic and complete — a region never ambiguously refers to "the
+            // whole item." A single-submesh part yields exactly one region.
+            // Resolution of the key to a UnityEngine.Material is a render-layer
+            // concern (MaterialResolver), so the generator output stays key-only and
+            // the domain stays portable. The implicit combined item deliberately gets
+            // no regions — the single-mesh vertex-color bake remains the default path
+            // (CC-028 scope).
+            List<MaterialRegion> regions = null;
             if (!string.IsNullOrWhiteSpace(part.Appearance.MaterialKey))
             {
-                item.MaterialRegions.Add(new MaterialRegion
+                int subMeshCount = Mathf.Max(1, mesh.subMeshCount);
+                regions = new List<MaterialRegion>(subMeshCount);
+                for (int s = 0; s < subMeshCount; s++)
                 {
-                    StartIndex = 0,
-                    IndexCount = mesh.triangles.Length,
-                    MaterialKey = part.Appearance.MaterialKey,
-                });
+                    regions.Add(new MaterialRegion(
+                        submeshIndex: s,
+                        startIndex: 0,
+                        indexCount: mesh.GetTriangles(s).Length,
+                        materialKey: part.Appearance.MaterialKey));
+                }
             }
 
-            return item;
+            return new GeometryItem(
+                sourcePartId: mirror ? part.Id + GeneratedCreature.MirrorSuffix : part.Id,
+                geometryType: GeometryType.MeshAsset,
+                mesh: mesh,
+                sourceMesh: source,
+                restPlacement: placement,
+                materialRegions: regions,
+                rigBinding: new RigBindingMetadata(part.Id, part.ParentId, mirror));
         }
 
         private static int[] CopyTriangles(int[] triangles, bool reverseWinding)

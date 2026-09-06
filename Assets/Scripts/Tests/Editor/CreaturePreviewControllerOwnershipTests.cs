@@ -1,5 +1,6 @@
 using System.Collections.Generic;
 using NUnit.Framework;
+using ProceduralCreature.Definition;
 using ProceduralCreature.Editor;
 using ProceduralCreature.Generation;
 using UnityEditor;
@@ -66,15 +67,30 @@ namespace ProceduralCreature.Tests.Editor
 
         private static GeneratedCreature BuildGenerated(int extraItems)
         {
+            // TSK-0125: GeneratedCreature is immutable to consumers and built only
+            // through its internal construction path (AddGeometry). This editor test
+            // fabricates preview output through that path (granted to the editor test
+            // assembly via Runtime AssemblyInfo InternalsVisibleTo), so it never
+            // depends on a public mutable output model.
             var generated = new GeneratedCreature();
-            generated.Geometry.Add(new GeometryItem
-            {
-                SourcePartId = GeneratedCreature.ImplicitSurfaceSourceId,
-                Mesh = MakeMesh()
-            });
+            generated.AddGeometry(new GeometryItem(
+                sourcePartId: GeneratedCreature.ImplicitSurfaceSourceId,
+                geometryType: GeometryType.Implicit,
+                mesh: MakeMesh(),
+                sourceMesh: null,
+                restPlacement: Matrix4x4.identity,
+                materialRegions: null,
+                rigBinding: new RigBindingMetadata(GeneratedCreature.ImplicitSurfaceSourceId, null, false)));
             for (int i = 0; i < extraItems; i++)
             {
-                generated.Geometry.Add(new GeometryItem { SourcePartId = "extra-" + i, Mesh = MakeMesh() });
+                generated.AddGeometry(new GeometryItem(
+                    sourcePartId: "extra-" + i,
+                    geometryType: GeometryType.MeshAsset,
+                    mesh: MakeMesh(),
+                    sourceMesh: null,
+                    restPlacement: Matrix4x4.identity,
+                    materialRegions: null,
+                    rigBinding: new RigBindingMetadata("extra-" + i, null, false)));
             }
             return generated;
         }
