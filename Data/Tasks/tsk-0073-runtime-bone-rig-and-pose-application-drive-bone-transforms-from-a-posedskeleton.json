@@ -58,15 +58,21 @@
       "author": "anonymous",
       "body": "Audit synthesis (2026-09-05, deep-dive code reviews): TSK-0121 (child) owns finite-by-construction pose injection in PosedSkeleton.WithUpdatedPositions and the CreatureRig creature-space vs world-space host-transform contract decision. This extends the pose/rig owner (TSK-0073 / CC-069) and complements TSK-0118. Provenance: docs/audits/creaturecreator-deep-dive-code-review-2026-09-05.md P1 (PosedSkeleton) and P2 (rig space). Do not duplicate.",
       "createdAtUtc": "2026-09-06T04:25:59.3154236Z"
+    },
+    {
+      "id": "c-ce657036d7eb4e09b423a76438ba1987",
+      "author": "anonymous",
+      "body": "Audit synthesis 2026-09-06 (council-reviewed): scope note per the animation-MVP audits \u2014 this task (rig/pose, CC-069) does NOT own locomotion, gait, or animation state, and does not own the SkinnedMeshRenderer (that is the separate presentation adapter TSK-0132). It hosts the runtime bone/pose foundation and children TSK-0118 (indexed hot path, close it) and TSK-0133 (external pose-driver interface decision \u002B minimal pose-driver harness).",
+      "createdAtUtc": "2026-09-06T19:15:24.7295884Z"
     }
   ],
   "epicId": null,
   "parentId": null,
   "dueDateUtc": null,
   "createdAtUtc": "2026-09-01T03:20:52.1648146Z",
-  "updatedAtUtc": "2026-09-06T04:25:59.3154236Z",
+  "updatedAtUtc": "2026-09-06T19:15:24.7295884Z",
   "completedAtUtc": null,
-  "revision": 7,
+  "revision": 8,
   "isArchived": false,
   "hasLoadError": false,
   "loadError": null,

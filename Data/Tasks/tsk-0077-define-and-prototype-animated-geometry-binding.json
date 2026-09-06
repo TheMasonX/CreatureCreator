@@ -39,15 +39,21 @@
       "author": "anonymous",
       "body": "Audit synthesis (2026-09-05, deep-dive code reviews): TSK-0120 (child) now owns the LinearBlendSkinning finite-spatial-input validation and the MaxBoneInfluencesPerVertex enforcement decision. This extends TSK-0077\u0027s binding contract (CC-073). Provenance: docs/audits/creaturecreator-deep-dive-code-review-audit-26-09-05-23-07-45.md F2/F3 and docs/audits/creaturecreator-deep-dive-code-review-2026-09-05.md P1 items. Do not duplicate.",
       "createdAtUtc": "2026-09-06T04:25:59.2817487Z"
+    },
+    {
+      "id": "c-596e83201af74b7d8a5db22f730ab5fe",
+      "author": "anonymous",
+      "body": "Audit synthesis 2026-09-06 (SkinnedMeshRenderer animation-MVP audits; council-reviewed): TSK-0077 stays InProgress as the geometry-binding owner. The C4.5 mirror proof is closed on the synthetic fixture. The remaining distance to the real MVP is real-geometry weighting \u002B SkinnedMeshRenderer wiring, now filed as children under this owner: TSK-0130 (rigid mesh-asset bind weights, de-risking), TSK-0131 (deterministic implicit welded-surface weights, MVP-critical), TSK-0132 (runtime SkinnedMeshRenderer adapter), TSK-0134 (per-frame perf budget). 0133 (external-driver decision) sits under TSK-0073. Council disposition: tighten this task\u0027s acceptance from \u0022SkinnedMeshRenderer OR documented equivalent\u0022 to a live SMR-parity-with-LBS-oracle gate on real generated geometry, delivered by child TSK-0132; do NOT close on the LBS-only branch because the user MVP requires a real SkinnedMeshRenderer. Source-verified: implicit surface is one welded mesh (body\u002Blimbs), so TSK-0131 is not optional for idle/walk. Keep GeneratedCreature pose-free; binding/weights are build-time pure data.",
+      "createdAtUtc": "2026-09-06T19:15:24.6006141Z"
     }
   ],
   "epicId": null,
   "parentId": null,
   "dueDateUtc": null,
   "createdAtUtc": "2026-09-01T03:20:52.269603Z",
-  "updatedAtUtc": "2026-09-06T04:25:59.2817487Z",
+  "updatedAtUtc": "2026-09-06T19:15:24.6006141Z",
   "completedAtUtc": null,
-  "revision": 5,
+  "revision": 6,
   "isArchived": false,
   "hasLoadError": false,
   "loadError": null,

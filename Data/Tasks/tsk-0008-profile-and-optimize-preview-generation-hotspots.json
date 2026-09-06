@@ -175,15 +175,21 @@
       "author": "anonymous",
       "body": "## CCWIND orientation test gate \u002B benchmark evidence (2026-09-06)\n\nTSK-0008 owns the directed-edge orientation test gate and the performance baseline for winding changes.\n\n### W-01 test gate delivered\n\u0060Assets/Scripts/Tests/Runtime/MeshWindingOrientationTests.cs\u0060 adds the directed-edge invariant \u0060MeshTopologyValidator\u0060 intentionally lacks (it canonicalizes edges to unordered (min,max) pairs, so it cannot detect a shared edge traversed twice in the same direction). Test-only, cheap, no hot-path structure. Also an analytic sphere outward invariant (\u0060dot(faceNormal, centroid - center) \u003E 0\u0060). Fixtures: sphere, coarse-resolution sphere, overlapping spheres, smooth-union spheres. A single locally-reversed triangle fails the directed-edge check. These supplement the validator (boundary/non-manifold counts only) and are the objective failing-fixture mechanism the CCWIND audit asked for.\n\n### Benchmarks (before/after the W-02/W-03 trilinear-gradient fix)\n| Metric | Before | After |\n|---|---|---|\n| VPU10 total GenerateData | 215ms | ~204ms |\n| VPU16 total GenerateData | ~620ms | ~626ms (median, GC-clean) |\n| VPU16 extraction-only | \u2014 | 133.5ms (12 reps) |\n\nNo material regression. The fix adds no per-triangle SDF eval, no global orientation traversal, no hot-path allocation \u2014 orientation derives from the 8 already-loaded cell corners.\n\n### Remaining fan/duplicate-geometry follow-up (NOT winding)\nResidual on dinus@VPU10 is one DUPLICATED degenerate triangle (tri7419 \u2261 tri7422, coincident identical vertices on the x=0.5 cell face at a near-zero-field region) \u2192 1 co-directional edge \u002B 2 non-manifold edges. Pre-existing and orthogonal to winding. A robust fix needs duplicate/coincident-triangle detection, which is a per-triangle or global structure the perf mandate forbids in the extraction hot path; it should be characterized against the fan-quality fixtures (sphere/overlap/smooth-union/symmetry) before any change (CCWIND W-06).",
       "createdAtUtc": "2026-09-06T17:27:25.7291619Z"
+    },
+    {
+      "id": "c-45acb221a5234605b941ef6e2fd9c097",
+      "author": "anonymous",
+      "body": "## HANDOFF \u2014 orientation test gate \u002B benchmark \u002B residual work (reviewable state)\n\nTSK-0008 is the extraction/quality/perf \u002B benchmark owner. This comment records what shipped and what remains for a future agent.\n\n### Shipped\n- \u0060Tests/Runtime/MeshWindingOrientationTests.cs\u0060 \u2014 test-only directed-edge invariant (for every 2-use undirected edge the two traversals are opposite; the production \u0060MeshTopologyValidator\u0060 intentionally does not check this) \u002B analytic sphere outward invariant (\u0060dot(faceNormal, centroid)\u003E0\u0060). Fixtures: sphere, coarse sphere, overlapping spheres, smooth-union spheres. A single locally-reversed triangle fails.\n- Winding-fix benchmark (before/after the trilinear-gradient change): VPU10 total ~215\u2192204ms; VPU16 ~620\u2192626ms median (GC-clean; the earlier 817ms was GC noise); extraction-only VPU16 133.5ms (12 reps). No material regression.\n\n### Remaining on this owner\n- **Residual duplicated-degenerate sliver (dinus@VPU10 tri7419\u22617422):** two coincident identical triangles on the x=0.5 cell face at a near-zero-field region \u2192 1 co-directional edge \u002B 2 non-manifold edges. Pre-existing and orthogonal to winding. A safe fix needs duplicate/coincident-triangle detection, which is a per-triangle/global structure the perf mandate forbids in the extraction hot path. Characterize against fan-quality fixtures (W-06) before changing.\n- **NEW (active): low-resolution thin-feature topology robustness** \u2014 see the dedicated follow-up task created under this owner. At coarse VPU (e.g. 5\u201310) thin parts (e.g. a finger capsule of radius ~0.075, below the ~0.1\u20130.2 cell size) under-sample and produce missing triangles / broken topology; this is independent of winding and of the skeleton-node work owned by TSK-0048.",
+      "createdAtUtc": "2026-09-06T18:25:19.9937504Z"
     }
   ],
   "epicId": null,
   "parentId": null,
   "dueDateUtc": null,
   "createdAtUtc": "2026-09-01T03:16:25.5654277Z",
-  "updatedAtUtc": "2026-09-06T17:27:25.7291619Z",
+  "updatedAtUtc": "2026-09-06T18:25:19.9937504Z",
   "completedAtUtc": null,
-  "revision": 28,
+  "revision": 29,
   "isArchived": false,
   "hasLoadError": false,
   "loadError": null,

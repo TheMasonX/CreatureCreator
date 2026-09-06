@@ -22,16 +22,23 @@
   "attachments": [],
   "externalLinks": [],
   "linkedPages": [],
-  "comments": [],
+  "comments": [
+    {
+      "id": "c-15c1eedd21cb47d4972ab3385a295b43",
+      "author": "anonymous",
+      "body": "Audit synthesis 2026-09-06 (council-reviewed): DEFER behind the SkinnedMeshRenderer binding work (TSK-0130/0131/0132) rather than running in parallel. The animation-MVP movement rig is externally supplied and out of scope, so semantic animation queries / morphology-scaled motion are not on this MVP\u0027s critical path. Keep as the long-term semantic-query owner; do not start in parallel with the binding bottleneck. If a concrete missing query is later proven to block the MVP, promote a narrow slice then.",
+      "createdAtUtc": "2026-09-06T19:15:24.6594036Z"
+    }
+  ],
   "epicId": null,
   "parentId": null,
   "dueDateUtc": null,
   "createdAtUtc": "2026-09-01T03:16:57.6228091Z",
-  "updatedAtUtc": "2026-09-01T03:16:57.6228091Z",
+  "updatedAtUtc": "2026-09-06T19:15:24.6594036Z",
   "completedAtUtc": null,
-  "revision": 1,
+  "revision": 2,
   "isArchived": false,
   "hasLoadError": false,
   "loadError": null,
-  "sourceFilePath": null
+  "sourceFilePath": "tsk-0010-add-semantic-animation-query-and-morphology-scaled-motion-model.json"
 }

@@ -22,16 +22,23 @@
   "attachments": [],
   "externalLinks": [],
   "linkedPages": [],
-  "comments": [],
+  "comments": [
+    {
+      "id": "c-b6e515667eb341b0829825f782e29559",
+      "author": "anonymous",
+      "body": "Audit synthesis 2026-09-06 (council-reviewed): DEFER behind the SkinnedMeshRenderer binding work (TSK-0130/0131/0132). The MVP\u0027s movement/idle/walk rig is externally supplied and out of scope, so CreatureCreator\u0027s own locomotion controller/gait is not on this MVP\u0027s critical path. Do not start in parallel with the binding bottleneck; keep Backlog as the locomotion owner.",
+      "createdAtUtc": "2026-09-06T19:15:24.6916922Z"
+    }
+  ],
   "epicId": null,
   "parentId": null,
   "dueDateUtc": null,
   "createdAtUtc": "2026-09-01T03:16:57.6432802Z",
-  "updatedAtUtc": "2026-09-01T03:16:57.6432802Z",
+  "updatedAtUtc": "2026-09-06T19:15:24.6916922Z",
   "completedAtUtc": null,
-  "revision": 1,
+  "revision": 2,
   "isArchived": false,
   "hasLoadError": false,
   "loadError": null,
-  "sourceFilePath": null
+  "sourceFilePath": "tsk-0011-implement-locomotion-controller-gait-terrain-contact-and-foot-placement.json"
 }
