@@ -53,6 +53,17 @@ namespace ProceduralCreature.Common
         public const float MinLimbSegmentLength = 1e-3f;
 
         /// <summary>
+        /// Minimum allowed separation between authored Body samples (the absolute
+        /// Body-spacing / degenerate-length floor, CC-079). A consecutive pair
+        /// closer than this is a degenerate near-zero-length Body segment, and any
+        /// two non-consecutive samples closer than this are a near-coincident
+        /// duplicate. Either can produce degenerate field geometry, so both are
+        /// reported by validation. Mirrors <see cref="MinLimbSegmentLength"/> and
+        /// the GenerationTolerances linear degenerate family.
+        /// </summary>
+        public const float MinBodySegmentLength = 1e-3f;
+
+        /// <summary>
         /// Allowed deviation of a limb chain's root joint from the local origin
         /// (<c>Joints[0] ≈ Vector3.zero</c>, ADR-001 §3). This keeps
         /// <c>Transform.position</c> and <c>Joints[0].Position</c> from becoming

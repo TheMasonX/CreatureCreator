@@ -256,6 +256,39 @@ namespace ProceduralCreature.Definition
                 }
             }
 
+            // CC-079: minimum absolute Body-spacing / degenerate-length check.
+            // Report-only; never repairs or merges samples. Any two samples closer
+            // than MinBodySegmentLength form a degenerate near-zero-length segment
+            // (if consecutive) or a near-coincident duplicate (if not). The pair
+            // scan is order-independent by construction, so reordering the authored
+            // sample list never changes the result. Only the first offending pair is
+            // reported to keep the issue list deterministic and compact.
+            if (definition.Body.Samples.Count > 1)
+            {
+                float minSeparationSqr = GenerationTolerances.MinBodySegmentLength *
+                                         GenerationTolerances.MinBodySegmentLength;
+                bool reported = false;
+                for (int i = 0; i < definition.Body.Samples.Count - 1 && !reported; i++)
+                {
+                    BodySample first = definition.Body.Samples[i];
+                    if (first == null) continue;
+                    for (int j = i + 1; j < definition.Body.Samples.Count; j++)
+                    {
+                        BodySample second = definition.Body.Samples[j];
+                        if (second == null) continue;
+                        if ((second.Position - first.Position).sqrMagnitude < minSeparationSqr)
+                        {
+                            issues.Add(new ValidationIssue(
+                                ValidationSeverity.Error, ValidationCode.BodySamplesTooClose,
+                                $"Body samples at index {i} and {j} are closer than the minimum " +
+                                $"body segment length ({GenerationTolerances.MinBodySegmentLength:F4})."));
+                            reported = true;
+                            break;
+                        }
+                    }
+                }
+            }
+
             if (!IsFinite(definition.Forward.x) || !IsFinite(definition.Forward.y) ||
                 !IsFinite(definition.Forward.z) || definition.Forward.sqrMagnitude <=
                 GenerationTolerances.ScalarComparisonEpsilon * GenerationTolerances.ScalarComparisonEpsilon)

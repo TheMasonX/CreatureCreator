@@ -129,6 +129,101 @@ namespace ProceduralCreature.Tests.Runtime
             Assert.IsTrue(HasCode(result, ValidationCode.UnevenBodySpacing));
         }
 
+        // ---- CC-079 minimum absolute Body-spacing / degenerate-length ---------------
+
+        [Test]
+        public void Validate_DetectsNearlyCoincidentBodySamples()
+        {
+            // Two authored Body samples closer than the absolute floor
+            // (GenerationTolerances.MinBodySegmentLength) form a degenerate
+            // near-zero-length segment and must be reported, never repaired.
+            var definition = CreatureDefinition.CreateEmpty();
+            definition.Forward = Vector3.forward;
+            definition.Body.Samples.Add(new BodySample { Id = 1, Position = new Vector3(0f, 0f, 0f), Radius = 0.75f });
+            definition.Body.Samples.Add(new BodySample { Id = 2, Position = new Vector3(0f, 0f, 0.0005f), Radius = 0.75f });
+            definition.AddPart(ValidPart("part_leg"));
+
+            ValidationResult result = DefinitionValidator.Validate(definition);
+
+            Assert.IsTrue(HasCode(result, ValidationCode.BodySamplesTooClose),
+                "two nearly coincident Body samples must report the stable code");
+        }
+
+        [Test]
+        public void Validate_NormalBodySpline_NoFalsePositive()
+        {
+            // A normal, evenly spaced Body spline (a dino-like spine along the
+            // forward axis) must not report the degenerate-length check.
+            var definition = CreatureDefinition.CreateEmpty();
+            definition.Forward = Vector3.forward;
+            const float spacing = 0.5f;
+            for (int i = 0; i < 9; i++)
+            {
+                definition.Body.Samples.Add(new BodySample
+                {
+                    Id = (uint)(i + 1),
+                    Position = new Vector3(0f, 0f, -2f + spacing * i),
+                    Radius = 0.75f,
+                });
+            }
+            definition.AddPart(ValidPart("part_leg"));
+
+            ValidationResult result = DefinitionValidator.Validate(definition);
+
+            Assert.IsTrue(result.IsValid, "a normal evenly spaced Body spline should validate clean");
+            Assert.IsFalse(HasCode(result, ValidationCode.BodySamplesTooClose),
+                "a normal Body spline must not trigger the minimum-spacing check");
+        }
+
+        [Test]
+        public void Validate_BodySamplesTooClose_IsDeterministicAndOrderIndependent()
+        {
+            // Two fixtures holding the same Body samples in different list orders:
+            // the near-coincident pair (A,C) is non-adjacent in one and adjacent in
+            // the other. The minimum-spacing check is a pair scan, so both must
+            // report the same stable code regardless of where the pair sits.
+            CreatureDefinition MakeDefinition(bool interleave)
+            {
+                var definition = CreatureDefinition.CreateEmpty();
+                definition.Forward = Vector3.forward;
+                // A and C are nearly coincident; B is far away.
+                BodySample a = new BodySample { Id = 1, Position = new Vector3(0f, 0f, 0f), Radius = 0.75f };
+                BodySample b = new BodySample { Id = 2, Position = new Vector3(0f, 0f, 1f), Radius = 0.75f };
+                BodySample c = new BodySample { Id = 3, Position = new Vector3(0f, 0f, 0.0005f), Radius = 0.75f };
+                if (interleave)
+                {
+                    definition.Body.Samples.Add(a);
+                    definition.Body.Samples.Add(b);
+                    definition.Body.Samples.Add(c);
+                }
+                else
+                {
+                    definition.Body.Samples.Add(b);
+                    definition.Body.Samples.Add(a);
+                    definition.Body.Samples.Add(c);
+                }
+                definition.AddPart(ValidPart("part_leg"));
+                return definition;
+            }
+
+            CreatureDefinition definitionA = MakeDefinition(interleave: true);
+            CreatureDefinition definitionB = MakeDefinition(interleave: false);
+
+            ValidationResult resultA = DefinitionValidator.Validate(definitionA);
+            ValidationResult resultB = DefinitionValidator.Validate(definitionB);
+            ValidationResult resultA2 = DefinitionValidator.Validate(definitionA);
+
+            Assert.IsTrue(HasCode(resultA, ValidationCode.BodySamplesTooClose));
+            Assert.IsTrue(HasCode(resultB, ValidationCode.BodySamplesTooClose),
+                "reordering the samples must not change whether the near-coincident pair is reported");
+            Assert.AreEqual(resultA.Issues.Count, resultA2.Issues.Count);
+            for (int i = 0; i < resultA.Issues.Count; i++)
+            {
+                Assert.AreEqual(resultA.Issues[i].Code, resultA2.Issues[i].Code,
+                    "validation must be deterministic run-to-run");
+            }
+        }
+
         [Test]
         public void Validate_DetectsZeroForward()
         {

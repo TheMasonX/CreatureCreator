@@ -50,5 +50,6 @@ namespace ProceduralCreature.Definition
         ResolvedPartOutOfBounds,
         ResolvedLimbJointOutOfBounds,
         ResolvedMeshAttachmentOutOfBounds,
+        BodySamplesTooClose,
     }
 }

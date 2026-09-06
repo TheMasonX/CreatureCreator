@@ -4,7 +4,7 @@
   "title": "Add a minimum absolute Body-spacing / degenerate-length validation",
   "description": "Source: docs/tasks/tickets/CC-079-minimum-body-spacing-validation.md\nSource key: CC-079\nSource status: Backlog\nSource priority: P3\n\n## Summary\r\n\r\nThe validator has no minimum absolute Body-sample spacing check, so two\r\ndegenerately close samples (or a zero-length body segment) pass validation and\r\ncan produce degenerate field geometry.\r\n\r\n## Scope\r\n\r\n- Add a report-only validation that flags Body samples closer than a documented\r\n  absolute tolerance, or a degenerate (near-zero-length) body segment.\r\n- Define the tolerance as a GenTolerance constant consistent with existing limb\r\n  tolerances.\r\n- Do not repair or auto-merge samples.\r\n\r\n## Acceptance Criteria\r\n\r\n- A definition with two nearly coincident Body samples reports a validation\r\n  issue with a stable code.\r\n- A normal dino fixture reports no false positives.\r\n- The check is deterministic and independent of list order.\r\n\r\n## Validation\r\n\r\n- Validator PlayMode tests for the degenerate and normal cases.\r\n\r\n## Findings\r\n\r\nRaised as finding 2.4 in the 2026-08-24 audit addendum. Related to CC-054\r\n(thickness-profile quantization) but distinct: this is about authored Body\r\nsample positions, not curve keys.\r\n\r\n## Blockers\r\n\r\nNone.\r\n\r\n## Next Step\r\n\r\nConfirm the tolerance value against the dino fixture, then add the check \u002B tests.",
   "type": "Task",
-  "status": "Backlog",
+  "status": "Done",
   "priority": "Low",
   "assigneeMode": "Custom",
   "assigneeDirectoryId": null,
@@ -20,16 +20,23 @@
   "attachments": [],
   "externalLinks": [],
   "linkedPages": [],
-  "comments": [],
+  "comments": [
+    {
+      "id": "c-d67e0d0213914b3e8772a569a9cc990b",
+      "author": "anonymous",
+      "body": "Implementation (Round 2 subagent): report-only minimum absolute Body-spacing / degenerate-length check in DefinitionValidator.ValidateBody (CC-079 finding 2.4). Tolerance constant \u0060GenerationTolerances.MinBodySegmentLength = 1e-3f\u0060 (mirrors MinLimbSegmentLength / the linear 1e-3 degenerate family). New stable code \u0060ValidationCode.BodySamplesTooClose\u0060 (APPENDED at end of enum to preserve existing numeric codes). No repair, no merge, no canonicalization change. Design: pair-scan of unordered Body-sample pairs (\u003C tol^2 via sqrMagnitude, report first pair once) so detection is order-independent and also catches a degenerate adjacent (near-zero-length) segment.\n\nFiles: GenerationTolerances.cs, ValidationCode.cs, DefinitionValidator.cs, DefinitionValidatorTests.cs.\n\nValidation (Unity PlayMode, actually executed \u2014 editor 6000.0.35f1): DefinitionValidatorTests fixture 42/42 passed; new tests individually 1/1 each: Validate_DetectsNearlyCoincidentBodySamples, Validate_NormalBodySpline_NoFalsePositive, Validate_BodySamplesTooClose_IsDeterministicAndOrderIndependent. dotnet build Runtime \u002B Tests.Runtime 0W/0E. git diff --check clean.",
+      "createdAtUtc": "2026-09-06T15:31:51.6404437Z"
+    }
+  ],
   "epicId": null,
   "parentId": null,
   "dueDateUtc": null,
   "createdAtUtc": "2026-09-01T03:20:52.4376863Z",
-  "updatedAtUtc": "2026-09-01T03:20:52.4376863Z",
-  "completedAtUtc": null,
-  "revision": 1,
+  "updatedAtUtc": "2026-09-06T15:31:53.7087838Z",
+  "completedAtUtc": "2026-09-06T15:31:53.7087838Z",
+  "revision": 4,
   "isArchived": false,
   "hasLoadError": false,
   "loadError": null,
-  "sourceFilePath": null
+  "sourceFilePath": "tsk-0083-add-a-minimum-absolute-body-spacing-degenerate-length-validation.json"
 }
