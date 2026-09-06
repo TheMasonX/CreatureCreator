@@ -154,8 +154,16 @@ namespace ProceduralCreature.Tests.Runtime
             }
 
             Vector3 centroid = (p0 + p1 + p2) / 3f;
-            Vector3 gradient = grid.EstimateGradient(centroid);
             result.GradientEvaluationCount++;
+
+            // Mirrors production MarchingCubesExtractor.EmitTriangle: prefer the
+            // cell-local trilinear derivative at the centroid; fall back to the
+            // finite-aware nearest-corner estimate only on a non-finite cell.
+            Vector3 gradient;
+            if (!grid.TryEstimateGradient(centroid, out gradient))
+            {
+                gradient = grid.EstimateGradient(centroid);
+            }
 
             if (Vector3.Dot(faceNormal, gradient) >= 0f)
             {

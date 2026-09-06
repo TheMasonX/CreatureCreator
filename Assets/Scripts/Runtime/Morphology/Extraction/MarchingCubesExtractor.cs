@@ -253,8 +253,23 @@ namespace ProceduralCreature.Morphology.Extraction
             }
 
             Vector3 centroid = (p0 + p1 + p2) / 3f;
-            Vector3 gradient = grid.EstimateGradient(centroid);
             result.GradientEvaluationCount++;
+
+            // Winding reference: prefer the analytic trilinear derivative at the
+            // centroid, derived from this cached grid's own cell corners. Unlike
+            // the nearest-corner EstimateGradient, it varies smoothly as the
+            // centroid moves and so does not flip a marginal triangle when the
+            // centroid crosses a corner-rounding boundary. It uses only
+            // already-loaded cell data (never a fresh SDF evaluation). Only when
+            // the containing cell has a non-finite (culled/absent) corner do we
+            // fall back to the finite-aware centered/one-sided estimate — a
+            // deterministic reference from existing grid data, never arbitrary
+            // loop order.
+            Vector3 gradient;
+            if (!grid.TryEstimateGradient(centroid, out gradient))
+            {
+                gradient = grid.EstimateGradient(centroid);
+            }
 
             bool correctlyWound = Vector3.Dot(faceNormal, gradient) >= 0f;
 
