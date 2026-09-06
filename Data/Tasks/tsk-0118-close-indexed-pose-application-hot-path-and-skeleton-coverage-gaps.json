@@ -4,7 +4,7 @@
   "title": "Close indexed pose-application hot path and skeleton coverage gaps",
   "description": "## User Mandate\n\n\u003E \u0022Review this this external audit critically and synthesize into durable tasks as appropriate after cross-validating\u0022\n\nSTRICT. Cross-validate the supplied animation and locomotion audit against current source and task records before accepting findings. Preserve audit provenance, do not reopen findings already fixed, and create only the durable task coverage required by confirmed mechanisms.\n\n## Summary\nCross-validated residual work from \u0060docs/audits/creaturecreator-animation-locomotion-deep-dive-2026-09-05-2029.md\u0060. The current CC-069 adapter has a confirmed per-application allocation and string-keyed lookup path. A build-time terminal-bone rotation lookup and missing direct snapshot contract tests are also confirmed. The task owns these residuals without changing locomotion ownership.\n\n## Scope\n- Replace or bypass the per-call rotation dictionary in \u0060PoseRotationResolver\u0060 with caller-owned or indexed rotation storage.\n- Add an index-parallel \u0060Transform[]\u0060 path in \u0060CreatureRig\u0060 for \u0060ApplyPose\u0060 while retaining the public stable-ID dictionary boundary.\n- Replace \u0060SkeletonInferrer.AppendLimbBones\u0060 terminal rotation \u0060FindBone\u0060 lookup with the already computed previous rotation.\n- Add focused tests for duplicate IDs, missing parents, bone-order mismatch, and invalid child indices in \u0060SkeletonSnapshot\u0060.\n- Preserve the existing pure runtime and Unity adapter boundary. Do not implement locomotion, gait, terrain contact, or geometry binding.\n\n## Acceptance Criteria\n- \u0060CreatureRig.ApplyPose\u0060 performs no per-call managed dictionary allocation for rotations and no per-bone string-keyed lookup on the hot path.\n- Existing rotation and pose behavior remains deterministic for terminal, segmented, branching, and coincident positions.\n- \u0060SkeletonInferrer\u0060 no longer performs a list scan to recover the terminal bone rotation.\n- Focused runtime tests cover each listed \u0060SkeletonSnapshot\u0060 contract and pass.\n- A Unity or equivalent runtime test gate records the focused suite result. No task status changes to Done without executable validation.\n\n## Validation\nRun the focused runtime test suite for rig and pose application, plus the new snapshot contract tests. Run the runtime project build, \u0060git diff --check\u0060, and a performance-oriented allocation check or benchmark for repeated \u0060ApplyPose\u0060 calls when the implementation is available.\n\n## Findings\nSource-confirmed from the supplied audit: C-1 and H-4. M-1 is accepted as a coverage addition. H-1, H-2, and H-3 were refuted as stale because current source and live records show TSK-0113, TSK-0114, and TSK-0116 complete. M-2 remains test organization, M-4 remains optional utility consolidation, and L-1 remains documentation drift.\n\n## Blockers\nNo implementation blocker identified. Unity execution and a measured allocation result were unavailable during synthesis.\n\n## Next Step\nImplement the indexed pose-application path and focused contract tests under the CC-069 owner, then attach executable validation evidence.",
   "type": "Task",
-  "status": "Backlog",
+  "status": "InProgress",
   "priority": "High",
   "assigneeMode": "Custom",
   "assigneeDirectoryId": null,
@@ -22,16 +22,29 @@
   "attachments": [],
   "externalLinks": [],
   "linkedPages": [],
-  "comments": [],
+  "comments": [
+    {
+      "id": "c-9bee534f09c64bd3b8789ab9b8f2802b",
+      "author": "anonymous",
+      "body": "Round 1 implementation evidence: indexed PoseRotationResolver.ResolveInto destination-buffer path; CreatureRig caches index-parallel Transform[] and Quaternion[] and ApplyPose performs no per-call dictionary allocation or per-bone string lookup; SkeletonInferrer terminal rotation reuses previous segment rotation; added SkeletonSnapshot contract tests and repeated ApplyPose allocation test. Validation: focused PlayMode run 28/28 passed; direct Unity measurement repeated=1000 allocatedBytes=0 elapsedMilliseconds=0.555; dotnet build ProceduralCreature.Runtime.csproj --no-restore passed; dotnet build ProceduralCreature.Tests.Runtime.csproj --no-restore passed; git diff --check passed. Unity console had 0 errors; one persistent allocation warning was observed before the focused run. No commit/push.",
+      "createdAtUtc": "2026-09-06T03:25:18.2028269Z"
+    },
+    {
+      "id": "c-449875ad3ecc45f6a0cc74b8e3e3a8b9",
+      "author": "anonymous",
+      "body": "Orchestrator review of Round 1 (2026-09-05): PASS. Reviewed the bounded diff at baseline a81dd61. CreatureRig now applies indexed rotations into cached buffers and cached Transform[] entries; the stable-ID dictionary resolver remains only as a compatibility boundary. SkeletonInferrer carries the computed previous rotation into the terminal bone instead of calling FindBone. Focused tests cover duplicate IDs, missing parents, indexed-order mismatch, and invalid child indices. Subagent evidence accepted: Unity PlayMode 28/28, runtime and Tests.Runtime dotnet builds clean, repeated warmed ApplyPose 1,000 calls measured 0 allocated bytes and 0.555 ms editor-side, Unity console 0 errors, git diff --check passed. No unrelated source or documentation changes; residual risk is that the allocation number is an editor-side focused measurement, not a full-game profile. Round 1 is ready for commit and the next sequential round.",
+      "createdAtUtc": "2026-09-06T03:26:01.0548642Z"
+    }
+  ],
   "epicId": null,
   "parentId": "TSK-0073",
   "dueDateUtc": null,
   "createdAtUtc": "2026-09-06T03:06:41.5219151Z",
-  "updatedAtUtc": "2026-09-06T03:06:41.5219151Z",
+  "updatedAtUtc": "2026-09-06T03:26:03.9747355Z",
   "completedAtUtc": null,
-  "revision": 1,
+  "revision": 4,
   "isArchived": false,
   "hasLoadError": false,
   "loadError": null,
-  "sourceFilePath": null
+  "sourceFilePath": "tsk-0118-close-indexed-pose-application-hot-path-and-skeleton-coverage-gaps.json"
 }

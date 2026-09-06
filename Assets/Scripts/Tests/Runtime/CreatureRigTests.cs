@@ -127,5 +127,36 @@ namespace ProceduralCreature.Tests.Runtime
             rig.ApplyPose(PosedSkeleton.FromRestPose(valid));
             Assert.AreSame(previousRoot, rig.Bones["root"]);
         }
+
+        [Test]
+        public void ApplyPose_RepeatedCallsAllocateNoManagedMemoryAfterWarmup()
+        {
+            var host = new GameObject("RigHost");
+            _objects.Add(host);
+            var skeleton = new Skeleton.Skeleton();
+            skeleton.Bones.Add(new Bone { Id = "root", Rotation = Quaternion.identity });
+            skeleton.Bones.Add(new Bone
+            {
+                Id = "tip",
+                ParentBoneId = "root",
+                Position = Vector3.up,
+                Rotation = Quaternion.identity,
+            });
+
+            CreatureRig rig = host.AddComponent<CreatureRig>();
+            rig.Build(skeleton);
+            PosedSkeleton pose = PosedSkeleton.FromRestPose(skeleton).WithUpdatedPositions(
+                new Dictionary<string, Vector3> { ["tip"] = Vector3.up * 2f });
+
+            for (int i = 0; i < 16; i++) rig.ApplyPose(pose);
+            long before = System.GC.GetAllocatedBytesForCurrentThread();
+            var stopwatch = System.Diagnostics.Stopwatch.StartNew();
+            for (int i = 0; i < 1000; i++) rig.ApplyPose(pose);
+            stopwatch.Stop();
+            long allocated = System.GC.GetAllocatedBytesForCurrentThread() - before;
+
+            Debug.Log($"ApplyPose repeated=1000 allocatedBytes={allocated} elapsedMilliseconds={stopwatch.Elapsed.TotalMilliseconds:F3}");
+            Assert.AreEqual(0L, allocated);
+        }
     }
 }

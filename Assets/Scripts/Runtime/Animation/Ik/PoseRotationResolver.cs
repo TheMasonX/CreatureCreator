@@ -31,7 +31,30 @@ namespace ProceduralCreature.Animation.Ik
                 throw new DomainException("pose must use the same bone order as restSkeleton.");
             }
 
+            var indexedRotations = new Quaternion[restSkeleton.Count];
+            ResolveInto(restSkeleton, pose, indexedRotations);
             var rotations = new Dictionary<string, Quaternion>(restSkeleton.Count);
+            for (int i = 0; i < restSkeleton.Count; i++)
+            {
+                rotations.Add(restSkeleton[i].Id, indexedRotations[i]);
+            }
+            return rotations;
+        }
+
+        public static void ResolveInto(
+            SkeletonSnapshot restSkeleton, PosedSkeleton pose, Quaternion[] rotations)
+        {
+            if (restSkeleton == null) throw new DomainException("restSkeleton must not be null.");
+            if (pose == null) throw new DomainException("pose must not be null.");
+            if (rotations == null || rotations.Length < restSkeleton.Count)
+            {
+                throw new DomainException("rotations must contain one entry per rest-skeleton bone.");
+            }
+            if (!restSkeleton.HasSameBoneOrder(pose.Skeleton))
+            {
+                throw new DomainException("pose must use the same bone order as restSkeleton.");
+            }
+
             for (int i = 0; i < restSkeleton.Count; i++)
             {
                 BoneSnapshot bone = restSkeleton[i];
@@ -39,7 +62,7 @@ namespace ProceduralCreature.Animation.Ik
                 IReadOnlyList<int> children = restSkeleton.GetChildren(i);
                 if (children.Count == 0)
                 {
-                    rotations[bone.Id] = bone.Rotation;
+                    rotations[i] = bone.Rotation;
                     continue;
                 }
 
@@ -55,9 +78,8 @@ namespace ProceduralCreature.Animation.Ik
                 }
 
                 Vector3 direction = targetPosition - position;
-                rotations[bone.Id] = ResolveLookRotation(direction, bone.Rotation);
+                rotations[i] = ResolveLookRotation(direction, bone.Rotation);
             }
-            return rotations;
         }
 
         private static int FindPrimaryChild(SkeletonSnapshot skeleton, IReadOnlyList<int> children)

@@ -17,6 +17,8 @@ namespace ProceduralCreature.Animation
         private readonly Dictionary<string, Transform> _bones = new Dictionary<string, Transform>();
         private readonly List<GameObject> _generatedObjects = new List<GameObject>();
         private SkeletonSnapshot _restSkeleton;
+        private Transform[] _indexedBones = new Transform[0];
+        private Quaternion[] _indexedRotations = new Quaternion[0];
 
         public IReadOnlyDictionary<string, Transform> Bones => _bones;
 
@@ -26,6 +28,7 @@ namespace ProceduralCreature.Animation
 
             SkeletonSnapshot nextSkeleton = SkeletonSnapshot.Capture(restSkeleton);
             var nextBones = new Dictionary<string, Transform>(nextSkeleton.Count);
+            var nextIndexedBones = new Transform[nextSkeleton.Count];
             var nextGeneratedObjects = new List<GameObject>(nextSkeleton.Count);
             try
             {
@@ -35,11 +38,12 @@ namespace ProceduralCreature.Animation
                     var boneObject = new GameObject(BoneObjectPrefix + bone.Id);
                     Transform parent = bone.ParentIndex < 0
                         ? transform
-                        : nextBones[nextSkeleton[bone.ParentIndex].Id];
+                        : nextIndexedBones[bone.ParentIndex];
                     boneObject.transform.SetParent(parent, worldPositionStays: false);
                     boneObject.transform.position = bone.Position;
                     boneObject.transform.rotation = bone.Rotation;
                     nextBones.Add(bone.Id, boneObject.transform);
+                    nextIndexedBones[i] = boneObject.transform;
                     nextGeneratedObjects.Add(boneObject);
                 }
             }
@@ -58,6 +62,8 @@ namespace ProceduralCreature.Animation
             }
             _generatedObjects.AddRange(nextGeneratedObjects);
             _restSkeleton = nextSkeleton;
+            _indexedBones = nextIndexedBones;
+            _indexedRotations = new Quaternion[nextSkeleton.Count];
         }
 
         public void ApplyPose(PosedSkeleton pose)
@@ -65,13 +71,12 @@ namespace ProceduralCreature.Animation
             if (_restSkeleton == null) throw new DomainException("Build must be called before ApplyPose.");
             if (pose == null) throw new DomainException("pose must not be null.");
 
-            Dictionary<string, Quaternion> rotations = Ik.PoseRotationResolver.Resolve(_restSkeleton, pose);
+            Ik.PoseRotationResolver.ResolveInto(_restSkeleton, pose, _indexedRotations);
             for (int i = 0; i < _restSkeleton.Count; i++)
             {
-                BoneSnapshot bone = _restSkeleton[i];
-                Transform boneTransform = _bones[bone.Id];
+                Transform boneTransform = _indexedBones[i];
                 boneTransform.position = pose.GetPosition(i);
-                boneTransform.rotation = rotations[bone.Id];
+                boneTransform.rotation = _indexedRotations[i];
             }
         }
 
@@ -81,6 +86,8 @@ namespace ProceduralCreature.Animation
             _generatedObjects.Clear();
             _bones.Clear();
             _restSkeleton = null;
+            _indexedBones = new Transform[0];
+            _indexedRotations = new Quaternion[0];
         }
 
         private static void DestroyGeneratedObjects(List<GameObject> generatedObjects)

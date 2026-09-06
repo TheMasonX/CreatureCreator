@@ -242,6 +242,7 @@ namespace ProceduralCreature.Skeleton
 
             string rootParentBoneId = SemanticBoneResolver.ResolveParentBoneId(snapshot, resolvedPart, mirrored);
             string previousBoneId = null;
+            Quaternion previousRotation = Quaternion.identity;
 
             for (int i = 0; i < resolved.JointPositions.Count - 1; i++)
             {
@@ -252,6 +253,7 @@ namespace ProceduralCreature.Skeleton
                 Vector3 toWorld = partMatrix.MultiplyPoint3x4(to);
                 Vector3 segmentDir = toWorld - fromWorld;
                 Quaternion rotation = LimbBoneRotation(segmentDir, upHint);
+                previousRotation = rotation;
 
                 string boneId = SemanticBoneResolver.ResolveLimbSegmentBoneId(part, i, mirrored);
                 skeleton.Bones.Add(new Bone
@@ -282,9 +284,7 @@ namespace ProceduralCreature.Skeleton
                 PartType = part.PartType,
                 IsMirrored = mirrored,
                 Position = terminalPosition,
-                Rotation = previousBoneId == null
-                    ? Quaternion.identity
-                    : skeleton.FindBone(previousBoneId).Rotation,
+                Rotation = previousBoneId == null ? Quaternion.identity : previousRotation,
             });
         }
 
