@@ -24,6 +24,7 @@ namespace ProceduralCreature.Definition
         MissingBody,
         InvalidBodySampleCount,
         DuplicateBodySampleId,
+        OutOfOrderBodySampleId,
         InvalidBodySample,
         UnevenBodySpacing,
         InvalidForward,

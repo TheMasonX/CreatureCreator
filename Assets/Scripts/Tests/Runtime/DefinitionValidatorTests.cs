@@ -76,23 +76,39 @@ namespace ProceduralCreature.Tests.Runtime
         [Test]
         public void Validate_DetectsDuplicateBodySampleIds()
         {
-            CreatureDefinition definition = ValidDefinitionWithBody();
+            // A genuinely reused sample Id (id 1 appears twice) is the duplicate
+            // problem and must report DuplicateBodySampleId, not the ordering code.
+            CreatureDefinition definition = ValidDefinitionWithBody(); // Id 1, 2
             definition.Body.Samples.Add(new BodySample { Id = 1, Position = new Vector3(0f, 0f, 2f), Radius = 0.5f });
 
             ValidationResult result = DefinitionValidator.Validate(definition);
 
-            Assert.IsTrue(HasCode(result, ValidationCode.DuplicateBodySampleId));
+            Assert.IsTrue(HasCode(result, ValidationCode.DuplicateBodySampleId),
+                "a reused sample Id must report the duplicate code");
+            Assert.IsFalse(HasCode(result, ValidationCode.OutOfOrderBodySampleId),
+                "a repeated sample Id is a duplicate, not an out-of-order list");
         }
 
         [Test]
-        public void Validate_DetectsNonIncreasingBodySampleIds()
+        public void Validate_DetectsOutOfOrderBodySampleIds()
         {
-            CreatureDefinition definition = ValidDefinitionWithBody();
-            definition.Body.Samples[1].Id = 1; // must increase with spline order
+            // All sample Ids are unique (1, 3, 2) but do not ascend with spline
+            // order; this is the ordering problem and must report the out-of-order
+            // code, not the duplicate code. Ids stay unique and evenly spaced so
+            // the only body Id defect present is the ordering one.
+            CreatureDefinition definition = CreatureDefinition.CreateEmpty();
+            definition.Forward = Vector3.forward;
+            definition.Body.Samples.Add(new BodySample { Id = 1, Position = new Vector3(0f, 0f, -2f), Radius = 0.75f });
+            definition.Body.Samples.Add(new BodySample { Id = 3, Position = new Vector3(0f, 0f, 0f), Radius = 0.75f });
+            definition.Body.Samples.Add(new BodySample { Id = 2, Position = new Vector3(0f, 0f, 2f), Radius = 0.75f });
+            definition.AddPart(ValidPart("part_leg"));
 
             ValidationResult result = DefinitionValidator.Validate(definition);
 
-            Assert.IsTrue(HasCode(result, ValidationCode.DuplicateBodySampleId));
+            Assert.IsTrue(HasCode(result, ValidationCode.OutOfOrderBodySampleId),
+                "unique-but-non-monotonic Ids must report the out-of-order code");
+            Assert.IsFalse(HasCode(result, ValidationCode.DuplicateBodySampleId),
+                "unique-but-non-monotonic Ids are out-of-order, not duplicates");
         }
 
         [Test]

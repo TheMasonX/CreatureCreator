@@ -214,11 +214,15 @@ namespace ProceduralCreature.Definition
                         ValidationSeverity.Error, ValidationCode.DuplicateBodySampleId,
                         $"Duplicate Body sample Id '{sample.Id}'."));
                 }
-                if (i > 0 && definition.Body.Samples[i - 1] != null &&
-                    sample.Id <= definition.Body.Samples[i - 1].Id)
+                else if (i > 0 && definition.Body.Samples[i - 1] != null &&
+                         sample.Id <= definition.Body.Samples[i - 1].Id)
                 {
+                    // CC-078 split: an Id that is unique but non-monotonic across
+                    // spline order is an ordering defect, not a duplicate. A reused
+                    // Id (sampleIds.Add fails above) is the duplicate case, so the
+                    // two problems map to distinct codes and stay report-only.
                     issues.Add(new ValidationIssue(
-                        ValidationSeverity.Error, ValidationCode.DuplicateBodySampleId,
+                        ValidationSeverity.Error, ValidationCode.OutOfOrderBodySampleId,
                         "Body sample IDs must increase with spline order."));
                 }
 
