@@ -4,7 +4,7 @@
   "title": "Resolve the dead ParentId-null guard in HasParentCycle",
   "description": "Source: docs/tasks/tickets/CC-080-has-parent-cycle-dead-null-guard.md\nSource key: CC-080\nSource status: Backlog\nSource priority: P3\n\n## Summary\r\n\r\n\u0060HasParentCycle\u0060 contains \u0060if (current.ParentId == null) break;\u0060. Under schema v2\r\n\u0060ParentId\u0060 is always set (the validator rejects null at a separate site), so the\r\nguard never fires for valid definitions. It only matters if a legacy or\r\nhand-built definition deserializes with a null ParentId.\r\n\r\n## Scope\r\n\r\n- Decide whether the guard is dead under v2 and remove it (with a test proving\r\n  no v2 definition reaches it), or keep it and document it as a defensive guard\r\n  for legacy data.\r\n- Do not change the cycle-detection result in either case.\r\n\r\n## Acceptance Criteria\r\n\r\n- The decision is recorded on the ticket.\r\n- If removed, a regression test asserts cycle detection still works and a legacy\r\n  null-ParentId definition is handled without an infinite loop.\r\n\r\n## Validation\r\n\r\n- Runtime definition tests for cycle detection with and without null ParentId.\r\n\r\n## Findings\r\n\r\nRaised as finding 2.5 in the 2026-08-24 audit addendum. The guard is defensive\r\nrather than harmful; the cleanup value is documenting the intent or removing the\r\ndead branch.\r\n\r\n## Blockers\r\n\r\nNone.\r\n\r\n## Next Step\r\n\r\nRemove or comment the guard, then run the definition cycle tests.",
   "type": "Task",
-  "status": "Backlog",
+  "status": "Done",
   "priority": "Low",
   "assigneeMode": "Custom",
   "assigneeDirectoryId": null,
@@ -20,16 +20,23 @@
   "attachments": [],
   "externalLinks": [],
   "linkedPages": [],
-  "comments": [],
+  "comments": [
+    {
+      "id": "c-0ce335a70937478bb1987df728ca5f0a",
+      "author": "anonymous",
+      "body": "## Sprint Round 3 (TSK-0084) \u2014 decision \u002B validation evidence\n\n**Decision:** Chose scope option (b) \u2014 KEEP the null-\u0060ParentId\u0060 guard in \u0060CreaturePartHierarchyIndex.HasParentCycle\u0060 and document it as a deliberate defensive guard for legacy/hand-built v1-style data. Rationale: under schema v2 a valid definition always sets \u0060ParentId\u0060 (DefinitionValidator rejects null at \u0060ValidateParentsAndCycles\u0060), so the null branch is only reachable from legacy/hand-built data; removing it would not change cycle-detection results for valid definitions, and keeping it guarantees the parent walk terminates without an infinite loop for such data. The guard was NOT removed; it is now self-documenting via an explanatory comment (CC-080 finding 2.5). \u0060BodyId\u0060 remains the explicit v2 root sentinel.\n\n**Changed files (worktree):**\n- \u0060Assets/Scripts/Runtime/Definition/CreaturePartHierarchyIndex.cs\u0060: added a detailed comment explaining the defensive null-\u0060ParentId\u0060 root-termination branch in \u0060HasParentCycle\u0060. No logic change \u2014 cycle-detection result unchanged (acceptance criterion 2 satisfied by construction).\n- \u0060Assets/Scripts/Tests/Runtime/CreatureDefinitionTests.cs\u0060: added two regression tests \u2014\n  1. \u0060HasParentCycle_NullParentLegacyRootIsNotACycleAndDoesNotMaskSiblingCycle\u0060: a legacy null-\u0060ParentId\u0060 root is not reported as a cycle, and does not mask a genuine sibling self-cycle (terminates; a hang would fail the run).\n  2. \u0060HasParentCycle_AllNullParentLegacyRoots_IsNotACycle\u0060: an all-null-parent legacy forest returns false and terminates.\n\n**Validation (independently run):**\n- dotnet build --no-restore: \u0060ProceduralCreature.Runtime.csproj\u0060 and \u0060ProceduralCreature.Tests.Runtime.csproj\u0060 both 0 warnings / 0 errors.\n- Unity PlayMode full Runtime suite (\u0060ProceduralCreature.Tests.Runtime\u0060): **519/519 passed, 0 failed, 0 skipped** \u2014 includes both new TSK-0084 tests.\n- \u0060git diff --check\u0060: clean.\n- Confirmed \u0060CreatureDefinition.HasParentCycle\u0060 delegates to \u0060CreaturePartHierarchyIndex.HasParentCycle\u0060, so the tests exercise the documented guard.",
+      "createdAtUtc": "2026-09-06T16:14:56.7165072Z"
+    }
+  ],
   "epicId": null,
   "parentId": null,
   "dueDateUtc": null,
   "createdAtUtc": "2026-09-01T03:20:52.4633418Z",
-  "updatedAtUtc": "2026-09-01T03:20:52.4633418Z",
-  "completedAtUtc": null,
-  "revision": 1,
+  "updatedAtUtc": "2026-09-06T16:15:00.3356976Z",
+  "completedAtUtc": "2026-09-06T16:15:00.3356976Z",
+  "revision": 3,
   "isArchived": false,
   "hasLoadError": false,
   "loadError": null,
-  "sourceFilePath": null
+  "sourceFilePath": "tsk-0084-resolve-the-dead-parentid-null-guard-in-hasparentcycle.json"
 }

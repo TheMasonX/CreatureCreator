@@ -112,6 +112,17 @@ namespace ProceduralCreature.Definition
                         break;
                     }
                     if (!TryResolve(currentId, out CreaturePart current)) break;
+
+                    // Root termination, deliberately defensive. Under schema v2 a
+                    // valid definition always sets ParentId (DefinitionValidator
+                    // rejects null at ValidateParentsAndCycles), so ParentId == null
+                    // is only reachable from a legacy or hand-built definition that
+                    // deserialized with a null parent. Treating that part as a root
+                    // (not a cycle) matches legacy semantics and guarantees the walk
+                    // terminates for such data without an infinite loop (CC-080
+                    // finding 2.5 / TSK-0084). BodyId is the explicit v2 root
+                    // sentinel. Removing this null branch would not change results,
+                    // so it is kept as a clear, self-documenting defensive guard.
                     if (current.ParentId == null || current.ParentId == CreatureDefinition.BodyId) break;
                     currentId = current.ParentId;
                 }

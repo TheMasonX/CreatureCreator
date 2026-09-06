@@ -89,6 +89,45 @@ namespace ProceduralCreature.Tests.Runtime
         }
 
         [Test]
+        public void HasParentCycle_NullParentLegacyRootIsNotACycleAndDoesNotMaskSiblingCycle()
+        {
+            // CC-080 finding 2.5 / TSK-0084: under schema v2 a valid definition
+            // always sets ParentId, but a legacy or hand-built definition may
+            // deserialize a part with a null ParentId (an implicit root). The
+            // defensive guard in CreaturePartHierarchyIndex.HasParentCycle must
+            // (a) treat such a part as a root — not a cycle — and (b) terminate
+            // without an infinite loop while still detecting a genuine cycle
+            // elsewhere in the same definition. A hang here would fail the run.
+            var definition = CreatureDefinition.CreateEmpty();
+            definition.AddPart(MakePart("legacy_root"));   // ParentId == null
+            definition.AddPart(MakePart("child", "legacy_root"));
+            var selfCycled = MakePart("self_cycle");
+            selfCycled.ParentId = "self_cycle";            // genuine cycle
+            definition.AddPart(selfCycled);
+
+            Assert.IsTrue(definition.HasParentCycle(out List<string> ids));
+            CollectionAssert.DoesNotContain(ids, "legacy_root",
+                "A legacy null-ParentId root must not be reported as part of a cycle.");
+            CollectionAssert.Contains(ids, "self_cycle",
+                "A null-ParentId sibling must not mask a genuine cycle elsewhere.");
+        }
+
+        [Test]
+        public void HasParentCycle_AllNullParentLegacyRoots_IsNotACycle()
+        {
+            // A definition whose parts all terminate at a null ParentId (implicit
+            // legacy roots) is a forest, not a cycle; it must return false and
+            // terminate without an infinite loop.
+            var definition = CreatureDefinition.CreateEmpty();
+            definition.AddPart(MakePart("root_a")); // ParentId == null
+            definition.AddPart(MakePart("root_b")); // ParentId == null
+            definition.AddPart(MakePart("leaf_a", "root_a"));
+            definition.AddPart(MakePart("leaf_b", "root_b"));
+
+            Assert.IsFalse(definition.HasParentCycle(out _));
+        }
+
+        [Test]
         public void MalformedHierarchy_IsTotalAndPreservesDiagnostics()
         {
             var definition = CreatureDefinition.CreateEmpty();
