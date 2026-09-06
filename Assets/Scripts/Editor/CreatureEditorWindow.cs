@@ -2544,7 +2544,7 @@ namespace ProceduralCreature.Editor
                 string currentRevisionId;
                 try
                 {
-                    currentRevisionId = ResolvedCreatureSnapshot.Resolve(_definition).RevisionId;
+                    currentRevisionId = ResolvePreviewRevision();
                 }
                 catch (DomainException)
                 {
@@ -3002,7 +3002,7 @@ namespace ProceduralCreature.Editor
         {
             if (_previewController == null) return;
             _previewController.ProcessCompletions(
-                () => ResolvedCreatureSnapshot.Resolve(_definition).RevisionId,
+                ResolvePreviewRevision,
                 result =>
             {
                 if (!result.Succeeded)
@@ -3045,6 +3045,13 @@ namespace ProceduralCreature.Editor
                     EditorUtility.DisplayDialog("Generation Failed", ex.Message, "OK");
                 }
             });
+        }
+
+        private string ResolvePreviewRevision()
+        {
+            CreatureDefinition previewDefinition = _definition.Clone();
+            previewDefinition.Generation.VoxelsPerUnit = _previewVoxelsPerUnit;
+            return ResolvedCreatureSnapshot.Resolve(previewDefinition).RevisionId;
         }
 
         private static string FormatDiagnosticTiming(StageTiming timing)
