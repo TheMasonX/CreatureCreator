@@ -46,15 +46,21 @@
       "author": "anonymous",
       "body": "Round 2 audit correction: the mutable-Skeleton-at-CreatureRig-boundary claim is stale. Current CreatureRig captures SkeletonSnapshot, and indexed child lookup is precomputed. F-04/F-11 remain resolved under this task. Residual robustness defects are separately owned by TSK-0113, TSK-0114, and TSK-0116.",
       "createdAtUtc": "2026-09-05T07:09:17.6632788Z"
+    },
+    {
+      "id": "c-df0c16dce65c41a1b881e3c389f231de",
+      "author": "anonymous",
+      "body": "## Audit synthesis 2026-09-05 \u2014 animation and locomotion deep dive\n\nThe supplied audit was cross-validated against current source and live task records. H-1, H-2, and H-3 are stale, not open: current \u0060PoseRotationResolver\u0060 selects a deterministic primary child, \u0060SkeletonSnapshot.Capture\u0060 emits parent-first ordering, and \u0060CreatureRig.Build\u0060 constructs transactionally before replacing the prior rig. \u0060TSK-0113\u0060, \u0060TSK-0114\u0060, and \u0060TSK-0116\u0060 are already Done and must not be reopened.\n\nConfirmed residuals remain owned by this CC-069 slice or its focused follow-up: C-1, the per-application rotation dictionary and string-keyed bone lookup in \u0060CreatureRig.ApplyPose\u0060, and H-4, the terminal limb rotation re-lookup in \u0060SkeletonInferrer.AppendLimbBones\u0060. M-1 is a useful focused coverage gap for \u0060SkeletonSnapshot\u0060 contracts. M-2 is test-file organization only. M-4 and L-1 are deferred cleanup, not blockers for CC-011. A dedicated follow-up task was created for C-1, H-4, and M-1.\n\nEvidence: \u0060Assets/Scripts/Runtime/Animation/CreatureRig.cs\u0060, \u0060Assets/Scripts/Runtime/Animation/Ik/PoseRotationResolver.cs\u0060, \u0060Assets/Scripts/Runtime/Skeleton/SkeletonSnapshot.cs\u0060, and \u0060Assets/Scripts/Runtime/Skeleton/SkeletonInferrer.cs\u0060 were read at the current worktree fixed point. No Unity execution was performed in this synthesis.",
+      "createdAtUtc": "2026-09-06T03:06:41.5203649Z"
     }
   ],
   "epicId": null,
   "parentId": null,
   "dueDateUtc": null,
   "createdAtUtc": "2026-09-01T03:20:52.1648146Z",
-  "updatedAtUtc": "2026-09-05T07:09:17.6632788Z",
+  "updatedAtUtc": "2026-09-06T03:06:41.5203649Z",
   "completedAtUtc": null,
-  "revision": 5,
+  "revision": 6,
   "isArchived": false,
   "hasLoadError": false,
   "loadError": null,

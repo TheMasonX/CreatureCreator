@@ -1,0 +1,42 @@
+﻿{
+  "id": "tsk-0117-author-orchestrator-handoff-for-three-subagent-rounds",
+  "key": "TSK-0117",
+  "title": "Author orchestrator handoff for three subagent rounds",
+  "description": "## Summary\n\nCreate a handoff document that lets another (orchestrator) agent run three rounds of CreatureCreator work, where each round\u0027s implementation is performed by a sequential subagent so the orchestrator keeps a small context.\n\n## User Mandate\n\n\u003E \u0022Create a handoff for another agent to do 3 rounds of tasks like this, but by using sequential subagents for each actual implementation round so it retains smaller context in the orchestrator agent, and can focus on sending the subagents off and then reviewing. It would pass in the relevant context to each agent and give them the next steps\u0022\n\nSTRICT. Binding constraints:\n- Exactly three rounds.\n- One sequential subagent per implementation round (not parallel, not multiple per round).\n- The orchestrator retains small context and focuses on dispatching subagents and reviewing.\n- The handoff must describe the context passed to each subagent and the next steps.\n- Deliverable is a durable handoff document, not an implementation round.\n\n## Scope\n\n- Produce the handoff document under docs/tasks/handoffs/ describing the operating model, the per-round template (context in / report out), a recommended three-round program tied to live owners (TSK-0105 geometry/mirror consolidation, TSK-0077 C4 binding contract \u002B fixture, TSK-0098 A7.1 preview coordinator), the shared repository contract, the orchestrator review checklist, and a round log.\n\n## Acceptance Criteria\n\n- The document specifies three concrete rounds, each with an owning task, acceptance gate, and stop boundaries.\n- It states the sequential-subagent operating model and what context is passed in and returned.\n- It states that only the orchestrator reviews and commits/pushes after review.\n\n## Validation\n\n- Document present at the handoff path; consistent with repo handoff conventions.\n- No runtime/editor code changed.\n\n## Findings\n\n## Blockers\n\n## Next Step",
+  "type": "Documentation",
+  "status": "Done",
+  "priority": "Medium",
+  "assigneeMode": "Custom",
+  "assigneeDirectoryId": null,
+  "assigneeCustomText": "Agent",
+  "reporter": "anonymous",
+  "labels": [
+    "user-mandated",
+    "handoff",
+    "orchestration",
+    "subagent",
+    "docs"
+  ],
+  "attachments": [],
+  "externalLinks": [],
+  "linkedPages": [],
+  "comments": [
+    {
+      "id": "c-c65895eab0e04e79867998f9308f2114",
+      "author": "anonymous",
+      "body": "Deliverable created (2026-09-05): docs/tasks/handoffs/2026-09-05-three-round-sequential-subagent-handoff.md. Contains Part A operating model (orchestrator \u002B one sequential subagent per round; context-in/report-out brief), Part B shared repo contract, Part C three concrete rounds tied to live owners (Round 1 TSK-0105 geometry/mirror consolidation; Round 2 TSK-0077 C4 binding contract \u002B two-segment fixture; Round 3 TSK-0098 A7.1 preview coordinator), each with owning task, hypothesis, discriminating check, context-to-pass, stop boundaries, and validation gate, Part D orchestrator review checklist, Part E do-not-do, and Part F round log. No runtime/editor code changed. Doc style follows existing handoff conventions (e.g., 2026-09-05-post-pr1-* and 2026-09-04-culling-budget-*).",
+      "createdAtUtc": "2026-09-05T16:00:54.5292387Z"
+    }
+  ],
+  "epicId": null,
+  "parentId": null,
+  "dueDateUtc": null,
+  "createdAtUtc": "2026-09-05T16:00:50.3635156Z",
+  "updatedAtUtc": "2026-09-05T16:00:54.5561336Z",
+  "completedAtUtc": "2026-09-05T16:00:54.5561336Z",
+  "revision": 3,
+  "isArchived": false,
+  "hasLoadError": false,
+  "loadError": null,
+  "sourceFilePath": "tsk-0117-author-orchestrator-handoff-for-three-subagent-rounds.json"
+}
