@@ -4,7 +4,7 @@
   "title": "One canonical end-to-end morphology verification run",
   "description": "Source: docs/tasks/tickets/CC-081-canonical-end-to-end-verification-fixture.md\nSource key: CC-081\nSource status: Backlog\nSource priority: P2\n\n## Summary\r\n\r\nTest evidence is fragmented across focused runtime runs, broader runs with\r\nbaseline failures, initialization timeouts, and editor-only manual checks.\r\nBefore the morphology foundation is called stable, establish one canonical\r\nverification command/run that proves the full chain for one canonical dino\r\nfixture plus several adversarial fixtures.\r\n\r\n## Scope\r\n\r\nOne run that proves:\r\n\u0060\u0060\u0060text\r\nDefinition -\u003E Morphology -\u003E SDF -\u003E Mesh -\u003E Skeleton -\u003E Rig -\u003E serialization\r\n\u0060\u0060\u0060\r\n- One canonical dino fixture plus adversarial fixtures (mirrored, child-at-tip,\r\n  limb chains, mesh-asset items, non-finite inputs).\r\n- Deterministic topology \u002B value assertions at the SDF/mesh boundary.\r\n- Recorded command and expected pass set so new work has a single regression\r\n  gate instead of a loose collection of runs.\r\n\r\n## Acceptance Criteria\r\n\r\n- The canonical run is documented with its exact command/filter and expected\r\n  pass count.\r\n- The five documented pre-existing PlayMode failures are explicitly separated\r\n  from regressions.\r\n- A new contributor can run one command to see the whole chain green.\r\n\r\n## Validation\r\n\r\nThe run itself is the validation: all chain stages pass on the dino \u002B adversarial\r\nfixtures.\r\n\r\n## Findings\r\n\r\nThe 2026-08-24 delta audit (\u00A713) flags that focused runs, baseline failures, and\r\ntimeouts make it hard to prove the foundation is stable. This ticket consolidates\r\nthat evidence into one gate.\r\n\r\n## Blockers\r\n\r\nNone; can proceed in parallel with CC-056A migration.\r\n\r\n## Next Step\r\n\r\nDefine the fixture set and the exact NUnit filter, add any missing chain-stage\r\nasserts, and record the command in the README validation section.",
   "type": "Task",
-  "status": "Backlog",
+  "status": "Done",
   "priority": "Medium",
   "assigneeMode": "Custom",
   "assigneeDirectoryId": null,
@@ -20,16 +20,23 @@
   "attachments": [],
   "externalLinks": [],
   "linkedPages": [],
-  "comments": [],
+  "comments": [
+    {
+      "id": "c-321b3a7ffae34ee0b2a3b88154749082",
+      "author": "anonymous",
+      "body": "Round 3 (final) BeastMaster evidence.\n\nCHAIN-COVERAGE AUDIT: Current suite is GREEN \u2014 there is NO pre-existing 5-failure set to separate from regressions (the stale 2026-08-24 note is resolved). Full default Runtime PlayMode suite passes 538/538 at capture. Every chain stage was already covered by dedicated per-stage fixtures (JsonDnaSerializer* serialization; SdfProgramBuilder*/DensityGrid* SDF; MarchingCubesExtractor*/parity/winding/topology mesh; SkeletonInferrer* skeleton; CreatureRigTests rig; GeneratedCreatureTests generation multi-item \u002B CC-091 parity). What was MISSING: one coherent cross-stage integration gate that drives the whole chain on one canonical dino \u002B adversarial fixtures with deterministic topology/value assertions at the SDF/mesh boundary \u2014 the per-stage fixtures each use small synthetic inputs and never combine stages on a full dino. No [Category] existed anywhere.\n\nCANONICAL GATE ADDED: new PlayMode fixture \u0060Assets/Scripts/Tests/Runtime/CanonicalMorphologyChainTests.cs\u0060 (\u002B .meta), [Category(\u0022CanonicalMorphologyChain\u0022)], 6 deterministic tests on a canonical dino (even straight spine \u002B mirrored Leg, Foot child-at-tip, mirrored Eye) \u002B adversarial (mesh-asset item, non-finite input): determinism\u002Bwatertight implicit surface; serialization round-trip chain parity; mirror-never-cascades; rig rest hierarchy from inferred skeleton; mesh-asset item rig-binding \u002B serialization; non-finite rejected before chain.\n\nVALIDATION (Unity 6000.5.9f1): dotnet build ProceduralCreature.Tests.Runtime.csproj clean (0 warn/0 err). Unity PlayMode category CanonicalMorphologyChain: 6/6 passed. Unity default Runtime PlayMode suite: 538/538 passed (532 prior \u002B 6 new), 0 failed. git diff --check clean. No commit/push (HEAD a40fdfa). README validation section updated with run command, fixture set, and expected pass count (6).\n\nChanged files: README.md (doc); new CanonicalMorphologyChainTests.cs \u002B .cs.meta. No production behavior change. No redundant duplicates of existing canonical tests (the gate is a new cross-stage integration, not a copy). Left InProgress for orchestrator review \u002B commit.",
+      "createdAtUtc": "2026-09-06T21:45:41.731383Z"
+    }
+  ],
   "epicId": null,
   "parentId": null,
   "dueDateUtc": null,
   "createdAtUtc": "2026-09-01T03:20:52.4842255Z",
-  "updatedAtUtc": "2026-09-01T03:20:52.4842255Z",
-  "completedAtUtc": null,
-  "revision": 1,
+  "updatedAtUtc": "2026-09-06T21:46:15.9551911Z",
+  "completedAtUtc": "2026-09-06T21:46:15.9551911Z",
+  "revision": 4,
   "isArchived": false,
   "hasLoadError": false,
   "loadError": null,
-  "sourceFilePath": null
+  "sourceFilePath": "tsk-0085-one-canonical-end-to-end-morphology-verification-run.json"
 }

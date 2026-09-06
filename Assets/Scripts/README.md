@@ -603,3 +603,42 @@ Reference baselines on this fixture, captured 2026-09-06 in Unity 6000.5.9f1:
 VPU 10 median total about 97.5 ms; VPU 16 median total about 215.7 ms. The
 TSK-0008 gate numbers (VPU 10 about 204 ms; VPU 16 about 626 ms) came from a
 different creature and remain the gate reference.
+
+## Canonical end-to-end morphology verification run (TSK-0085)
+
+One canonical run proves the full chain on one dino-like creature and several
+adversarial fixtures:
+
+    Definition -> Morphology -> SDF -> Mesh -> Skeleton -> Rig -> serialization
+
+The run is a single PlayMode fixture with one NUnit category:
+
+    Location: Assets/Scripts/Tests/Runtime/CanonicalMorphologyChainTests.cs
+    Category: CanonicalMorphologyChain
+    Pass set: 6 tests (deterministic)
+
+Run it in the Unity Test Runner (PlayMode) filtered to the category, or from
+code / MCP `run_tests` with `category_names = ["CanonicalMorphologyChain"]`.
+Expected result: 6 passed, 0 failed.
+
+Fixture set (one canonical dino plus adversarial fixtures):
+
+- Canonical dino (Body spine + mirrored Leg, Foot child-at-tip, mirrored Eye).
+- `CanonicalDino_GenerateTwice_...` - Definition -> SDF -> Mesh determinism and
+  watertight implicit surface (MeshTopologyReport) at the SDF/mesh boundary.
+- `CanonicalDino_SerializationRoundTrip_...` - serialization stage preserves the
+  downstream mesh counts, topology, and inferred skeleton.
+- `CanonicalDino_Skeleton_MirrorsOnlyFlaggedParts` - Definition -> Skeleton:
+  mirroring never cascades to an unflagged child-at-tip.
+- `CanonicalDino_Rig_BuildsRestHierarchyFromInferredSkeleton` - Definition ->
+  Skeleton -> Rig: rig rest positions match the inferred skeleton.
+- `Adversarial_MeshAssetItem_...` - mesh-asset item emits a rig-bound geometry
+  item and survives serialization.
+- `Adversarial_NonFiniteInput_IsRejectedBeforeTheChain` - non-finite DNA is
+  rejected before any generation stage runs.
+
+The default Runtime PlayMode suite is green. There is no pre-existing failure
+set to separate from regressions: the older "five documented pre-existing
+PlayMode failures" note is resolved, and the full Runtime suite passes
+(538 tests at the 2026-09-06 capture). A new contributor can run the default
+Runtime suite or the single category above to see the whole chain green.
