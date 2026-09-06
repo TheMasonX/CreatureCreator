@@ -1,3 +1,4 @@
+using System.Collections.Generic;
 using System.Linq;
 using NUnit.Framework;
 using UnityEngine;
@@ -427,6 +428,112 @@ namespace ProceduralCreature.Tests.Runtime
 
             Assert.AreEqual(SemanticBoneResolver.ResolveBodySocketBoneId(2), parentBoneId,
                 "The snapshot resolver must bind to the anchor segment captured at construction, not re-derive from live DNA.");
+        }
+
+        [Test]
+        public void RawAndSnapshotParentResolvers_ProduceIdenticalIds_ForRepresentativeParts()
+        {
+            // TSK-0124: the definition (raw) and snapshot parent resolvers must
+            // resolve identical parent bone ids for every part of representative
+            // creatures — Body-attached, mirrored, limb-with-child, and
+            // mirrored-limb-child parts — because both funnel through one shared
+            // decision core.
+            var definitions = new List<CreatureDefinition> { BuildDefinition() };
+
+            // A mirrored limb with a mirrored child-of-limb.
+            var mirroredChain = CreatureDefinition.CreateEmpty();
+            mirroredChain.Forward = Vector3.forward;
+            mirroredChain.SymmetryMode = SymmetryMode.MirrorAcrossXAxis;
+            mirroredChain.Body.Samples.Add(new BodySample { Id = 1, Position = new Vector3(0f, 0f, -1f), Radius = 0.75f });
+            mirroredChain.Body.Samples.Add(new BodySample { Id = 2, Position = new Vector3(0f, 0f, 1f), Radius = 0.9f });
+            mirroredChain.AddPart(new CreaturePart
+            {
+                Id = "part_leg",
+                ParentId = CreatureDefinition.BodyId,
+                PartType = PartType.Limb,
+                Transform = TransformData.Identity,
+                Shape = ShapeDefinition.DefaultSphere,
+                Appearance = AppearanceDefinition.Default,
+                MirrorAcrossSymmetryPlane = true,
+                Limb = LimbChainWith(Vector3.zero, new Vector3(0f, -1f, 0f), new Vector3(0f, -2f, 0f)),
+            });
+            mirroredChain.AddPart(Part("part_foot", "part_leg", TransformData.Identity, mirrored: true));
+            definitions.Add(mirroredChain);
+
+            // An anchored Body child (anchor-based socket binding).
+            var anchored = CreatureDefinition.CreateEmpty();
+            anchored.Forward = Vector3.forward;
+            anchored.SymmetryMode = SymmetryMode.MirrorAcrossXAxis;
+            anchored.Body.Samples.Add(new BodySample { Id = 1, Position = new Vector3(0f, 0f, -1f), Radius = 0.5f });
+            anchored.Body.Samples.Add(new BodySample { Id = 2, Position = new Vector3(0f, 0f, 1f), Radius = 0.5f });
+            anchored.Body.Samples.Add(new BodySample { Id = 3, Position = new Vector3(0f, 0f, 3f), Radius = 0.5f });
+            anchored.AddPart(new CreaturePart
+            {
+                Id = "part_spine",
+                ParentId = CreatureDefinition.BodyId,
+                PartType = PartType.Part,
+                Transform = TransformData.Identity,
+                Shape = ShapeDefinition.DefaultSphere,
+                Appearance = AppearanceDefinition.Default,
+                ParentAttachment = new BodySurfaceAnchor
+                {
+                    SegmentStartSampleId = 2,
+                    SegmentT = 0.9f,
+                    RadialAngle = 0f,
+                    SurfaceOffset = 0f,
+                    Roll = 0f,
+                },
+            });
+            definitions.Add(anchored);
+
+            foreach (CreatureDefinition definition in definitions)
+            {
+                ResolvedCreatureSnapshot snapshot = ResolvedCreatureSnapshot.Resolve(definition);
+                foreach (CreaturePart part in definition.Parts)
+                {
+                    Assert.IsTrue(snapshot.TryGetPart(part.Id, out ResolvedPartSnapshot resolvedPart),
+                        $"Snapshot must contain authored part '{part.Id}'.");
+                    foreach (bool mirrored in new[] { false, true })
+                    {
+                        string rawId = SemanticBoneResolver.ResolveParentBoneId(definition, part, mirrored);
+                        string snapshotId = SemanticBoneResolver.ResolveParentBoneId(
+                            snapshot, resolvedPart, mirrored);
+                        Assert.AreEqual(rawId, snapshotId,
+                            $"raw and snapshot parent resolvers disagree for '{part.Id}' mirrored={mirrored}.");
+                    }
+                }
+            }
+        }
+
+        [Test]
+        public void SnapshotResolver_BodySocket_DoesNotChangeAfterAuthoredBodyMutation()
+        {
+            // TSK-0124: the snapshot path must bind a Body-rooted part from the
+            // sample positions CAPTURED at snapshot construction. Moving an
+            // authored body sample after the snapshot must not re-bind it.
+            var definition = CreatureDefinition.CreateEmpty();
+            definition.Forward = Vector3.forward;
+            definition.SymmetryMode = SymmetryMode.MirrorAcrossXAxis;
+            definition.Body.Samples.Add(new BodySample { Id = 1, Position = new Vector3(0f, 0f, -1f), Radius = 0.5f });
+            definition.Body.Samples.Add(new BodySample { Id = 2, Position = new Vector3(0f, 0f, 1f), Radius = 0.5f });
+            definition.AddPart(Part("part_head", CreatureDefinition.BodyId,
+                new TransformData { Position = new Vector3(0f, 0f, 0.2f), Rotation = Quaternion.identity, Scale = Vector3.one }));
+
+            ResolvedCreatureSnapshot snapshot = ResolvedCreatureSnapshot.Resolve(definition);
+            Assert.IsTrue(snapshot.TryGetPart("part_head", out ResolvedPartSnapshot resolvedHead));
+
+            // Nearest captured sample to (0,0,0.2) is sample 2 at (0,0,1).
+            string before = SemanticBoneResolver.ResolveParentBoneId(snapshot, resolvedHead, mirrored: false);
+            Assert.AreEqual(SemanticBoneResolver.ResolveBodySocketBoneId(2), before);
+
+            // Move the nearest authored sample far away after snapshot
+            // construction. A resolver that re-derived from live DNA would now
+            // bind to sample 1.
+            definition.Body.Samples[1].Position = new Vector3(0f, 0f, 40f);
+
+            string after = SemanticBoneResolver.ResolveParentBoneId(snapshot, resolvedHead, mirrored: false);
+            Assert.AreEqual(before, after,
+                "A post-snapshot authored body mutation must not re-bind the snapshot resolution.");
         }
     }
 }

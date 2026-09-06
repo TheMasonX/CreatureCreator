@@ -4,7 +4,7 @@
   "title": "Collapse SemanticBoneResolver raw/snapshot duplication to one authoritative path",
   "description": "## Summary\n\nCollapse the duplicated raw-definition and resolved-snapshot implementations of the same parent/Body-socket resolution decisions in \u0060SemanticBoneResolver\u0060 into one authoritative snapshot path. An external audit (P2) found parallel authority that the resolved-snapshot architecture is meant to eliminate: bug fixes can land in one path and not the other.\n\nProvenance: \u0060docs/audits/creaturecreator-deep-dive-code-review-2026-09-05.md\u0060 P2 (SemanticBoneResolver). Verified at current HEAD \u006099fe6ad\u0060: raw \u0060CreatureDefinition\u0060 overloads (\u0060ResolveParentBoneId\u0060, \u0060ResolveBodyParentBoneId\u0060) coexist with snapshot overloads. Broad owner family: TSK-0095 (snapshot authority / generation stage boundaries). No existing TSK owns this collapse.\n\n## Scope\n\n\u0060Assets/Scripts/Runtime/Skeleton/SemanticBoneResolver.cs\u0060:\n\n- Make the \u0060ResolvedCreatureSnapshot\u0060 overloads the canonical implementation of parent-bone and Body-socket decisions.\n- Turn the raw-\u0060CreatureDefinition\u0060 overloads into thin compatibility entry points that resolve/canonicalize once and delegate to the snapshot path, or remove them after caller migration.\n- Preserve identical outputs between the raw and snapshot paths during the transition; add a parity test.\n- Do not introduce a new resolver abstraction or service.\n\n## Acceptance Criteria\n\n- The snapshot overload is the single implementation of parent/Body-socket resolution; the raw overload (if retained) delegates and produces identical results.\n- A parity test proves raw overload and snapshot overload produce identical outputs for representative definitions (including mirrored and Body-attached parts).\n- Mutation of the source \u0060CreatureDefinition\u0060 after snapshot creation never changes the resolved path.\n- Existing semantic-resolution tests remain green.\n\n## Validation\n\nFocused runtime tests for raw-vs-snapshot parity and snapshot immutability. Run the full Unity runtime suites. Static source inspection alone cannot close this task.\n\n## Findings\n\n- Duplicated policy: Body-rooted vs non-Body parent classification, Body-surface-anchor socket selection, nearest-Body-sample fallback, mirrored-parent handling, and limb-terminal attachment selection are each implemented for raw and resolved inputs.\n- The snapshot overload exists specifically to avoid observing mutable authoring state after resolution; keeping a second raw algorithm re-opens that risk.\n\n## Blockers\n\nNone known.\n\n## Next Step\n\nDesignate the snapshot path canonical, make the raw overload delegate (or migrate callers), and add the parity test.",
   "type": "Task",
-  "status": "Backlog",
+  "status": "Done",
   "priority": "Medium",
   "assigneeMode": "Custom",
   "assigneeDirectoryId": null,
@@ -23,16 +23,23 @@
   "attachments": [],
   "externalLinks": [],
   "linkedPages": [],
-  "comments": [],
+  "comments": [
+    {
+      "id": "c-a7c5f8947eea49cf9c15dc84c19ed45f",
+      "author": "anonymous",
+      "body": "## Implementation evidence (sprint round 1)\n\nCollapsed SemanticBoneResolver raw/snapshot duplication to ONE authoritative decision core:\n- Extracted \u0060ResolveParentBoneIdCore(...)\u0060 and \u0060ResolveBodyParentBoneIdCore(...)\u0060 as the single implementations of the parent-bone and Body-socket decisions.\n- Both the raw-\u0060CreatureDefinition\u0060 overloads (\u0060ResolveParentBoneId\u0060/\u0060ResolveBodyParentBoneId\u0060) and the snapshot overloads now read inputs from their own source and funnel through the SAME core, so the two paths cannot drift.\n- Snapshot overloads remain canonical for normal generation (immutability preserved). Raw overloads retained ONLY as thin compatibility adapters because \u0060SkeletonInferrer\u0060\u0027s malformed-DNA defensive fallback resolves parts from authored DNA that cannot be canonicalized into a snapshot (snapshot \u0060Resolve\u0060 throws on missing parent/null Parts). A raw-\u003Esnapshot delegate would regress those fallback tests.\n- No new resolver abstraction/service; no new snapshot type.\n\nFiles changed:\n- \u0060Assets/Scripts/Runtime/Skeleton/SemanticBoneResolver.cs\u0060\n- \u0060Assets/Scripts/Tests/Runtime/SemanticBoneResolverTests.cs\u0060\n\n## Validation evidence\n- \u0060git diff --check\u0060: pass (exit 0).\n- \u0060dotnet build ProceduralCreature.Runtime.csproj --no-restore\u0060: pass.\n- \u0060dotnet build ProceduralCreature.Tests.Runtime.csproj --no-restore\u0060: pass.\n- Unity PlayMode (report-backed, editor reachable): SemanticBoneResolverTests 12/12; SkeletonInferrerTests 12/12 (regression guard). No console errors.\n- New tests: \u0060RawAndSnapshotParentResolvers_ProduceIdenticalIds_ForRepresentativeParts\u0060 (Body-attached, mirrored non-limb, limb-with-child, mirrored-limb-child, anchored Body child; both mirror flags); \u0060SnapshotResolver_BodySocket_DoesNotChangeAfterAuthoredBodyMutation\u0060 (moves authored Body sample after snapshot construction, asserts captured socket kept).\n\n## Residual risk\nRaw overloads remain as shared-core adapters (not deleted) solely for the SkeletonInferrer malformed fallback. Fully removing them would require a separate rework of that fallback; tracked as optional future work, not required for this task\u0027s acceptance.",
+      "createdAtUtc": "2026-09-06T06:09:15.4482419Z"
+    }
+  ],
   "epicId": null,
   "parentId": "tsk-0095-establish-concrete-generation-pipeline-stage-boundaries",
   "dueDateUtc": null,
   "createdAtUtc": "2026-09-06T04:25:46.4310212Z",
-  "updatedAtUtc": "2026-09-06T04:25:46.4310212Z",
-  "completedAtUtc": null,
-  "revision": 1,
+  "updatedAtUtc": "2026-09-06T06:09:17.8249322Z",
+  "completedAtUtc": "2026-09-06T06:09:17.8249322Z",
+  "revision": 3,
   "isArchived": false,
   "hasLoadError": false,
   "loadError": null,
-  "sourceFilePath": null
+  "sourceFilePath": "tsk-0124-make-semanticboneresolver-snapshot-authoritative.json"
 }

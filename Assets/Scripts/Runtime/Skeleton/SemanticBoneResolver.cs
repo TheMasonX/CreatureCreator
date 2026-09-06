@@ -1,3 +1,4 @@
+using System.Collections.Generic;
 using UnityEngine;
 using ProceduralCreature.Common;
 using ProceduralCreature.Definition;
@@ -80,34 +81,38 @@ namespace ProceduralCreature.Skeleton
         /// </summary>
         public static string ResolveParentBoneId(CreatureDefinition definition, CreaturePart part, bool mirrored)
         {
+            // Compatibility entry point over the shared decision core. Kept for
+            // the SkeletonInferrer defensive fallback, which resolves parts from
+            // authored DNA that cannot be canonicalized into a snapshot. For any
+            // valid definition it produces the identical id as the snapshot
+            // overload (they funnel through the same core below).
             if (part.ParentId == null || part.ParentId == CreatureDefinition.BodyId)
             {
                 return ResolveBodyParentBoneId(definition, part, mirrored);
             }
 
             CreaturePart parentPart = definition.FindPart(part.ParentId);
-            bool parentIsAlsoMirrored = parentPart != null
-                                         && parentPart.MirrorAcrossSymmetryPlane
-                                         && definition.SymmetryMode != SymmetryMode.None;
-
-            string parentBoneBaseId;
-            if (parentPart != null
+            bool parentFound = parentPart != null;
+            bool parentMirrorFlagged = parentFound
+                && parentPart.MirrorAcrossSymmetryPlane;
+            bool symmetryEnabled = definition.SymmetryMode != SymmetryMode.None;
+            bool parentIsRealLimb = parentFound
                 && parentPart.Limb != null
                 && parentPart.Limb.Joints != null
-                && parentPart.Limb.Joints.Count >= 2)
-            {
-                // The child of a limb attaches to its explicit terminal joint node.
-                parentBoneBaseId = ResolveLimbTerminalBoneId(
-                    parentPart, ResolvedLimb.Resolve(parentPart.Limb), mirrored: false);
-            }
-            else
-            {
-                // Existing rule: an unmirrored part's bone id is exactly the
-                // source part id.
-                parentBoneBaseId = part.ParentId;
-            }
+                && parentPart.Limb.Joints.Count >= 2;
+            string parentLimbTerminalId = parentIsRealLimb
+                ? ResolveLimbTerminalBoneId(
+                    parentPart, ResolvedLimb.Resolve(parentPart.Limb), mirrored: false)
+                : null;
 
-            return ResolveMirroredBoneId(parentBoneBaseId, mirrored && parentIsAlsoMirrored);
+            return ResolveParentBoneIdCore(
+                part.ParentId,
+                parentFound,
+                parentMirrorFlagged,
+                symmetryEnabled,
+                parentIsRealLimb,
+                parentLimbTerminalId,
+                mirrored);
         }
 
         /// <summary>
@@ -125,27 +130,64 @@ namespace ProceduralCreature.Skeleton
                 return ResolveBodyParentBoneId(snapshot, part, mirrored);
             }
 
-            if (snapshot.TryGetPart(part.ParentId, out ResolvedPartSnapshot parent))
+            bool parentFound = snapshot.TryGetPart(part.ParentId, out ResolvedPartSnapshot parent);
+            bool parentMirrorFlagged = parentFound
+                && parent.MirrorAcrossSymmetryPlane;
+            bool symmetryEnabled = snapshot.SymmetryMode != SymmetryMode.None;
+            // CC-091: a resolved limb parent is only a real limb parent when its
+            // chain has at least two joints (N joints -> N-1 bones, so the
+            // terminal bone index N-2 must be >= 0). ResolvedLimb permits a
+            // single-joint degenerate chain, and validation
+            // (MinLimbJointCount == 2) is not guaranteed for a direct call, so we
+            // guard on the resolved joint count exactly like the definition
+            // overload guards on the authored Joints.Count. This keeps the two
+            // overloads consistent and never fabricates a "_j-1" bone id.
+            bool parentIsRealLimb = parentFound
+                && parent.HasLimb
+                && parent.Limb.JointPositions.Count >= 2;
+            string parentLimbTerminalId = parentIsRealLimb
+                ? ResolveLimbTerminalBoneId(
+                    new CreaturePart { Id = parent.Id }, parent.Limb, mirrored: false)
+                : null;
+
+            return ResolveParentBoneIdCore(
+                part.ParentId,
+                parentFound,
+                parentMirrorFlagged,
+                symmetryEnabled,
+                parentIsRealLimb,
+                parentLimbTerminalId,
+                mirrored);
+        }
+
+        /// <summary>
+        /// The single implementation of the parent-bone decision for a
+        /// non-Body-rooted part, shared by the definition and snapshot overloads
+        /// so the raw/snapshot paths cannot drift. A child binds to its parent's
+        /// TERMINAL bone (a real limb parent with at least two joints) or to the
+        /// bare parent id (a non-limb parent, or an absent parent); a mirrored
+        /// child binds to the mirrored copy of its DNA parent when that parent is
+        /// also mirrored, or to the single unmirrored parent bone otherwise.
+        /// </summary>
+        private static string ResolveParentBoneIdCore(
+            string partParentId,
+            bool parentFound,
+            bool parentMirrorFlagged,
+            bool symmetryEnabled,
+            bool parentIsRealLimb,
+            string parentLimbTerminalId,
+            bool mirrorChild)
+        {
+            if (!parentFound)
             {
-                bool parentIsAlsoMirrored = parent.MirrorAcrossSymmetryPlane
-                    && snapshot.SymmetryMode != SymmetryMode.None;
-                // CC-091: a resolved limb parent is only a real limb parent when
-                // its chain has at least two joints (N joints -> N-1 bones, so the
-                // terminal bone index N-2 must be >= 0). ResolvedLimb permits a
-                // single-joint degenerate chain, and validation
-                // (MinLimbJointCount == 2) is not guaranteed for a direct call, so
-                // guard on the resolved joint count exactly like the definition
-                // overload guards on the authored Joints.Count. This keeps the two
-                // overloads consistent and never fabricates a "_j-1" bone id.
-                string parentBoneBaseId = parent.HasLimb
-                    && parent.Limb.JointPositions.Count >= 2
-                    ? ResolveLimbTerminalBoneId(
-                        new CreaturePart { Id = parent.Id }, parent.Limb, mirrored: false)
-                    : parent.Id;
-                return ResolveMirroredBoneId(parentBoneBaseId, mirrored && parentIsAlsoMirrored);
+                // Existing rule: a part whose DNA parent is absent binds to the
+                // bare parent id.
+                return partParentId;
             }
 
-            return part.ParentId;
+            bool parentIsAlsoMirrored = parentMirrorFlagged && symmetryEnabled;
+            string parentBoneBaseId = parentIsRealLimb ? parentLimbTerminalId : partParentId;
+            return ResolveMirroredBoneId(parentBoneBaseId, mirrorChild && parentIsAlsoMirrored);
         }
 
         /// <summary>
@@ -156,7 +198,9 @@ namespace ProceduralCreature.Skeleton
         /// geometry — replacing the legacy nearest-sample search at this single
         /// seam (CC-007). Otherwise, the nearest Body sample to the part's
         /// resolved creature-space origin (the limb's root joint, or the part
-        /// origin for a non-limb) is used.
+        /// origin for a non-limb) is used. This definition overload is a thin
+        /// compatibility entry over the shared body core for the SkeletonInferrer
+        /// defensive fallback.
         /// </summary>
         public static string ResolveBodyParentBoneId(
             CreatureDefinition definition, CreaturePart part, bool mirrored)
@@ -168,44 +212,21 @@ namespace ProceduralCreature.Skeleton
             }
 
             ResolvedBody resolvedBody = ResolvedBody.Resolve(definition.Body);
-
-            // CC-007: anchor-based binding for direct Body children. The anchor
-            // drives geometry placement only for ParentId == BodyId, so binding
-            // follows the same rule. Falls back to nearest-sample when the anchor
-            // does not reference a valid segment start (defensive; the validator
-            // rejects those before inference).
-            BodySurfaceAnchor anchor = part.ParentAttachment;
-            if (part.ParentId == CreatureDefinition.BodyId && anchor != null)
-            {
-                for (int i = 0; i < resolvedBody.SampleIds.Count - 1; i++)
-                {
-                    if (resolvedBody.SampleIds[i] == anchor.SegmentStartSampleId)
-                    {
-                        return ResolveBodySocketBoneId(anchor.SegmentStartSampleId);
-                    }
-                }
-            }
-
             Matrix4x4 world = CreaturePartWorldTransformResolver.ResolveLocalToCreatureSpace(
                 definition, part);
             Vector3 position = part.Limb != null
                 ? world.MultiplyPoint3x4(ResolvedLimb.Resolve(part.Limb).RootSocket)
                 : world.GetColumn(3);
-            if (mirrored) position = MirrorUtility.ReflectPointAcrossX(position);
 
-            int nearestIndex = 0;
-            float nearestDistance = float.PositiveInfinity;
-            for (int i = 0; i < resolvedBody.SamplePositions.Count; i++)
-            {
-                float distance = (resolvedBody.SamplePositions[i] - position).sqrMagnitude;
-                if (distance < nearestDistance)
-                {
-                    nearestDistance = distance;
-                    nearestIndex = i;
-                }
-            }
-
-            return ResolveBodySocketBoneId(resolvedBody.SampleIds[nearestIndex]);
+            BodySurfaceAnchor anchor = part.ParentAttachment;
+            return ResolveBodyParentBoneIdCore(
+                resolvedBody.SamplePositions,
+                resolvedBody.SampleIds,
+                part.ParentId,
+                partHasAnchor: anchor != null,
+                anchorSampleId: anchor != null ? anchor.SegmentStartSampleId : 0u,
+                position,
+                mirrored);
         }
 
         private static string ResolveBodyParentBoneId(
@@ -216,25 +237,65 @@ namespace ProceduralCreature.Skeleton
                 return null;
             }
 
-            if (part.ParentId == CreatureDefinition.BodyId)
-            {
-                string anchorSocket = ResolveAnchorSocketBoneId(snapshot.Body, part);
-                if (anchorSocket != null)
-                {
-                    return anchorSocket;
-                }
-            }
-
             Vector3 position = part.HasLimb
                 ? part.PartFrameToCreatureSpace.MultiplyPoint3x4(part.Limb.RootSocket)
                 : part.PartFrameToCreatureSpace.GetColumn(3);
+
+            return ResolveBodyParentBoneIdCore(
+                snapshot.Body.SamplePositions,
+                snapshot.Body.SampleIds,
+                part.ParentId,
+                partHasAnchor: part.HasBodySurfaceAnchor,
+                anchorSampleId: part.BodySurfaceAnchorSegmentStartSampleId,
+                position,
+                mirrored);
+        }
+
+        /// <summary>
+        /// The single implementation of the Body-socket decision, shared by the
+        /// definition and snapshot overloads so the raw/snapshot paths cannot
+        /// drift: anchor-based binding for a direct Body child, else the nearest
+        /// Body sample to the given creature-space position. Callers supply the
+        /// resolved sample arrays and the part's resolved position from their own
+        /// source (authored DNA vs the immutable snapshot).
+        /// </summary>
+        private static string ResolveBodyParentBoneIdCore(
+            IReadOnlyList<Vector3> samplePositions,
+            IReadOnlyList<uint> sampleIds,
+            string partParentId,
+            bool partHasAnchor,
+            uint anchorSampleId,
+            Vector3 position,
+            bool mirrored)
+        {
+            if (samplePositions == null || samplePositions.Count == 0)
+            {
+                return null;
+            }
+
+            // CC-007: anchor-based binding for direct Body children. The anchor
+            // drives geometry placement only for ParentId == BodyId, so binding
+            // follows the same rule. Falls back to nearest-sample when the anchor
+            // does not reference a valid segment start (defensive; the validator
+            // rejects those before inference).
+            if (partParentId == CreatureDefinition.BodyId && partHasAnchor)
+            {
+                for (int i = 0; i < sampleIds.Count - 1; i++)
+                {
+                    if (sampleIds[i] == anchorSampleId)
+                    {
+                        return ResolveBodySocketBoneId(anchorSampleId);
+                    }
+                }
+            }
+
             if (mirrored) position = MirrorUtility.ReflectPointAcrossX(position);
 
             int nearestIndex = 0;
             float nearestDistance = float.PositiveInfinity;
-            for (int i = 0; i < snapshot.Body.SamplePositions.Count; i++)
+            for (int i = 0; i < samplePositions.Count; i++)
             {
-                float distance = (snapshot.Body.SamplePositions[i] - position).sqrMagnitude;
+                float distance = (samplePositions[i] - position).sqrMagnitude;
                 if (distance < nearestDistance)
                 {
                     nearestDistance = distance;
@@ -242,20 +303,7 @@ namespace ProceduralCreature.Skeleton
                 }
             }
 
-            return ResolveBodySocketBoneId(snapshot.Body.SampleIds[nearestIndex]);
-        }
-
-        private static string ResolveAnchorSocketBoneId(ResolvedBody body, ResolvedPartSnapshot part)
-        {
-            if (!part.HasBodySurfaceAnchor) return null;
-            for (int i = 0; i < body.SampleIds.Count - 1; i++)
-            {
-                if (body.SampleIds[i] == part.BodySurfaceAnchorSegmentStartSampleId)
-                {
-                    return ResolveBodySocketBoneId(part.BodySurfaceAnchorSegmentStartSampleId);
-                }
-            }
-            return null;
+            return ResolveBodySocketBoneId(sampleIds[nearestIndex]);
         }
     }
 }
