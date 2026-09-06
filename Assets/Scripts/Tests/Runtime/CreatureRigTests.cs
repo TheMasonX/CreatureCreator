@@ -158,5 +158,52 @@ namespace ProceduralCreature.Tests.Runtime
             Debug.Log($"ApplyPose repeated=1000 allocatedBytes={allocated} elapsedMilliseconds={stopwatch.Elapsed.TotalMilliseconds:F3}");
             Assert.AreEqual(0L, allocated);
         }
+
+        [Test]
+        public void RigHostSpace_IdentityRoot_BoneWorldPositionMatchesCreatureCoordinate()
+        {
+            var host = new GameObject("RigHost");
+            _objects.Add(host);
+            var skeleton = new Skeleton.Skeleton();
+            skeleton.Bones.Add(new Bone
+            {
+                Id = "root",
+                Position = new Vector3(1f, 2f, 3f),
+                Rotation = Quaternion.identity,
+            });
+
+            CreatureRig rig = host.AddComponent<CreatureRig>();
+            rig.Build(skeleton);
+
+            // At an identity host the bone's world position is the creature-space
+            // coordinate directly (the reference behavior of the space contract).
+            Assert.That(Vector3.Distance(rig.Bones["root"].position, new Vector3(1f, 2f, 3f)), Is.LessThan(1e-5f));
+        }
+
+        [Test]
+        public void RigHostSpace_NonIdentityRoot_DoesNotOffsetBoneWorldPosition()
+        {
+            var host = new GameObject("RigHost");
+            host.transform.position = new Vector3(10f, 0f, 0f);
+            _objects.Add(host);
+            var skeleton = new Skeleton.Skeleton();
+            skeleton.Bones.Add(new Bone
+            {
+                Id = "root",
+                Position = new Vector3(1f, 0f, 0f),
+                Rotation = Quaternion.identity,
+            });
+
+            CreatureRig rig = host.AddComponent<CreatureRig>();
+            rig.Build(skeleton);
+
+            // CreatureRig is not a world-space adapter: it writes the
+            // creature-space coordinate as the bone's world position without
+            // composing the host transform, so a non-identity host does not
+            // offset the bone. This documents why the host must remain at
+            // identity (the explicit space-contract invariant).
+            Assert.That(Vector3.Distance(rig.Bones["root"].position, new Vector3(1f, 0f, 0f)), Is.LessThan(1e-5f));
+            Assert.That(Vector3.Distance(rig.Bones["root"].position, new Vector3(11f, 0f, 0f)), Is.GreaterThan(1f));
+        }
     }
 }

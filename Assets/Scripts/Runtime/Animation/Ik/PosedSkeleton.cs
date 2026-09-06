@@ -13,6 +13,12 @@ namespace ProceduralCreature.Animation.Ik
     /// get a new PosedSkeleton back from WithUpdatedPositions rather than mutating
     /// one in place). A rest Skeleton never changes; a PosedSkeleton is created
     /// fresh each time a solve happens and replaces the previous one.
+    ///
+    /// PosedSkeleton is finite-by-construction: every position held by an
+    /// instance is a finite Vector3. The single creation choke point (the
+    /// private constructor) rejects any non-finite value, and the pose-mutation
+    /// boundary (WithUpdatedPositions) rejects non-finite updates so invalid
+    /// input cannot reach downstream pose application.
     /// </summary>
     public sealed class PosedSkeleton
     {
@@ -21,6 +27,14 @@ namespace ProceduralCreature.Animation.Ik
 
         private PosedSkeleton(SkeletonSnapshot skeleton, Vector3[] positions)
         {
+            for (int i = 0; i < positions.Length; i++)
+            {
+                if (!NumericValidity.IsFinite(positions[i]))
+                {
+                    throw new DomainException(
+                        $"PosedSkeleton positions must be finite; got ({positions[i].x}, {positions[i].y}, {positions[i].z}).");
+                }
+            }
             _skeleton = skeleton;
             _positions = positions;
         }
@@ -77,6 +91,11 @@ namespace ProceduralCreature.Animation.Ik
                 if (!_skeleton.TryGetIndex(update.Key, out int index))
                 {
                     throw new DomainException($"Bone '{update.Key}' has no position in the rest skeleton.");
+                }
+                if (!NumericValidity.IsFinite(update.Value))
+                {
+                    throw new DomainException(
+                        $"Bone '{update.Key}' pose update must be finite; got ({update.Value.x}, {update.Value.y}, {update.Value.z}).");
                 }
                 merged[index] = update.Value;
             }

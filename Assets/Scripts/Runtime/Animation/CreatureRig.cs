@@ -10,6 +10,16 @@ namespace ProceduralCreature.Animation
     /// Unity adapter for an inferred creature skeleton. The semantic skeleton and
     /// pose remain pure data; this component owns only its generated Transform
     /// hierarchy and applies poses in world space.
+    ///
+    /// Space contract: pose coordinates are creature-space. This adapter applies
+    /// them directly as world positions/rotations on the generated bone
+    /// Transforms without composing the rig host GameObject's own transform
+    /// (CreatureRig is not a world-space adapter that offsets creature-space
+    /// coordinates by a rig root transform). The host GameObject's transform
+    /// must therefore remain at identity (position zero, rotation identity,
+    /// scale one) for the generated hierarchy to be placed and driven
+    /// predictably. Keeping the host at identity is an explicit invariant; do
+    /// not move, rotate, or scale the GameObject that owns this component.
     /// </summary>
     public sealed class CreatureRig : MonoBehaviour
     {

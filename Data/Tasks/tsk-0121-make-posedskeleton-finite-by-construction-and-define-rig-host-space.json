@@ -4,7 +4,7 @@
   "title": "Make PosedSkeleton finite-by-construction and define the rig host-space contract",
   "description": "## Summary\n\nMake runtime pose injection finite-by-construction and make the rig\u0027s creature-space vs world-space host-transform contract explicit. An external audit (P1) found \u0060PosedSkeleton.WithUpdatedPositions\u0060 accepts arbitrary \u0060Vector3\u0060 including NaN/Infinity, which can reach \u0060CreatureRig.ApplyPose\u0060 and pollute transforms/derived rotations.\n\nProvenance: \u0060docs/audits/creaturecreator-deep-dive-code-review-2026-09-05.md\u0060 P1 (PosedSkeleton finite) and P2 (CreatureRig creature-space vs world-space ambiguity). Verified at current HEAD \u006099fe6ad\u0060. Broad owner family: TSK-0073 (pose/rig) / TSK-0118 (indexed pose-application residuals); no existing TSK owns this finite-pose validation explicitly.\n\n## Scope\n\n- \u0060Assets/Scripts/Runtime/Animation/Ik/PosedSkeleton.cs\u0060: \u0060WithUpdatedPositions\u0060 must reject any non-finite update value using the existing shared \u0060NumericValidity.IsFinite(Vector3)\u0060. Reject earlier (at the pose-mutation boundary) so downstream pose application does not need to defensively sanitize arbitrary vectors.\n- State the invariant \u0022PosedSkeleton is finite-by-construction\u0022 in the type docs.\n- Document the \u0060CreatureRig\u0060 space contract: either (a) \u0060CreatureRig\u0060 is a world-space adapter that transforms creature-space pose coordinates by the rig root transform, or (b) \u0060CreatureRig\u0060 must live at identity as an explicit invariant. Pick one, update the class comment, and cover it with a focused test.\n- Do not change pose math or locomotion ownership (locomotion stays out of scope).\n\n## Acceptance Criteria\n\n- \u0060WithUpdatedPositions\u0060 throws \u0060DomainException\u0060 for a NaN or Infinity in each vector component; a fully finite update is accepted.\n- The chosen \u0060CreatureRig\u0060 space contract is documented and covered by a focused test (identity-root reference behavior and/or non-identity root behavior per the chosen contract).\n- No regression in existing IK / pose-application behavior.\n\n## Validation\n\nFocused runtime/EditMode tests for finite pose rejection and the rig root-space contract. Run the full Unity runtime suites. Static source inspection alone cannot close this task.\n\n## Findings\n\n- \u0060WithUpdatedPositions\u0060 only checks that the bone ID exists, then writes the supplied vector directly into the new pose with no finite validation.\n- The wider runtime already treats finite authored state as a hard precondition (\u0060TransformData.IsFinite\u0060 -\u003E \u0060NumericValidity\u0060).\n- \u0060BoneSnapshot.Position\u0060/\u0060BonePose\u0060 describe creature-space frames while \u0060CreatureRig\u0060 assigns them to \u0060Transform.position\u0060; the host-transform (identity) assumption is implicit.\n\n## Blockers\n\nNone known.\n\n## Next Step\n\nAdd the finite guard and decide/document the rig space contract, then add the focused tests.",
   "type": "Bug Fix",
-  "status": "Backlog",
+  "status": "Done",
   "priority": "High",
   "assigneeMode": "Custom",
   "assigneeDirectoryId": null,
@@ -24,16 +24,23 @@
   "attachments": [],
   "externalLinks": [],
   "linkedPages": [],
-  "comments": [],
+  "comments": [
+    {
+      "id": "c-fa06f9eb8c354041a759935842f8da3c",
+      "author": "anonymous",
+      "body": "Round 2 implementation complete.\n\nHypothesis (stated before editing): WithUpdatedPositions accepted NaN/Infinity and wrote it into the pose; CreatureRig host-space contract undocumented. Discriminating check: finite guard makes previously-accepted NaN update throw DomainException; rig contract documented \u002B tested. Both confirmed.\n\nChanges:\n- PosedSkeleton.cs: private constructor (single creation choke point) now rejects non-finite positions -\u003E finite-by-construction for ALL creation paths (FromRestPose \u002B WithUpdatedPositions). WithUpdatedPositions rejects non-finite per-update at the pose-mutation boundary with a bone-identifying DomainException. Uses existing shared NumericValidity.IsFinite(Vector3) (no second guard). Type docs state \u0022PosedSkeleton is finite-by-construction\u0022.\n- CreatureRig.cs: class comment now states the space contract explicitly (option b): CreatureRig applies creature-space coordinates directly as world transforms and is NOT a world-space adapter composing the host transform, so the host GameObject must remain at identity (explicit invariant). Chose (b) over (a) because (a) would require composing host transform = pose-math/ApplyPose semantic change, out of scope.\n- New PosedSkeletonTests.cs: NaN-per-component, Infinity-per-component, fully-finite accepted, non-finite rest pose rejected.\n- CreatureRigTests.cs: two host-space contract tests (identity-root reference; non-identity root does not offset bones -\u003E why host must stay identity).\n\nValidation evidence:\n- dotnet build ProceduralCreature.Runtime.csproj --no-restore: succeeded, exit 0, 0 errors/0 warnings.\n- dotnet build ProceduralCreature.Tests.Runtime.csproj --no-restore: succeeded, exit 0, 0 errors/0 warnings.\n- git diff --check: clean (exit 0).\n- Unity EditMode (connected editor): full editor suite 125/125 passed.\n- Unity PlayMode runtime suite: 507/507 passed, 0 failed, 0 skipped. New tests confirmed passing: PosedSkeletonTests (4) \u002B CreatureRigTests RigHostSpace (2).\n\nResidual risk: chose documentation \u002B focused test for the rig identity invariant rather than a runtime guard/throw, to avoid changing ApplyPose/Build semantics (out of scope). No pose math or locomotion touched.",
+      "createdAtUtc": "2026-09-06T05:15:38.1855286Z"
+    }
+  ],
   "epicId": null,
   "parentId": "tsk-0073-runtime-bone-rig-and-pose-application-drive-bone-transforms-from-a-posedskeleton",
   "dueDateUtc": null,
   "createdAtUtc": "2026-09-06T04:25:29.4727307Z",
-  "updatedAtUtc": "2026-09-06T04:25:29.4727307Z",
-  "completedAtUtc": null,
-  "revision": 1,
+  "updatedAtUtc": "2026-09-06T05:15:40.8392302Z",
+  "completedAtUtc": "2026-09-06T05:15:40.8392302Z",
+  "revision": 4,
   "isArchived": false,
   "hasLoadError": false,
   "loadError": null,
-  "sourceFilePath": null
+  "sourceFilePath": "tsk-0121-make-posedskeleton-finite-by-construction-and-define-rig-host-space.json"
 }
