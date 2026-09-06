@@ -27,15 +27,21 @@
       "author": "anonymous",
       "body": "Audit synthesis 2026-09-04: S01 confirms DensityGrid.EstimateGradient subtracts \u002Binf samples even though archived CC-064 defines \u002Binf as absent. Own the extraction-side regression gate with finite, one-sided, and invalid-gradient policy tests; winding must never consume NaN. No implementation is claimed by the synthesis.",
       "createdAtUtc": "2026-09-04T22:46:16.3366158Z"
+    },
+    {
+      "id": "c-525dad9001ea430597f7e8a95d35d64d",
+      "author": "anonymous",
+      "body": "ROUND 2 (BeastMaster sub-slice, S01 gradient/winding regression gate): S01 verdict = ALREADY GUARDED at HEAD 5a82401; NO production change. Evidence: MarchingCubesExtractor.EmitTriangle winding prefers TryEstimateGradient, which returns false when the containing cell has any non-finite (\u002Binf/NaN) corner (added e1b078a), else falls back to EstimateGradient whose per-axis EstimateAxis is finite-aware (d040ed6: center non-finite -\u003E0; \u002Binf neighbor skipped via one-sided finite diff; never \u002Binf - \u002Binf as finite). Both gradient paths are always finite, so the winding decision Dot(faceNormal, gradient)\u003E=0 never consumes NaN/Inf. DensityGrid.cs and MarchingCubesExtractor.cs are clean at HEAD (no uncommitted changes).\n\nAdded committed regression gate (test-only): Assets/Scripts/Tests/Runtime/DensityGridGradientPolicyTests.cs (\u002B.meta). Six tests lock the gradient policy across finite, one-sided (field present on one side of an absent boundary), and invalid/absent (\u002Binf/NaN corner, \u002Binf center) cases, and assert the end-to-end winding decision never consumes NaN/Inf (per-triangle re-derived winding reference is finite and consistent; output finite/watertight/no co-directional edge; fixture grid provably contains \u002Binf corners so not vacuous). Deterministic hand-written ramp field injected via internal MutableSamples seam.\n\nValidation: git diff --check exit 0; dotnet build Tests.Runtime exit 0; Unity PlayMode focused 6/6 passed; full Runtime PlayMode suite 532/532 passed (526 prior \u002B 6 new). Test-only =\u003E no benchmark run (GenerateDataBenchmark not invoked; no production extraction HOT PATH touched). Broader TSK-0065 optimization matrix (sparse/compact-isocontour etc.) is separate scope and NOT attempted. Did NOT commit/push (orchestrator reviews). Task status left unchanged (broader scope still open).",
+      "createdAtUtc": "2026-09-06T21:37:15.0830101Z"
     }
   ],
   "epicId": null,
   "parentId": null,
   "dueDateUtc": null,
   "createdAtUtc": "2026-09-01T03:20:51.9637005Z",
-  "updatedAtUtc": "2026-09-04T22:46:16.3366158Z",
+  "updatedAtUtc": "2026-09-06T21:37:15.0830101Z",
   "completedAtUtc": null,
-  "revision": 2,
+  "revision": 3,
   "isArchived": false,
   "hasLoadError": false,
   "loadError": null,
