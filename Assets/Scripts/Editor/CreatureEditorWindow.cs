@@ -178,7 +178,7 @@ namespace ProceduralCreature.Editor
         private string _currentFilePath;
         private CreaturePreviewController _previewController;
 
-        private static readonly IDnaSerializer Serializer = new JsonDnaSerializer();
+        private static readonly JsonDnaSerializer Serializer = new JsonDnaSerializer();
         private const float MinimumAutoRegenerationDelaySeconds = 0.01f;
         private const string AutoRegenerationDelayKey = "ProceduralCreature.AutoRegenerationDelay";
         private const string PreviewVoxelsPerUnitKey = "ProceduralCreature.PreviewVoxelsPerUnit";

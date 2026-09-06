@@ -18,7 +18,7 @@ namespace ProceduralCreature.Serialization
     /// escapes). Reaching for a full package (Newtonsoft/System.Text.Json) is a
     /// reasonable upgrade once one is already a project dependency for another
     /// reason; nothing here blocks that swap since it's isolated behind
-    /// IDnaSerializer.
+    /// JsonDnaSerializer.
     /// </summary>
     internal static class MiniJsonReader
     {

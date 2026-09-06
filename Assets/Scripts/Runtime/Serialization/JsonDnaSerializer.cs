@@ -6,12 +6,30 @@ using ProceduralCreature.Definition;
 namespace ProceduralCreature.Serialization
 {
     /// <summary>
-    /// Default IDnaSerializer implementation. Serialize always canonicalizes first
-    /// (so callers never need to remember to do it themselves); Deserialize parses
-    /// structurally but performs no semantic validation — see IDnaSerializer's
-    /// contract notes.
+    /// Serializes/deserializes canonical CreatureDefinition JSON with schema/version
+    /// handling and deterministic formatting (implementation guide §11). Depends only
+    /// on the Definition model, never on generated state (§1.2 dependency rules).
+    ///
+    /// Serialize always canonicalizes the definition first —
+    /// <see cref="DefinitionCanonicalizer.Canonicalize"/> then
+    /// <see cref="CanonicalJsonWriter.Write"/> — so callers never need to remember
+    /// to do it themselves. It throws DomainException if the definition is not
+    /// finite/valid; callers should validate first (DefinitionValidator) so a bad
+    /// definition never reaches serialization in the first place.
+    ///
+    /// Deserialize parses JSON into a CreatureDefinition but does NOT validate the
+    /// result — callers must run DefinitionValidator on the returned definition
+    /// before using it for generation (§14: "Add load command that validates before
+    /// replacing current canonical state").
     /// </summary>
-    public sealed class JsonDnaSerializer : IDnaSerializer
+    /// <remarks>
+    /// <see cref="Deserialize"/> throws <see cref="DnaDeserializationException"/>
+    /// when the JSON is structurally malformed (not valid JSON, or missing a required
+    /// field). This is distinct from semantic validation — a structurally valid JSON
+    /// document with a NaN transform deserializes fine and is caught by
+    /// DefinitionValidator instead.
+    /// </remarks>
+    public sealed class JsonDnaSerializer
     {
         public string Serialize(CreatureDefinition definition)
         {

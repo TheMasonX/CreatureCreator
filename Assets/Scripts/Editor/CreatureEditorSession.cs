@@ -21,7 +21,7 @@ namespace ProceduralCreature.Editor
     public static class CreatureEditorSession
     {
         private const string SessionKey = "ProceduralCreature.WorkingDefinitionJson";
-        private static readonly IDnaSerializer Serializer = new JsonDnaSerializer();
+        private static readonly JsonDnaSerializer Serializer = new JsonDnaSerializer();
 
         public static void Save(CreatureDefinition definition)
         {

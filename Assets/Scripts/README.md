@@ -62,7 +62,7 @@ Tests/Editor/
   CreatureEditorSessionTests.cs          — verified against the real SessionState API
   CreatureUndoStateTests.cs              — the ScriptableObject wrapper's own round-trip behavior
     Serialization/
-      IDnaSerializer.cs, DnaDeserializationException.cs
+      DnaDeserializationException.cs
       MiniJsonReader.cs         — dependency-free JSON parser
       CanonicalJsonWriter.cs    — fixed field order/nesting/numeric formatting
       JsonDnaSerializer.cs
@@ -493,7 +493,7 @@ real Unity session before relying on it.
   Newtonsoft/System.Text.Json, so this layer has zero package dependencies. If your
   project already carries `com.unity.nuget.newtonsoft-json` for other reasons,
   swapping the parser is a contained change — it's fully isolated behind
-  `IDnaSerializer`.
+  `JsonDnaSerializer`.
 - Not compiled against a live Unity install (none available in the environment
   this was produced in) — reviewed carefully by hand, but run the test suite as
   your first step after dropping this in, before building anything on top of it.
