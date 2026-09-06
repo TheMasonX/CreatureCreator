@@ -1,0 +1,134 @@
+{
+  "Id": "creaturecreator-serialization-contract",
+  "Content": "FINE SLICE under creaturecreator-definition-model: the JSON DNA serialization contract (Assets/Scripts/Runtime/Serialization, namespace ProceduralCreature.Serialization). Boundary, exception taxonomy, canonical writer, isolated reader, schema versioning, gradient/curve form \u002B verticalOffset migration, additive optional fields, byte-stability tests.\n\n1) Serialize/deserialize boundary. JsonDnaSerializer.Serialize = DefinitionCanonicalizer.Canonicalize(definition) then CanonicalJsonWriter.Write(canonical) (JsonDnaSerializer.cs:16). It ALWAYS canonicalizes first so callers never must. Canonicalize throws DomainException (not DnaDeserializationException) on null input, null/has-null part, duplicate part Id, reserved part Id (CreatureDefinition.BodyId=\u0027body\u0027), parent cycle, null/invalid Body spline, non-finite or zero forward, non-finite transform, null/invalid gradient/curve/thickness/mesh attachment (DefinitionCanonicalizer.cs:30,139-247). Canonicalize does NOT validate/repair: it clones input (never mutates), quantizes, normalizes quaternions, and reorders; a definition that must be repaired is rejected. [Confirmed: source].\n\nDeserialize is STRUCTURAL ONLY: MiniJsonReader.Parse -\u003E tree walk -\u003E CreatureDefinition; it performs NO semantic validation. A structurally valid doc with a NaN transform deserializes fine and is caught later by DefinitionValidator, not the reader (IDnaSerializer.cs:27-40 doc). [Confirmed: source \u002B IDnaSerializer contract].\n\nException taxonomy (DnaDeserializationException.cs): DnaDeserializationException = structural malformation (not valid JSON, wrong type, missing required field, unknown enum value). It is deliberately NOT a DomainException (reserved for programmer errors) and NOT a ValidationIssue (reserved for semantically-parseable-but-invalid creature content). Callers catch it around load and present \u0027this file is not a valid DNA document\u0027 rather than routing through content-validation UI. [Confirmed: class doc]. Inference: no catch sites were deep-dived this slice; editor/load routing is covered by the coarse editor record.\n\n2) CanonicalJsonWriter fixed order \u002B numeric formatting. \u0027Canonical\u0027 = fixed key order (declared, never dictionary-iteration order), fixed numeric formatting, fixed part ordering by Id ordinal. Top-level order: schemaVersion, symmetryMode, bounds, generation, forward, body, parts (CanonicalJsonWriter.cs:89-122). Part record order: id, displayName, parentId, partType, transform, shape, appearance, mirrorAcrossSymmetryPlane, parentAttachment, limbChain, meshGeometry (WritePart :226). Every float is emitted via Num() = value.ToString(\u0027F\u0027\u002BGenerationTolerances.QuantizationDecimalPlaces, InvariantCulture) i.e. F4 invariant (Num :440). Rationale: fixed F4 (never \u0027R\u0027 or \u0027G\u0027) makes output independent of both the host platform locale (InvariantCulture) and the specific float\u0027s shortest round-trip representation, which is the entire point of \u0027canonical\u0027; this is what makes Save-\u003Eload-\u003Ecanonical-save byte-stable (Sprint 1.3 exit gate, doc :27-40). Integers/uint (schemaVersion, ids) use InvariantCulture ToString, not F4. [Confirmed: source \u002B Num comment].\n\n3) MiniJsonReader scope \u002B isolation. Minimal recursive-descent, dependency-free parser (MiniJsonReader.cs:23) that emits plain Dictionary\u003Cstring,object\u003E/List\u003Cobject\u003E/string/double/bool/null and knows NOTHING about CreatureDefinition. It covers exactly the JSON subset CanonicalJsonWriter produces: no comments, no trailing commas, standard escapes incl \\uXXXX; parses numbers to double invariant. It is isolated behind the IDnaSerializer interface so swapping to Newtonsoft/System.Text.Json later is a contained change that does not touch callers. [Confirmed: source doc \u002B interface segregation].\n\n4) Schema v2 only. CreatureDefinition.CurrentSchemaVersion = 2. Deserialize rejects schemaVersion==1 explicitly with message \u0027Schema version 1 is unsupported; flat v1 DNA cannot be migrated without changing author intent\u0027, and rejects any version != 2 (JsonDnaSerializer.cs:26-37). v1 rejection asserted by test Deserialize_RejectsV1Explicitly. [Confirmed: source \u002B test].\n\n5) Gradient/curve canonical forms \u002B verticalOffset migration. Gradient canonical JSON = {mode, colorKeys:[{time,color:{r,g,b,a}}], alphaKeys:[{time,alpha}}]} (WriteGradient :194, ReadGradient :162); mode survives round-trip. Curve canonical JSON = {keys:[{time,value,inTangent,outTangent}]} (WriteCurve :172, ReadCurve :127); wrap modes not serialized (input always clamped to [0,1]), weighted/constant tangents normalized away. Legacy pre-CC-025 gradient stored as array [{t,color}] still loads (single stop expands to 2-key solid with alpha=color.a; ReadLegacyGradient). [Confirmed: source \u002B Deserialize_LegacyArrayGradientFormat_LoadsAsGradient].\n\nverticalOffset-\u003Ecurve migration (exact, not approximate): CurveAdapter.FromLegacyOffset(o) clamps o to [-1,1] and returns a 3-key piecewise-linear curve blend(u)=(o\u002B1)*u for u\u003C=0.5, blend(u)=o\u002B(1-o)*u for u\u003E=0.5 (CurveAdapter.cs:89-123). Reader picks: verticalCurve if present, else verticalOffset (via FromLegacyOffset), else default Linear (JsonDnaSerializer.cs:88-127). Writer ALWAYS emits verticalCurve, making migrated files resave in canonical curve form. Test asserts for o=0.5: 0.375@0.25, 0.75@0.5, 0.875@0.75 (Deserialize_LegacyVerticalOffset_MigratesToEquivalentCurve). [Confirmed: source \u002B test].\n\n6) Additive optional fields emitted null when absent -\u003E save-load-save byte-stable. meshGeometry (CC-031): writer always emits part.meshGeometry, null for parts without (WriteNullableMeshGeometry :254); missing/null loads null; pre-CC-031 v2 files load unchanged, no version bump. limbChain (CC-018): writer always emits part.limbChain, null for non-limb (WriteNullableLimbChain :286); joints preserve authored chain order (list order IS the chain); missing/null -\u003E null. materialKey (CC-028): appearance always writes materialKey; blank/whitespace materialKey is normalized to null so save-load-save is byte-stable regardless of authored whitespace (WriteAppearance); materialKey is a stable NAME, never a UnityEngine.Object reference. body appearance (CC-025/034): writer always emits body.appearance; a body JSON without appearance loads BodyVerticalGradientAppearance.CreateDefault() = flat gray \u002B Linear vertical curve (Deserialize_BodyWithoutAppearance_DefaultsToFlatGray). meshGeometry.attachment is optional, defaults to identity when absent. displayName (CC-084): authored DisplayName is preserved verbatim (null round-trips null) rather than substituting the part Id (WritePart :226). [Confirmed: source \u002B per-feature tests; the CC-084 displayName round-trip is source-confirmed with only coarse coverage \u2014 see open questions].\n\n7) Named byte-stability tests (all read this slice, all pass gate semantics). JsonDnaSerializerTests: Serialize_IsByteStableAcrossRepeatedCalls (:79), SaveLoadSave_ProducesByteStableJson (:147), Serialize_IsStableAcrossPartInsertionOrder (:128), plus Deserialize_RejectsV1Explicitly (:173), Deserialize_ThrowsOnMalformedJson (:160), Deserialize_ThrowsOnMissingRequiredField (:166). BodyVerticalGradientAppearanceTests: RoundTrip_SaveLoadSave_IsByteStableWithBodyAppearance (:700), RoundTrip_PreservesBodyVerticalGradientAppearance (:679), Deserialize_LegacyVerticalOffset_MigratesToEquivalentCurve (:771). JsonDnaSerializerLimbTests: RoundTrip_LimbChain_IsByteIdentical (:70), RoundTrip_NonLimbPart_SerializesNullLimbChain (:91). JsonDnaSerializerMeshGeometryTests: Serialize_SaveLoadSave_IsByteStable (:57), Serialize_PartWithoutMeshGeometry_EmitsNullAndLoadsNull (:66). JsonDnaSerializerMaterialKeyTests: Serialize_SaveLoadSave_IsByteStable (:92), Serialize_PartWithoutMaterialKey_EmitsNullAndLoadsNull (:67), Serialize_EmitsMaterialKeyByNameNotObject (:57), Deserialize_PreCc028FileWithoutField_LoadsNull (:101). Canonicalizer determinism: Canonicalize_QuantizesPositionToFourDecimalPlaces, Canonicalize_SortsPartsByIdRegardlessOfInputOrder (DefinitionCanonicalizerTests). [Confirmed: all tests read].\n\nRules: runtime serialization depends only on the Definition model, never on generated state or editor API. QuantizationDecimalPlaces=4 is the single fixed precision knob shared by canonicalization and the writer. Canonicalization ordering: parts under body appended DFS by Id ordinal, then remaining parts by Id ordinal (stable regardless of insertion order); body samples and limb joints keep authored order; gradient/curve/thickness keys are stably sorted by time by GradientAdapter.Quantize / CurveAdapter.Quantize / ThicknessProfile.Quantize. [Confirmed: source]. Classifications: all claims above are Confirmed (source \u002B named tests) unless marked otherwise.",
+  "Title": "CreatureCreator JSON DNA Serialization Contract",
+  "Status": 1,
+  "Confidence": 0.9,
+  "Tags": [
+    "kind:fact",
+    "scope:onboarding",
+    "serialization",
+    "json",
+    "canonical-writer",
+    "byte-stability",
+    "migration",
+    "schema",
+    "reader",
+    "dna"
+  ],
+  "References": [
+    "creaturecreator-definition-model",
+    "creaturecreator-tests-ops-validation"
+  ],
+  "Conflicts": [],
+  "Relationships": [
+    {
+      "sourceId": "creaturecreator-serialization-contract",
+      "targetId": "creaturecreator-definition-model",
+      "relationType": 0,
+      "origin": 0,
+      "createdAtUtc": "2026-09-06T04:51:26.5603973+00:00"
+    },
+    {
+      "sourceId": "creaturecreator-serialization-contract",
+      "targetId": "creaturecreator-tests-ops-validation",
+      "relationType": 0,
+      "origin": 0,
+      "createdAtUtc": "2026-09-06T04:51:26.5603973+00:00"
+    }
+  ],
+  "SourceLinks": [
+    {
+      "Label": "other:other:IDnaSerializer contract (boundary \u002B exceptions)",
+      "Uri": "Assets/Scripts/Runtime/Serialization/IDnaSerializer.cs",
+      "StartLine": 1,
+      "EndLine": 40
+    },
+    {
+      "Label": "other:other:JsonDnaSerializer serialize/deserialize \u002B version gate \u002B migration reads",
+      "Uri": "Assets/Scripts/Runtime/Serialization/JsonDnaSerializer.cs",
+      "StartLine": 16,
+      "EndLine": 303
+    },
+    {
+      "Label": "other:other:CanonicalJsonWriter fixed order \u002B F4 writer \u002B field reference",
+      "Uri": "Assets/Scripts/Runtime/Serialization/CanonicalJsonWriter.cs",
+      "StartLine": 89,
+      "EndLine": 455
+    },
+    {
+      "Label": "other:other:MiniJsonReader dependency-free parser",
+      "Uri": "Assets/Scripts/Runtime/Serialization/MiniJsonReader.cs",
+      "StartLine": 23,
+      "EndLine": 180
+    },
+    {
+      "Label": "other:other:DnaDeserializationException taxonomy",
+      "Uri": "Assets/Scripts/Runtime/Serialization/DnaDeserializationException.cs",
+      "StartLine": 1,
+      "EndLine": 22
+    },
+    {
+      "Label": "other:other:DefinitionCanonicalizer canonicalize \u002B ordering",
+      "Uri": "Assets/Scripts/Runtime/Definition/DefinitionCanonicalizer.cs",
+      "StartLine": 30,
+      "EndLine": 270
+    },
+    {
+      "Label": "other:other:CurveAdapter FromLegacyOffset \u002B Quantize \u002B validation",
+      "Uri": "Assets/Scripts/Runtime/Definition/CurveAdapter.cs",
+      "StartLine": 89,
+      "EndLine": 185
+    },
+    {
+      "Label": "other:other:GradientAdapter Quantize \u002B canonical form",
+      "Uri": "Assets/Scripts/Runtime/Definition/GradientAdapter.cs",
+      "StartLine": 1,
+      "EndLine": 240
+    },
+    {
+      "Label": "other:other:GenerationTolerances quantization precision",
+      "Uri": "Assets/Scripts/Runtime/Common/GenerationTolerances.cs",
+      "StartLine": 18,
+      "EndLine": 125
+    },
+    {
+      "Label": "other:other:Byte-stability \u002B v1-reject \u002B malformed tests",
+      "Uri": "Assets/Scripts/Tests/Runtime/JsonDnaSerializerTests.cs",
+      "StartLine": 79,
+      "EndLine": 173
+    },
+    {
+      "Label": "other:other:Body appearance byte-stable \u002B verticalOffset migration tests",
+      "Uri": "Assets/Scripts/Tests/Runtime/BodyVerticalGradientAppearanceTests.cs",
+      "StartLine": 679,
+      "EndLine": 800
+    },
+    {
+      "Label": "other:other:LimbChain byte-identical \u002B null tests",
+      "Uri": "Assets/Scripts/Tests/Runtime/JsonDnaSerializerLimbTests.cs",
+      "StartLine": 70,
+      "EndLine": 241
+    },
+    {
+      "Label": "other:other:MeshGeometry byte-stable \u002B null tests",
+      "Uri": "Assets/Scripts/Tests/Runtime/JsonDnaSerializerMeshGeometryTests.cs",
+      "StartLine": 57,
+      "EndLine": 66
+    },
+    {
+      "Label": "other:other:MaterialKey byte-stable \u002B null \u002B by-name tests",
+      "Uri": "Assets/Scripts/Tests/Runtime/JsonDnaSerializerMaterialKeyTests.cs",
+      "StartLine": 57,
+      "EndLine": 101
+    },
+    {
+      "Label": "other:other:Canonicalizer determinism tests",
+      "Uri": "Assets/Scripts/Tests/Runtime/DefinitionCanonicalizerTests.cs",
+      "StartLine": 33,
+      "EndLine": 186
+    }
+  ],
+  "UsageCount": 0,
+  "LastUpdated": "2026-09-06T04:56:05.339562Z"
+}

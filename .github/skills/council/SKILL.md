@@ -22,7 +22,7 @@ Produce a council report that includes:
 - Explicit disagreement and dissent; do not flatten differences into consensus
 - Risks, assumptions, and open questions
 - Acceptance criteria and evidence gates before implementation
-- Concrete `CC-###` task additions, modifications, or scope changes
+- Concrete MemorySmith task additions, modifications, or scope changes (TSK keys)
 
 ## When to Use
 
@@ -43,8 +43,9 @@ Collect these before running the workflow:
 
 - Decision topic and one-sentence question
 - Scope of impact: runtime, editor, serialization, generation, assets, tests, or docs
-- Primary evidence: `Assets/Scripts/README.md`, `docs/tasks/active-tasks.md`,
-  the relevant ticket, ADRs under `docs/adr/`, handoffs, audits, source, and tests
+- Primary evidence: `Assets/Scripts/README.md`, the relevant MemorySmith task(s)
+  (via `memorysmith_task_list`/`_get`), ADRs under `docs/adr/`, handoffs, audits,
+  source, and tests
 - Known stale documents, assumptions, validation gaps, or Unity constraints
 
 ## Procedure
@@ -54,7 +55,7 @@ Collect these before running the workflow:
 Start with the smallest relevant pack. Include:
 
 - `Assets/Scripts/README.md`
-- `docs/tasks/active-tasks.md` and the relevant `docs/tasks/tickets/CC-###-*.md`
+- The relevant MemorySmith task(s) (from `memorysmith_task_list`/`_get`)
 - Relevant ADRs under `docs/adr/`
 - Relevant handoffs under `docs/tasks/handoffs/`
 - Relevant audits under `docs/audits/`
@@ -121,13 +122,17 @@ ordering and quantization; skeleton inference and geometry share transform rules
 
 Apply only verified recommendations:
 
-- Create or update one canonical `CC-###` ticket per task
-- Update `docs/tasks/active-tasks.md` through the task tools when needed
+- Create or update one canonical MemorySmith task per work item (see
+  `task-tracker`)
+- Transition task status with `memorysmith_task_set_status` only after the
+  relevant gate passes
 - Update requirements or ADRs only when the decision changes those contracts
-- Add a handoff under `docs/tasks/handoffs/` for deferred work or next session
+- Record a handoff for deferred work or the next session on the owning
+  MemorySmith task (see `task-tracker`); do not create new Markdown handoffs
 - Keep audits as evidence; do not rewrite historical findings to hide dissent
 
-Run `python docs/tasks/tools/task_validate.py --strict` after task edits.
+Run the MemorySmith task-record check per `task-tracker` after task edits
+(no hand-edited `Data/Tasks/*.json`).
 
 ### 7. Record the Result
 
@@ -141,8 +146,8 @@ open questions, and links to the evidence pack.
   with rationale and a trigger condition.
 - **Phase paradox**: split the work, promote the dependency, or document why the
   ordering is intentional.
-- **Duplicate or conflicting task**: stop and reconcile the `CC-###` records
-  before recommending implementation.
+- **Duplicate or conflicting task**: stop and reconcile the MemorySmith task
+  records before recommending implementation.
 - **Evidence weakness**: defer implementation and define the missing Unity,
   source, serialization, topology, or editor evidence.
 - **Runtime/editor boundary risk**: keep the owning behavior in the correct
@@ -159,8 +164,9 @@ A council review is complete only when:
 - Acceptance criteria are testable or reviewable
 - Omitted tests or benchmarks have an exception rationale and follow-up gate
 - Open questions have an owner or evidence gate
-- `CC-###` task records and status reflect the recommendation
-- Task validation passes, or pre-existing failures are named explicitly
+- MemorySmith task records and status reflect the recommendation
+- Task records are current on MemorySmith (per `task-tracker`), or pre-existing
+  gaps are named explicitly
 
 ## Report Template
 
@@ -210,6 +216,6 @@ A council review is complete only when:
 ## References
 
 - [Subagent Swarm](../subagent-swarm/SKILL.md)
-- [Task Tracker](../../../docs/tasks/README.md)
+- [Task Tracker](../task-tracker/SKILL.md)
 - [Unity Validation](../unity-validation/SKILL.md)
 - [Source guide](../../../Assets/Scripts/README.md)

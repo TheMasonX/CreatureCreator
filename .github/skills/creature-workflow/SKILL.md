@@ -25,8 +25,9 @@ validation, and explicit residual risk.
 3. Load [engineering-guardrails](../engineering-guardrails/SKILL.md) for code,
    refactor, or architecture work. Apply its type, ownership, duplication,
    scope, and production-readiness gates before editing.
-4. Ensure the work has one MemorySmith task. Preserve direct user requirements
-   verbatim under `## User Mandate` and use the `user-mandated` label.
+4. Ensure the work has one MemorySmith task (see `task-tracker` for tool use,
+   statuses, and required fields). Preserve direct user requirements verbatim
+   under `## User Mandate` and use the `user-mandated` label.
 5. Edit the smallest owning slice. Keep `CreatureDefinition` authoritative and
    avoid duplicate DNA mutation or derivation paths.
 6. Run the narrowest executable validation immediately after the first edit.
@@ -49,7 +50,8 @@ validation, and explicit residual risk.
   and serialization boundaries.
 - Preserve documented simplifications unless the user requests a replacement.
 - Never claim Unity behavior from source inspection alone.
-- Do not edit `Data/Tasks/*.json` or create new historical `docs/tasks/` tickets.
+- Never edit `Data/Tasks/*.json` by hand; change task state only through
+  MemorySmith task tools. No Markdown/`CC-###` tickets exist.
 
 ## Handoff
 

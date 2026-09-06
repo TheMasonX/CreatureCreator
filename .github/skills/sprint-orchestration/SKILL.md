@@ -130,9 +130,8 @@ subagents inside one round. One round = one coherent change = one subagent.
 - SDF values are negative-inside / positive-outside. Symmetry is stored once;
   generation mirrors only the flagged part. Preserve documented simplifications
   unless the user requests a replacement.
-- Never add a competing DNA mutation/derivation path; never edit `Data/Tasks/*.json`
-  by hand (use MemorySmith task tools); never create new historical `docs/tasks/`
-  tickets.
+- Never add a competing DNA mutation/derivation path; never edit
+  `Data/Tasks/*.json` by hand (use MemorySmith task tools).
 - Repository state, not report text, is the source of truth. Task status is not
   implementation status — read source before assuming a gap exists.
 

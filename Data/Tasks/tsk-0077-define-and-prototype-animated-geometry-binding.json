@@ -33,15 +33,21 @@
       "author": "anonymous",
       "body": "Round 2 C4.5 focused validation (2026-09-05): diagnosed the failure as test-fixture construction, not production LinearBlendSkinning. SkeletonSnapshot already contains inferred mirrored absolute frames; the helper reflected those mirrored frames a second time, so rest round trip passed while posed bind/deform reflection failed. Corrected only Assets/Scripts/Tests/Runtime/LinearBlendSkinningTests.cs: mirrored bind/pose arrays consume SnapshotPoses(snapshot), source pose uses a local/rest-frame delta (rest rotation * Quaternion.AngleAxis(47, Vector3.right)), and mirrored posed absolute frame is ReflectPose(source posed frame). Existing semantic bone indices, binding contract, and MirrorUtility convention are unchanged. Connected Unity 6000.5.9f1 PlayMode focused test passed 1/1: Deform_ResolvedMirroredLimb_RestAndPosedResultsReflectBySemanticIdentity. Runtime builds passed: dotnet build ProceduralCreature.Runtime.csproj --no-restore (0 warnings, 0 errors); dotnet build ProceduralCreature.Tests.Runtime.csproj --no-restore (0 warnings, 0 errors). git diff --check passed. Batch Unity CLI attempt exited before test discovery with code 1 and no XML; connected editor validation is authoritative. No commit or push.",
       "createdAtUtc": "2026-09-06T03:47:04.3958805Z"
+    },
+    {
+      "id": "c-e52dcee760c64a559be095f22c5a81f9",
+      "author": "anonymous",
+      "body": "Audit synthesis (2026-09-05, deep-dive code reviews): TSK-0120 (child) now owns the LinearBlendSkinning finite-spatial-input validation and the MaxBoneInfluencesPerVertex enforcement decision. This extends TSK-0077\u0027s binding contract (CC-073). Provenance: docs/audits/creaturecreator-deep-dive-code-review-audit-26-09-05-23-07-45.md F2/F3 and docs/audits/creaturecreator-deep-dive-code-review-2026-09-05.md P1 items. Do not duplicate.",
+      "createdAtUtc": "2026-09-06T04:25:59.2817487Z"
     }
   ],
   "epicId": null,
   "parentId": null,
   "dueDateUtc": null,
   "createdAtUtc": "2026-09-01T03:20:52.269603Z",
-  "updatedAtUtc": "2026-09-06T03:47:04.3958805Z",
+  "updatedAtUtc": "2026-09-06T04:25:59.2817487Z",
   "completedAtUtc": null,
-  "revision": 4,
+  "revision": 5,
   "isArchived": false,
   "hasLoadError": false,
   "loadError": null,

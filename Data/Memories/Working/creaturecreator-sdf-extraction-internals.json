@@ -1,0 +1,172 @@
+{
+  "Id": "creaturecreator-sdf-extraction-internals",
+  "Content": "FINER slice over creaturecreator-generation-morphology covering two coupled subsystems under Assets/Scripts/Runtime/Morphology/: the blittable SDF program model (Sdf/), and the contour/mesh extraction internals (Extraction/). Sign convention is negative-inside / positive-outside everywhere; surface is sampled value 0 (Assets/Scripts/Runtime/Common/GenerationTolerances.cs). [Confirmed]\n\n(1) BLITTABLE SdfProgram \u002B OP MODEL \u002B ALLOCATOR OWNERSHIP. SdfProgram (Sdf/SdfProgram.cs) is a sealed IDisposable owning one NativeArray\u003CSdfOperation\u003E (Allocator.Persistent) plus RootIndex, InfluenceRadius (max SmoothUnion blend radius \u002B 1e-4), and an optional root potential-bound envelope (HasPotentialBounds/PotentialMinBound/MaxBound). [Confirmed] SdfOperation is a plain blittable struct: Type, child indices A/B, float3 Parameters, float4x4 Matrix, DistanceScale, MinBound/MaxBound, and bool Cullable. [Confirmed] Op types: Empty, Sphere, Box, Capsule, Ellipsoid, Transform, Symmetry, SmoothUnion. [Confirmed] Ownership: SdfProgram.Dispose disposes its NativeArray; MutableOperations is internal (builder writes before sealing); callers see a ReadOnly view. Consumers must Dispose the program (using pattern in tests). [Confirmed] A resolved part binds to one sub-program via ResolvedPartProgram (ResolvedPartSnapshot \u002B SdfProgram), keeping detached snapshot data rather than an authored CreaturePart reference. [Confirmed]\n\n(2) DETERMINISTIC ID-ORDERED FOLD \u002B BODY-FIRST COMPOSITION. SdfProgramBuilder (Sdf/SdfProgramBuilder.cs) is read-only over its input (never mutates DNA). [Confirmed] Parts are folded into the creature union in ascending Id order using System.StringComparer.Ordinal regardless of Parts authoring order - the same ordering rule DefinitionCanonicalizer uses for serialization. [Confirmed] Parent hierarchy is used ONLY for world-transform resolution (CreaturePartWorldTransformResolver) and is kept separate from SDF composition order. [Confirmed] The Body spline field is composed FIRST as the primary field, then each part is smooth-unioned onto the accumulated root (previousRoot/root fold). [Confirmed] Body samples are ordered by authoritative spline order (list index), not by Id, because sample order IS the spline. [Confirmed] Within the fold each new part is SmoothUnion onto the previous cumulative root with PartUnionBlendRadius(part): a limb part\u0027s blend comes from LimbChain.BlendRadius (ShapeDefinition.SmoothBlendRadius is inert for limbs, CC-018/ADR-001), a shape part\u0027s blend is its Shape.SmoothBlendRadius; mesh-asset parts (HasMeshGeometry, CC-031) never enter the implicit field (continue). [Confirmed] Smooth unions between adjacent Body samples and adjacent derived limb metaballs use a deterministic BodySampleBlendFactor/LimbSampleBlendFactor = 0.5f of the smaller adjacent radius (no per-sample schema field). [Confirmed]\n\n(3) SIGN CONVENTION \u002B NON-FINITE EVALUATOR CONTRACT (\u002Binf=outside, NaN=invalid) AND WHERE ENFORCED. CC-064 contract: \u002Binf means outside/culled/absent (never a giant valid distance); NaN is always invalid; -inf invalid for sampling; finite is the evaluated field. [Confirmed] Fast culling (CC-063, the only runtime mode) writes float.PositiveInfinity for a skipped operation. [Confirmed] Enforcement sites verified in source\u002Btests: (a) SdfProgramEvaluator.SmoothMin short-circuits \u002Binf children before blending because math.lerp(b,a,h) is NaN on inf*0 - returns min(a,b); [Confirmed] (b) CubeContourResolver.InterpolateEdge guards NaN (midpoint) and \u002Binf endpoints (clamp t to the finite endpoint) so a crossed edge with one culled endpoint never leaks NaN/out-of-range vertex; [Confirmed] (c) DensityGrid.EstimateGradient treats \u002Binf/NaN as absent and falls back to one-sided finite differences (never \u002Binf - \u002Binf -\u003E NaN); [Confirmed] (d) appearance selection must treat all-\u002Binf candidates as absent -\u003E default appearance, not the Body gradient (finite-body guard; the old \u002Binf\u003C=\u002Binf made Body \u0027win\u0027); [Confirmed via SdfNonFiniteFieldContractTests] (e) ActiveCellScanJob and the extractor replicate NormalizeSurfaceDensity which leaves \u002Binf as \u002Binf and NaN as NaN (Abs(NaN)\u003C=eps is false). [Confirmed] GenerationTolerances.NormalizeSurfaceDensity: returns 0 when |d| \u003C= ScalarComparisonEpsilon (1e-3) else the value unchanged. [Confirmed]\n\n(4) NON-UNIFORM SCALING = MIN-AXIS distanceScale APPROXIMATION; ELLIPSOID IS NOT Cullable. A part\u0027s creature-space matrix lossyScale yields distanceScale = min(|sx|,|sy|,|sz|) and each Transform op multiplies its child\u0027s field by DistanceScale - a documented non-uniform-scaling approximation (an SDF under non-uniform scale is not a true distance; the min axis is used). [Confirmed] Culling is proof-based: an op is skipped only when it is Cullable AND its valid world AABB inflated by InfluenceRadius does not contain the point. [Confirmed] Ellipsoid and any subtree containing one are NOT Cullable, because the approximate ellipsoid field can be smaller than the AABB distance, so AABB alone is not a culling proof (SdfOperation.Cullable doc). [Confirmed] Builder sets Cullable on a Transform op only when the wrapped primitive is not Ellipsoid (AppendResolvedPrimitive: SetCullable(..., primitiveType != Ellipsoid)); SmoothUnion/Symmetry Cullable = AND of children. [Confirmed] An AABB culling site must check the Cullable flag, never bounds alone. [Confirmed]\n\n(5) EXTRACTION DESIGN. MarchingCubesExtractor (Extraction/MarchingCubesExtractor.cs) does not carry a 256-row MC triangulation table. Rationale documented at class level in CubeTopology/CubeContourResolver: a large externally-sourced lookup table cannot be compile-verified in this environment, so extraction is built from a small, individually-reasoned topology \u002B a per-face asymptotic decider instead. [Confirmed as stated rationale; Inference that no hidden table exists is Confirmed by reading the files - none reference a 256-row table.] Extraction path: DensityGrid.SamplePortable samples the SDF with a Burst IJobParallelFor (SdfSamplingJob) into a NativeArray\u003Cfloat\u003E, batching over a scratch buffer budgeted at 8MiB; cellSize = 1/VoxelsPerUnit; origin at -bounds maxima. [Confirmed] ActiveCellBuilder runs a Burst single-threaded ActiveCellScanJob that classifies every cell once (epsilon-normalized signs; case bit c set when corner c normalized \u003E= 0) and retains only mixed-sign cells (case != 0 and != 255) in increasing global cell index order (z-major,y,x), so homogeneous volume is never re-traversed during contour resolution and output ordering is deterministic. [Confirmed] MeshExtractionResult.ContourResolutionCallCount == MixedCellCount is asserted in tests, proving homogeneous cells never reach the resolver. [Confirmed]\n\nCube topology (Extraction/CubeTopology.cs) uses one self-consistent bit-interleaved corner convention: corner i (0-7) at (i\u00261, (i\u003E\u003E1)\u00261, (i\u003E\u003E2)\u00261) = bit0 x, bit1 y, bit2 z. [Confirmed] 12 edges connect corners differing in exactly one bit (EdgeCorners); 6 faces list 4 corners in cyclic order (FaceCorners) plus matching cyclic FaceEdges. Self-consistency is compile-time-verified by CubeTopologyTests (every edge appears in exactly 2 faces; every face edge matches a real EdgeCorners entry; corner grid offsets match corner offsets; each face has 4 distinct corners). [Confirmed]\n\nCubeContourResolver (Extraction/CubeContourResolver.cs) builds boundary loops per cube from 8 corner densities in three steps: (1) per-face segments - a face has 0, 2, or 4 crossed cyclic edges (never 1 or 3, since sign changes around a closed cycle are even); 0 =\u003E nothing, 2 =\u003E the single valid pairing, 4 =\u003E ambiguous checkerboard resolved by AsymptoticDecider.DiagonalConnectsThroughMiddle (through-the-middle \u0027B\u0027 pairing groups (e0,e1)\u002B(e2,e3); \u0027A\u0027 separated groups (e3,e0)\u002B(e1,e2)); [Confirmed] (2) loop tracing - every crossed cube edge borders exactly 2 faces and is used by exactly one segment from each, so every edge-crossing point has degree exactly 2 and the segment graph decomposes into disjoint closed loops with no special-casing (a topological guarantee, asserted by a degree-2 DomainException check in TraceLoops); [Confirmed] (3) triangulation happens outside (in MarchingCubesExtractor) via fan triangulation from the first loop vertex, documented as safe/non-self-intersecting for the star-shaped loops at target resolutions and a known simplification (revisit ear-clipping only if coarse golden fixtures show self-intersection). [Confirmed]\n\nWHY THIS ELIMINATES HOLES (delta-audit item #1): two cubes sharing a face compute the ambiguous-face decision from the exact same four corner densities, so they always agree on that face\u0027s connectivity - there is no separate per-cube table row to disagree; the decision is a direct function of shared data. Confirmed by test CubeContourResolverTests.SharedFace_BothOrientationsOfTheSameDataProduceTheSameFaceDecision which feeds the same four physical values in the two orders a neighbor cube would present and asserts equal decisions. [Confirmed]\n\nAsymptoticDecider (Extraction/AsymptoticDecider.cs, Nielson \u0026 Hamann 1991): IsFaceAmbiguous is a pure sign test (diagonal pairs (c0,c2),(c1,c3) each same sign but disagree with each other =\u003E checkerboard) and can never be wrong regardless of values. [Confirmed] DiagonalConnectsThroughMiddle evaluates the bilinear saddle value f(u*,v*)=(v00*v11-v01*v10)/D, D=v00-v10-v01\u002Bv11; if saddle sign == the shared diagonal (v00==v11) sign the region connects through the middle, else separated. Degenerate D (bilinear planar along a direction) falls back consistently to \u0027separated\u0027/false; both cubes compute identical D from identical shared corners so consistency (the only property needed to close holes) is preserved. [Confirmed]\n\nHAND-WORKED DECIDER-CHANGES-TOPOLOGY EXAMPLES (CubeContourResolverTests \u002B AsymptoticDeciderTests, all predicted by hand from the documented rules, not smoke tests): (a) single corner 0 inside =\u003E exactly one 3-vertex loop on its incident edges {0,4,8}; [Confirmed] (b) corners 0,3 inside with weak off-diagonal outside corners (-1,1,1,-1 top face out) =\u003E decider \u0027separated\u0027 =\u003E two separate corner-cutoff triangles (edges {0,4,8} and {1,5,11}); [Confirmed] (c) same sign pattern but strong diagonal (-10,1,1,-10) =\u003E decider flips \u0027through the middle\u0027 =\u003E ONE connected hexagonal loop using all 6 crossed edges {0,1,4,5,8,11}. So the decider\u0027s magnitude decision changes the topology for the same sign case. [Confirmed] Direct decider math pinned in AsymptoticDeciderTests: -10,-10 diagonal vs \u002B1,\u002B1 off-diagonal (D=-22, saddle -4.5) =\u003E through-middle true; \u002B1,\u002B1 vs -10,-10 (D=22, saddle -4.5, opposite sign) =\u003E false; symmetric under v00\u003C-\u003Ev11 swap; degenerate denominator returns false without NaN. [Confirmed]\n\nWELDING \u002B GRADIENT WINDING \u002B ZERO-VALUE CORNERS (MarchingCubesExtractor). Vertex welding keys a shared dictionary by edge identity (lower corner\u0027s grid coords \u002B axis), independent of which of up-to-8 cubes computed a crossing, so neighboring cubes reuse the SAME output vertex - producing a connected (welded) mesh rather than per-cube duplicated coincident vertices; this is what delivers smooth-skinning-friendly topology, not just hole closure. [Confirmed] Welding is asserted structurally by MarchingCubesExtractorTests.Extract_VertexCountIsWeldedNotPerCubeDuplicated: welded closed genus-0 mesh satisfies Euler V-E\u002BF=2. [Confirmed] Winding: CubeContourResolver loop direction is not guaranteed outward; instead each triangle\u0027s winding is corrected independently by comparing its geometric face normal to a finite-difference gradient (EstimateGradient) at the triangle centroid from cached grid samples - a correctly wound outward triangle\u0027s normal points generally along the gradient (density increases inside-\u003Eoutside). This is a safe local per-triangle fix that avoids global winding arguments and avoids re-evaluating the SDF during extraction. [Confirmed] Degenerate (near-zero-area) triangles are skipped rather than emitted. [Confirmed] Zero-value grid corners: an exact normalized-0 grid corner is represented as an intersection on every incident crossed edge; ResolveVertexIndex keys by the corner identity (axis -1) using the normalized ENDPOINT value rather than comparing interpolated positions, because near-zero values yield slightly different floating-point positions across edges incident to the same corner. [Confirmed]\n\nMeshExtractionResult (Extraction/MeshExtractionResult.cs) is plain data (positions, triangle indices, timing/accounting counters, optional angle-weighted normals) intentionally free of Unity Mesh until ToUnityMesh(); normals/UVs are Phase 4 appearance-baking concerns (design doc 8), keeping extraction independently testable. [Confirmed] ComputeAngleWeightedNormals accumulates per-vertex face normal * subtended angle, idempotent, recomputed from scratch. [Confirmed]\n\n(6) MeshTopologyValidator (Extraction/MeshTopologyValidator.cs) meaning of watertight: IsWatertight == (NonManifoldEdgeCount==0 \u0026\u0026 BoundaryEdgeCount==0), where every undirected edge is counted by the number of triangles sharing it; count==1 is a boundary edge (a hole), count\u003E2 a non-manifold edge (self-intersecting/duplicated). This is the actual safety net for the hand-derived contour logic (delta-audit #1): it checks \u0027no holes\u0027 directly on output rather than trusting derivation. [Confirmed] Tests: single triangle =\u003E 3 boundary edges, not watertight; tetrahedron =\u003E watertight with 6 total edges; sphere / overlapping spheres at target resolution =\u003E watertight; full generation via CreatureMeshGenerator (Fast culling) yields a finite, watertight mesh. [Confirmed]\n\n(7) PARITY \u002B DETERMINISM (CC-008). MarchingCubesExtractorParityTests assert the active-cell extractor output is byte-for-byte identical (vertex count, each position, triangle index list, bounds, mixed-cell count) to a separate reference extractor (Tests/Runtime/MarchingCubesReferenceExtractor.cs) on the same sampled grid, for sphere, overlapping spheres, empty field, and body-spline-with-limb, plus determinism across repeated Extract calls and per-mixed-cell contour-call accounting. [Confirmed] Fast-culling generation is deterministic across runs (SdfCullingModeTests.FastCulling_IsDeterministic). [Confirmed]\n\nSIMPLIFICATIONS/ASSUMPTIONS (documented in code, keep unless requested otherwise): non-uniform SDF scaling via min-axis distanceScale; fan triangulation; face-only Asymptotic Decider handling (per-face saddle; no interior/cube-level saddle beyond the 6 faces); nearest-part appearance selection (separate subsystem); zero-measure degenerate-saddle fallback; Border/edge gradient one-sided fallback. These match the BeastMaster \u0027documented simplifications\u0027 invariant. [Confirmed as documented]\n\nNOTE ON VERIFICATION SCOPE: All claims above are Confirmed from direct source reading \u002B nearest test assertions. NO Unity/PlayMode execution was performed in this read-only pass, so runtime parity/watertight results are cited as test-asserted (source-level Confirmed), not independently re-run. Marked Confidence 0.9 (not \u003E=0.9 upper boundary of the Confirmed\u002Btest tier is not reached because no tests were executed this session and a few derivations are single-source). Open questions: (1) whether the fan-triangulation simplification ever self-intersects at very coarse resolution (flagged for golden-fixture revisit in code); (2) whether a cube-interior (not just per-face) saddle ambiguity beyond the 6 faces is ever reachable - code documents only face-level handling; (3) the exact allowed-source-root config for SourceLinks resolution (this draft uses repo-relative paths per request; the coarse record currently reports source.unresolved diagnostics).",
+  "Title": "CreatureCreator SDF Blittable Program Model \u002B Mesh Extraction Internals (no 256-row MC table, decider, welding, winding, topology validator)",
+  "Status": 1,
+  "Confidence": 0.9,
+  "Tags": [
+    "kind:fact",
+    "scope:onboarding",
+    "audience:agent",
+    "sdf",
+    "marching-cubes",
+    "burst",
+    "extraction",
+    "mesh",
+    "morphology",
+    "asymptotic-decider",
+    "welding",
+    "topology"
+  ],
+  "References": [
+    "creaturecreator-generation-morphology",
+    "creaturecreator-architecture-and-invariants"
+  ],
+  "Conflicts": [],
+  "Relationships": [
+    {
+      "sourceId": "creaturecreator-sdf-extraction-internals",
+      "targetId": "creaturecreator-generation-morphology",
+      "relationType": 0,
+      "origin": 0,
+      "createdAtUtc": "2026-09-06T04:51:08.5587729+00:00"
+    },
+    {
+      "sourceId": "creaturecreator-sdf-extraction-internals",
+      "targetId": "creaturecreator-architecture-and-invariants",
+      "relationType": 0,
+      "origin": 0,
+      "createdAtUtc": "2026-09-06T04:51:08.5587731+00:00"
+    }
+  ],
+  "SourceLinks": [
+    {
+      "Label": "other:SdfProgram.cs (ops, evaluator, non-finite contract, culling, job)",
+      "Uri": "Assets/Scripts/Runtime/Morphology/Sdf/SdfProgram.cs",
+      "StartLine": null,
+      "EndLine": null
+    },
+    {
+      "Label": "other:SdfProgramBuilder.cs (id-ordered fold, body-first, min-axis distanceScale, mirror)",
+      "Uri": "Assets/Scripts/Runtime/Morphology/Sdf/SdfProgramBuilder.cs",
+      "StartLine": null,
+      "EndLine": null
+    },
+    {
+      "Label": "other:SmoothMinMath.cs",
+      "Uri": "Assets/Scripts/Runtime/Morphology/Sdf/SmoothMinMath.cs",
+      "StartLine": null,
+      "EndLine": null
+    },
+    {
+      "Label": "other:CubeTopology.cs (bit-interleaved corners, edges, faces)",
+      "Uri": "Assets/Scripts/Runtime/Morphology/Extraction/CubeTopology.cs",
+      "StartLine": null,
+      "EndLine": null
+    },
+    {
+      "Label": "other:CubeContourResolver.cs (per-face segments, loop tracing, interpolation)",
+      "Uri": "Assets/Scripts/Runtime/Morphology/Extraction/CubeContourResolver.cs",
+      "StartLine": null,
+      "EndLine": null
+    },
+    {
+      "Label": "other:AsymptoticDecider.cs",
+      "Uri": "Assets/Scripts/Runtime/Morphology/Extraction/AsymptoticDecider.cs",
+      "StartLine": null,
+      "EndLine": null
+    },
+    {
+      "Label": "other:DensityGrid.cs (sampling, gradient, \u002Binf handling)",
+      "Uri": "Assets/Scripts/Runtime/Morphology/Extraction/DensityGrid.cs",
+      "StartLine": null,
+      "EndLine": null
+    },
+    {
+      "Label": "other:ActiveCell.cs",
+      "Uri": "Assets/Scripts/Runtime/Morphology/Extraction/ActiveCell.cs",
+      "StartLine": null,
+      "EndLine": null
+    },
+    {
+      "Label": "other:ActiveCellBuilder.cs (classify-once scan)",
+      "Uri": "Assets/Scripts/Runtime/Morphology/Extraction/ActiveCellBuilder.cs",
+      "StartLine": null,
+      "EndLine": null
+    },
+    {
+      "Label": "other:MarchingCubesExtractor.cs (welding, winding, fan, zero-corner)",
+      "Uri": "Assets/Scripts/Runtime/Morphology/Extraction/MarchingCubesExtractor.cs",
+      "StartLine": null,
+      "EndLine": null
+    },
+    {
+      "Label": "other:MeshExtractionResult.cs",
+      "Uri": "Assets/Scripts/Runtime/Morphology/Extraction/MeshExtractionResult.cs",
+      "StartLine": null,
+      "EndLine": null
+    },
+    {
+      "Label": "other:MeshTopologyValidator.cs (watertight check)",
+      "Uri": "Assets/Scripts/Runtime/Morphology/Extraction/MeshTopologyValidator.cs",
+      "StartLine": null,
+      "EndLine": null
+    },
+    {
+      "Label": "other:GenerationTolerances.cs (epsilon \u002B NormalizeSurfaceDensity)",
+      "Uri": "Assets/Scripts/Runtime/Common/GenerationTolerances.cs",
+      "StartLine": null,
+      "EndLine": null
+    },
+    {
+      "Label": "other:CubeTopologyTests.cs (self-consistency)",
+      "Uri": "Assets/Scripts/Tests/Runtime/CubeTopologyTests.cs",
+      "StartLine": null,
+      "EndLine": null
+    },
+    {
+      "Label": "other:CubeContourResolverTests.cs (hand-worked decider topology)",
+      "Uri": "Assets/Scripts/Tests/Runtime/CubeContourResolverTests.cs",
+      "StartLine": null,
+      "EndLine": null
+    },
+    {
+      "Label": "other:AsymptoticDeciderTests.cs (saddle math)",
+      "Uri": "Assets/Scripts/Tests/Runtime/AsymptoticDeciderTests.cs",
+      "StartLine": null,
+      "EndLine": null
+    },
+    {
+      "Label": "other:MarchingCubesExtractorTests.cs (watertight, Euler welding, validator)",
+      "Uri": "Assets/Scripts/Tests/Runtime/MarchingCubesExtractorTests.cs",
+      "StartLine": null,
+      "EndLine": null
+    },
+    {
+      "Label": "other:MarchingCubesExtractorParityTests.cs (CC-008 reference parity)",
+      "Uri": "Assets/Scripts/Tests/Runtime/MarchingCubesExtractorParityTests.cs",
+      "StartLine": null,
+      "EndLine": null
+    },
+    {
+      "Label": "other:SdfNonFiniteFieldContractTests.cs (CC-064)",
+      "Uri": "Assets/Scripts/Tests/Runtime/SdfNonFiniteFieldContractTests.cs",
+      "StartLine": null,
+      "EndLine": null
+    },
+    {
+      "Label": "other:SdfCullingModeTests.cs (CC-063 fast finite watertight)",
+      "Uri": "Assets/Scripts/Tests/Runtime/SdfCullingModeTests.cs",
+      "StartLine": null,
+      "EndLine": null
+    },
+    {
+      "Label": "other:SmoothMinMathTests.cs",
+      "Uri": "Assets/Scripts/Tests/Runtime/SmoothMinMathTests.cs",
+      "StartLine": null,
+      "EndLine": null
+    }
+  ],
+  "UsageCount": 0,
+  "LastUpdated": "2026-09-06T04:56:05.3384673Z"
+}

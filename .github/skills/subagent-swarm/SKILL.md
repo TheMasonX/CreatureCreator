@@ -30,7 +30,7 @@ Use a single-agent path for a focused one-file change or trivial bug fix.
 - Target subsystems and expected deliverables
 - Constraints such as deterministic output, topology, Unity assembly boundaries,
   editor lifecycle, or manual-check limitations
-- Existing `CC-###` tickets, ADRs, handoffs, audits, and requirements
+- Existing MemorySmith tasks, ADRs, handoffs, audits, and requirements
 - Optional user-supplied recovery directory for delegated artifacts
 
 ## Recovery Workspace
@@ -52,7 +52,7 @@ Stop delegation if the recovery workspace cannot be created or written.
 Before delegation, provide the same relevant baseline to every workstream:
 
 - `Assets/Scripts/README.md`
-- `docs/tasks/active-tasks.md` and the relevant `CC-###` ticket
+- The relevant MemorySmith task(s) (via `memorysmith_task_list`/`_get`)
 - Relevant `docs/adr/`, `docs/tasks/handoffs/`, and `docs/audits/` files
 - A clear statement that `CreatureDefinition` is authoritative
 - Runtime/editor assembly boundaries and the required SDF sign convention
@@ -68,15 +68,15 @@ Split the request into two to four concrete tracks, for example:
 - runtime contract and source evidence
 - editor integration and user workflow
 - focused Unity tests, topology, determinism, or benchmark validation
-- documentation, ticket, ADR, and handoff updates
+- documentation, MemorySmith task, ADR, and handoff updates
 
 Give each track one finish condition and name files it may inspect or modify.
 
 ### 2. Gather Evidence
 
 Each stream begins by locating the nearest code that computes or owns the
-behavior, its neighboring tests, and the relevant ticket. Record one falsifiable
-hypothesis and one discriminating check before implementation.
+behavior, its neighboring tests, and the relevant MemorySmith task. Record one
+falsifiable hypothesis and one discriminating check before implementation.
 
 ### 3. Implement in Stages
 
@@ -92,9 +92,9 @@ preview objects, scene handles, and lifecycle code in the editor assembly.
 
 ### 4. Reconcile Results
 
-The coordinator merges outputs only after checking for contradictions,
-duplicate task work, public API drift, and disagreement about evidence. Preserve
-unresolved risks and create follow-up tickets rather than silently dropping them.
+The coordinator merges outputs only after checking for contradictions, duplicate task work, public API drift, and disagreement about
+evidence. Preserve unresolved risks and create follow-up MemorySmith tasks rather
+than silently dropping them.
 
 ## Decision Points
 
@@ -114,8 +114,9 @@ The swarm is complete only when:
 - Findings are reconciled into one coherent implementation result
 - Focused Unity or static validation evidence is recorded
 - Runtime/editor and authoritative-DNA boundaries remain intact
-- Relevant `CC-###` ticket, handoff, ADR, or audit records are updated
-- `python docs/tasks/tools/task_validate.py --strict` is run after task edits
+- Relevant MemorySmith task, handoff, ADR, or audit records are updated
+- Task records are updated through MemorySmith tools per `task-tracker` (no
+  hand-edited `Data/Tasks/*.json`)
 - Remaining failures, manual checks, and residual risks are stated explicitly
 
 ## Quality Bar
@@ -129,5 +130,5 @@ The swarm is complete only when:
 ## Example Prompts
 
 - `/subagent-swarm investigate a generation change across runtime, tests, and docs`
-- `/subagent-swarm split editor authoring, Unity validation, and task updates for CC-###`
+- `/subagent-swarm split editor authoring, Unity validation, and task updates for the owning MemorySmith task`
 - `/subagent-swarm audit a morphology pipeline and produce an implementation handoff`

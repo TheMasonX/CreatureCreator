@@ -1,0 +1,192 @@
+{
+  "Id": "creaturecreator-skeleton-ik-rig-details",
+  "Content": "Finer slice over creaturecreator-skeleton-ik-pose (layer map). Scope: deterministic skeleton ordering, semantic bone-id conventions, pure FABRIK vs adapters, transactional rig build, pose-rotation determinism, and MirrorUtility conjugation vs left-multiplied reflection usage. Namespaces: ProceduralCreature.Skeleton, ProceduralCreature.Animation(.Ik/.Binding). Every claim below read from source \u002B nearest tests; classify each as Confirmed (source\u002Btest) or Inference (rationale only). No Unity runtime was executed; all evidence is static source \u002B EditMode test bodies. Unity blocked (no editor session), so behavior claims are Confirmed-by-source, not Confirmed-by-execution.\n\n(1) SKELETONSNAPSHOT DETERMINISTIC ORDERING [Confirmed]. SkeletonSnapshot.Capture(Skeleton) is an immutable flat capture that enforces PARENT-BEFORE-CHILD ordering. It validates: duplicate ids (TryAdd fails -\u003E DomainException), missing parent (ParentBoneId not in indices -\u003E DomainException), and cycles (BFS leaves \u003C total -\u003E DomainException). Ordering algorithm: collect roots and childrenById; roots.Sort by StringComparer.Ordinal on Id; each sibling list also sorted by Id; then a BFS worklist starting from sorted roots, and after each dequeue the pending list is re-sorted by Id (CompareBonesById). Result: fully deterministic index order regardless of input Skeleton.Bones list order. Exposes Count, this[int] -\u003E BoneSnapshot, GetIndex/TryGetIndex(boneId), GetChildren(int) (as IReadOnlyList\u003Cint\u003E), and HasSameBoneOrder(other) which requires equal Count and equal Id at every index (ordinal), else false (SkeletonSnapshotTests: Capture_DuplicateIdsThrowDomainException, Capture_MissingParentThrowsDomainException, HasSameBoneOrder_RejectsDifferentIndexedOrder, GetChildren_InvalidIndexThrowsDomainException). BoneSnapshot is a readonly struct copying Bone fields (Id, Index, ParentIndex, SourcePartId, PartType, IsMirrored, Position, Rotation, HasSegment, EndPosition, HasChildAttachmentPosition, ChildAttachmentPosition). This captured order is the canonical bone index space shared by PosedSkeleton, PoseRotationResolver.ResolveInto, CreatureRig._indexedBones/_indexedRotations, and LinearBlendSkinning.VertexInfluence.BoneIndex (never re-discovered).\n\n(2) SKELETONINFERRER CONSTRUCTION \u002B AUTHORED-JOINT SOURCE [Confirmed]. SkeletonInferrer.Infer(CreatureDefinition) is the single inference path (ProceduralCreature.Skeleton). Primary path calls ResolvedCreatureSnapshot.Resolve(definition) once and passes the immutable snapshot into BuildBone/AppendLimbBones/AppendBodyBones so later authored DNA mutations cannot be observed mid-generation. Parts are iterated OrderBy(p.Id, Ordinal) for order-independence (SkeletonInferrerTests.Infer_IsOrderIndependent). Defensive fallback when Resolve throws DomainException (malformed DNA): preserves an independently resolvable Body and resolves non-limb parts in try/catch, skipping malformed chains. BODY: AppendBodyBones emits one bone per Body sample (body_j\u003CsampleId\u003E), parent = previous sample bone, chain root has null parent; rotations = Quaternion.LookRotation(BodyFrameResolver.ComputeSampleFrames(...).Tangent, .Normal). NON-LIMB part: BuildBone emits one origin bone at part\u0027s resolved creature-space placement (world.GetColumn(3), world.rotation); mirror appends a second bone. LIMB part: AppendLimbBones emits N-1 segment bones \u002B one explicit terminal joint node (the limb\u0027s last joint). Segment bone i spans Joints[i]-\u003EJoints[i\u002B1]; the terminal node sits at Joints[N-1]. Segment bones set HasSegment=true, EndPosition=toWorld, and the last segment sets HasChildAttachmentPosition=true with ChildAttachmentPosition=toWorld. Joint source: limb bones consume resolvedPart.Limb (ResolvedLimb), which derives JointPositions from the AUTHORED LimbChain.Joints (v1 centerline; ResolvedLimb doc: \u0027until then the authored joints ARE the [centerline]\u0027), NOT from derived metaball samples. Confirmed by SkeletonInferrerLimbTests (Infer_LimbWithNullJoint_DoesNotThrowAndEmitsNoBones via ResolvedLimb) and the class doc claiming render-geometry density can change without changing the rig [the \u0027density independence\u0027 benefit is Inference/rationale; the authored-joint derivation is Confirmed]. Structurally broken chain (empty / null joint) resolves to no bones defensively; validator rejects before inference.\n\n(3) SEMANTICBONERESOLVER ID CONVENTIONS \u002B MIRRORED-PARENT RULE [Confirmed]. Single source of part-to-bone mapping (CC-076) used by inference, mesh binding, and animation queries. Conventions: mirror suffix MirrorSuffix=\u0027_mirror\u0027 appended only when mirrored (ResolveMirroredBoneId); limb segment separator LimbJointBoneSeparator=\u0027_j\u0027 so segment/joint bones are part.Id\u002B\u0027_j\u0027\u002Bi (ResolveLimbSegmentBoneId, ResolveLimbJointBoneId); Body socket bones are \u0027body_j\u0027\u002BsampleId via ResolveBodySocketBoneId(uint) (BodyId=\u0027body\u0027 -\u003E body_j\u003CsampleId\u003E, body_j40 style; SkeletonInferrerTests.Infer_BodyBoneIdentityUsesStableSampleIdsNotListIndices confirms id tracks authored sample id, not list index). ResolveParentBoneId has two overloads: (a) definition\u002Bpart, and (b) snapshot\u002BResolvedPartSnapshot (used by normal generation so it cannot observe later mutations; CC-091 keeps both consistent and never fabricates a \u0027_j-1\u0027 id for a single-joint limb). MIRRORED-PARENT RESOLUTION RULE [Confirmed]: a mirrored part binds to the MIRRORED copy of its DNA parent IF that parent is also flagged for mirroring (and SymmetryMode != None), else to the single unmirrored parent bone. Non-limb parent -\u003E root bone id = parent.Id; limb parent (\u003E=2 joints) -\u003E parent\u0027s explicit TERMINAL joint node id (ResolveLimbTerminalBoneId = \u0027_j\u0027\u002B(count-1)); a child of a limb attaches to the limb\u0027s terminal joint, NOT to the part id (the child\u0027s local space IS the limb tip frame; CC-018). BODY-rooted part (ParentId null or BodyId): binds via ResolveBodyParentBoneId \u2014 if direct Body child carries a BodySurfaceAnchor, binds to the socket of the anchor\u0027s SegmentStartSampleId (CC-007 anchor seam, same sample the morphology layer uses); otherwise nearest Body sample to the resolved creature-space origin (limb root joint, or part origin for non-limb), with a mirrored part reflecting that point first. Tests confirm: child-of-limb binds to terminal (SemanticBoneResolverTests.ResolverMatchesInferredSkeleton_ForChildOfLimb -\u003E \u0027_j\u0027 terminal), mirrored child of mirrored limb -\u003E mirrored terminal (SnapshotResolver_MirroredChildOfMirroredLimbParent_ResolvesToMirroredTerminalBone), anchor binds to anchor socket not nearest (Resolver_BodyRootedPartWithAnchor_BindsToAnchorSocketBone), null-parent anchor stays inert (Resolver_AnchoredPartUnderNullParent_KeepsNearestSampleBinding), snapshot resolver keeps captured socket after authored mutation (SnapshotResolver_AnchoredBodyChild_KeepsCapturedSocketAfterAuthoredMutation).\n\n(4) FABRIK / BONECHAIN / POSEDSKELETON / IKCHAINSOLVER [Confirmed]. FabrikSolver is pure math (Aristidou \u0026 Lasenby 2011) over Vector3[] positions \u002B float[] linkLengths \u002B target; no Bone/Skeleton/Transform knowledge. Reachable: alternate BackwardPass (pull end effector to target, walk back fixing lengths) and ForwardPass (re-pin root, walk out fixing lengths) until within tolerance or maxIterations. Unreachable (root-target distance \u003E= sum of links): exact straight stretch toward target, no iteration. Validates: \u003E=2 joints, linkLengths.Length==positions.Length-1, every length finite \u0026 positive, maxIterations\u003E0, tolerance\u003E=0. Deterministic SafeDirection fallback Vector3.up on coincident points (never NaN). BoneChain (the other adapter half, no FABRIK math): ExtractChain walks ParentBoneId from a leaf up with a visited set (throws on cycle) then Reverse to root-first order; ExtractRestPositions returns each bone\u0027s rest Position; ComputeLinkLengths = consecutive Vector3.Distance. PosedSkeleton is immutable (\u0027one posing path\u0027): created via FromRestPose (positions from rest snapshot) or WithUpdatedPositions, which clones positions, writes only valid bone ids, and returns a NEW PosedSkeleton; never mutates in place; holds SkeletonSnapshot \u002B Vector3[] world positions (pose has positions only, no rotations). IkChainSolver is the SOLE integration point where FabrikSolver, BoneChain, Skeleton, PosedSkeleton meet (single-chain adapter): SolveChainTarget(restSkeleton, currentPose, leafBoneId, targetPosition, maxIterations=10, tolerance=0.01). It extracts chain, requires \u003E=2 bones (root leaf -\u003E DomainException), and computes link lengths from the REST pose (bones rigid/fixed-length), then SEEDS FABRIK\u0027s initial guess from the CURRENT pose positions (per-frame continuity) \u2014 behavior Confirmed (IkChainSolverTests.SolveChainTarget_RootBoneIsUnchanged / _DoesNotMutateTheInputPose; FabrikSolverTests confirm stretch, root pin, link-length preservation). \u0027Current-pose seeding converges faster than rest reseeding\u0027 is Inference/rationale; the seeding-from-current behavior is Confirmed. Returns currentPose.WithUpdatedPositions(solved).\n\n(5) CREATURERIG TRANSACTIONAL BUILD \u002B APPLYPOSE [Confirmed]. CreatureRig (MonoBehaviour, ProceduralCreature.Animation) is the Unity adapter owning ONLY its generated Transform hierarchy; skeleton/pose stay pure data. Build(Skeleton): captures next SkeletonSnapshot, then in try builds all child GameObjects named \u0027Bone_\u0027\u002Bid, SetParent(worldPositionStays:false) to parent index transform (or this.transform for root), sets position/rotation from rest; on ANY exception it destroys only the newly created objects (DestroyGeneratedObjects(nextGeneratedObjects)) and rethrows BEFORE touching _generatedObjects/_bones, so the PREVIOUS valid rig is preserved (Confirmed: CreatureRigTests.FailedBuild_PreservesPreviousValidRig asserts the previous root Transform survives a failed Build and a subsequent ApplyPose). Only after full success does it destroy the old generated objects, clear, and commit next state (_restSkeleton=nextSkeleton; _indexedBones/_indexedRotations sized). ApplyPose(PosedSkeleton): requires Build first, calls PoseRotationResolver.ResolveInto(_restSkeleton, pose, _indexedRotations) then sets each transform position = pose.GetPosition(i) and rotation = _indexedRotations[i] in world space. No managed alloc after warmup is asserted by test ApplyPose_RepeatedCallsAllocateNoManagedMemoryAfterWarmup (Assert.AreEqual(0L, allocated) over 1000 calls) \u2014 Confirmed-by-test-source. Clear() destroys generated objects and resets state. Geometry binding intentionally out of scope for this slice (see LinearBlendSkinning summary below).\n\n(6) POSEROTATIONRESOLVER DETERMINISM [Confirmed]. PoseRotationResolver derives runtime rotations from a position-only pose. Guards: requires restSkeleton.HasSameBoneOrder(pose.Skeleton) else DomainException (poses must share the captured bone order). For each bone: if no children -\u003E KEEPS REST ROTATION (bone.Rotation) \u2014 terminal/leaf bones have no pose endpoint (Confirmed: PoseRotationResolverTests.Resolve_TerminalBoneUsesRestRotation). Non-terminal with HasSegment -\u003E target = position \u002B (bone.EndPosition - bone.Position), i.e. direction from the rest segment offset (rigid), independent of which child exists (Confirmed: Resolve_SegmentUsesEndpointRegardlessOfChildOrder). Non-terminal non-segment -\u003E FindPrimaryChild picks the LEXICOGRAPHICALLY SMALLEST child id among all children via string.CompareOrdinal (NOT merely children[0]) \u2014 this removes any dependency on child enumeration order, giving deterministic multi-child orientation; note snapshot siblings are already Id-sorted, so this is belt-and-suspenders. Direction -\u003E ResolveLookRotation: forward = normalized(direction) or, if degenerate (sqrMagnitude\u003C=1e-8), restRotation*Vector3.forward (coincident child stays finite, Confirmed: Resolve_CoincidentChildPositionRemainsFinite); up = restRotation*Vector3.up, and if |dot(forward,up.normalized)|\u003E0.9999 (anti/parallel \u2014 the common vertical-leg case) substitutes up = restRotation*Vector3.right, then guards degenerate up -\u003E Vector3.up; returns Quaternion.LookRotation(forward, up). Uses restRotation only as a deterministic up/forward hint \u2014 never mutates skeleton or pose (Confirmed: Resolve_DoesNotMutateSkeletonOrPose).\n\n(7) MIRRORUTILITY CONJUGATION vs LEFT-MULTIPLIED REFLECTION [Confirmed]. Mirror across creature-space X=0 plane, S = Matrix4x4.Scale(-1,1,1) (S is its own inverse, det -1). Three helpers: ReflectPointAcrossX(p)=S*p (point form); ReflectTransformAcrossX(M)=S*M (LEFT-multiplied reflection); MirrorAcrossXPlane(M)=S*M*S (CONJUGATION). Conjugation S*M*S is a true reflection: it reflects position X and CONJUGATES rotation (det(S*R*S)=det(R) since det(S)^2=1), so the extracted Matrix4x4.rotation is still a proper right-handed rotation (Confirmed: MirrorUtilityTests.MirrorAcrossXPlane_ProducesAProperRotation checks determinant \u002B1; _IsAnInvolution checks round-trip; _NegatesPositionX_KeepsYAndZ). USAGE [Confirmed from SkeletonInferrer]: (a) BuildBone for a NON-LIMB part\u0027s single origin bone uses MirrorAcrossXPlane (conjugate) because the bone sits at the part ORIGIN and its rotation is extracted via Matrix4x4.rotation, so it must stay a proper rotation; (b) a LIMB mirrored chain uses ReflectTransformAcrossX (LEFT-multiplied S*M, not conjugate) and separately negates the up hint X (upHint=Scale(upHint,-1,1,1)); joint points are transformed as fromWorld=partMatrix.MultiplyPoint3x4(joint) so each mirrored joint lands at S*(world*joint) \u2014 the same placement the SDF compiler\u0027s mirrored limb chain produces; rotations are NOT extracted from the matrix but recomputed by LimbBoneRotation(segmentDir, upHint) with a deterministic non-parallel up substitution when the segment is (anti)parallel to up (vertical default leg). Rationale: conjugate is correct only for a bone at the part origin; a joint offset from that origin needs the left-multiplied point reflection (mirror comment \u002B SkeletonInferrer class doc: \u0027S*(world*joint)\u0027). Body/nearest-sample parent lookup also uses ReflectPointAcrossX on a candidate position. Test: Infer_MirroredLimb_EmitsFullMirroredChainAcrossX (9 nodes = body \u002B 4 leg \u002B 4 mirrored leg), Infer_MirroredLimbWithRotatedTransform_MirrorsBoneForwardAndUpAxes.\n\nLINEARBLENDSKINNING.CONTRACT (summary only, separate domain): Binding/LinearBlendSkinning is a documented pure-math deformation path that consumes resolved bone frames (BonePose absolute position\u002Brotation, exactly like BoneSnapshot/CreatureRig world frames) \u002B per-vertex VertexInfluence{BoneIndex,Weight} and returns posed vertices; no SkinnedMeshRenderer/scene object, authors no DNA, derives no bones, owns no pose state. Conventions: REST-SPACE vertices, BONE-INDEX = SkeletonSnapshot capture order (never re-maps part-\u003Ebone, no nearest-bone, no mesh-name reads), BIND-POSE = rest pose with bind offset inv(rest.Rotation)*(v-rest.Position) (no scale -\u003E exact quaternion inverse), WEIGHTS non-negative authored-to-sum-1 with MaxBoneInfluencesPerVertex=4 and Deform normalizing defensively, MIRROR via existing SemanticBoneResolver/MirrorUtility (positions ReflectPointAcrossX, rotations conjugated via MirrorAcrossXPlane) \u2014 never re-discovers mirror identity; REST-POSE ROUND-TRIP invariant (posed==rest returns vertices unchanged within RestRoundTripTolerance). Ownership boundary: pure consumer of resolved anatomy. Out of scope: welded Body surface weighting model. (Confirmed by LinearBlendSkinningTests contract \u002B doc comments; not part of this slice\u0027s core claims.)\n\nADR-005 (docs/adr/ADR-005-runtime-rig-hierarchy-and-pose-application.md, Accepted 2026-08-24, CC-052/CC-069/CC-071) records the accepted decision behind (5)/(6): one child GameObject per inferred Bone keyed by stable id; parent links from Bone.ParentBoneId; rest positions/rotations from inferred Skeleton; a PosedSkeleton applied in one method setting world positions \u002B rotations derived by PoseRotationResolver; terminal rotations use rest rotation; rebuilding destroys only the rig\u0027s own generated children; geometry binding explicitly pending and not coupled to the first hierarchy. [Confirmed]",
+  "Title": "CreatureCreator Skeleton Inference, Semantic Bone IDs, IK, Pose and Rig Details",
+  "Status": 1,
+  "Confidence": 0.93,
+  "Tags": [
+    "kind:fact",
+    "scope:onboarding",
+    "creaturecreator",
+    "skeleton",
+    "ik",
+    "rig",
+    "pose",
+    "semantic-bone",
+    "mirror",
+    "determinism",
+    "fabrik",
+    "animation"
+  ],
+  "References": [
+    "creaturecreator-skeleton-ik-pose",
+    "creaturecreator-definition-model",
+    "creaturecreator-architecture-and-invariants"
+  ],
+  "Conflicts": [],
+  "Relationships": [
+    {
+      "sourceId": "creaturecreator-skeleton-ik-rig-details",
+      "targetId": "creaturecreator-skeleton-ik-pose",
+      "relationType": 0,
+      "origin": 0,
+      "createdAtUtc": "2026-09-06T04:51:53.7178717+00:00"
+    },
+    {
+      "sourceId": "creaturecreator-skeleton-ik-rig-details",
+      "targetId": "creaturecreator-definition-model",
+      "relationType": 0,
+      "origin": 0,
+      "createdAtUtc": "2026-09-06T04:51:53.7178719+00:00"
+    },
+    {
+      "sourceId": "creaturecreator-skeleton-ik-rig-details",
+      "targetId": "creaturecreator-architecture-and-invariants",
+      "relationType": 0,
+      "origin": 0,
+      "createdAtUtc": "2026-09-06T04:51:53.717872+00:00"
+    }
+  ],
+  "SourceLinks": [
+    {
+      "Label": "other:SkeletonSnapshot.cs",
+      "Uri": "Assets/Scripts/Runtime/Skeleton/SkeletonSnapshot.cs",
+      "StartLine": null,
+      "EndLine": null
+    },
+    {
+      "Label": "other:Bone.cs",
+      "Uri": "Assets/Scripts/Runtime/Skeleton/Bone.cs",
+      "StartLine": null,
+      "EndLine": null
+    },
+    {
+      "Label": "other:SkeletonInferrer.cs",
+      "Uri": "Assets/Scripts/Runtime/Skeleton/SkeletonInferrer.cs",
+      "StartLine": null,
+      "EndLine": null
+    },
+    {
+      "Label": "other:SemanticBoneResolver.cs",
+      "Uri": "Assets/Scripts/Runtime/Skeleton/SemanticBoneResolver.cs",
+      "StartLine": null,
+      "EndLine": null
+    },
+    {
+      "Label": "other:MirrorUtility.cs",
+      "Uri": "Assets/Scripts/Runtime/Skeleton/MirrorUtility.cs",
+      "StartLine": null,
+      "EndLine": null
+    },
+    {
+      "Label": "other:CreatureRig.cs",
+      "Uri": "Assets/Scripts/Runtime/Animation/CreatureRig.cs",
+      "StartLine": null,
+      "EndLine": null
+    },
+    {
+      "Label": "other:FabrikSolver.cs",
+      "Uri": "Assets/Scripts/Runtime/Animation/Ik/FabrikSolver.cs",
+      "StartLine": null,
+      "EndLine": null
+    },
+    {
+      "Label": "other:BoneChain.cs",
+      "Uri": "Assets/Scripts/Runtime/Animation/Ik/BoneChain.cs",
+      "StartLine": null,
+      "EndLine": null
+    },
+    {
+      "Label": "other:PosedSkeleton.cs",
+      "Uri": "Assets/Scripts/Runtime/Animation/Ik/PosedSkeleton.cs",
+      "StartLine": null,
+      "EndLine": null
+    },
+    {
+      "Label": "other:IkChainSolver.cs",
+      "Uri": "Assets/Scripts/Runtime/Animation/Ik/IkChainSolver.cs",
+      "StartLine": null,
+      "EndLine": null
+    },
+    {
+      "Label": "other:PoseRotationResolver.cs",
+      "Uri": "Assets/Scripts/Runtime/Animation/Ik/PoseRotationResolver.cs",
+      "StartLine": null,
+      "EndLine": null
+    },
+    {
+      "Label": "other:LinearBlendSkinning.cs",
+      "Uri": "Assets/Scripts/Runtime/Animation/Binding/LinearBlendSkinning.cs",
+      "StartLine": null,
+      "EndLine": null
+    },
+    {
+      "Label": "other:SkeletonSnapshotTests.cs",
+      "Uri": "Assets/Scripts/Tests/Runtime/SkeletonSnapshotTests.cs",
+      "StartLine": null,
+      "EndLine": null
+    },
+    {
+      "Label": "other:SkeletonInferrerTests.cs",
+      "Uri": "Assets/Scripts/Tests/Runtime/SkeletonInferrerTests.cs",
+      "StartLine": null,
+      "EndLine": null
+    },
+    {
+      "Label": "other:SkeletonInferrerLimbTests.cs",
+      "Uri": "Assets/Scripts/Tests/Runtime/SkeletonInferrerLimbTests.cs",
+      "StartLine": null,
+      "EndLine": null
+    },
+    {
+      "Label": "other:SemanticBoneResolverTests.cs",
+      "Uri": "Assets/Scripts/Tests/Runtime/SemanticBoneResolverTests.cs",
+      "StartLine": null,
+      "EndLine": null
+    },
+    {
+      "Label": "other:MirrorUtilityTests.cs",
+      "Uri": "Assets/Scripts/Tests/Runtime/MirrorUtilityTests.cs",
+      "StartLine": null,
+      "EndLine": null
+    },
+    {
+      "Label": "other:CreatureRigTests.cs",
+      "Uri": "Assets/Scripts/Tests/Runtime/CreatureRigTests.cs",
+      "StartLine": null,
+      "EndLine": null
+    },
+    {
+      "Label": "other:PoseRotationResolverTests.cs",
+      "Uri": "Assets/Scripts/Tests/Runtime/PoseRotationResolverTests.cs",
+      "StartLine": null,
+      "EndLine": null
+    },
+    {
+      "Label": "other:FabrikSolverTests.cs",
+      "Uri": "Assets/Scripts/Tests/Runtime/FabrikSolverTests.cs",
+      "StartLine": null,
+      "EndLine": null
+    },
+    {
+      "Label": "other:BoneChainTests.cs",
+      "Uri": "Assets/Scripts/Tests/Runtime/BoneChainTests.cs",
+      "StartLine": null,
+      "EndLine": null
+    },
+    {
+      "Label": "other:LinearBlendSkinningTests.cs",
+      "Uri": "Assets/Scripts/Tests/Runtime/LinearBlendSkinningTests.cs",
+      "StartLine": null,
+      "EndLine": null
+    },
+    {
+      "Label": "other:ADR-005-runtime-rig-hierarchy-and-pose-application.md",
+      "Uri": "docs/adr/ADR-005-runtime-rig-hierarchy-and-pose-application.md",
+      "StartLine": null,
+      "EndLine": null
+    }
+  ],
+  "UsageCount": 0,
+  "LastUpdated": "2026-09-06T04:56:05.3414611Z"
+}

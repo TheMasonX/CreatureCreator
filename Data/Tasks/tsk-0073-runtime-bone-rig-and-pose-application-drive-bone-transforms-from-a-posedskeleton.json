@@ -52,15 +52,21 @@
       "author": "anonymous",
       "body": "## Audit synthesis 2026-09-05 \u2014 animation and locomotion deep dive\n\nThe supplied audit was cross-validated against current source and live task records. H-1, H-2, and H-3 are stale, not open: current \u0060PoseRotationResolver\u0060 selects a deterministic primary child, \u0060SkeletonSnapshot.Capture\u0060 emits parent-first ordering, and \u0060CreatureRig.Build\u0060 constructs transactionally before replacing the prior rig. \u0060TSK-0113\u0060, \u0060TSK-0114\u0060, and \u0060TSK-0116\u0060 are already Done and must not be reopened.\n\nConfirmed residuals remain owned by this CC-069 slice or its focused follow-up: C-1, the per-application rotation dictionary and string-keyed bone lookup in \u0060CreatureRig.ApplyPose\u0060, and H-4, the terminal limb rotation re-lookup in \u0060SkeletonInferrer.AppendLimbBones\u0060. M-1 is a useful focused coverage gap for \u0060SkeletonSnapshot\u0060 contracts. M-2 is test-file organization only. M-4 and L-1 are deferred cleanup, not blockers for CC-011. A dedicated follow-up task was created for C-1, H-4, and M-1.\n\nEvidence: \u0060Assets/Scripts/Runtime/Animation/CreatureRig.cs\u0060, \u0060Assets/Scripts/Runtime/Animation/Ik/PoseRotationResolver.cs\u0060, \u0060Assets/Scripts/Runtime/Skeleton/SkeletonSnapshot.cs\u0060, and \u0060Assets/Scripts/Runtime/Skeleton/SkeletonInferrer.cs\u0060 were read at the current worktree fixed point. No Unity execution was performed in this synthesis.",
       "createdAtUtc": "2026-09-06T03:06:41.5203649Z"
+    },
+    {
+      "id": "c-79e8feb1c6cb467c9b15d3e52652c436",
+      "author": "anonymous",
+      "body": "Audit synthesis (2026-09-05, deep-dive code reviews): TSK-0121 (child) owns finite-by-construction pose injection in PosedSkeleton.WithUpdatedPositions and the CreatureRig creature-space vs world-space host-transform contract decision. This extends the pose/rig owner (TSK-0073 / CC-069) and complements TSK-0118. Provenance: docs/audits/creaturecreator-deep-dive-code-review-2026-09-05.md P1 (PosedSkeleton) and P2 (rig space). Do not duplicate.",
+      "createdAtUtc": "2026-09-06T04:25:59.3154236Z"
     }
   ],
   "epicId": null,
   "parentId": null,
   "dueDateUtc": null,
   "createdAtUtc": "2026-09-01T03:20:52.1648146Z",
-  "updatedAtUtc": "2026-09-06T03:06:41.5203649Z",
+  "updatedAtUtc": "2026-09-06T04:25:59.3154236Z",
   "completedAtUtc": null,
-  "revision": 6,
+  "revision": 7,
   "isArchived": false,
   "hasLoadError": false,
   "loadError": null,

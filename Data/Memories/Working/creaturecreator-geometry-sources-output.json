@@ -1,0 +1,116 @@
+{
+  "Id": "creaturecreator-geometry-sources-output",
+  "Content": "FINE-GRAINED slice over CC-031 composable geometry sources and the deterministic GeneratedCreature multi-item output. Complements the coarse records creaturecreator-definition-model, creaturecreator-generation-morphology, and creaturecreator-resolved-model-world-resolver (which cover DNA shape \u002B pipeline stage orchestration \u002B the resolved frame resolver). Claim classification inline: [C] = Confirmed by direct source inspection of the named file plus its nearest tests; [I] = Inference/design intent not literally asserted in code.\n\n=== GEOMETRY TYPE vs PART TYPE ===\nGeometryType (Assets/Scripts/Runtime/Definition/GeometryType.cs, ns ProceduralCreature.Definition) is an enum classifying HOW a part\u0027s geometry is produced, kept semantic and ORTHOGONAL to PartType (Eye/Limb/...) [C]. PartType is deliberately never turned into a geometry taxonomy (EyeMesh/EyeSdf/...) [C per enum XML \u002B ADR-002 \u00A76]. Values [C]: Implicit=0 (surface derived from the implicit SDF field: Body \u002B Shape/Limb parts), MeshAsset=1 (pre-authored mesh asset referenced by a stable key), Procedural=2 (mesh produced by a procedural MeshGenerator). Procedural is declared but NOT implemented and never produced [C: enum \u002B ADR-002 pass-1 \u0027procedural geometry (MeshGenerator)\u0027 deferred; no code path emits GeometryType.Procedural]. A creature definition does not store a GeometryType on a part directly; a part\u0027s geometry source is implied by which of Limb/MeshGeometry is non-null (null\u002Bnull Shape primitive = implicit) [C].\n\n=== MESH GEOMETRY \u002B GEOMETRY ATTACHMENT (DNA layer) ===\nMeshGeometry (Assets/Scripts/Runtime/Definition/MeshGeometry.cs) is a [Serializable] sealed class, the mesh-asset geometry source on a CreaturePart [C]. Fields: string MeshAssetKey (stable NAME; DNA NEVER stores a UnityEngine.Object) and GeometryAttachment Attachment = new GeometryAttachment() default [C]. Clone() deep-copies both fields (Attachment null-safe) [C]. MeshAssetKey is resolved through an EXTERNAL mesh palette/registry at generation time via an injected resolver Func\u003Cstring,Mesh\u003E; resolution is a generator-layer concern and the domain model stays portable [C: MeshGeometry XML \u002B CreatureMeshPalette XML \u002B generator]. This mirrors the CC-028 convention for material keys [C: doc comments].\n\nGeometryAttachment (Assets/Scripts/Runtime/Definition/GeometryAttachment.cs) is the semantic placement intent relative to the owning part, stored in DNA so resolution/topology changes do not lose attachment intent [C]. Pass-1 carries only: UnityEngine.Vector3 Offset (default zero), Quaternion Orientation (default identity), Vector3 Scale (default one) in the part\u0027s LOCAL frame [C]. IsFinite() returns NumericValidity.IsFinite(Offset) \u0026\u0026 IsFinite(Scale) \u0026\u0026 IsFinite(Orientation) [C]. Clone() copies all three [C]. The body-surface anchor on GeometryAttachment is DELIBERATELY DEFERRED; pass 1 places mesh geometry at the part\u0027s local-space position (ADR-002 \u00A72) [C per class XML \u002B ADR-002].\n\n=== CreaturePart PLUMBING \u002B MUTUAL EXCLUSION ===\nCreaturePart (Assets/Scripts/Runtime/Definition/CreaturePart.cs) carries nullable MeshGeometry parallel to nullable Limb [C]. Doc contract [C]: when MeshGeometry is non-null the part\u0027s geometry is a pre-authored mesh resolved by MeshAssetKey instead of the implicit SDF field; Shape and Limb are inert for generation; the two geometry sources (Limb chain vs MeshGeometry) are MUTUALLY EXCLUSIVE (validator-enforced). PartType.MirrorAcrossSymmetryPlane and ParentAttachment (BodySurfaceAnchor) coexist independently [C]. Clone() propagates MeshGeometry via MeshGeometry.Clone() (independent deep copy) [C: field \u002B GeneratedCreatureTests.CreaturePart_Clone_CopiesMeshGeometryIndependently].\n\nVALIDATOR (DefinitionValidator, no repair): a part with both a limb chain and MeshGeometry is rejected (ValidationCode.InvalidMeshGeometry) [C: DefinitionValidatorMeshGeometryTests.Validate_LimbAndMeshGeometry_ReportsInvalidMeshGeometry]; empty/whitespace MeshAssetKey is rejected (InvalidMeshGeometry) [C]; non-finite attachment (e.g. NaN offset) is rejected (NonFiniteMeshGeometryAttachment) [C]; a Scale component below the supported minimum is rejected (InvalidMeshGeometryScale) [C: zero x-scale (0,1,1) invalid per test]; Shape is INERT for a mesh part so a zero/invalid Shape does not raise InvalidShapeParameter [C: Validate_MeshPart_DoesNotRequireMeaningfulShape]. Validator reports invalid DNA without repair (project invariant) [I].\n\n=== SDF COMPILER SKIPS MESH PARTS ===\nSdfProgramBuilder skips resolved parts that HasMeshGeometry in the portable compile (continue) and the per-part/individual compile path filters !HasMeshGeometry, so a mesh part contributes NO Shape sphere to the implicit surface [C: SdfProgramBuilder.cs lines 450, 536]. This is why mesh geometry coexists with the implicit surface as a SEPARATE item rather than blending into it.\n\n=== RESOLVED SNAPSHOT MESH FIELDS (single placement seam) ===\nResolvedPartSnapshot (CreaturePartWorldTransformResolver.cs) exposes HasMeshGeometry (= part.MeshGeometry != null), MeshAssetKey, GeometryOffset/Orientation/Scale (attachment normalized; defaults zero/identity/one) and GeometryPlacementToCreatureSpace = partFrameToCreatureSpace * Matrix4x4.TRS(GeometryOffset, GeometryOrientation, GeometryScale) [C]. Placement comes ONLY from the resolved snapshot (never raw DNA), per CC-051 single-seam rule; CreatureMeshGenerator reads resolvedPart.GeometryPlacementToCreatureSpace [C]. See creaturecreator-resolved-model-world-resolver for the full frame-resolver model; do not duplicate.\n\n=== GENERATED CREATURE (multi-item output) ===\nGeneratedCreature (Assets/Scripts/Runtime/Generation/GeneratedCreature.cs, ns ProceduralCreature.Generation) is the deterministic, ORDERED multi-item output of generation \u2014 a creature is no longer a single Mesh [C]. Constants [C]: string ImplicitSurfaceSourceId = \u0022\u0022 (the implicit combined surface SourcePartId \u2014 no single part owns it) and string MirrorSuffix = \u0022_mirror\u0022 (matches SkeletonInferrer.MirrorSuffix). Members [C]: List\u003CGeometryItem\u003E Geometry (get-only), int Count =\u003E Geometry.Count, Mesh MainMesh =\u003E Geometry.Count\u003E0 ? Geometry[0].Mesh : null. Method TryFindGeometryForPart(string partId, out GeometryItem) linear-searches Geometry by SourcePartId [C].\n\nORDERING CONTRACT [C: code \u002B GeneratedCreatureTests.Generate_MeshParts_OrderedBySourcePartId_AndDeterministic]: Item 0 is ALWAYS the implicit combined surface (Body \u002B Shape/Limb parts extracted from the SDF), SourcePartId = ImplicitSurfaceSourceId \u0022\u0022, GeometryType.Implicit, with an empty RigBindingMetadata; the generator unconditionally adds it in Assemble. Items 1..n are mesh-asset/procedural parts in ASCENDING SourcePartId (Ordinal StringComparer) so output is independent of authoring order. Mesh items are appended via AppendMeshAssetItems from data.Snapshot.PartsById.Values.Where(HasMeshGeometry).OrderBy(p =\u003E p.Id, StringComparer.Ordinal). Output is deterministic across repeated runs AND across canonicalization-equivalent inputs (CC-091 parity gate test Generate_CanonicalizationEquivalentDefinitions_ProduceEqualOutput asserts identical item count/source ids/type/vertex count/triangle count/bounds).\n\nGeometryItem fields [C]: string SourcePartId; GeometryType GeometryType; Mesh Mesh; Mesh SourceMesh (the ORIGINAL mesh-asset source in its authored local space, never mutated); Matrix4x4 RestPlacement (authored source-to-creature rest placement; = Matrix4x4.identity default); List\u003CMaterialRegion\u003E MaterialRegions = new(); RigBindingMetadata RigBinding = new(). The item that ends up in Geometry[0] is the implicit combined surface.\n\nMainMesh semantics [C]: returns item-0 mesh (the implicit combined surface). A body-only creature yields exactly one item (Generate_BodyOnly_ProducesSingleImplicitItem asserts Count==1, item0 SourcePartId==\u0022\u0022, GeometryType.Implicit, Mesh non-null, MainMesh non-null).\n\n=== ASSEMBLE \u002B BUILD MESH ASSET ITEM ===\nCreatureMeshGenerator.Assemble(data, meshResolver) is the Unity-Mesh boundary [C]: builds item 0 via data.MeshResult.ToUnityMesh() \u002B mesh.SetColors(data.Colors), appends item 0 unconditionally, then calls AppendMeshAssetItems(generated, data, meshResolver) for items 1..n. AppendMeshAssetItems: for each mesh resolved part, ResolveMesh(partId, MeshAssetKey, meshResolver) -\u003E Matrix4x4 placement = part.GeometryPlacementToCreatureSpace; adds BuildMeshAssetItem(part, sourceMesh, placement, mirror:false); if part.MirrorAcrossSymmetryPlane \u0026\u0026 data.Snapshot.SymmetryMode != SymmetryMode.None, adds a SECOND BuildMeshAssetItem with placement = MirrorUtility.ReflectTransformAcrossX(placement) and mirror:true [C]. So mirroring emits a mirrored COPY only for parts flagged MirrorAcrossSymmetryPlane under a non-None SymmetryMode; the original is always present [C: test Generate_MirroredMeshPart_EmitsMirroredCopy asserts implicit\u002Boriginal\u002Bmirrored, mirror only when flag\u002Bmode].\n\nMIRROR MECHANICS [C]: ReflectTransformAcrossX(M) = Matrix4x4.Scale(-1,1,1) * M (LEFT-multiplied reflection across the creature-space X=0 plane), centralized in Assets/Scripts/Runtime/Skeleton/MirrorUtility.cs and shared with the SDF compiler and skeleton inference so a mirrored mesh-asset item lands on the same side as the mirrored implicit field. CopyTriangles reverses winding on mirrored copies (swaps index i\u003C-\u003Ei\u002B2 per triangle) to PRESERVE outward winding after X reflection [C: Generate_MirroredMeshPart_PreservesOutwardWinding]. Mirrored item SourcePartId = part.Id \u002B \u0022_mirror\u0022; GeometryType stays MeshAsset; RigBinding.IsMirrored=true [C].\n\nBuildMeshAssetItem (per-item bake) [C]: transforms every source vertex by placement.MultiplyPoint3x4 into a NEW Mesh named \u0022Generated_{part.Id}\u0022 (\u002B \u0022_mirror\u0022 if mirrored); preserves submesh structure when source.subMeshCount\u003E1 else single submesh; RecalculateNormals(); RecalculateBounds(); bakes the part\u0027s OWN authored appearance onto the item via AppearanceBaker.BakePart(part.Appearance, mesh.vertices, mesh.normals) \u2014 NOT nearest-surface sampling, because a mesh part is not part of the implicit SDF field (never from the Body\u0027s implicit gradient) [C: code \u002B test Generate_MeshAssetPart_BakesAuthoredVertexColors asserts a pure-red authored color reaches every vertex with no green/blue]. The SOURCE mesh asset is never mutated; mirrored items reuse the SAME source mesh with a reflected placement [C: test asserts Geometry[1].SourceMesh == Geometry[2].SourceMesh]. Sets SourceMesh=source, RestPlacement=placement, RigBinding {SourcePartId=part.Id, ParentPartId=part.ParentId, IsMirrored=mirror} [C].\n\n=== MATERIAL REGION (CC-028) ===\nMaterialRegion {int StartIndex; int IndexCount; string MaterialKey} [C]. A mesh-asset part whose Appearance.MaterialKey is non-empty/whitespace emits ONE MaterialRegion on its item (and on its mirrored copy): StartIndex=0, IndexCount=mesh.triangles.Length, MaterialKey=part.Appearance.MaterialKey [C: BuildMeshAssetItem \u002B test Generate_MeshPart_WithMaterialKey_PopulatesMaterialRegions]. Pass-1 region is key-only and covers the whole item (the common single-material case; doc comment calls it \u0027submesh 0\u0027); resolution of the key to a UnityEngine.Material is a render-layer concern (MaterialResolver), so the generator output stays key-only and the domain stays portable [C per code comment; the \u0027submesh 0 / whole single-material item\u0027 precision is [I] from the comment]. ITEM 0 (implicit combined surface) DELIBERATELY gets NO MaterialRegion \u2014 it keeps the single-mesh vertex-color default path (CC-028 scope) [C: test asserts Geometry[0].MaterialRegions.Count==0]. A mesh part without a MaterialKey has no regions and keeps the part-appearance path [C].\n\n=== RIG BINDING METADATA (CC-018 separation) ===\nRigBindingMetadata {string SourcePartId; string ParentPartId; bool IsMirrored} [C]. It records the semantic rig binding \u2014 what the item FOLLOWS during animation, derived from the semantic skeleton (CC-018), never from the render mesh. Surface attachment (GeometryAttachment) and rig attachment (RigBindingMetadata) stay SEPARATE and are not collapsed into one transform [C per XML \u002B ADR-002 \u00A74]. Pass-1 records only source/parent part ids; resolving the EXACT bone id reuses SkeletonInferrer.ResolveParentBoneId in a LATER pass (deferred, not yet wired on the output) [C per XML \u002B ADR-002 pass-1 \u0027exact bone binding\u0027 deferred]. RigBinding on item 0 (implicit) is an empty RigBindingMetadata [C: Assemble].\n\n=== MESH-ASSET KEY RESOLUTION ===\nThe mesh resolver is an INJECTED Func\u003Cstring, Mesh\u003E passed to Generate/Assemble [C]. CreatureMeshGenerator.ResolveMesh: if meshResolver==null, throws DomainException \u0022Part \u0027X\u0027 declares mesh geometry (\u0027key\u0027) but no mesh resolver was provided.\u0022; if meshResolver(key) returns null, throws DomainException \u0022Mesh asset \u0027key\u0027 for part \u0027X\u0027 could not be resolved.\u0022 \u2014 an unresolvable mesh-asset key is a programmer/config error and THROWS, NO SILENT DROP (per ADR-002) [C: code \u002B tests Generate_MeshPart_WithoutResolver_ThrowsDomainException and Generate_MeshPart_WithUnresolvableKey_ThrowsDomainException]. A body-only definition with NO mesh parts never calls the resolver [C: no DomainException on body-only generate].\n\nCreatureMeshPalette (Assets/Scripts/Runtime/Generation/CreatureMeshPalette.cs) is the runtime ScriptableObject mesh-asset registry backing the injected resolver [C]: [Serializable] Entry{string Key; Mesh Mesh}; List\u003CEntry\u003E Entries. TryResolve(key,out mesh) resolves via internal KeyedPaletteLookup matching entry.Key to the key ordinal (case-sensitive; rejects entries whose Mesh==null) [C]; GetUsableKeys() returns usable keys SORTED \u002B DEDUPLICATED (ordinal) [C]; HasDuplicateKeys(out duplicateKey) reports an ordinal duplicate [C]. Creator uses ordinal key resolution (not case-insensitive): TryResolve(\u0022Eye\u0022) is false when only \u0022eye\u0022 present [C: Editor CreatureMeshPaletteTests]. The palette is the EDITOR-side key-\u003EUnityEngine.Mesh asset holder (DNA stores only the ordinal key, so generated output can be rebuilt in Play Mode without editor-only assets) [C per palette XML]; wiring of an editor palette/resolver/authoring UI into the generator is deferred (the generator itself only accepts the injected Func) [C per ADR-002 pass-1 deferred \u0027editor mesh palette \u002B resolver \u002B authoring UI\u0027].\n\n=== SERIALIZATION ===\nSerialization of MeshGeometry on a part is additive and covered in detail by creaturecreator-serialization-contract and the JsonDnaSerializerMeshGeometryTests fixture (reference only \u2014 meshGeometry always emitted, null for parts without one; pre-CC-031 files load unchanged; canonicalization quantizes the attachment) [C per ADR-002 Consequences; not re-derived here].\n\n=== CURRENT-STATE SUMMARY ===\nA creature = deterministic ordered List\u003CGeometryItem\u003E: item 0 implicit combined surface (source \u0022\u0022, GeometryType.Implicit, no material region, empty rig binding), items 1..n mesh-asset parts ascending SourcePartId (each placed via GeometryPlacementToCreatureSpace from the resolved snapshot, mirroring via ReflectTransformAcrossX, per-part authored vertex colors, optional key-only MaterialRegion over the item, RigBindingMetadata source/parent ids \u002B IsMirrored). Procedural geometry and exact bone binding remain un-implemented/deferred. No mesh part ever contributes to the implicit SDF. Domain model stores no UnityEngine.Object; all asset references are stable string keys resolved at generation time through injected resolvers, with unresolvable keys throwing DomainException (no silent drop).",
+  "Title": "CreatureCreator Composable Geometry Sources and GeneratedCreature Multi-Item Output",
+  "Status": 1,
+  "Confidence": 0.9,
+  "Tags": [
+    "creaturecreator",
+    "definition",
+    "generation",
+    "geometry",
+    "geometrytype",
+    "meshgeometry",
+    "geometryattachment",
+    "generatedcreature",
+    "geometryitem",
+    "materialregion",
+    "rigbinding",
+    "mesh-asset",
+    "composable-geometry",
+    "cc-031",
+    "cc-028",
+    "kind:fact",
+    "scope:onboarding"
+  ],
+  "References": [
+    "creaturecreator-definition-model",
+    "creaturecreator-generation-morphology",
+    "creaturecreator-serialization-contract",
+    "creaturecreator-resolved-model-world-resolver"
+  ],
+  "Conflicts": [],
+  "Relationships": [],
+  "SourceLinks": [
+    {
+      "Label": "GeometryType.cs enum (Implicit/MeshAsset/Procedural)",
+      "Uri": "Assets/Scripts/Runtime/Definition/GeometryType.cs",
+      "StartLine": null,
+      "EndLine": null
+    },
+    {
+      "Label": "MeshGeometry.cs (MeshAssetKey \u002B Attachment)",
+      "Uri": "Assets/Scripts/Runtime/Definition/MeshGeometry.cs",
+      "StartLine": null,
+      "EndLine": null
+    },
+    {
+      "Label": "GeometryAttachment.cs (Offset/Orientation/Scale intent)",
+      "Uri": "Assets/Scripts/Runtime/Definition/GeometryAttachment.cs",
+      "StartLine": null,
+      "EndLine": null
+    },
+    {
+      "Label": "CreaturePart.cs (MeshGeometry property, mutual exclusion with Limb)",
+      "Uri": "Assets/Scripts/Runtime/Definition/CreaturePart.cs",
+      "StartLine": null,
+      "EndLine": null
+    },
+    {
+      "Label": "GeneratedCreature.cs (GeneratedCreature/GeometryItem/MaterialRegion/RigBindingMetadata/constants)",
+      "Uri": "Assets/Scripts/Runtime/Generation/GeneratedCreature.cs",
+      "StartLine": null,
+      "EndLine": null
+    },
+    {
+      "Label": "CreatureMeshGenerator.cs (Assemble/AppendMeshAssetItems/BuildMeshAssetItem/ResolveMesh)",
+      "Uri": "Assets/Scripts/Runtime/Generation/CreatureMeshGenerator.cs",
+      "StartLine": null,
+      "EndLine": null
+    },
+    {
+      "Label": "CreatureMeshPalette.cs (ScriptableObject mesh-asset registry)",
+      "Uri": "Assets/Scripts/Runtime/Generation/CreatureMeshPalette.cs",
+      "StartLine": null,
+      "EndLine": null
+    },
+    {
+      "Label": "MirrorUtility.cs (ReflectTransformAcrossX)",
+      "Uri": "Assets/Scripts/Runtime/Skeleton/MirrorUtility.cs",
+      "StartLine": null,
+      "EndLine": null
+    },
+    {
+      "Label": "CreaturePartWorldTransformResolver.cs (ResolvedPartSnapshot mesh fields/placement seam)",
+      "Uri": "Assets/Scripts/Runtime/Definition/CreaturePartWorldTransformResolver.cs",
+      "StartLine": null,
+      "EndLine": null
+    },
+    {
+      "Label": "ADR-002 Composable geometry sources and the GeneratedCreature output",
+      "Uri": "docs/adr/ADR-002-composable-geometry-and-generatedcreature-output.md",
+      "StartLine": null,
+      "EndLine": null
+    },
+    {
+      "Label": "GeneratedCreatureTests.cs (ordering/mirroring/placement/resolver/regions)",
+      "Uri": "Assets/Scripts/Tests/Runtime/GeneratedCreatureTests.cs",
+      "StartLine": null,
+      "EndLine": null
+    },
+    {
+      "Label": "DefinitionValidatorMeshGeometryTests.cs (mutual exclusion/attachment validation)",
+      "Uri": "Assets/Scripts/Tests/Runtime/DefinitionValidatorMeshGeometryTests.cs",
+      "StartLine": null,
+      "EndLine": null
+    },
+    {
+      "Label": "CreatureMeshPaletteTests.cs (Editor; ordinal key resolution)",
+      "Uri": "Assets/Scripts/Tests/Editor/CreatureMeshPaletteTests.cs",
+      "StartLine": null,
+      "EndLine": null
+    }
+  ],
+  "UsageCount": 0,
+  "LastUpdated": "2026-09-06T04:56:05.2981172Z"
+}

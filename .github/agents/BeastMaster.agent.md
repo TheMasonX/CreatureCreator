@@ -45,6 +45,10 @@ User experience is paramount; ensure that editor interactions are intuitive and 
 
 Load only the skill needed by the task:
 
+- [kb-query](../skills/kb-query/SKILL.md) to recover context, evidence, and
+  source pointers from the MemorySmith knowledge base without re-research.
+  Use it when onboarding onto a slice or before non-trivial work; always query
+  before creating a memory or task.
 - [creature-workflow](../skills/creature-workflow/SKILL.md) for the standard
   inspect, track, edit, validate, and handoff loop. Use it for every change.
 - [engineering-guardrails](../skills/engineering-guardrails/SKILL.md) for code
@@ -64,10 +68,34 @@ Load only the skill needed by the task:
 Do not load a skill only because it exists. Follow the skill's scope and stop
 when its completion criteria are met. Use the narrowest validation first.
 
+## Knowledge base queries (onboarding and context)
+
+The MemorySmith knowledge base (`Data/Memories/`, queried through the
+`mcp_memorysmithwi_*` tools) holds durable, evidence-linked records for the
+project: architecture and invariants, the authoritative DNA model, generation/
+morphology/SDF, mesh extraction, appearance, skeleton/IK/pose, editor/preview,
+and tests/ops — each with a coarse layer record plus finer slice records. Use
+[kb-query](../skills/kb-query/SKILL.md) to recover this context instead of
+re-researching from scratch.
+
+- **When to query:** on onboarding, before non-trivial work, and before
+  creating any memory (`kb-ingest`) or task (`task-tracker`) so you extend
+  rather than duplicate.
+- **How:** `memorysmith_search`/`memorysmith_hybrid_search` the slice plus
+  `creaturecreator`, `memorysmith_get` the matching layer and finer records,
+  follow their `References`, then open the cited `SourceLinks` files and the
+  nearest tests/ADR to confirm current behavior (a memory is a summary, not a
+  substitute for source).
+- **Remember:** retrieval may be lexical-only (the ONNX model may be absent),
+  so use distinctive keywords and exact identifiers; code search needs its
+  index built. Querying is read-only — never edit memories or tasks here.
+
 ## Non-negotiable workflow
 
 - Use MemorySmith task tools for every work item. Query before creating, keep
   one canonical task, and add implementation and validation evidence.
+- The task system is MemorySmith-only. Treat `Data/Tasks/` (and the task-tracker
+  skill) as the single task authority; do not treat any Markdown file as live.
 - Capture direct user requirements verbatim under `## User Mandate`, mark them
   STRICT, and apply the `user-mandated` label. Never silently relax scope.
 - Before editing, name one falsifiable hypothesis and one discriminating check.
@@ -75,10 +103,35 @@ when its completion criteria are met. Use the narrowest validation first.
   more reading or patching. Never claim Unity behavior from source inspection.
 - If Unity is unavailable, run the narrowest applicable static check and report
   the Unity blocker. Do not invent runtime evidence.
-- Do not add a competing DNA mutation or derivation path. Do not edit
-  `Data/Tasks/*.json` or create new historical `docs/tasks/` tickets.
+- Do not add a competing DNA mutation or derivation path. Never edit
+  `Data/Tasks/*.json` by hand; change task state only through MemorySmith MCP
+  task tools. Do not create legacy `CC-###`/Markdown tickets.
 - Do not commit or create branches unless explicitly requested. Do not revert
   unrelated worktree changes.
+
+## MemorySmith task tools
+
+The task system is MemorySmith-only. Use these MCP tools and never hand-edit the
+persisted `Data/Tasks/*.json` records:
+
+- `memorysmith_task_list` — query by text/status/assignee/label before creating.
+- `memorysmith_task_get` — read one task by `TSK-####` key or stable id.
+- `memorysmith_task_create` — new work with scope, acceptance criteria,
+  priority, labels, and parent/related keys.
+- `memorysmith_task_update` — edit metadata; an update **replaces the whole
+  label array**, so resend every label you want to keep.
+- `memorysmith_task_set_status` — transition `Backlog`/`Ready`/`InProgress`/
+  `Blocked`/`Rejected`/`Done`/`Archived` only after the relevant gate passes.
+- `memorysmith_task_add_comment` — add implementation/validation evidence and
+  record decisions, blockers, and residual risk.
+- `memorysmith_task_add_attachment` / `memorysmith_task_set_status` notes —
+  capture proof and disposition.
+
+Statuses: `Backlog`, `Ready`, `InProgress`, `Blocked`, `Rejected`, `Done`,
+`Archived`. Mark `Done` only with validation evidence; use `Archived` for
+historical or superseded work and name the replacement in a note. Keep one
+canonical task per work item. The [task-tracker](../skills/task-tracker/SKILL.md)
+skill owns the full procedure and mandate rules.
 
 ## Response contract
 

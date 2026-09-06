@@ -1,0 +1,220 @@
+{
+  "Id": "creaturecreator-editor-authoring-preview-details",
+  "Content": "FINER slice under creaturecreator-editor-preview. All editor files live under Assets/Scripts/Editor (assembly ProceduralCreature.Editor). Two families: (A) PURE authoring helpers with no UnityEditor dependency (EditMode-testable), and (B) the preview async state machine \u002B session/undo anchors that DO use Unity APIs. All claims below are classified inline: [C] = Confirmed by direct source inspection of code \u002B class XML doc; [I] = Inference not literally stated in source.\n\n=== (A) PURE AUTHORING HELPERS (no UnityEditor API; never touch window/undo/serialization; mutate only the definition/clone the caller hands them; EditMode-tested) ===\n\nA1 BodySplineAuthoring (BodySplineAuthoring.cs, public static) [C] - Body-spline even-spacing invariant authoring. AppendSample/PrependSample extend tail/head along current chord at average segment length (Spore-like: adds length, never re-squeezes existing samples) [C]; RenumberSamplesInOrder renumbers sample Ids to canonical 1..N in index order [C]; TryRemoveEndpointSample enforces a min sample count (DefaultMinSampleCount=5) and never goes below it [C]. SpaceEvenly re-snaps every sample to equal CHORD distance riding the source polyline (endpoints \u002B radii preserved, final sample snapped to tail so it never drifts), leaving \u003C3-sample splines unchanged [C]; chord (not arc) spacing matches DefinitionValidator\u0027s UnevenBodySpacing Euclidean-distance rule [C]. RespaceToTargetSpacing is the density control (CC-015): resamples to a target chord density, interpolating radii by source-arc [C]. DragSampleEvenly is the OLD FABRIK equal-link spine drag (CC-015), RETAINED as a constraint primitive \u002B historical-test baseline but SUPERSEDED for the editor viewport by BodyEditSolver (CC-016) [C]. Uses no UnityEditor API; only mutates the caller\u0027s BodySpline inside the editor\u0027s MutateDefinition clone funnel [C].\n\nA2 BodyEditSolver (BodyEditSolver.cs, public static) [C] - Local curve-edit solver (CC-016), operates on a generic ordered Vector3 chain, NOT on BodySpline/DNA/serialization, returns a pure BodyEditResult (Positions \u002B SelectedIndex \u002B ChangedSampleIndices \u002B diagnostics TotalArcLength/MinSegmentLength/MinSegmentRatio/MaxCurvatureDegrees/SelectedDisplacement/MaxNeighborDisplacement/ArcLengthDelta) [C]. BodyEditKind enum { InteriorBend, EndpointLength } - the EDITOR classifies drag by sample position (interior vs endpoint); the solver never classifies drag direction [C]. Pipeline: snapshot -\u003E desired selected position (straighten bias toward neighbor chord) -\u003E weighted drag -\u003E soft compression-only segment-length correction -\u003E tiny curvature/kink (second-difference) relaxation -\u003E clamp pathological compression [C]. Each frame solves from the mouse-down snapshot (never previous frame) so long drags do not drift [C]. Scope is local: selected sample \u002B at most \u002B/-3 neighbors (7 max even on 1024-sample body); neighbor movement weights 1.00/0.25/0.07/0 [C]. Length preservation is SOFT (stretched allowed, only excessive compression countered; MinSegmentRatio=0.55 floor; EndpointLength exempts the endpoint\u0027s own segment because that segment IS the length edit) [C]. No UnityEditor API; pure math, EditMode-testable [C]. In CreatureEditorWindow the drag kind is chosen by activeIsEndpoint (line 2130) and solved via SolveEndpointDrag/SolveInteriorDrag, committed through MutateDefinition (Drag Body Endpoint (Viewport) / Drag Body Sample (Viewport)) [C].\n\nA3 BodyPlacementAuthoring (BodyPlacementAuthoring.cs, public static) [C] - CC-007 step-4 placement helpers. TryProjectToAnchor takes a preview-mesh hit (creature-space position \u002B outward normal) and returns the semantic BodySurfaceAnchor in CANONICAL (renumbered 1..N) sample-ID space by projecting against a renumbered CLONE, so a non-sequential loaded Body cannot yield a validator-rejected anchor after mutation renumbers samples (CC-007 review fix) [C]. TryResolveSurfaceFrame/ResolveSurfaceFrameRotation reproduce the surface frame (position \u002B LookRotation from Tangent/Normal), local \u002BZ = body Tangent, \u002BY = outward Normal, matching BodyFrameResolver / runtime ResolveBodyChildSurfaceFrame [C]. False/throws on degenerate body or unknown/terminal SegmentStartSampleId; caller falls back to a raw creature-space position [C]. CanonicalClone is private; never mutates the source definition [C].\n\nA4 BodySampleRadiusHandle (BodySampleRadiusHandle.cs, public static) [C] - shared math for the radius affordance: ComputeRadius = distance(sample,handle) floored at minimumRadius; GetHandlePosition = sample \u002B normalized dragAxis * max(radius, 0.01f) so tiny bodies never get an unselectable handle [C]. Pure, no UnityEditor API [C].\n\nA5 LimbAuthoring (LimbAuthoring.cs, public static) [C] - pure limb-chain authoring for CC-018. IsLimbChainType = Limb/Leg/Arm only (Foot/Hand are terminal attachment parts, not chains) [C]. ApplyLimbStateForTypeChange seeds a default chain when the new PartType is a chain type, else clears Limb so the part falls back to Shape geometry [C]. DefaultLimbChainForType -\u003E LimbChain.CreateDefault() (root at origin, terminal at local -Y, tapering) [C]. NextLimbJointId = max existing \u002B 1 (strictly-increasing joint ids match validator LimbJointOrderNotDeterministic) [C]. ResizeLimbChain clamps to GenerationTolerances Min/MaxLimbJointCount, never removes the root, grows downward from the tail [C]. ClampJointToBounds honors root-at-origin (index 0 always clamps to zero) [C]. WorldJointPosition/LocalJointPosition map through the part world matrix (same transform SDF/skeleton use) [C]. Child local space = parent TERMINAL joint for limbs; no per-child placement override needed (resolver owns child frame) [C].\n\nA6 PartSiblingOrderer (PartSiblingOrderer.cs) [C] - presentation-only tree ordering. IPartSiblingOrderer { OrderSiblings }; AlphabeticalPartSiblingOrderer (default; by DisplayName OrdinalIgnoreCase then Id) and GroupedPartSiblingOrderer (PartType then DisplayName then Id, not the active default) selected via static PartSiblingOrderers.Alphabetical/Grouped [C]. NEVER touches DNA/validation/canonicalization/serialization; swapping strategy only reorders tree nodes [C].\n\nA7 SkeletonDisplay (SkeletonDisplay.cs, public static) [C] - CC-066 pure read-only view data for the skeleton overlay. BuildBoneLines/BuildJointPoints convert an inferred rest Skeleton into draw primitives (BoneLine start/end \u002B joint points) with no SceneView access and no Unity Editor dependency beyond UnityEngine math types; the window renders them in OnSceneGUI; never mutates DNA [C].\n\n=== (B) PREVIEW ASYNC STATE MACHINE \u002B SESSION/UNDO ANCHORS (use Unity APIs; live in the editor layer) ===\n\nB1 Ownership split (three owners, no duplication) [C] - CreatureGenerationScheduler (Runtime, Assets/Scripts/Runtime/Generation/CreatureGenerationScheduler.cs) owns EXECUTION and runs the heavy GenerateData off the main thread via Task.Run (Enqueue clones the definition, \u002B\u002B_latestSequence -\u003E sequence id, background Run calls CreatureMeshGenerator.GenerateData(definition, diagnostics) producing plain-data GeneratedCreatureData with NO Unity Mesh/scene objects, enqueues a CreatureGenerationResult carrying that sequence). CreaturePreviewRequestState (Editor) owns the EDITOR request lifecycle and the current-vs-stale decision. CreaturePreviewAcceptanceState (Editor) owns accepted-result identity (A7.2). The editor\u0027s CreaturePreviewController mediates between the runtime scheduler and these two editor states.\n\nB2 CreaturePreviewRequestState (CreaturePreviewRequestState.cs, internal sealed) [C] - A7.1/CC-094 viewport-free, scene-object-free coordinator with no viewport/editor-window dependency (deterministic EditMode unit tests). BeginRequest(requestId) records the single current request (monotonic scheduler sequence; any earlier becomes stale); IsCurrentRequest(requestId) true only for the current pending request (stale/superseded/negative/cleared -\u003E not current); TryAcceptResult(requestId, resultRevisionId, currentRevisionId) accepts a completed result ONLY when its request is current AND the generated snapshot\u0027s revision still equals the current definition\u0027s revision, then always Clear()s the pending request (so a current terminal result, even invalid, clears; a superseded result leaves the newer request pending) [C]; Clear() cancels on teardown/cancel. Uses the scheduler sequence so it introduces NO second revision scheme and stays consistent with the runtime scheduler [C].\n\nB3 CreaturePreviewAcceptanceState (CreaturePreviewAcceptanceState.cs, internal sealed) [C] - A7.2 revision \u002B fingerprint gating of the LAST APPLIED preview. Accept(revisionId, placementFingerprint) stores both; HasAcceptedPreview true only when both set; IsStale(currentRevisionId, currentPlacementFingerprint) returns true when there is no accepted preview OR revision differs OR placement fingerprint differs; Clear() resets [C]. In CreatureEditorWindow the accepted pair is the snapshot RevisionId \u002B BuildPlacementFingerprint(_definition) which is BODY-SCOPE ONLY (Body sample Ids/positions/radii \u002B Forward), so pure PART edits never mark the preview stale (CC-007 step 5) while any Body/surface change does [C]. IsPreviewStale() resolves the current preview revision and consults _previewAcceptance.IsStale; an unknown/carried-across-domain-reload accepted preview is treated as stale and must regenerate before placement is allowed [C].\n\nB4 CreaturePreviewController (CreaturePreviewController.cs, internal sealed : IDisposable) [C] - owns the transient preview scene objects. Enqueue(definition, voxelsPerUnit, logDiagnostics) clones the definition, pins VoxelsPerUnit, delegates to _scheduler.Enqueue then _requestState.BeginRequest, returns requestId [C]. ProcessCompletions(currentRevisionResolver, onCompleted) pumps _scheduler.TryTakeCompleted in a loop; a FAILED result is forwarded only if its request is still current (then clears); a SUCCEEDED result is accepted via _requestState.TryAcceptResult(result.Sequence, result.Data.Snapshot.RevisionId, currentRevisionId) and only then onCompleted fires - so stale results (wrong sequence OR snapshot revision drifted from the live definition) are discarded [C]. ApplyPreviewGeometry(generated) applies the main mesh and (re)creates transient child geometry objects named \u0022CreatureCreator Preview Geometry N\u0022 under the root [C]. ApplyPreviewMesh creates/grabs a GameObject named \u0022CreatureCreator Preview\u0022 carrying MeshFilter\u002BMeshRenderer\u002BMeshCollider (collider = preview Body collider used for placement raycasts; stale-collider behavior is a documented simplification) [C]. Dispose() clears request state and disposes the scheduler [C].\n\nB5 Off-main-thread GenerateData / main-thread Assemble [C] - CreatureGenerationScheduler.Run calls CreatureMeshGenerator.GenerateData (pure plain-data stages: ValidateAndResolve -\u003E SDF compile\u002Bfield sampling -\u003E MarchingCubes extract -\u003E topology validate -\u003E appearance bake) off-thread via Task.Run; the produced GeneratedCreatureData has no UnityEngine.Object, so it is safe off-thread. CreatureMeshGenerator.Assemble(data, meshResolver) (CreatureMeshGenerator.cs) converts to real Unity Mesh (ToUnityMesh \u002B SetColors) and places mesh-asset items, resolving each source mesh through the injected Func\u003Cstring,Mesh\u003E - so Assemble MUST run on the Unity main thread. In the editor, Assemble is called inside the ProcessGenerationCompletions completion callback (CreatureEditorWindow.cs line ~3020, ResolveMeshAsset -\u003E palette asset lookup), and ProcessGenerationCompletions is pumped from ProcessAutoRegeneration wired to EditorApplication.update - i.e. completions are drained on the main thread [C]. CreatureMeshGenerator.Generate (sync wrapper) = GenerateData then Assemble for the runtime/PlayMode path [C]. The runtime CreatureRuntimePreview mirrors this by calling Assemble(result.Data, ResolveMeshAsset) [C]. Scheduler result also exposes internal IsStale (set when a dequeued result\u0027s sequence != latest) still used by the runtime preview path [C].\n\nB6 Session persistence (CreatureEditorSession.cs, public static) [C] - resolves delta-audit #5 (working state survives domain reload). Deliberately uses SessionState (key \u0022ProceduralCreature.WorkingDefinitionJson\u0022, JsonDnaSerializer) which is per-editor-process and survives domain reload but NOT editor restart - exactly the scope (script-recompile must not discard unsaved work), not a substitute for explicit Save/Load-to-disk which the window toolbar provides separately [C]. TryLoad returns null on corrupt JSON / DnaDeserializationException rather than throwing (losing an edit is recoverable; crashing OnEnable is not) [C].\n\nB7 Undo anchor (CreatureUndoState.cs, public sealed : ScriptableObject) [C] - a minimal [SerializeField] string _json wrapper whose only job is to give Unity\u0027s native Undo a serializable UnityEngine.Object to snapshot. CreatureDefinition is a plain C# object (no Unity serialization by design), so it cannot be the direct target of Undo.RecordObject; the wrapper holds the canonical JsonDnaSerializer JSON instead, letting Unity\u0027s own serialization-diffing Undo do the snapshot/restore with NO custom undo stack [C]. Created via ScriptableObject.CreateInstance with HideFlags.HideAndDontSave in CreatureEditorWindow.OnEnable; destroyed in OnDisable; never saved as an asset, never shown in the Project window - in-memory undo anchor for one window instance [C].\n\nNOTES ON PURE-vs-EDITOR boundary: the pure helpers (A1-A7) share an explicit, repeated code-comment pattern \u0022pure math, no UnityEditor API, EditMode-testable\u0022 and mutate only caller-owned definitions/clones; all edits still commit through CreatureEditorWindow\u0027s single MutateDefinition funnel (clone -\u003E mutate -\u003E revalidate -\u003E Undo) so they flow through validation, Undo, and the session boundary [C]. Authoring tools never author authoritative runtime generation - runtime derives from DNA; it does not author it [C].",
+  "Title": "CreatureCreator Editor Authoring Tools and Preview Async State Machine (details)",
+  "Status": 1,
+  "Confidence": 0.82,
+  "Tags": [
+    "creaturecreator",
+    "editor",
+    "authoring",
+    "body-spline",
+    "body-edit-solver",
+    "limb-authoring",
+    "placement",
+    "preview",
+    "async",
+    "state-machine",
+    "session",
+    "undo",
+    "kind:fact",
+    "scope:onboarding"
+  ],
+  "References": [
+    "creaturecreator-editor-preview",
+    "creaturecreator-generation-morphology",
+    "creaturecreator-skeleton-ik-pose",
+    "creaturecreator-definition-model"
+  ],
+  "Conflicts": [],
+  "Relationships": [
+    {
+      "sourceId": "creaturecreator-editor-authoring-preview-details",
+      "targetId": "creaturecreator-editor-preview",
+      "relationType": 0,
+      "origin": 0,
+      "createdAtUtc": "2026-09-06T04:52:16.4198567+00:00"
+    },
+    {
+      "sourceId": "creaturecreator-editor-authoring-preview-details",
+      "targetId": "creaturecreator-generation-morphology",
+      "relationType": 0,
+      "origin": 0,
+      "createdAtUtc": "2026-09-06T04:52:16.4198569+00:00"
+    },
+    {
+      "sourceId": "creaturecreator-editor-authoring-preview-details",
+      "targetId": "creaturecreator-skeleton-ik-pose",
+      "relationType": 0,
+      "origin": 0,
+      "createdAtUtc": "2026-09-06T04:52:16.4198569+00:00"
+    },
+    {
+      "sourceId": "creaturecreator-editor-authoring-preview-details",
+      "targetId": "creaturecreator-definition-model",
+      "relationType": 0,
+      "origin": 0,
+      "createdAtUtc": "2026-09-06T04:52:16.419857+00:00"
+    }
+  ],
+  "SourceLinks": [
+    {
+      "Label": "other:BodySplineAuthoring.cs",
+      "Uri": "Assets/Scripts/Editor/BodySplineAuthoring.cs",
+      "StartLine": null,
+      "EndLine": null
+    },
+    {
+      "Label": "other:BodyEditSolver.cs",
+      "Uri": "Assets/Scripts/Editor/BodyEditSolver.cs",
+      "StartLine": null,
+      "EndLine": null
+    },
+    {
+      "Label": "other:BodyPlacementAuthoring.cs",
+      "Uri": "Assets/Scripts/Editor/BodyPlacementAuthoring.cs",
+      "StartLine": null,
+      "EndLine": null
+    },
+    {
+      "Label": "other:BodySampleRadiusHandle.cs",
+      "Uri": "Assets/Scripts/Editor/BodySampleRadiusHandle.cs",
+      "StartLine": null,
+      "EndLine": null
+    },
+    {
+      "Label": "other:LimbAuthoring.cs",
+      "Uri": "Assets/Scripts/Editor/LimbAuthoring.cs",
+      "StartLine": null,
+      "EndLine": null
+    },
+    {
+      "Label": "other:PartSiblingOrderer.cs",
+      "Uri": "Assets/Scripts/Editor/PartSiblingOrderer.cs",
+      "StartLine": null,
+      "EndLine": null
+    },
+    {
+      "Label": "other:SkeletonDisplay.cs",
+      "Uri": "Assets/Scripts/Editor/SkeletonDisplay.cs",
+      "StartLine": null,
+      "EndLine": null
+    },
+    {
+      "Label": "other:CreaturePreviewController.cs",
+      "Uri": "Assets/Scripts/Editor/CreaturePreviewController.cs",
+      "StartLine": null,
+      "EndLine": null
+    },
+    {
+      "Label": "other:CreaturePreviewRequestState.cs",
+      "Uri": "Assets/Scripts/Editor/CreaturePreviewRequestState.cs",
+      "StartLine": null,
+      "EndLine": null
+    },
+    {
+      "Label": "other:CreaturePreviewAcceptanceState.cs",
+      "Uri": "Assets/Scripts/Editor/CreaturePreviewAcceptanceState.cs",
+      "StartLine": null,
+      "EndLine": null
+    },
+    {
+      "Label": "other:CreatureEditorSession.cs",
+      "Uri": "Assets/Scripts/Editor/CreatureEditorSession.cs",
+      "StartLine": null,
+      "EndLine": null
+    },
+    {
+      "Label": "other:CreatureUndoState.cs",
+      "Uri": "Assets/Scripts/Editor/CreatureUndoState.cs",
+      "StartLine": null,
+      "EndLine": null
+    },
+    {
+      "Label": "other:CreatureEditorWindow.cs",
+      "Uri": "Assets/Scripts/Editor/CreatureEditorWindow.cs",
+      "StartLine": null,
+      "EndLine": null
+    },
+    {
+      "Label": "other:CreatureGenerationScheduler.cs",
+      "Uri": "Assets/Scripts/Runtime/Generation/CreatureGenerationScheduler.cs",
+      "StartLine": null,
+      "EndLine": null
+    },
+    {
+      "Label": "other:CreatureMeshGenerator.cs",
+      "Uri": "Assets/Scripts/Runtime/Generation/CreatureMeshGenerator.cs",
+      "StartLine": null,
+      "EndLine": null
+    },
+    {
+      "Label": "other:CreatureRuntimePreview.cs",
+      "Uri": "Assets/Scripts/Runtime/Generation/CreatureRuntimePreview.cs",
+      "StartLine": null,
+      "EndLine": null
+    },
+    {
+      "Label": "other:BodySplineAuthoringTests.cs",
+      "Uri": "Assets/Scripts/Tests/Editor/BodySplineAuthoringTests.cs",
+      "StartLine": null,
+      "EndLine": null
+    },
+    {
+      "Label": "other:BodyEditSolverTests.cs",
+      "Uri": "Assets/Scripts/Tests/Editor/BodyEditSolverTests.cs",
+      "StartLine": null,
+      "EndLine": null
+    },
+    {
+      "Label": "other:BodyPlacementAuthoringTests.cs",
+      "Uri": "Assets/Scripts/Tests/Editor/BodyPlacementAuthoringTests.cs",
+      "StartLine": null,
+      "EndLine": null
+    },
+    {
+      "Label": "other:CreaturePreviewRequestStateTests.cs",
+      "Uri": "Assets/Scripts/Tests/Editor/CreaturePreviewRequestStateTests.cs",
+      "StartLine": null,
+      "EndLine": null
+    },
+    {
+      "Label": "other:CreaturePreviewAcceptanceStateTests.cs",
+      "Uri": "Assets/Scripts/Tests/Editor/CreaturePreviewAcceptanceStateTests.cs",
+      "StartLine": null,
+      "EndLine": null
+    },
+    {
+      "Label": "other:PartSiblingOrdererTests.cs",
+      "Uri": "Assets/Scripts/Tests/Editor/PartSiblingOrdererTests.cs",
+      "StartLine": null,
+      "EndLine": null
+    },
+    {
+      "Label": "other:CreatureEditorWindowLimbAuthoringTests.cs",
+      "Uri": "Assets/Scripts/Tests/Editor/CreatureEditorWindowLimbAuthoringTests.cs",
+      "StartLine": null,
+      "EndLine": null
+    },
+    {
+      "Label": "other:CreatureEditorSessionTests.cs",
+      "Uri": "Assets/Scripts/Tests/Editor/CreatureEditorSessionTests.cs",
+      "StartLine": null,
+      "EndLine": null
+    },
+    {
+      "Label": "other:CreatureUndoStateTests.cs",
+      "Uri": "Assets/Scripts/Tests/Editor/CreatureUndoStateTests.cs",
+      "StartLine": null,
+      "EndLine": null
+    },
+    {
+      "Label": "other:CreatureGenerationSchedulerTests.cs",
+      "Uri": "Assets/Scripts/Tests/Runtime/CreatureGenerationSchedulerTests.cs",
+      "StartLine": null,
+      "EndLine": null
+    }
+  ],
+  "UsageCount": 0,
+  "LastUpdated": "2026-09-06T04:56:05.2953817Z"
+}

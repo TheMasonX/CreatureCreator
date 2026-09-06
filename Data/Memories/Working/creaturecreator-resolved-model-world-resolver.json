@@ -1,0 +1,186 @@
+{
+  "Id": "creaturecreator-resolved-model-world-resolver",
+  "Content": "Finer slice over the shared RESOLVED MORPHOLOGY MODEL and the single geometry world-transform resolver in the CreatureCreator Unity repo.\n\n(1) WHY A DERIVED RESOLVED MODEL EXISTS \u2014 [Confirmed: source doc-comments \u002B docs/adr/ADR-007-resolved-morphology-model.md; also related CC-056A/056B/018/051]. ADR-007 (Accepted 2026-08-24) decides: derive ONE resolved geometry model from authoritative DNA and make every generation subsystem consume it instead of independently re-deriving the same segment lengths/arc lengths/frames. ResolvedLimb (CC-056A part A) is an immutable snapshot of a LimbChain; a matching ResolvedBody follows for Body samples/frames (CC-056A part B). RESOLVED STATE IS DERIVED, NEVER SERIALIZED, NEVER WRITTEN BACK INTO DNA (ADR-001 \u00A75, repeated in ResolvedBody.cs and ResolvedLimb.cs headers: \u0027Entirely derived state: never serialized and never written back into DNA (ADR-001 \u00A75, ADR-007)\u0027). CreatureDefinition remains authoritative; meshes, colors, skeletons, poses are derived outputs. Resolve is pure/deterministic and COPIES its input values; the snapshot holds private read-only wrappers, so neither later source mutation nor consumer mutation can change it. The v1 centerline IS the authored polyline (sample positions / joint positions) until CC-055 decides a smooth centerline.\n\n(2) ResolvedCreatureSnapshot.Resolve FLOW \u002B ResolvedPartSnapshot CONTENTS \u2014 [Confirmed: CreaturePartWorldTransformResolver.cs source]. ResolvedCreatureSnapshot.Resolve(CreatureDefinition): throws DomainException on null definition/Parts; canonicalizes input via DefinitionCanonicalizer.Canonicalize; computes RevisionId = lowercase hex SHA-256 of CanonicalJsonWriter.Write(canonical) (stable under part reordering \u2014 test ResolvedCreatureSnapshot_RevisionId_IsCanonicalAndStable); hasBody when canonical.Body.Samples non-empty -\u003E ResolvedBody.Resolve(Body); sorts canonical.Parts by Ordinal string Id; per part: rejects null/empty Id and duplicate Id; ResolvedLimb.Resolve when part.Limb != null; resolves partFrame = CreaturePartWorldTransformResolver.ResolvePartFrameToCreatureSpace(canonical, part); childFrame = partFrame then translated by limb.TerminalSocket when the part has a limb; builds an immutable ResolvedPartSnapshot and an O(1) read-only PartsById dictionary; public TryGetPart(id, out ResolvedPartSnapshot). Fields cached on snapshot (read by consumers, never re-derived): HasBody, Body (ResolvedBody), BodyAppearance, Forward, Bounds, Generation, SymmetryMode, RevisionId, PartsById. ResolvedPartSnapshot carries Id, ParentId, PartType, Transform, Appearance, MirrorAcrossSymmetryPlane, ResolvedShape (resolved via shape.WithLegacyDefaults()), HasLimb, Limb, PartFrameToCreatureSpace, ChildFrameToCreatureSpace, HasMeshGeometry, MeshAssetKey, GeometryOffset/Orientation(normalized)/Scale, GeometryPlacementToCreatureSpace (= partFrame * TRS(offset,orient,scale)), HasBodySurfaceAnchor, BodySurfaceAnchorSegmentStartSampleId. NOTE: these resolved placements/shapes are cached in the snapshot; the SDF compiler and skeleton inferrer read the cached fields rather than calling the resolver per primitive.\n\n(3) ResolvedBody (from BodySpline samples) vs ResolvedLimb (from AUTHORED JOINTS, not metaball samples) \u2014 [Confirmed: ResolvedBody.cs, ResolvedLimb.cs, LimbMetaballSampler.cs]. ResolvedBody.Resolve(BodySpline) (or IReadOnlyList\u003CBodySample\u003E) reads ONLY BodySpline.Samples geometry (never Appearance), throws DomainException on null/empty/null-sample input, and copies positions/ids/radii; exposes SamplePositions, SampleIds, SampleRadii, SegmentLengths, TotalLength, NormalizedArcLengthAtSample, Centerline (alias == SamplePositions), RootSocket = first sample, TerminalSocket = last sample. Frame derivation (tangent/normal/binormal) is NOT in ResolvedBody; it lives in BodyFrameResolver (parallel transport), which consumes a ResolvedBody. ResolvedBody.Resolve internally uses the shared ResolvedPolyline geometry calc. ResolvedLimb.Resolve(LimbChain) derives from AUTHORED LimbChain.Joints (joint positions only); exposes JointPositions, SegmentLengths, TotalLength, NormalizedArcLengthAtJoint, Thickness (fallback ThicknessProfile.CreateDefault() when none; cloned), BlendRadius, Centerline (== JointPositions), RootSocket (Joints[0] approx part origin), TerminalSocket (Joints[count-1], where children attach). ResolvedLimb does NOT sample metaballs \u2014 LimbMetaballSampler.Sample(ResolvedLimb) is a SEPARATE downstream generator that owns only the per-segment fidelity knob (DesiredSampleSpacing = 0.1), deriving between-joint balls from ResolvedLimb segment lengths/arc length and evaluating Thickness.Evaluate(t). The task framing (\u0027JointPositions/SegmentLengths/TotalLength/Thickness/RootSocket/TerminalSocket from authored joints, not metaball samples\u0027) is accurate. ResolvedPolyline.cs is NOT a separate file \u2014 the ResolvedPolyline struct is declared inside ResolvedBody.cs and shared by body and limb derivation.\n\n(4) CreaturePartWorldTransformResolver = THE ONE GEOMETRY-SEAM FUNCTION \u2014 [Confirmed: source \u002B usage search across Runtime \u002B Editor]. CreaturePart.Transform is stored PARENT-relative; any consumer needing a part position/rotation/scale in CREATURE-ROOT space must compose the parent chain through CreaturePartWorldTransformResolver.ResolvePartFrameToCreatureSpace (canonical method; alias ResolveLocalToCreatureSpace). Doc comment states consumers \u0027must go through this one method; no consumer re-derives placement from raw ParentId/Transform/Limb fields\u0027 (ADR-002 \u00A77; CC-051). ResolveChildFrameToCreatureSpace returns the frame a direct child is authored in (limb parent -\u003E extends to terminal joint). Placement precedence (ADR-002 \u00A77): exactly one resolved frame per part via Transform \u002B parent chain \u002B limb child-at-tip (CC-018), with ONE addition: a direct Body child carrying a BodySurfaceAnchor is placed by projecting the anchor onto the resolved Body surface (CC-056B; ResolveBodyChildSurfaceFrame -\u003E BodySurfaceProjector.Project -\u003E SurfaceFrame; local transform = fine adjustment in that frame). Body-child without anchor: transform is creature-space already (Body owns creature frame; chain stops at Body). Terminal-joint translation is inserted only for ANCESTOR limbs (i \u003C chain.Count-1), NOT the resolved part itself (a limb\u0027s own frame keeps root-at-origin per Joints[0] ~ zero). Throws DomainException (never loops/truncates) on parent cycles / missing parents / null input; every generation stage validates first. CONSUMERS: (a) VALIDATOR \u2014 DefinitionValidator.ValidateResolvedEnvelope (CC-050) wraps ResolveLocalToCreatureSpace in try/catch(DomainException) and pre-skips when HasStructuralParentIssue; (b) SDF compiler \u2014 SdfProgramBuilder calls ResolvedCreatureSnapshot.Resolve then reads cached part.PartFrameToCreatureSpace (and ResolvedLimb / metaballs) in CompilePortablePart / CompilePortableBodyField / CompilePortableLimbChain; (c) skeleton inference \u2014 SkeletonInferrer builds ResolvedCreatureSnapshot then reads resolvedPart.PartFrameToCreatureSpace (BuildBone) and resolves limb bones via shared ResolvedLimb; (d) also consumed by the mesh generator (CreatureMeshGenerator.ValidateAndResolve -\u003E ResolvedCreatureSnapshot.Resolve), appearance bakers/samplers, and the EDITOR (CreatureEditorWindow uses ResolveLocalToCreatureSpace, ResolvePartFrameToCreatureSpace, ResolveChildFrameToCreatureSpace for placement/handles/drag, and ResolvedCreatureSnapshot.Resolve(...).RevisionId). BodySurfaceProjector.ProjectHitToAnchor is the inverse (mesh raycast input-only -\u003E authoritative anchor DNA), used by editor authoring; only the anchor becomes DNA, the mesh is never stored.\n\n(5) CONSUMERS ARE TOTAL / NON-THROWING ON STRUCTURALLY INVALID INPUT \u2014 [Confirmed for ResolvedBody/ResolvedLimb via TryResolve (CC-089); nuance Confirmed for the world resolver, which is intentionally throwing]. ResolvedBody.TryResolve(BodySpline / IReadOnlyList\u003CBodySample\u003E) and ResolvedLimb.TryResolve(LimbChain) return false (out resolved = default) instead of throwing on null/empty/null-sample inputs; when true they return EXACTLY what Resolve produces (test TryResolve_ValidInput_MatchesResolveAndReturnsTrue). These are the validator-only envelope paths so routine incomplete-authoring states (already separately reported by ValidateBody/ValidateLimbChains) do NOT use exceptions for control flow. A single-joint (degenerate) chain still resolves (\u003E=2-joint invariant is enforced by validation via GenerationTolerances.MinLimbJointCount, not by derivation). ResolvedBody/ResolvedLimb.Resolve THROW DomainException on the same structural states \u2014 those throwing overloads are used by non-validator generation consumers which guard totalness at the snapshot/inference boundary (e.g. SkeletonInferrer catches DomainException from ResolvedCreatureSnapshot.Resolve and falls back to a defensive per-body/per-part adapter). CreaturePartWorldTransformResolver is DOCUMENTED as a deliberately throwing contract (throws DomainException on DNA that failed validation); it is not a TryResolve seam. Its consumers are kept total by pre-validation \u002B catch: DefinitionValidator skips the stage on structural parent issues and catches DomainException around each part resolve; SkeletonInferrer catches DomainException. So the \u0027non-throwing on invalid input\u0027 property is delivered by (i) TryResolve on ResolvedBody/ResolvedLimb for the validator and (ii) guarded throwing resolve (structural pre-check \u002B catch) for the world resolver and full-snapshot resolve.\n\n(6) VALIDATOR RESOLVED-ENVELOPE STAGE (ValidateResolvedEnvelope) \u2014 [Confirmed: DefinitionValidator.cs CC-050/CC-056A-increment2\u002B3/CC-089]. Purpose: local-frame checks cannot see a nested part/limb/mesh whose RESOLVED creature-space position falls outside generation bounds (the voxel domain that would crop it); this stage re-resolves every geometry source through the SHARED world-frame resolver and reports origins/joints/attachment points outside BoundsDefinition. Flow: skip if HasStructuralParentIssue(issues) (resolution undefined on broken chain). Body samples: if ResolvedBody.TryResolve(Body) -\u003E iterate bodyResolved.SamplePositions, report ValidationCode.ResolvedBodySampleOutOfBounds for out-of-bounds (non-finite skipped; radius may extend past box by design \u2014 cropping). Per part (from hierarchy index): skip non-finite transform; world = ResolveLocalToCreatureSpace inside try/catch(DomainException) { continue }; if limb with joints -\u003E if !ResolvedLimb.TryResolve(part.Limb) continue, else for each resolved.JointPositions[i] world.MultiplyPoint3x4 -\u003E ResolvedLimbJointOutOfBounds (authored joint Id read only for message); else origin = world.GetColumn(3) -\u003E ResolvedPartOutOfBounds; mesh attachment -\u003E world.MultiplyPoint3x4(attachment.Offset) -\u003E ResolvedMeshAttachmentOutOfBounds. Report-only (adds ValidationIssue entries; DefinitionValidator reports invalid DNA WITHOUT repair). The one non-structural throw source is an anchored Body child whose surface frame cannot project (degenerate Body, or anchor to missing/terminal/non-finite sample) \u2014 genuinely authored errors reported separately (MissingBody / InvalidAttachmentAnchor), so a single documented defensive boundary stays exception-based rather than duplicating projection validity.\n\nKEY INVARIANTS (finer than the coarse records): (a) exactly ONE placement derivation path (CreaturePartWorldTransformResolver.ResolvePartFrameToCreatureSpace); (b) snapshot caching \u2014 SDF/skeleton read cached PartFrameToCreatureSpace, they do not re-call the resolver per primitive; (c) ResolvedBody = sample-derived, ResolvedLimb = joint-derived, metaballs are a separate downstream derivation via LimbMetaballSampler; (d) frames stay in part-local morphology frame until the resolver lifts them to creature space; (e) derived state never serialized / written back to DNA; (f) RevisionId (SHA-256 over canonical JSON) is stable under part reordering but changes on any DNA change. Claim classifications: items (1)-(6) above are all CONFIRMED by direct source inspection \u002B unit tests present in Assets/Scripts/Tests/Runtime (ResolvedBodyTests, ResolvedLimbTests, BodyFrameResolverTests, BodySurfaceProjectorTests, CreaturePartWorldTransformResolverTests). No Unity tests were EXECUTED during this read-only pass, so behavioral/runtime verdicts are source-and-test-evidence (not runtime-run) unless noted. INFERENCE (not yet runtime-verified): that every listed consumer is exercised in current PlayMode suites and that RevisionId is consumed only by the editor. OPEN: CC-055 smooth-centerline decision pending (v1 = authored polyline); whether ResolvedCreatureSnapshot is rebuilt fresh per Resolve call (no cross-call caching observed). Confidence 0.82 (high source\u002Btest evidence; lower due to no runtime execution in this read-only pass and one inference about editor-only RevisionId use).",
+  "Title": "CreatureCreator Shared Resolved Morphology Model and the Geometry World-Transform Resolver Seam",
+  "Status": 1,
+  "Confidence": 0.82,
+  "Tags": [
+    "kind:fact",
+    "scope:onboarding",
+    "resolved-morphology",
+    "world-transform-resolver",
+    "geometry-seam",
+    "definition",
+    "morphology",
+    "skeleton",
+    "sdf",
+    "validation",
+    "cc-056a",
+    "cc-056b"
+  ],
+  "References": [
+    "creaturecreator-definition-model",
+    "creaturecreator-generation-morphology",
+    "creaturecreator-skeleton-ik-pose",
+    "creaturecreator-editor-preview",
+    "creaturecreator-tests-ops-validation",
+    "creaturecreator-architecture-and-invariants"
+  ],
+  "Conflicts": [],
+  "Relationships": [
+    {
+      "sourceId": "creaturecreator-resolved-model-world-resolver",
+      "targetId": "creaturecreator-definition-model",
+      "relationType": 0,
+      "origin": 0,
+      "createdAtUtc": "2026-09-06T04:51:31.4793483+00:00"
+    },
+    {
+      "sourceId": "creaturecreator-resolved-model-world-resolver",
+      "targetId": "creaturecreator-generation-morphology",
+      "relationType": 0,
+      "origin": 0,
+      "createdAtUtc": "2026-09-06T04:51:31.4793485+00:00"
+    },
+    {
+      "sourceId": "creaturecreator-resolved-model-world-resolver",
+      "targetId": "creaturecreator-skeleton-ik-pose",
+      "relationType": 0,
+      "origin": 0,
+      "createdAtUtc": "2026-09-06T04:51:31.4793485+00:00"
+    },
+    {
+      "sourceId": "creaturecreator-resolved-model-world-resolver",
+      "targetId": "creaturecreator-editor-preview",
+      "relationType": 0,
+      "origin": 0,
+      "createdAtUtc": "2026-09-06T04:51:31.4793485+00:00"
+    },
+    {
+      "sourceId": "creaturecreator-resolved-model-world-resolver",
+      "targetId": "creaturecreator-tests-ops-validation",
+      "relationType": 0,
+      "origin": 0,
+      "createdAtUtc": "2026-09-06T04:51:31.4793486+00:00"
+    },
+    {
+      "sourceId": "creaturecreator-resolved-model-world-resolver",
+      "targetId": "creaturecreator-architecture-and-invariants",
+      "relationType": 0,
+      "origin": 0,
+      "createdAtUtc": "2026-09-06T04:51:31.4793487+00:00"
+    }
+  ],
+  "SourceLinks": [
+    {
+      "Label": "other:CreaturePartWorldTransformResolver.cs",
+      "Uri": "Assets/Scripts/Runtime/Definition/CreaturePartWorldTransformResolver.cs",
+      "StartLine": null,
+      "EndLine": null
+    },
+    {
+      "Label": "other:ResolvedBody.cs",
+      "Uri": "Assets/Scripts/Runtime/Morphology/ResolvedBody.cs",
+      "StartLine": null,
+      "EndLine": null
+    },
+    {
+      "Label": "other:ResolvedLimb.cs",
+      "Uri": "Assets/Scripts/Runtime/Morphology/ResolvedLimb.cs",
+      "StartLine": null,
+      "EndLine": null
+    },
+    {
+      "Label": "other:LimbMetaballSampler.cs",
+      "Uri": "Assets/Scripts/Runtime/Morphology/LimbMetaballSampler.cs",
+      "StartLine": null,
+      "EndLine": null
+    },
+    {
+      "Label": "other:BodySurfaceProjector.cs",
+      "Uri": "Assets/Scripts/Runtime/Morphology/BodySurfaceProjector.cs",
+      "StartLine": null,
+      "EndLine": null
+    },
+    {
+      "Label": "other:BodyFrameResolver.cs",
+      "Uri": "Assets/Scripts/Runtime/Definition/BodyFrameResolver.cs",
+      "StartLine": null,
+      "EndLine": null
+    },
+    {
+      "Label": "other:BodySpline.cs",
+      "Uri": "Assets/Scripts/Runtime/Definition/BodySpline.cs",
+      "StartLine": null,
+      "EndLine": null
+    },
+    {
+      "Label": "other:DefinitionValidator.cs",
+      "Uri": "Assets/Scripts/Runtime/Definition/DefinitionValidator.cs",
+      "StartLine": null,
+      "EndLine": null
+    },
+    {
+      "Label": "other:SdfProgramBuilder.cs",
+      "Uri": "Assets/Scripts/Runtime/Morphology/Sdf/SdfProgramBuilder.cs",
+      "StartLine": null,
+      "EndLine": null
+    },
+    {
+      "Label": "other:SkeletonInferrer.cs",
+      "Uri": "Assets/Scripts/Runtime/Skeleton/SkeletonInferrer.cs",
+      "StartLine": null,
+      "EndLine": null
+    },
+    {
+      "Label": "other:CreatureMeshGenerator.cs",
+      "Uri": "Assets/Scripts/Runtime/Generation/CreatureMeshGenerator.cs",
+      "StartLine": null,
+      "EndLine": null
+    },
+    {
+      "Label": "other:CreatureEditorWindow.cs",
+      "Uri": "Assets/Scripts/Editor/CreatureEditorWindow.cs",
+      "StartLine": null,
+      "EndLine": null
+    },
+    {
+      "Label": "other:CreaturePartWorldTransformResolverTests.cs",
+      "Uri": "Assets/Scripts/Tests/Runtime/CreaturePartWorldTransformResolverTests.cs",
+      "StartLine": null,
+      "EndLine": null
+    },
+    {
+      "Label": "other:ResolvedBodyTests.cs",
+      "Uri": "Assets/Scripts/Tests/Runtime/ResolvedBodyTests.cs",
+      "StartLine": null,
+      "EndLine": null
+    },
+    {
+      "Label": "other:ResolvedLimbTests.cs",
+      "Uri": "Assets/Scripts/Tests/Runtime/ResolvedLimbTests.cs",
+      "StartLine": null,
+      "EndLine": null
+    },
+    {
+      "Label": "other:BodyFrameResolverTests.cs",
+      "Uri": "Assets/Scripts/Tests/Runtime/BodyFrameResolverTests.cs",
+      "StartLine": null,
+      "EndLine": null
+    },
+    {
+      "Label": "other:BodySurfaceProjectorTests.cs",
+      "Uri": "Assets/Scripts/Tests/Runtime/BodySurfaceProjectorTests.cs",
+      "StartLine": null,
+      "EndLine": null
+    },
+    {
+      "Label": "other:ADR-007-resolved-morphology-model.md",
+      "Uri": "docs/adr/ADR-007-resolved-morphology-model.md",
+      "StartLine": null,
+      "EndLine": null
+    }
+  ],
+  "UsageCount": 0,
+  "LastUpdated": "2026-09-06T04:56:05.3012672Z"
+}

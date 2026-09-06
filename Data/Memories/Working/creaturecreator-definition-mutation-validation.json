@@ -1,0 +1,160 @@
+{
+  "Id": "creaturecreator-definition-mutation-validation",
+  "Content": "FINER slice on CreatureCreator (D:\\UnityProjects\\CreatureCreator) definition MUTATION / CLONE / HIERARCHY semantics \u002B the VALIDATION surface. Namespace: ProceduralCreature.Definition. Complements (not duplicates) the coarse records creaturecreator-definition-model / creaturecreator-architecture-and-invariants. Every material claim is classified inline: Confirmed = verified in source AND a test; Inference = source-supported but not directly test-asserted (or a reasonable reading). All paths repo-relative under Assets/.\n\n## 1. Mutation boundary \u0026 deep clone\n\n- CreatureDefinition is the single authoritative model. All edits to it funnel through ONE mutation path at the editor layer (CreatureEditorWindow.MutateDefinition): every field edit CLONES the current definition, applies the edit to the scratch copy, and only becomes canonical state after DefinitionValidator passes (README.md ~375-407). GUI code never assigns directly into the window\u0027s _definition. Confirmed (source CreatureDefinition.cs docstring cites guide SS16 \u0027one mutation path\u0027; README lines 375-407).\n- CreatureDefinition.Clone() is a DEEP clone: it copies SchemaVersion, SymmetryMode, Bounds, Generation, Forward, clones Body via Body.Clone(), and re-clones each part via CreaturePart.Clone() (null entries preserved as null). It is the mutation-boundary primitive so a viewport drag / in-progress edit operates on a scratch copy before commit. Confirmed (CreatureDefinition.cs 42-55; CreatureDefinitionTests.Clone_ProducesEqualButIndependentParts; Clone_PreservesNullPartEntriesWithoutThrowing).\n- CreaturePart is immutable-by-convention (callers replace instances wholesale via definition helpers rather than mutating a stored part\u0027s fields) so the single enforcement point stays at CreatureDefinition. Confirmed (CreaturePart.cs class docstring; clone-independence asserted in CreatureDefinitionTests).\n- AddPart(CreaturePart) appends WITHOUT canonicalizing/validating \u2014 it is a plain data op; the canonicalizer/validator run at the mutation boundary one layer up. Throws Common.DomainException on null. Confirmed (CreatureDefinition.cs 98-103).\n- RemovePart(id) is linear scan removing only the FIRST match; skips null entries; returns false when Parts is null or id not found. Confirmed (CreatureDefinition.cs 104-119; CreatureDefinitionTests.RemovePart_SkipsNullEntriesAndRemovesOnlyFirstDuplicate; RemovePart_ReturnsFalseForNullPartList).\n- BodyId reserved constant = \u0022body\u0022; CurrentSchemaVersion = 2. Confirmed (CreatureDefinition.cs 21-22).\n\n## 2. ClonePartAsChild vs CloneAsDuplicate\n\n- CreaturePart.Clone() copies Id, DisplayName, ParentId, PartType, Transform, Shape, Appearance, MirrorAcrossSymmetryPlane, and deep-clones Limb / MeshGeometry / ParentAttachment (null-safe). Confirmed (CreaturePart.cs 78-95; clone-independence tests).\n- CreaturePart.CloneAsDuplicate() = Clone() then a FRESH Id via PartIdGenerator.CreateNew(). It does NOT change ParentId/Transform/ParentAttachment (those are still copied) \u2014 it is the pure \u0027duplicate with new id\u0027 primitive. Confirmed (CreaturePart.cs 97-110; CreatureDefinitionTests.CloneAsDuplicate_GeneratesNewId asserts new id \u002B copied PartType).\n- CreatureDefinition.ClonePartAsChild(sourceId, newParentId) (CC-029 \u0027Add Child as Duplicate\u0027) returns a NEW part: it calls source.CloneAsDuplicate() (fresh Id) then explicitly overrides ParentId = newParentId, Transform = TransformData.Identity (identity placement relative to the new parent), ParentAttachment = null. Copied authoring props: PartType, Shape, Appearance, MirrorAcrossSymmetryPlane, DisplayName. No generated/runtime state copied; Shape/Appearance/Transform are value structs so the clone is independent by construction. Throws Common.DomainException if sourceId is not found. The returned part is NOT added to Parts \u2014 callers add via AddPart so the single mutation boundary stays authoritative. Confirmed (CreatureDefinition.cs 112-155; CreatureDefinitionClonePartAsChildTests.*: copies authoring props, fresh identity, resets placement\u002Battachment, leaves source\u002Bdefinition untouched, unknown-source throws, CloneThenAddPart_ProducesValidDefinition).\n- Inference-to-note: \u0027parenting under the source itself\u0027 is legal at the data layer (ClonePartAsChild(source.Id, source.Id) is used in tests); the validation surface then must accept it (a clone under its own source is a normal child relationship, not a self-cycle, because cycle detection only flags when following ParentId reaches an already-visited id). Confirmed-adjacent: DefinitionValidatorLimbTests/DefinitionValidatorTests accept such trees; CloneThenAddPart_ProducesValidDefinition asserts IsValid for a Body\u002Bsource\u002Bcloned-child-under-source.\n\n## 3. PartIdGenerator\n\n- Format: \u0022part_\u0022 \u002B 8 lowercase hex chars (4 random bytes via System.Random, thread-guarded by a lock), e.g. \u0022part_4f9a1c02\u0022. Short deterministic prefix \u002B random suffix (design doc SS2.2). Ids created once at creation time and never re-derived from list position. Confirmed (PartIdGenerator.cs 1-43).\n- LooksValid(id): structural only \u2014 non-empty/non-whitespace AND StartsWith \u0022part_\u0022 (ordinal). Does NOT confirm uniqueness within a definition; uniqueness is DefinitionValidator\u0027s whole-collection responsibility. Confirmed (PartIdGenerator.cs 31-43; ClonePartAsChild test asserts LooksValid on fresh ids).\n- Note: hierarchy cycle-termination treats a parent equal to CreatureDefinition.BodyId (\u0022body\u0022) as a root stop, and BodyId is a reserved, non-generated id, so the \u0022part_\u0022 prefix is a real guard that authored parts cannot collide with \u0022body\u0022. Confirmed (HierarchyIndex.HasParentCycle; DefinitionValidator reserved-id check).\n\n## 4. Hierarchy index, cycle detection, reserved body\n\n- CreaturePartHierarchyIndex(CreatureDefinition) is a TOLERANT, FIRST-WINS view over a DETACHED SNAPSHOT of definition.Parts taken at construction (CC-089 read-only aliasing). The index\u0027s Parts surface is a private copy wrapped in Array.AsReadOnly, so callers cannot mutate the definition through it, and later mutation of definition.Parts cannot change what the index reports. Confirmed (CreaturePartHierarchyIndex.cs 1-75; CreatureDefinitionTests.HierarchyIndex_Parts_IsDetachedSnapshotOfDefinition; HierarchyIndex_Parts_CannotBeMutatedThroughReadOnlyView).\n- It keeps _firstById (first part wins per id), _childrenByParent (null ParentId grouped under empty-string key = implicit root; BodyId children also under their literal \u0022body\u0022 key), _duplicateIds, HasNullEntries. Confirmed (source).\n- TryResolve(id): resolves via first-wins map; false for null/empty id. FindPart(id) and GetChildren(parentId) and HasParentCycle on CreatureDefinition all delegate to a freshly built index (never cached), so there is exactly one place parent/child relationships are derived (explicit anti-caching rationale). Confirmed (CreatureDefinition.cs 56-95; CreatureDefinitionTests.FindPart_IsUnaffectedByListReordering; MalformedHierarchy_IsTotalAndPreservesDiagnostics).\n- HasParentCycle(out partIdsInCycle): walks ParentId links from every part; stops when ParentId is null OR == CreatureDefinition.BodyId (root); reports a cycle when it revisits an already-visited id. Returns true if any cycle. Confirmed (CreaturePartHierarchyIndex.cs 107-140; CreatureDefinitionTests.HasParentCycle_DetectsSelfReference / _DetectsIndirectCycle / _FalseForValidTree).\n- Reserved \u0027body\u0027 id: a part whose Id == CreatureDefinition.BodyId is an Error (ReservedPartId); a part whose ParentId == BodyId is treated as a direct Body child (root). A null ParentId is itself an Error (InvalidBodyParent: \u0027must be a descendant of the Body\u0027). Confirmed (DefinitionValidator.ValidateDuplicateIds ~388-435; ValidateParentsAndCycles ~437-471; DefinitionValidatorTests.Validate_RejectsReservedBodyPartId; Validate_RejectsPartWithNoParent).\n\n## 5. Validation surface\n\n### Run order (DefinitionValidator.Validate, DefinitionValidator.cs 18-55) \u2014 Confirmed (code):\n1 ValidateSchemaVersion\n2 ValidateBody\n3 ValidateBodyAppearance (CC-025)\n4 ValidateBounds\n5 ValidateGenerationBudget\n6 ValidateDuplicateIds\n7 ValidateParentsAndCycles\n8 ValidatePartTypes\n9 ValidateTransformsAndShapesAndAppearance\n10 ValidateLimbChains\n11 ValidateMeshGeometry (CC-031)\n12 ValidateResolvedEnvelope (CC-050 / CC-056A / CC-089)\nValidate(null) throws DomainException. Validator is pure-ish and NEVER repairs \u2014 only reports (definition-vs-validator invariant). Confirmed.\n\n### Severity semantics (ValidationSeverity.cs) \u2014 Confirmed:\n- Info=0: does not block generation; surfaced for awareness (e.g. \u0027unusually thin blend radius\u0027).\n- Warning=1: does not block generation but flags likely-unintended state.\n- Error=2: BLOCKS generation \u2014 a definition with any Error must not proceed to generation (SS2.4).\n- In current validator code, every emitted issue is Error EXCEPT one Warning: LegFootChainMissingAnkleJoint (leg with a direct Foot child but only two limb joints). NO current validator check emits Info (the Info tier is defined but unused by DefinitionValidator today). Confirmed (grep: only one ValidationSeverity.Warning at DefinitionValidator.cs ~716; zero Info emissions).\n\n### Aggregation / sorting (ValidationResult.cs) \u2014 Confirmed:\n- IsValid == true iff there are NO Error-severity issues (Warning/Info do not block).\n- Issues are sorted deterministically: OrderBy(PartId ?? \u0027\u0027, Ordinal).ThenBy(Code).ThenBy(Severity) \u2014 satisfying \u0027validation failures are deterministic and order-independent\u0027 (reorder of Parts without semantic change yields same ordered issue list).\n- ValidationIssue carries Severity, Code, optional PartId (null for definition-wide issues), Message. Generation must depend only on Severity/Code, never editor rendering. Confirmed.\n\n### Complete ValidationCode inventory (ValidationCode.cs, 1-52), grouped by concern \u2014 Confirmed (enum) with per-code source/tests:\n\nSTRUCTURAL (definition-level):\n- UnsupportedSchemaVersion (schema != 2) [stage1]\n- InvalidBounds (Bounds not finite/positive)\n- GenerationBudgetExceeded (voxel budget or non-positive/NaN VoxelsPerUnit)\n- NullPart (null Parts list or null part entry)\n- DuplicatePartId (duplicate or null/empty part Id)\n- ReservedPartId (Id == \u0022body\u0022)\n- MissingParent (ParentId references a non-resolved id)\n- ParentCycle\n- UnsupportedPartType (undefined enum OR Body/Root reserved in schema v2)\n- InvalidBodyParent (null ParentId, or independent root Tail)\n- MissingBody (no non-empty Body spline)\n\nBODY:\n- MissingBody\n- InvalidBodySampleCount (\u003E MaxBodySampleCount)\n- DuplicateBodySampleId (duplicate OR non-increasing across spline order)\n- InvalidBodySample (null sample, or non-finite position / non-positive radius)\n- UnevenBodySpacing (arc-length spacing deviates \u003E tolerance)\n- InvalidForward (non-finite or ~zero)\n- InvalidBodyAppearance (null appearance/curve/gradient, or no valid key in [0,1])\n- NonFiniteBodyAppearance (non-finite curve/gradient key/tangent/value)\n- InvalidAttachmentAnchor (non-finite or out-of-range SegmentT; references a non-segment-start/terminal Body sample)\n\nLIMB:\n- InvalidLimbChain (limb chain present on a non-limb PartType; null/no joints; null joint; null thickness)\n- LimbJointCountOutOfRange (below Min or above Max)\n- LegFootChainMissingAnkleJoint (WARNING only)\n- DuplicateLimbJointId\n- LimbJointOrderNotDeterministic (ids must increase with chain order)\n- NonFiniteLimbJoint\n- LimbSegmentTooShort (\u003C MinLimbSegmentLength)\n- LimbJointOutOfBounds (local-frame)\n- LimbRootNotAtOrigin (Joints[0] must sit at local origin)\n- InvalidThicknessProfile (null, \u003C2 keys, duplicate/out-of-range T, non-positive value)\n- NonFiniteThickness\n- InvalidLimbBlendRadius (NaN/Inf or negative)\n\nMESH (CC-031):\n- InvalidMeshGeometry (empty MeshAssetKey; limb\u002Bmesh both present \u2014 exactly one geometry source; null attachment)\n- NonFiniteMeshGeometryAttachment\n- InvalidMeshGeometryScale (scale component \u003C minimum)\n\nRESOLVED (CC-050 envelope, stage 12, skips when a structural MissingParent/ParentCycle error exists):\n- ResolvedBodySampleOutOfBounds\n- ResolvedPartOutOfBounds\n- ResolvedLimbJointOutOfBounds\n- ResolvedMeshAttachmentOutOfBounds\n\nEach code is asserted by a named test in DefinitionValidatorTests.cs / DefinitionValidatorLimbTests.cs / DefinitionValidatorMeshGeometryTests.cs (Confirmed by matching test method names, e.g. Validate_DetectsDuplicateIds, Validate_DetectsParentCycle, Validate_LimbWithDuplicateJointIds_ReportsDuplicateLimbJointId, Validate_EmptyMeshAssetKey_ReportsInvalidMeshGeometry).\n\n### Notable invariants worth remembering\n- Geometry sources are mutually exclusive per part: at most ONE of Shape (primitive SDF) / LimbChain (joint metaballs) / MeshGeometry (pre-authored mesh) is generation-active; Shape is inert for limb and mesh parts, so shape-parameter validity is skipped for them. Validator-enforced (InvalidMeshGeometry for limb\u002Bmesh; InvalidShapeParameter only when Limb==null \u0026\u0026 MeshGeometry==null). Confirmed.\n- Resolved-envelope stage consumes the SHARED ResolvedBody / ResolvedLimb / CreaturePartWorldTransformResolver derivations (never re-derives), so it checks exactly the joint/position data generation uses; world-frame resolver throws on DNA that failed validation, hence the stage\u0027s early skip on structural parent defects. Confirmed (DefinitionValidator.cs 57-178; source comments CC-056A/CC-089).\n- Mirroring does NOT cascade to children (per-part MirrorAcrossSymmetryPlane only) \u2014 consistent with \u0027one mutation path\u0027. Confirmed (README ~295-307).\n\n## Open questions / notes (not asserted as fact)\n- ValidationSeverity.Info has no emitting check today; if a future \u0027thin blend radius\u0027 advisory is added it would be the first Info use. Inference.\n- Whether an independent root (null ParentId) is ever intended for non-Tail parts: validator rejects ANY null ParentId as InvalidBodyParent (all parts must descend from Body). Inference that the model is strict single-root.\n- This record is a DRAFT; see track1/NOTES.md for ingest caveats (the MemorySmith store schema also lists a required \u0027relationships\u0027 array; the draft omits it per mandate and it should be added as [] at ingest).",
+  "Title": "CreatureCreator Definition Mutation/Clone/Hierarchy Semantics and Full Validation Surface (run order, severity, ValidationCode inventory)",
+  "Status": 1,
+  "Confidence": 0.95,
+  "Tags": [
+    "creaturecreator",
+    "definition",
+    "mutation",
+    "clone",
+    "hierarchy",
+    "cycle-detection",
+    "partid",
+    "validation",
+    "validationcode",
+    "severity",
+    "kind:fact",
+    "scope:onboarding"
+  ],
+  "References": [
+    "creaturecreator-definition-model",
+    "creaturecreator-architecture-and-invariants"
+  ],
+  "Conflicts": [],
+  "Relationships": [
+    {
+      "sourceId": "creaturecreator-definition-mutation-validation",
+      "targetId": "creaturecreator-definition-model",
+      "relationType": 0,
+      "origin": 0,
+      "createdAtUtc": "2026-09-06T04:51:59.3028161+00:00"
+    },
+    {
+      "sourceId": "creaturecreator-definition-mutation-validation",
+      "targetId": "creaturecreator-architecture-and-invariants",
+      "relationType": 0,
+      "origin": 0,
+      "createdAtUtc": "2026-09-06T04:51:59.3028163+00:00"
+    }
+  ],
+  "SourceLinks": [
+    {
+      "Label": "other:CreatureDefinition.cs",
+      "Uri": "Assets/Scripts/Runtime/Definition/CreatureDefinition.cs",
+      "StartLine": null,
+      "EndLine": null
+    },
+    {
+      "Label": "other:CreaturePart.cs",
+      "Uri": "Assets/Scripts/Runtime/Definition/CreaturePart.cs",
+      "StartLine": null,
+      "EndLine": null
+    },
+    {
+      "Label": "other:PartIdGenerator.cs",
+      "Uri": "Assets/Scripts/Runtime/Definition/PartIdGenerator.cs",
+      "StartLine": null,
+      "EndLine": null
+    },
+    {
+      "Label": "other:CreaturePartHierarchyIndex.cs",
+      "Uri": "Assets/Scripts/Runtime/Definition/CreaturePartHierarchyIndex.cs",
+      "StartLine": null,
+      "EndLine": null
+    },
+    {
+      "Label": "other:DefinitionValidator.cs",
+      "Uri": "Assets/Scripts/Runtime/Definition/DefinitionValidator.cs",
+      "StartLine": null,
+      "EndLine": null
+    },
+    {
+      "Label": "other:DefinitionValidator.cs",
+      "Uri": "Assets/Scripts/Runtime/Definition/DefinitionValidator.cs",
+      "StartLine": null,
+      "EndLine": null
+    },
+    {
+      "Label": "other:DefinitionValidator.cs",
+      "Uri": "Assets/Scripts/Runtime/Definition/DefinitionValidator.cs",
+      "StartLine": null,
+      "EndLine": null
+    },
+    {
+      "Label": "other:DefinitionValidator.cs",
+      "Uri": "Assets/Scripts/Runtime/Definition/DefinitionValidator.cs",
+      "StartLine": null,
+      "EndLine": null
+    },
+    {
+      "Label": "other:DefinitionValidator.cs",
+      "Uri": "Assets/Scripts/Runtime/Definition/DefinitionValidator.cs",
+      "StartLine": null,
+      "EndLine": null
+    },
+    {
+      "Label": "other:ValidationSeverity.cs",
+      "Uri": "Assets/Scripts/Runtime/Definition/ValidationSeverity.cs",
+      "StartLine": null,
+      "EndLine": null
+    },
+    {
+      "Label": "other:ValidationCode.cs",
+      "Uri": "Assets/Scripts/Runtime/Definition/ValidationCode.cs",
+      "StartLine": null,
+      "EndLine": null
+    },
+    {
+      "Label": "other:ValidationIssue.cs",
+      "Uri": "Assets/Scripts/Runtime/Definition/ValidationIssue.cs",
+      "StartLine": null,
+      "EndLine": null
+    },
+    {
+      "Label": "other:ValidationResult.cs",
+      "Uri": "Assets/Scripts/Runtime/Definition/ValidationResult.cs",
+      "StartLine": null,
+      "EndLine": null
+    },
+    {
+      "Label": "other:README.md",
+      "Uri": "Assets/Scripts/README.md",
+      "StartLine": null,
+      "EndLine": null
+    },
+    {
+      "Label": "other:CreatureDefinitionTests.cs",
+      "Uri": "Assets/Scripts/Tests/Runtime/CreatureDefinitionTests.cs",
+      "StartLine": null,
+      "EndLine": null
+    },
+    {
+      "Label": "other:CreatureDefinitionClonePartAsChildTests.cs",
+      "Uri": "Assets/Scripts/Tests/Editor/CreatureDefinitionClonePartAsChildTests.cs",
+      "StartLine": null,
+      "EndLine": null
+    },
+    {
+      "Label": "other:DefinitionValidatorTests.cs",
+      "Uri": "Assets/Scripts/Tests/Runtime/DefinitionValidatorTests.cs",
+      "StartLine": null,
+      "EndLine": null
+    },
+    {
+      "Label": "other:DefinitionValidatorLimbTests.cs",
+      "Uri": "Assets/Scripts/Tests/Runtime/DefinitionValidatorLimbTests.cs",
+      "StartLine": null,
+      "EndLine": null
+    },
+    {
+      "Label": "other:DefinitionValidatorMeshGeometryTests.cs",
+      "Uri": "Assets/Scripts/Tests/Runtime/DefinitionValidatorMeshGeometryTests.cs",
+      "StartLine": null,
+      "EndLine": null
+    }
+  ],
+  "UsageCount": 0,
+  "LastUpdated": "2026-09-06T04:56:05.2944922Z"
+}

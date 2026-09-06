@@ -1,0 +1,75 @@
+{
+  "Id": "creaturecreator-editor-preview",
+  "Content": "Editor code lives in Assets/Scripts/Editor (assembly ProceduralCreature.Editor, root ns ProceduralCreature.Editor, includePlatforms [Editor], references Runtime). Editor OWNS sessions, undo, previews, scene handles, and Unity editor lifecycle. Runtime never references Editor. Internal editor members visible only to ProceduralCreature.Tests.Editor via Editor AssemblyInfo InternalsVisibleTo.\n\nSESSION PERSISTENCE: CreatureEditorSession (Assets/Scripts/Editor/CreatureEditorSession.cs, public static) stores the in-progress CreatureDefinition as JSON in SessionState under key \u0022ProceduralCreature.WorkingDefinitionJson\u0022. API: Save, TryLoad, Clear. Uses JsonDnaSerializer (IDnaSerializer). Deliberate choice: SessionState survives domain reload but NOT editor restart (resolves delta-audit #5). TryLoad returns null on DnaDeserializationException rather than throwing.\n\nUNDO: CreatureUndoState (Assets/Scripts/Editor/CreatureUndoState.cs, public sealed : ScriptableObject) - minimal in-memory [SerializeField] string _json wrapper (public Json property) whose only job is to give Unity\u0027s native Undo a serializable UnityEngine.Object anchor. Created via ScriptableObject.CreateInstance \u002B HideFlags.HideAndDontSave in CreatureEditorWindow.OnEnable, destroyed in OnDisable. Never saved as asset. Reason: CreatureDefinition is a plain C# object so cannot be Undo.RecordObject target.\n\nWINDOW: CreatureEditorWindow (public sealed : EditorWindow). Single mutation funnel MutateDefinition/ReplaceDefinition/ApplyDefinitionChange (every GUI edit clones -\u003E mutates -\u003E revalidates -\u003E hooks Undo). Methods: OnEnable/OnDisable, OnGUI, DrawToolbar, CreateNew/SaveCurrent/SaveAs/WriteToDisk/LoadFromDisk (disk save/load via JsonDnaSerializer), DrawPartList (tree), DrawPartInspector \u002B per-domain inspectors (DrawBodyInspector, DrawLimbFields, DrawAppearanceFields, DrawShapeFields, DrawMeshGeometryFields, DrawSymmetryFields), DrawValidationPanel, DrawSkeletonOverlay, OnSceneGUI, part-type plumbing (NewGenericPart, AddNewPart, RemoveSelectedPart, SelectPart; expanded-ID tree state via EditorPrefs key ProceduralCreature.ExpandedPartIds). Owns preview GameObject, generation config, placement mode, auto-regeneration delay, ShowWindow static entry. Editor settings pref keys ProceduralCreature.* (AutoRegenerationDelay, PreviewVoxelsPerUnit, ShowSkeleton, GenerationConfig, LogGenerationDiagnostics, CurrentFilePath).\n\nPREVIEW STATE MODEL (A7.x async generation): CreaturePreviewController (internal sealed, IDisposable) owns a CreatureGenerationScheduler, a CreaturePreviewRequestState, injected material resolvers, the preview GameObject (\u0022CreatureCreator Preview\u0022) and per-geometry children (\u0022CreatureCreator Preview Geometry N\u0022). Enqueue clones definition, forces VoxelsPerUnit, enqueues on runtime scheduler, calls _requestState.BeginRequest. ProcessCompletions pulls completed results and (A7.2) only replaces preview if result snapshot revision still matches live definition via TryAcceptResult. ApplyPreviewGeometry/ApplyPreviewMesh build scene GameObject/MeshFilter/MeshRenderer/MeshCollider; ClearGeometryObjects \u002B Dispose clean up via DestroyImmediate. CreaturePreviewRequestState (internal sealed, PURE/testable): records current request id and decides whether a completed result is the current request (stale discard); no scene/editor-window dependency; request ids = scheduler monotonic sequence; methods BeginRequest, IsCurrentRequest, TryAcceptResult, Clear, HasPendingRequest. CreaturePreviewAcceptanceState (internal sealed, pure): stores last-accepted revisionId \u002B placementFingerprint; Accept/IsStale/Clear/HasAcceptedPreview; decides whether applied preview is stale for placement.\n\nOWNERSHIP: window owns preview lifecycle; CreaturePreviewController owns creation/destruction of transient preview scene GameObjects \u002B collider; acceptance state holds identity (revision\u002Bfingerprint). Async generation executes on RUNTIME CreatureGenerationScheduler (no editor dependency) and results marshaled back in ProcessCompletions.\n\nAUTHORING TOOLS (pure math, no UnityEditor API where possible -\u003E EditMode-testable): BodySplineAuthoring (public static) pure body-spline editing (add sample, space-evenly, FABRIK equal-link baseline DragSampleEvenly, renumber canonical 1..N) preserving even-spacing validator invariant. BodyEditSolver (BodyEditKind {InteriorBend, EndpointLength}, BodyEditResult, static) SolveInteriorDrag/SolveEndpointDrag (local curve edit over selected sample \u002B/- up to 3 neighbors; CC-016). BodyPlacementAuthoring (public static, CC-007) TryProjectToAnchor maps preview-mesh hit (position\u002Bnormal) to semantic BodySurfaceAnchor in canonical renumbered sample-ID space. BodySampleRadiusHandle (public static) radial radius-drag math ComputeRadius/GetHandlePosition. LimbAuthoring (public static, CC-018) seed/reconcile limb chains by PartType (IsLimbChainType = Limb/Leg/Arm; Foot/Hand attachments), joint ordering, root-at-origin invariant. PartSiblingOrderer (internal IPartSiblingOrderer, AlphabeticalPartSiblingOrderer default \u002B GroupedPartSiblingOrderer, PartSiblingOrderers {Alphabetical, Grouped}) presentation-only tree ordering, never touches DNA. SkeletonDisplay (public static, CC-066) pure view data converting inferred rest Skeleton to BoneLine primitives for read-only scene overlay.\n\nKNOWN STALE DOC: Assets/Scripts/README.md documents only CreatureEditorSession, CreatureUndoState, CreatureEditorWindow and an old Phase structure - it does NOT mention authoring tools, preview states, BodyEditSolver, SkeletonDisplay, or A7 changes. Do not rely on it as a current editor map.",
+  "Title": "CreatureCreator Editor Layer and Preview State Model",
+  "Status": 1,
+  "Confidence": 0.9,
+  "Tags": [
+    "creaturecreator",
+    "editor",
+    "preview",
+    "window",
+    "undo",
+    "session",
+    "authoring",
+    "kind:fact",
+    "scope:onboarding"
+  ],
+  "References": [
+    "creaturecreator-architecture-and-invariants",
+    "creaturecreator-definition-model",
+    "creaturecreator-generation-morphology"
+  ],
+  "Conflicts": [],
+  "Relationships": [
+    {
+      "sourceId": "creaturecreator-editor-preview",
+      "targetId": "creaturecreator-architecture-and-invariants",
+      "relationType": 0,
+      "origin": 0,
+      "createdAtUtc": "2026-09-06T04:51:46.6340169+00:00"
+    },
+    {
+      "sourceId": "creaturecreator-editor-preview",
+      "targetId": "creaturecreator-definition-model",
+      "relationType": 0,
+      "origin": 0,
+      "createdAtUtc": "2026-09-06T04:51:46.634017+00:00"
+    },
+    {
+      "sourceId": "creaturecreator-editor-preview",
+      "targetId": "creaturecreator-generation-morphology",
+      "relationType": 0,
+      "origin": 0,
+      "createdAtUtc": "2026-09-06T04:51:46.634017+00:00"
+    }
+  ],
+  "SourceLinks": [
+    {
+      "Label": "other:other:CreatureEditorWindow.cs",
+      "Uri": "Assets/Scripts/Editor/CreatureEditorWindow.cs",
+      "StartLine": null,
+      "EndLine": null
+    },
+    {
+      "Label": "other:other:CreatureEditorSession.cs",
+      "Uri": "Assets/Scripts/Editor/CreatureEditorSession.cs",
+      "StartLine": null,
+      "EndLine": null
+    },
+    {
+      "Label": "other:other:CreaturePreviewController.cs",
+      "Uri": "Assets/Scripts/Editor/CreaturePreviewController.cs",
+      "StartLine": null,
+      "EndLine": null
+    },
+    {
+      "Label": "other:other:CreaturePreviewRequestState.cs",
+      "Uri": "Assets/Scripts/Editor/CreaturePreviewRequestState.cs",
+      "StartLine": null,
+      "EndLine": null
+    }
+  ],
+  "UsageCount": 0,
+  "LastUpdated": "2026-09-06T04:56:05.2963096Z"
+}

@@ -232,15 +232,21 @@
       "author": "anonymous",
       "body": "Phase-1 cleanup closure implemented and validated (2026-09-05). Deleted write-only SdfOperation.ConsumerUnionIndex (field \u002B default init \u002B redundant -1 in SetWorldAabb \u002B SetConsumer helper \u002B all 5 call sites in SdfProgramBuilder.cs) and the removed read-only parity assertion in SdfProgramBuilderTests.cs. Deleted private dead DensityGrid.SetSample (zero callers); CornersZ untouched. Files: SdfProgram.cs, SdfProgramBuilder.cs, DensityGrid.cs, SdfProgramBuilderTests.cs. Pure deletion, no behavior change.\n\nHypothesis: ConsumerUnionIndex is write-only dead state and SetSample has no callers; removing both leaves compiled operation data and generation output identical. Discriminating check: SdfProgramBuilderTests \u002B DensityGridTests and the full generation determinism suite stay green.\n\nValidation (Unity 6000.5.9f1, connected): focused PlayMode SdfProgramBuilderTests \u002B DensityGridTests 23/23 passed; full ProceduralCreature.Tests.Runtime PlayMode 476/476 passed (0 failed, 0 skipped); dotnet build ProceduralCreature.Tests.Runtime.csproj --no-restore 0 errors/0 warnings; Unity console clean; git diff --check clean.\n\nMaxVoxelBudget semantics disposition separately recorded (confirmed correct corner-sample semantics; documentation only).",
       "createdAtUtc": "2026-09-05T15:57:22.919662Z"
+    },
+    {
+      "id": "c-ffb50a00ca1a4992ac1f37615b7ccc85",
+      "author": "anonymous",
+      "body": "Audit synthesis (2026-09-05, deep-dive code reviews): two new children own bounded mechanisms \u2014 TSK-0124 (SemanticBoneResolver raw/snapshot duplication to snapshot-authoritative) and TSK-0125 (GeneratedCreature/GeometryItem/MaterialRegion output-contract hardening \u002B MaterialRegion submesh semantics). Residual within TSK-0095, not re-filed: CreatureMeshGenerator still passes raw CreatureDefinition alongside the resolved snapshot into appearance code (AppearanceBaker raw overloads as legacy-exit target). Provenance: docs/audits/creaturecreator-deep-dive-code-review-2026-09-05.md P2 items. Do not duplicate.",
+      "createdAtUtc": "2026-09-06T04:25:59.3449203Z"
     }
   ],
   "epicId": null,
   "parentId": null,
   "dueDateUtc": null,
   "createdAtUtc": "2026-09-01T03:20:52.7496119Z",
-  "updatedAtUtc": "2026-09-05T15:57:22.919662Z",
+  "updatedAtUtc": "2026-09-06T04:25:59.3449203Z",
   "completedAtUtc": "2026-09-02T03:10:44.2511455Z",
-  "revision": 39,
+  "revision": 40,
   "isArchived": false,
   "hasLoadError": false,
   "loadError": null,

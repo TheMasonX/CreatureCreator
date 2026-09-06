@@ -1,0 +1,65 @@
+{
+  "Id": "creaturecreator-definition-model",
+  "Content": "The authoritative creature model is CreatureDefinition (Assets/Scripts/Runtime/Definition/CreatureDefinition.cs), ns ProceduralCreature.Definition. It is [Serializable] sealed, CurrentSchemaVersion=2, BodyId=\u0022body\u0022, and contains NO Unity scene objects, NO generated mesh/bone data, NO cached SDF arrays. Fields: SchemaVersion, SymmetryMode, Bounds (BoundsDefinition), Generation (GenerationSettings), Body (BodySpline), Forward (Vector3, default Vector3.forward), Parts (List\u003CCreaturePart\u003E). Methods: Clone(), CreateHierarchyIndex(), FindPart(id), GetChildren(parentId), HasParentCycle, AddPart, RemovePart, ClonePartAsChild(sourceId,newParentId). AddPart does NOT canonicalize/validate - that happens at the mutation boundary.\n\nCreaturePart ([Serializable] sealed, immutable-by-convention): Id (stable slug, never list-position-derived), DisplayName, ParentId (null=root), PartType, Transform (TransformData), Shape (ShapeDefinition), Appearance (AppearanceDefinition), nullable Limb (LimbChain), nullable MeshGeometry, MirrorAcrossSymmetryPlane, nullable ParentAttachment (BodySurfaceAnchor). Methods Clone(), CloneAsDuplicate() (fresh Id via PartIdGenerator).\n\nENUMS (ns ProceduralCreature.Definition): PartType (Body=0, Limb, Leg, Arm, Tail, Foot, Root, Part, Eye, Hand; serialized by NAME so numeric value stable); SymmetryMode (None=0, MirrorAcrossXAxis=1; generation-time-only - a mirrored part is ONE Parts entry, mirror produced by SDF compiler \u002B skeleton inference as derived state, never written back); ShapeType (Sphere, Capsule, Box, Ellipsoid); ShapeAxis (X,Y,Z capsule local axis); GeometryType (Implicit=0 SDF, MeshAsset=1 pre-authored mesh by key, Procedural=2 not yet implemented; orthogonal to PartType).\n\nDATA STRUCTS: TransformData (Position/Rotation/Scale, parent-local; IsFinite, Quantized - position/scale to 4dp, rotation normalized); ShapeDefinition (Type, legacy PrimarySize, Radius, CapsuleAxis, CapsuleHeight, EllipsoidRadii, BoxHalfExtents, SmoothBlendRadius smooth-min blend 0=hard; WithLegacyDefaults, IsFinite, HasValidParameters); AppearanceDefinition (BaseColor, NoiseSeed, NoiseScale, MaterialKey optional stable submaterial name - NEVER UnityEngine.Object; Body owns gradient appearance and never carries a material key); BoundsDefinition (MaxX/Y/Z hard authoring bounds default 4; Contains checks [-Max,\u002BMax]); GenerationSettings (VoxelsPerUnit default 16; EstimateVoxelCount vs EstimateSampleCount - sample count is what validator budget guards).\n\nGEOMETRY ATTACHMENT: GeometryAttachment (Offset/Orientation/Scale in part local frame, placement intent); MeshGeometry (MeshAssetKey stable name \u002B Attachment; mutually exclusive with Limb - validator-enforced; DNA never stores UnityEngine.Object). PartIdGenerator format \u0022part_\u0022\u002B8 lowercase hex.\n\nSUPPORTING: LimbChain/LimbJoint/ThicknessProfile, BodySpline/BodySample/BodySurfaceAnchor, BodyVerticalGradientAppearance, adapters GradientAdapter/CurveAdapter/ThicknessCurveAdapter, CreaturePartHierarchyIndex, CreaturePartWorldTransformResolver, BodyFrameResolver.\n\nCANONICALIZATION (DefinitionCanonicalizer, static): Canonicalize(CreatureDefinition) returns a NEW definition (input not mutated). Does NOT validate and is NOT a repair pass - canonicalizing invalid DNA throws DomainException (callers validate first). Quantizes Body spline sample positions\u002Bradius, Forward (normalized first), each part Transform, mesh GeometryAttachment offset/scale (orientation via QuantizeUtil.CanonicalizeQuaternion), calls shape.WithLegacyDefaults(). Limb chains: quantize each joint position \u002B BlendRadius, order thickness keys; throws on non-finite/negative/no-joints. Body appearance: quantize gradient keys \u002B curve keys, ORDER keys by non-decreasing time. Stable part ordering: depth-first from BodyId (children sorted by Id ordinal), remaining disconnected parts appended sorted by Id.\n\nTOLERANCES (Assets/Scripts/Runtime/Common/GenerationTolerances.cs, ns ProceduralCreature.Common): QuantizationDecimalPlaces=4; ScalarComparisonEpsilon=1e-3f; MinScaleComponent=1e-3f; BodySpacingTolerance=1e-3f; MaxBodySampleCount=1024; MinLimbJointCount=2; MaxLimbJointCount=64; MinLimbSegmentLength=1e-3f; LimbRootAtOriginTolerance=1e-3f; MaxVoxelBudget=16777216L. Quantize uses Math.Round(value,4,MidpointRounding.AwayFromZero). QuantizeUtil: Quantize(float/Vector3), CanonicalizeQuaternion(q).\n\nVALIDATION (DefinitionValidator, static): Validate(CreatureDefinition) returns ValidationResult; throws DomainException only on null (programmer error). REPORT-ONLY, never repairs. Run order: ValidateSchemaVersion, ValidateBody, ValidateBodyAppearance, ValidateBounds, ValidateGenerationBudget, ValidateDuplicateIds, ValidateParentsAndCycles, ValidatePartTypes, ValidateTransformsAndShapesAndAppearance, ValidateLimbChains, ValidateMeshGeometry, ValidateResolvedEnvelope. The resolved-envelope stage re-resolves geometry through shared CreaturePartWorldTransformResolver \u002B ResolvedBody/ResolvedLimb derivations to catch nested origins out of bounds. Severities (ValidationSeverity): Info=0, Warning=1 (non-blocking), Error=2 (BLOCKS generation - any Error means don\u0027t generate). ValidationCode has 42 values (NullPart, DuplicatePartId, ReservedPartId, MissingParent, ParentCycle, ..., ResolvedMeshAttachmentOutOfBounds). ValidationResult.IsValid == true iff no Error. Issues sorted deterministically by PartId then Code then Severity (order-independent).\n\nSERIALIZATION (ns ProceduralCreature.Serialization): IDnaSerializer (Serialize canonicalizes first, throws DomainException if not finite/valid; Deserialize parses structurally only, does NOT validate - caller must run DefinitionValidator). DnaDeserializationException for structurally malformed JSON. JsonDnaSerializer (default): Serialize = Canonicalize -\u003E CanonicalJsonWriter.Write; Deserialize = MiniJsonReader.Parse -\u003E manual tree-walk. Rejects schema v1 explicitly. CanonicalJsonWriter: fixed key order, fixed numeric formatting, fixed part order; FLOATS ALWAYS \u0022F4\u0022 with InvariantCulture (never R/G) = heart of byte-stability. MiniJsonReader: dependency-free recursive-descent parser (Dictionary/List/string/double/bool/null).\n\nROUND-TRIP/BYTE-STABILITY: asserted in JsonDnaSerializerTests (RoundTrip_ReconstructsEquivalentDefinition, Serialize_IsByteStableAcrossRepeatedCalls, Serialize_IsStableAcrossPartInsertionOrder, SaveLoadSave_ProducesByteStableJson, Deserialize_RejectsV1Explicitly) and Limb/MeshGeometry/MaterialKey variants. Gate: \u0022Save -\u003E load -\u003E canonical-save produces byte-stable canonical JSON for supported definitions.\u0022 Mesh geometry serializes as part field meshGeometry {meshAssetKey, attachment{offset,orientation,scale}}; limb as limbChain {joints[{id,position}], blendRadius, thicknessProfile{keys[{t,value}]}}; part appearance {baseColor{r,g,b,a}, noiseSeed, noiseScale, materialKey}; Body appearance {topGradient, bottomGradient, verticalCurve} with {mode, colorKeys[{time,color}], alphaKeys[{time,alpha}]}; curve {keys[{time,value,inTangent,outTangent}]}. Legacy verticalOffset migrates exactly (3-key curve). DisplayName preserved verbatim; null round-trips as null.\n\nINVARIANTS: symmetry generation-time-only; CreatureDefinition/Part contain no generated state; stable Ids never change on reorder/save/load/regeneration; single mutation boundary in editor; canonicalization only at commit/serialization; shape inert when part has Limb or MeshGeometry; reserved PartType Body/Root not authorable in v2; Hand serialized by name; limb root joint at local origin (Joints[0] ~ Vector3.zero) - Transform is single placement authority (ADR-001).",
+  "Title": "CreatureCreator Authoritative DNA Model, Canonicalization, Validation, Serialization",
+  "Status": 1,
+  "Confidence": 0.95,
+  "Tags": [
+    "creaturecreator",
+    "definition",
+    "dna",
+    "canonicalization",
+    "validation",
+    "serialization",
+    "model",
+    "kind:fact",
+    "scope:onboarding"
+  ],
+  "References": [
+    "creaturecreator-architecture-and-invariants"
+  ],
+  "Conflicts": [],
+  "Relationships": [
+    {
+      "sourceId": "creaturecreator-definition-model",
+      "targetId": "creaturecreator-architecture-and-invariants",
+      "relationType": 0,
+      "origin": 0,
+      "createdAtUtc": "2026-09-06T04:52:11.0571196+00:00"
+    }
+  ],
+  "SourceLinks": [
+    {
+      "Label": "other:other:CreatureDefinition.cs",
+      "Uri": "Assets/Scripts/Runtime/Definition/CreatureDefinition.cs",
+      "StartLine": null,
+      "EndLine": null
+    },
+    {
+      "Label": "other:other:DefinitionCanonicalizer.cs",
+      "Uri": "Assets/Scripts/Runtime/Definition/DefinitionCanonicalizer.cs",
+      "StartLine": null,
+      "EndLine": null
+    },
+    {
+      "Label": "other:other:DefinitionValidator.cs",
+      "Uri": "Assets/Scripts/Runtime/Definition/DefinitionValidator.cs",
+      "StartLine": null,
+      "EndLine": null
+    },
+    {
+      "Label": "other:other:GenerationTolerances.cs",
+      "Uri": "Assets/Scripts/Runtime/Common/GenerationTolerances.cs",
+      "StartLine": null,
+      "EndLine": null
+    },
+    {
+      "Label": "other:other:JsonDnaSerializer.cs",
+      "Uri": "Assets/Scripts/Runtime/Serialization/JsonDnaSerializer.cs",
+      "StartLine": null,
+      "EndLine": null
+    }
+  ],
+  "UsageCount": 0,
+  "LastUpdated": "2026-09-06T04:56:05.293617Z"
+}

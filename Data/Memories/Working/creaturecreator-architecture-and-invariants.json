@@ -1,0 +1,89 @@
+{
+  "Id": "creaturecreator-architecture-and-invariants",
+  "Content": "CreatureCreator is a Spore-inspired procedural creature engine in Unity (Unity 6000.5.9f1, namespace root ProceduralCreature). The authoritative model is CreatureDefinition; meshes, colors, skeletons, and poses are derived outputs that are never written back to DNA. Runtime code is pure (no scene-object/editor-API/mutable-generated-state dependency); editor code owns sessions, undo, previews, scene handles, and Unity editor lifecycle.\n\nASSEMBLY BOUNDARIES:\n- Runtime: Assets/Scripts/Runtime/ProceduralCreature.Runtime.asmdef (root ns ProceduralCreature, includePlatforms [], sole external reference Unity.Burst). Subfolders: Common, Definition, Generation, Morphology (Sdf, Extraction), Appearance, Skeleton, Animation (Ik), Serialization. May use UnityEngine CORE value types only (Vector3, Quaternion, Color, Gradient, AnimationCurve) - never UnityEngine.Object or editor APIs.\n- Editor: Assets/Scripts/Editor/ProceduralCreature.Editor.asmdef (root ns ProceduralCreature.Editor, includePlatforms [Editor], references Runtime). Editor references Runtime; Runtime never references Editor.\n- AssemblyInfo.cs (Runtime): [InternalsVisibleTo(\u0022ProceduralCreature.Tests.Runtime\u0022)]. AssemblyInfo.cs (Editor): [InternalsVisibleTo(\u0022ProceduralCreature.Tests.Editor\u0022)].\n\nKEY INVARIANTS (enforced by code comments \u002B assembly refs):\n- DefinitionValidator REPORTS invalid DNA; it never repairs. DefinitionCanonicalizer owns quantization (4 decimals) and stable part ordering. Canonicalization\u002Bvalidation run only at commit/serialization boundaries, never during interactive editing.\n- SDF sign convention: negative = inside, positive = outside. Symmetry is stored ONCE on a single DNA part (MirrorAcrossSymmetryPlane); generation mirrors only that flagged part and does NOT cascade to children.\n- Pure-data generation path (CreatureMeshGenerator.GenerateData -\u003E GeneratedCreatureData) is background-thread safe; Assemble/ToUnityMesh is the only Unity-Mesh boundary and runs on the main thread.\n- Exception policy: DomainException = programmer/contract violation only; user-authored bad data surfaces as ValidationIssue; malformed JSON throws DnaDeserializationException.\n- Schema v2 only; v1 is rejected and cannot be migrated.\n\nLAYERS (see sibling records): creaturecreator-definition-model (DNA\u002Bcanonicalization\u002Bvalidation\u002Bserialization), creaturecreator-generation-morphology (SDF\u002Bextraction\u002Bappearance), creaturecreator-skeleton-ik-pose, creaturecreator-editor-preview, creaturecreator-tests-ops-validation.",
+  "Title": "CreatureCreator Architecture and Project Invariants",
+  "Status": 1,
+  "Confidence": 0.95,
+  "Tags": [
+    "creaturecreator",
+    "architecture",
+    "overview",
+    "invariants",
+    "onboarding",
+    "kind:index",
+    "scope:onboarding"
+  ],
+  "References": [
+    "creaturecreator-definition-model",
+    "creaturecreator-generation-morphology",
+    "creaturecreator-skeleton-ik-pose",
+    "creaturecreator-editor-preview",
+    "creaturecreator-tests-ops-validation"
+  ],
+  "Conflicts": [],
+  "Relationships": [
+    {
+      "sourceId": "creaturecreator-architecture-and-invariants",
+      "targetId": "creaturecreator-definition-model",
+      "relationType": 0,
+      "origin": 0,
+      "createdAtUtc": "2026-09-06T04:52:04.1632789+00:00"
+    },
+    {
+      "sourceId": "creaturecreator-architecture-and-invariants",
+      "targetId": "creaturecreator-generation-morphology",
+      "relationType": 0,
+      "origin": 0,
+      "createdAtUtc": "2026-09-06T04:52:04.163279+00:00"
+    },
+    {
+      "sourceId": "creaturecreator-architecture-and-invariants",
+      "targetId": "creaturecreator-skeleton-ik-pose",
+      "relationType": 0,
+      "origin": 0,
+      "createdAtUtc": "2026-09-06T04:52:04.163279+00:00"
+    },
+    {
+      "sourceId": "creaturecreator-architecture-and-invariants",
+      "targetId": "creaturecreator-editor-preview",
+      "relationType": 0,
+      "origin": 0,
+      "createdAtUtc": "2026-09-06T04:52:04.163279+00:00"
+    },
+    {
+      "sourceId": "creaturecreator-architecture-and-invariants",
+      "targetId": "creaturecreator-tests-ops-validation",
+      "relationType": 0,
+      "origin": 0,
+      "createdAtUtc": "2026-09-06T04:52:04.1632791+00:00"
+    }
+  ],
+  "SourceLinks": [
+    {
+      "Label": "other:other:Runtime asmdef",
+      "Uri": "Assets/Scripts/Runtime/ProceduralCreature.Runtime.asmdef",
+      "StartLine": null,
+      "EndLine": null
+    },
+    {
+      "Label": "other:other:Editor asmdef",
+      "Uri": "Assets/Scripts/Editor/ProceduralCreature.Editor.asmdef",
+      "StartLine": null,
+      "EndLine": null
+    },
+    {
+      "Label": "other:other:Runtime InternalsVisibleTo",
+      "Uri": "Assets/Scripts/Runtime/AssemblyInfo.cs",
+      "StartLine": null,
+      "EndLine": null
+    },
+    {
+      "Label": "other:other:Editor InternalsVisibleTo",
+      "Uri": "Assets/Scripts/Editor/AssemblyInfo.cs",
+      "StartLine": null,
+      "EndLine": null
+    }
+  ],
+  "UsageCount": 0,
+  "LastUpdated": "2026-09-06T04:56:05.2916888Z"
+}

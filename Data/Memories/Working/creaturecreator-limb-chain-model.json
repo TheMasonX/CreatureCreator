@@ -1,0 +1,121 @@
+{
+  "Id": "creaturecreator-limb-chain-model",
+  "Content": "Scope: ONE fine slice of the CreatureCreator DNA/render model - the authored limb chain and the derived geometry it feeds. Complements the coarse records (definition-model, generation-morphology, resolved-model-world-resolver, skeleton-ik-rig-details). All facts Confirmed [C] from source \u002B runtime tests unless marked Inference [I]. Authoritative design source: ADR-001 (CC-018); later deltas CC-049 (chain-level blend radius), CC-056A (ResolvedLimb canonical derivation), CC-089 (validator-only TryResolve), CC-055 (pending smooth-centerline decision).\n\n## 1. Model and ownership\n- LimbChain is a dedicated semantic limb model, NOT a reuse of BodySpline (ADR-001 s1). [C] BodySpline is an editable centerline where the author edits every sample and density is part of the authored representation; LimbChain authors only joint positions \u002B a 1D thickness profile and derives the intermediate geometry. [C]\n- LimbChain/Joint/ThicknessProfile live under Assets/Scripts/Runtime/Definition (namespace ProceduralCreature.Definition). [C]\n- The derived morphology (ResolvedLimb, LimbMetaball/LimbMetaballSampler) lives under Assets/Scripts/Runtime/Morphology and is entirely derived state, never serialized as authoritative DNA (ADR-001 s5). [C]\n- Runtime purity: LimbMetaballSampler and ResolvedLimb.Resolve are pure/deterministic with no UnityEditor, no scene-object, and no SDF-engine dependency in the derivation itself. [C]\n\n## 2. Chain structure - LimbChain and LimbJoint\n- LimbChain holds: List\u003CLimbJoint\u003E Joints; ThicknessProfile Thickness (default tapering profile); float BlendRadius (default 0.1). [C]\n- LimbJoint carries ONLY uint Id and Vector3 Position - no per-joint radius, no per-joint blend. [C] (Authoring statement in ADR-001 s4: there is no per-joint radius field; only thickness is authored per limb. [C])\n- Joint list order IS the semantic chain order (ADR-001 s1/s2; comments in LimbChain, LimbJoint, CanonicalJsonWriter). [C]\n- Joint Ids are stable, unique, and must INCREASE with chain order - validator rejects non-increasing Ids (DefinitionValidator.ValidateLimbChains -\u003E LimbJointOrderNotDeterministic); the canonicalizer keeps this deterministic. [C]\n- LimbChain is Clone-able; LimbJoint has Clone. CreateDefault() returns a straight limb: Joints[0] Id=1 at (0,0,0), Joints[1] Id=2 at (0,-1,0) along local -Y. [C]\n- Joint count range validated: MinLimbJointCount=2 .. MaxLimbJointCount=64 (GenerationTolerances). [C]\n\n## 3. Placement frames and single placement authority\n- CreaturePart.Transform is the SINGLE placement authority; Joints live in the owning part\u0027s local morphology frame. Root joint coincides with the local origin: Joints[0] ~ Vector3.zero (ADR-001 s3). [C]\n- This prevents Transform.position and Joints[0].Position from becoming two competing placement authorities. [C]\n- The validator enforces the root-at-origin invariant: it errors when Joints[0].Position.sqrMagnitude \u003E LimbRootAtOriginTolerance^2 (tolerance 1e-3, GenerationTolerances). [C]\n- Terminal joint (Joints[N-1]) is a stable semantic point that children (Foot, Hand, Claw, Decoration) attach to. [C]\n- Child-at-tip frame (CC-018): a CHILD of a limb is authored in the limb\u0027s TERMINAL-joint frame (tip-relative), not the limb\u0027s placement root. Generation composes each ancestor limb\u0027s terminal-joint translation when forming a child\u0027s world transform, so a child authored at local (0,0,0) sits at the limb tip; the limb\u0027s own frame stays root-at-origin (ADR-001 s3). [C]\n\n## 4. Chain vs primitive vs mesh geometry (mutual exclusivity)\n- A part with non-null Limb is a limb part: geometry derives from the joint chain and Shape is inert for generation; skeleton derives from the joints (ADR-001 s2). [C]\n- When Limb is null the part is a plain primitive shaped by Shape (Shape remains a non-nullable struct on CreaturePart; a limb\u0027s Shape is ignored by generation). [C]\n- A part with non-null MeshGeometry (CC-031/ADR-002) is a pre-authored mesh; Shape and Limb are both inert, and Limb vs MeshGeometry are mutually exclusive - the validator errors when a part declares both (DefinitionValidator.ValidateMeshGeometry). [C]\n- Geometry type detection: the validator\u0027s isLimbChainType is PartType == Limb || Leg || Arm; a non-null Limb on any OTHER PartType is an error (clear stale limb data). PartType.Leg with 2 joints \u002B a direct Foot child gets a Warning (add an authored ankle joint). [C]\n- CreaturePartWorldTransformResolver exposes HasLimb = part.Limb != null on its resolved part snapshot, used by SDF and skeleton layers to branch on geometry source. [C]\n\n## 5. Thickness profile - 1D over normalized arc length\n- ThicknessProfile(t) with t in [0,1] (0=root, 1=tip); t = cumulative arc length / total chain length; radius = Evaluate(t). 1D profile, no per-joint radius (ADR-001 s4). [C]\n- Domain key record is { t, value } with LINEAR interpolation; v1 tangent fields (inTangent/outTangent) are planned additive and do NOT break v1 (ADR-001 s4). [C]\n- ThicknessKey: T (normalized arc length in [0,1]) and Value (positive radius). [C]\n- Default tapering profile: 0.30 at root -\u003E 0.12 at tip (ThicknessProfile.CreateDefault, matched by ThicknessCurveAdapter.DefaultCurve). [C]\n- Evaluate is order-INDEPENDENT: it scans for the two bracketing keys and linearly interpolates, clamping t to [0,1]; clamps to nearest key before first/after last key; returns 0 for null/empty (callers that own a chain should guard instead). [C]\n- HasValidKeys requires \u003E=2 keys, all T in [0,1], finite, all Value \u003E 0, and UNIQUE key times; it does NOT require sorted order (Evaluate is order-independent). [C]\n- Quantize() quantizes every key T/Value and stable-sorts by increasing T so identical DNA always serializes identically regardless of authoring order. [C]\n- The domain profile is NOT coupled to UnityEngine.AnimationCurve; it mirrors the CurveAdapter/GradientAdapter contract (Evaluate, Clone, ContentEquals, IsFinite, HasValidKeys, Quantize) so the validator and canonicalizer share one seam. [C]\n\n## 6. Thickness curve adapter (editor seam)\n- ThicknessCurveAdapter (Assets/Scripts/Runtime/Definition, static) bridges the authoritative 1D profile to Unity AnimationCurve for editor CurveField authoring (CC-018 Phase 7). [C]\n- ToCurve emits one Keyframe per profile key with tangents set to the adjacent-segment slope, so the editor curve renders exactly as Evaluate interpolates (piecewise linear); null/empty profile maps to the default curve. [C]\n- ToProfile reads back only time and value - v1 tangents are NOT preserved; the domain re-interpolates linearly between authored keys. Clone/ContentEquals handle the AnimationCurve side. [C]\n\n## 7. ResolvedLimb - canonical derived geometry guide (CC-056A)\n- ResolvedLimb is an immutable readonly struct that resolves an authored LimbChain ONCE into: JointPositions, SegmentLengths, TotalLength, NormalizedArcLengthAtJoint, plus the resolved Thickness and BlendRadius (CC-056A increment A). [C]\n- Centerline property = JointPositions: the joint polyline IS the v1 centerline (CC-055 decides whether a future smooth centerline replaces it; until then authored joints ARE the centerline). [C]\n- RootSocket = JointPositions[0] (~ part origin); TerminalSocket = JointPositions[count-1] (children attach here). These two sockets are the SHARED attachment points consumed by BOTH metaball sampling and skeleton/semantic-bone resolution. [C]\n- Resolve() is pure and deterministic; arrays are private copies so later mutation of the source chain cannot change the snapshot (tests Resolve_IsAnImmutableSnapshot, Resolve_ImmutableSnapshot_IgnoresLaterThicknessMutation). [C]\n- Resolve falls back to the default tapering profile when chain.Thickness is null, so resolved Thickness is never null. [C]\n- Resolve throws DomainException on null chain / empty joints / null joint entry (guards keep direct calls total). [C]\n- TryResolve (CC-089) is the non-throwing variant for validator-only envelope checks; returns false (not exceptions) for the same incomplete-authoring states and otherwise yields exactly what Resolve produces. A single-joint (degenerate) chain still resolves; the \u003E=2-joint invariant is validation\u0027s (MinLimbJointCount), not this derivation type\u0027s. [C]\n- Same frame as LimbChain.Joints (part-local morphology); creature-space placement is a separate concern owned by CreaturePartWorldTransformResolver (CC-051/CC-056B). [C]\n\n## 8. Metaball sampling - authored joints into SDF spheres\n- LimbMetaballSampler (Assets/Scripts/Runtime/Morphology) derives the between-joint metaball sequence for a LimbChain (CC-018 Phase 4). Metaball sampling is a GEOMETRY concern, not an authoring concern; density can change without changing limb DNA (render density independent of the rig). [C]\n- LimbMetaball is a readonly struct { Vector3 Position; float Radius } - positions in the limb\u0027s local morphology frame; the SDF compiler wraps them with the part\u0027s creature-space transform. [C]\n- Sample(ResolvedLimb) per segment J[i] -\u003E J[i\u002B1]: count = max(1, ceil(segmentLength / DesiredSampleSpacing)); DesiredSampleSpacing = 0.1f is a fidelity knob, not authored. Each ball radius = Thickness.Evaluate(t) where t is normalized cumulative chain arc length. [C]\n- Terminal handling: after all segments, one metaball is appended AT the TerminalSocket with Evaluate(1f), so the tip is closed and children attach to a real surface. [C]\n- Degenerate (TotalLength \u003C= 1e-6) yields a single ball at RootSocket with radius Evaluate(0.5) (defensive; the validator rejects zero-length chains). [C]\n- Sampling is deterministic, pure, and bit-identical to sampling the source chain directly; never writes back to the chain (tests Sample_IsDeterministic, Sample_DoesNotMutateChain). [C]\n- Worked example from tests: straight 1.0-length chain at 0.1 spacing -\u003E 10 samples \u002B 1 terminal = 11 balls; endpoints (0,0,0) radius 0.30 and (0,-1,0) radius 0.12; a bent 2-segment chain -\u003E 21 balls with a ball exactly on the bend joint (t=0.5). [C]\n- SDF consumption: SdfProgramBuilder compiles a limb to a chain of derived metaball SPHERE primitives, each with the part\u0027s creature-space transform baked in; a mirrored limb bakes a mirrored copy of the chain rather than a Symmetry op (SdfProgramBuilder.CompileLimbChainPortable). [C]\n- Smooth blend radius: when a limb part joins the creature field the union uses LimbChain.BlendRadius (authoritative for limb parts); Shape.SmoothBlendRadius is inert for limbs (SdfProgramBuilder.PartUnionBlendRadius; ADR-001). [C]\n\n## 9. Chain-level blend radius (CC-049 migration)\n- LimbChain carries its OWN explicit BlendRadius (default DefaultBlendRadius = 0.1f), matching ShapeDefinition.DefaultSphere.SmoothBlendRadius (0.1f) so existing and default limbs generate identically after the CC-049 migration to an explicit limb blend. [C]\n- A value of 0 is a hard union; negative is invalid. Validator rejects NaN/Inf and negative BlendRadius. [C]\n\n## 10. Serialization (canonical JSON)\n- Canonical JSON always emits a limbChain field (explicit null for non-limb parts) so save/load/save stays byte-stable (JsonDnaSerializerLimbTests RoundTrip_NonLimbPart_SerializesNullLimbChain). [C]\n- Serialized limbChain shape: { joints:[{id, position{x,y,z}}...], blendRadius, thicknessProfile:{ keys:[{t, value}...] } }. [C]\n- Pre-CC-018 v2 files without a limbChain key load with Limb == null (additive, optional; no schema version bump needed) - test Deserialize_PreCC018FileWithoutLimbChainField_LoadsNull. [C]\n- Round-trip (save -\u003E load -\u003E canonical-save) of a limb chain is byte-identical. [C]\n\n## 11. Validation summary (DefinitionValidator.ValidateLimbChains, reports only, never repairs)\n- Chain-type consistency (Limb/Leg/Arm), joint-count bounds [2,64], duplicate joint Ids, non-increasing joint Ids, non-finite joint positions, out-of-bounds joints, too-short segments (MinLimbSegmentLength 1e-3), root-not-at-origin, null/non-finite/invalid thickness profile (\u003E=2 unique T in [0,1], positive values), and non-finite/negative blend radius. [C]\n- No anatomical constraints are imposed (knee direction, bend limits, planarity) - only numerical/pathological states are rejected (ADR-001 s1 decision; DefinitionValidator comment). [C]\n\n## Documented simplifications and pending decisions\n- Single-segment/primitive body representation notes: the limb slice is separate from the body spline; a limb is an articulated multi-joint chain but intermediate geometry and centerline are derived (no per-sample authoring). [C]\n- Thickness is a 1D profile over normalized arc length; there is no per-joint radius and no authored 3D thickness. [C]\n- Metaball chain is the v1 render representation; render density is a fidelity knob independent of rig and DNA. [C]\n- Centerline = authored joint polyline (v1); CC-055 is the pending decision on a future smooth centerline. [I] (referenced by code comments; decision status pending.)\n- Tangent fields (inTangent/outTangent) are planned additive fields; NOT yet serialized (v1 linear only). [C] (documented as future; currently linear.)\n- BlendRadius is chain-level; the skeleton rig slice owns bone mapping (one bone per consecutive joint pair per ADR-001 s6). [C] (bone-per-pair stated in ADR-001 s6 and skeleton source).\n\n## Open questions\n- Whether CC-055 introduces a smooth centerline replacing the joint polyline (would change ResolvedLimb.Centerline semantics). [I]\n- Whether tangent-based (non-linear) thickness interpolation is adopted as an additive format and how the editor CurveField tangents would round-trip. [I]\n- Editor limb-authoring UX details (terminal-frame dragging via ResolveChildFrameToCreatureSpace) were not re-verified from Editor sources in this slice. [I]",
+  "Title": "CreatureCreator Limb Chain Model - LimbChain/LimbJoint structure, placement frames, thickness, resolved sockets, and metaball sampling",
+  "Status": 1,
+  "Confidence": 0.95,
+  "Tags": [
+    "kind:fact",
+    "scope:onboarding",
+    "definition-model",
+    "limb-chain",
+    "morphology",
+    "metaball",
+    "thickness",
+    "resolved-limb",
+    "sdf",
+    "serialization"
+  ],
+  "References": [
+    "creaturecreator-definition-model",
+    "creaturecreator-generation-morphology",
+    "creaturecreator-resolved-model-world-resolver",
+    "creaturecreator-skeleton-ik-rig-details"
+  ],
+  "Conflicts": [],
+  "Relationships": [],
+  "SourceLinks": [
+    {
+      "Label": "LimbChain.cs - chain model, DefaultBlendRadius, CreateDefault",
+      "Uri": "Assets/Scripts/Runtime/Definition/LimbChain.cs",
+      "StartLine": null,
+      "EndLine": null
+    },
+    {
+      "Label": "LimbJoint.cs - Id \u002B Position only",
+      "Uri": "Assets/Scripts/Runtime/Definition/LimbJoint.cs",
+      "StartLine": null,
+      "EndLine": null
+    },
+    {
+      "Label": "ThicknessProfile.cs - keys, Evaluate, HasValidKeys, Quantize",
+      "Uri": "Assets/Scripts/Runtime/Definition/ThicknessProfile.cs",
+      "StartLine": null,
+      "EndLine": null
+    },
+    {
+      "Label": "ThicknessCurveAdapter.cs - AnimationCurve seam",
+      "Uri": "Assets/Scripts/Runtime/Definition/ThicknessCurveAdapter.cs",
+      "StartLine": null,
+      "EndLine": null
+    },
+    {
+      "Label": "LimbMetaballSampler.cs - metaball derivation",
+      "Uri": "Assets/Scripts/Runtime/Morphology/LimbMetaballSampler.cs",
+      "StartLine": null,
+      "EndLine": null
+    },
+    {
+      "Label": "ResolvedLimb.cs - sockets, Resolve, TryResolve",
+      "Uri": "Assets/Scripts/Runtime/Morphology/ResolvedLimb.cs",
+      "StartLine": null,
+      "EndLine": null
+    },
+    {
+      "Label": "CreaturePart.cs - Limb field, geometry-source container",
+      "Uri": "Assets/Scripts/Runtime/Definition/CreaturePart.cs",
+      "StartLine": null,
+      "EndLine": null
+    },
+    {
+      "Label": "DefinitionValidator.cs - ValidateLimbChains, isLimbChainType, root-at-origin",
+      "Uri": "Assets/Scripts/Runtime/Definition/DefinitionValidator.cs",
+      "StartLine": null,
+      "EndLine": null
+    },
+    {
+      "Label": "GenerationTolerances.cs - limb joint/size/tolerance constants",
+      "Uri": "Assets/Scripts/Runtime/Common/GenerationTolerances.cs",
+      "StartLine": null,
+      "EndLine": null
+    },
+    {
+      "Label": "SdfProgramBuilder.cs - limb-\u003Esphere compile, blend radius authority",
+      "Uri": "Assets/Scripts/Runtime/Morphology/Sdf/SdfProgramBuilder.cs",
+      "StartLine": null,
+      "EndLine": null
+    },
+    {
+      "Label": "CanonicalJsonWriter.cs - limbChain/thicknessProfile serialization",
+      "Uri": "Assets/Scripts/Runtime/Serialization/CanonicalJsonWriter.cs",
+      "StartLine": null,
+      "EndLine": null
+    },
+    {
+      "Label": "LimbMetaballSamplerTests.cs - sampling contract",
+      "Uri": "Assets/Scripts/Tests/Runtime/LimbMetaballSamplerTests.cs",
+      "StartLine": null,
+      "EndLine": null
+    },
+    {
+      "Label": "ResolvedLimbTests.cs - resolution contract",
+      "Uri": "Assets/Scripts/Tests/Runtime/ResolvedLimbTests.cs",
+      "StartLine": null,
+      "EndLine": null
+    },
+    {
+      "Label": "JsonDnaSerializerLimbTests.cs - serialization round-trip",
+      "Uri": "Assets/Scripts/Tests/Runtime/JsonDnaSerializerLimbTests.cs",
+      "StartLine": null,
+      "EndLine": null
+    },
+    {
+      "Label": "ADR-001 - LimbChain schema, placement frames, thickness, derived metaballs",
+      "Uri": "docs/adr/ADR-001-limbchain-schema-and-creaturepart-as-semantic-container.md",
+      "StartLine": null,
+      "EndLine": null
+    }
+  ],
+  "UsageCount": 0,
+  "LastUpdated": "2026-09-06T04:56:05.2992455Z"
+}

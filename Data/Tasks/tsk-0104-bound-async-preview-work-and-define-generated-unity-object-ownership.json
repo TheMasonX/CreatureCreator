@@ -45,15 +45,21 @@
       "author": "anonymous",
       "body": "Audit synthesis 2026-09-04: retain Backlog and existing parent relationship to TSK-0098. S05/S06 findings remain accepted for bounded queueing, one detached capture, request-scoped diagnostics, completion disposition, Unity-object lifetime, late results, and domain reload. No implementation or closure is claimed.",
       "createdAtUtc": "2026-09-04T22:46:16.6367639Z"
+    },
+    {
+      "id": "c-e2bb4c5804774a769f10f90248d57889",
+      "author": "anonymous",
+      "body": "Audit synthesis (2026-09-05, deep-dive code reviews): preview/generated Unity-object ownership is coordinated across TSK-0104 and TSK-0122. TSK-0122 (child of TSK-0098) owns making CreaturePreviewController root ownership structural (marker-based, not name/prefix-based). Coordinate with this task\u0027s \u0022define generated Unity-object ownership\u0022 scope to avoid two competing ownership schemes. Provenance: docs/audits/creaturecreator-deep-dive-code-review-audit-26-09-05-23-07-45.md F4. Do not duplicate.",
+      "createdAtUtc": "2026-09-06T04:26:05.7229276Z"
     }
   ],
   "epicId": null,
   "parentId": "tsk-0098-decompose-creatureeditorwindow-responsibilities",
   "dueDateUtc": null,
   "createdAtUtc": "2026-09-03T22:37:19.7381337Z",
-  "updatedAtUtc": "2026-09-04T22:46:16.6367639Z",
+  "updatedAtUtc": "2026-09-06T04:26:05.7229276Z",
   "completedAtUtc": null,
-  "revision": 4,
+  "revision": 5,
   "isArchived": false,
   "hasLoadError": false,
   "loadError": null,

@@ -1,0 +1,116 @@
+{
+  "Id": "creaturecreator-appearance-resolution",
+  "Content": "FINER slice on CreatureCreator (D:\\UnityProjects\\CreatureCreator) APPEARANCE RESOLUTION for an extracted mesh. Namespace: ProceduralCreature.Appearance (runtime assembly Assets/Scripts/Runtime/Appearance). Complements (not duplicates) the coarse records creaturecreator-definition-model (AppearanceDefinition field shape) and creaturecreator-generation-morphology (pipeline stage 5 BakeAppearance). Every claim is classified inline: [C] = Confirmed in source AND a focused test (or direct source comment); [I] = Inference from source structure, not directly asserted by a test. Worktree baseline HEAD 99fe6ad (main); source below is the real opened file, not a summary.\n\n1) WHOLE-STAGE FLOW (AppearanceBaker.Bake) [C]. AppearanceBaker is a separate stage from mesh extraction; it consumes MeshExtractionResult plain data (Positions/Normals/Triangles), not a Unity Mesh. Bake(definition, mesh, diagnostics) compiles SdfProgramBuilder.CompileIndividualPartsPortable(definition) into a per-part list of ResolvedPartProgram, plus one CompilePortableBodyField(definition) body program and ResolvedBody.Resolve(definition.Body) when the Body has samples; it disposes all programs in a finally. Inside DoBake: if mesh.Normals.Count != Positions.Count it first runs mesh.ComputeAngleWeightedNormals(); allocates Color[Positions.Count]; then either the Burst path (AppearanceBaker.UseBurstResolve, an internal static bool default true, toggleable by tests) or a managed loop over PartAppearanceSampler.Resolver.Resolve(pos). AppearanceBaker.Bake may also take an optional ResolvedCreatureSnapshot so previews resolve against authored/posed state (snapshot.BodyAppearance, snapshot.Forward, snapshot.Body, per-part appearances via snapshot.TryGetPart); both managed and Burst resolve accept it. TimeStage(GenerationStage.AppearanceBake, ...) wraps the work when diagnostics are supplied. Null definition or mesh throws DomainException.\n\n2) NEAREST-PART SINGLE-RESOLUTION SIMPLIFICATION (FLAGGED) [C]. PartAppearanceSampler KNOWN SIMPLIFICATION (class doc): because Compile folds every part into one unioned SDF, there is no per-vertex record of which CreaturePart owns a surface point; the resolver answers that after the fact by evaluating each part\u0027s OWN individually-compiled node and picking whichever part\u0027s surface is closest. It picks a SINGLE nearest part rather than blending appearance between the nearest two, so color can change abruptly right at a smooth-blended geometric seam between two parts with different BaseColor. Smooth appearance blending at seams (matching geometric smooth-min blending) is explicitly documented as a reasonable hardening target and is NOT implemented - it is flagged in source, not silently approximated. [I] No test asserts the absence of seam blending; the simplification is enforced only by the single-winner Resolve implementation.\n\n3) ResolvedAppearance carries BaseColor \u002B NoiseSeed \u002B NoiseScale \u002B optional MaterialKey [C]. The sampler surfaces which optional submaterial key applies (MaterialKey) so editor and runtime previews share the same decision; resolving that key to a UnityEngine.Material is a render-layer concern (MaterialResolver), so the sampler/DNA stay key-only and portable.\n\n4) MANAGED RESOLVER DECISION (PartAppearanceSampler.Resolver.Resolve) [C]. Resolver is IDisposable; it precomputes per-part PartBounds and a persistent NativeArray scratch large enough for the longest program. Resolve(position): (a) if no Parts and no Body samples returns AppearanceDefinition.Default (flat gray, seed 0, scale 1); (b) loops parts, applies the AABB broad phase (below), evaluates each part\u0027s individually-compiled SdfProgram at the point via SdfProgramEvaluator.Evaluate, and treats \u002Binf (culled/outside sample, CC-064 \u0027absent\u0027) as \u0027no candidate here\u0027 - skipped so it cannot win or poison the decision (never a giant valid distance); a finite candidate\u0027s distance = Abs(rawDistance) and the nearest is tracked with STRICT \u0027\u003C\u0027 (first-encountered tie wins among parts, so part ordering is deterministic); (c) evaluates the Body program similarly and the Body owns the surface point ONLY when the body program is created, its distance is finite (not \u002Binf), AND bodyAbsDistance \u003C= nearestAbsDistance - a NON-STRICT \u0027\u003C=\u0027 versus the parts\u0027 strict \u0027\u003C\u0027. When the Body wins, Resolve returns BodyVerticalGradientSampler.EvaluateColor(_bodyAppearance, _body, _forward, position) as BaseColor with NoiseSeed 0 and NoiseScale 1 (no MaterialKey). The guard prevents a point where every candidate is culled (\u002Binf everywhere) from incorrectly falling through to the Body\u0027s gradient color (CC-064). (d) If no part won, returns Default (gray). (e) Otherwise returns the nearest part\u0027s AppearanceDefinition fields, nulling MaterialKey when it is blank/whitespace. EnableBroadPhase is an internal test hook (default true) that when false makes Resolve evaluate every part unconditionally; production never toggles it.\n\n5) AABB BROAD PHASE [C]. Each part\u0027s precomputed PartBounds has Min/Max from the compiled program root MinBound/MaxBound and CanBroadPhase = (bounds valid) \u0026\u0026 root.Cullable. When every op in a part\u0027s program is Cullable (no ellipsoid), the part\u0027s SDF is bounded below by the Euclidean distance to its world AABB, so a part whose squared AABB distance (DistanceToAabbSquared: clamp point into the box, squared delta) is NOT smaller than the closest part found so far (\u003E= nearestAbsDistanceSq) can be skipped and the nearest-part decision is unchanged - bit-identical to evaluating it. Tests: Resolve_FarPartOutsideAabb_IsSkippedByBroadPhase, Resolve_OverlappingAabbs_StillPicksNearerPart, and Resolve_BroadPhase_MatchesUnconditionalReferenceAcrossPoints (grid of points over a multi-part \u002B Body definition, broad-phase Resolver vs a reference Resolver with EnableBroadPhase=false, asserting exact BaseColor AND MaterialKey equality).\n\n6) BURST RESOLVE (AppearanceResolveBurst) - DISTANCE MATRIX \u002B MERGE [C]. ResolveAll evaluates every compiled part program and the Body program in Burst jobs (PartSdfDistanceJob, mirroring SdfSamplingJob batching/scratch layout with Fast CC-063 culling), then an AppearanceMergeJob resolves each vertex. A distances matrix of vertexCount * programCount (parts 0..PartCount-1, Body column = PartCount) is pre-filled with \u002Binf so skipped/empty programs never look finite (CC-064), capped by an int.MaxValue guard with DomainException. Batch size = ScratchValueBudget (8MB) / maxOps. PartSdfDistanceJob calls SdfProgramEvaluator.EvaluateInto(..., allowCulling:true) and writes Abs(raw) into its column. AppearanceMergeJob picks the nearest finite part with strict \u0027\u003C\u0027, then the Body wins if its distance is finite and \u003C= nearest (non-strict), exactly mirroring the managed Resolver; the Body branch writes a placeholder white base with seed 0 / scale 1 and OutBodyWins=true; no part -\u003E Default gray base. Managed AppearanceBaker.BakeBurst then runs the Body vertical gradient (Body-owned vertices only) and triplanar noise in managed code, so the final colors are bit-identical to the managed resolver path. Test: Bake_BurstResolve_MatchesManagedResolveExactly (body tube with a vertical gradient \u002B a sphere bump that sticks out, forcing BOTH the Body-gradient branch and the part branch; asserts exact 0-tolerance color equality between the managed path (UseBurstResolve=false) and Burst path (UseBurstResolve=true)).\n\n7) PER-VERTEX COLOR MODULATION (AppearanceBaker.BakeVertexColor) [C]. For every vertex it computes noise = TriplanarNoise.Evaluate(position, normal, seed, scale), remaps the [0,1] noise to brightness = 1 \u002B (noise*2 - 1) * BrightnessVariation, where BrightnessVariation is a private const 0.15f (a named tolerance), then outputs Clamp01(baseColor.rgb * brightness) preserving baseColor.a. Body-owned vertices are resolved with NoiseSeed 0 / NoiseScale 1 and go through this SAME BakeVertexColor path, so Body vertical-gradient colors are also triplanar-noise-modulated at the fixed default seed/scale [C by code; note this is an observed coupling, not separately asserted]. BakePart(CreaturePart/AppearanceDefinition, positions, normals) bakes a part\u0027s OWN authored appearance (same BakeVertexColor noise modulation) onto an arbitrary vertex set and is used for MESH-ASSET geometry items (CC-031): a mesh-asset part is not part of the implicit SDF field, so nearest-surface resolution cannot reach it and it deliberately does NOT run the Body vertical-gradient or nearest-part samplers - its color is its own, never the Body\u0027s implicit color. Tests: Bake_ProducesOneColorPerVertex, Bake_ColorsStayNearBaseColorWithinBrightnessVariation (r in [0.5*0.84, 0.5*1.16]), BakePart_SolidNonWhiteAppearance_ProducesMatchingColors (pure-red gains no green/blue), BakePart_IgnoresNearestPartAndBodyGradient_ByDesign, plus null-arg DomainException tests.\n\n8) TRIPLANAR NOISE (TriplanarNoise) [C]. Deterministic 2D-Perlin triplanar projection. Evaluate(position, normal, seed, scale): blendWeights = |normal.x/y/z| normalized by their sum (fallback to 1/3,1/3,1/3 when the sum \u003C= 1e-6, e.g. a zero normal, to avoid NaN); p = position * scale; per-seed coordinate offsets offsetX = seed * 0.10132f and offsetY = seed * 0.07219f (fixed, irrational-ish decorrelators, NOT a randomness source); three axis-aligned 2D Perlin samples sampleYZ = Perlin(p.y\u002Box, p.z\u002Boy), sampleXZ = Perlin(p.x\u002Box, p.z\u002Boy), sampleXY = Perlin(p.x\u002Box, p.y\u002Boy); returns blendWeights.x*sampleYZ \u002B blendWeights.y*sampleXZ \u002B blendWeights.z*sampleXY, a value in [0,1]. It avoids the stretching artifacts of a single planar/UV projection on arbitrary blobby SDF geometry. Determinism: Mathf.PerlinNoise is a pure function of its inputs and the seed offsets are a fixed arithmetic transform, so identical (position, normal, seed, scale) always yields the identical output and regenerating a creature twice produces the same appearance. Tests: Evaluate_IsDeterministic, Evaluate_DifferentSeeds_ProduceDifferentValues, Evaluate_ReturnsValueInUnitRange, Evaluate_DegenerateZeroNormal_DoesNotThrowOrProduceNaN.\n\n9) BODY VERTICAL-GRADIENT SAMPLER (BodyVerticalGradientSampler) - MANAGED PATH [C]. Evaluates the Body\u0027s vertical-gradient appearance (CC-025/CC-034) at a surface point. TryGetBodySample projects the point onto the authoritative ResolvedBody spline (per-segment closest-point with clamping) to get the body-length parameter lengthT (0..1) and the local spine centerline \u002B interpolated radius. lengthT is 0 at the HEAD and 1 at the tail: the head is the end of the spline with the HIGHEST projection onto CreatureDefinition.Forward (so lengthT runs backwards along stored sample order when the spline was authored tail-first); it is computed as lengthT = (headForward \u003E= tailForward) ? 1 - arcFrac : arcFrac over the accumulated segment arc fraction. The vertical sample is the signed distance of the point from the spine centerline in WORLD up (Y), normalized by the local body radius (verticalRaw = (position.y - centerline.y)/radius, clamped to [-1,1]); -1 is the bottom (world-down) side and \u002B1 the top. WORLD up is documented as the camouflage-correct axis (an underbelly is always the world-down side) and is independent of the body\u0027s slope, so the top gradient reliably tints the highest side even on a sloped body (test EvaluateColor_SlopedBody_TopUsesTopGradient). EvaluateColor(appearance, body, forward, position): returns Color.gray when appearance/TopGradient/BottomGradient/VerticalCurve is null or there is no spline; otherwise maps verticalSample -1..1 to curve input u = (verticalSample \u002B 1) * 0.5, evaluates the authored VerticalCurve at u to get the top/bottom blend factor (default linear reproduces the pre-CC-034 offset-0 look), evaluates the TopGradient and BottomGradient at t (the body-length param), and returns Color.Lerp(bottom, top, blend). This sampler is the MANAGED path because Unity\u0027s built-in AnimationCurve and Gradient must render authored data exactly: evaluation goes through CurveAdapter.Evaluate (delegates to AnimationCurve.Evaluate) and GradientAdapter.Evaluate (delegates to Gradient.Evaluate); AppearanceResolveBurst explicitly keeps the Body vertical gradient and triplanar noise managed for this reason. Tests (BodyVerticalGradientAppearanceTests) assert the vertical sample head/tail orientation (TryGetBodySample_HeadIsForwardEnd), \u002B1 top / -1 bottom on a tube, centerline blend halfway (purple from red/blue), curve remap and legacy-offset pinning, sloped-body world-up behavior, gradient keyed over length (head differs from tail), gray fallbacks, plus validation/canonicalization/JSON round-trip (also covered by creaturecreator-serialization-contract). Resolver_PointOnBody_UsesBodyGradientNotNearestPart and Bake_BodyOnlyMesh_ReflectsVerticalGradient assert the bake integration.\n\n10) PER-PART SUBMATERIAL RESOLUTION VIA PALETTE (CC-028) - DNA STORES KEYS, NOT OBJECTS [C]. AppearanceDefinition.MaterialKey is a stable name (string) resolved through an external material palette at render time - never a UnityEngine.Object reference (same convention as MeshGeometry.MeshAssetKey); null/whitespace means \u0027no override\u0027 (part keeps nearest-part behavior); the Body owns its gradient appearance (CC-025) and NEVER carries a material key. Equals/GetHashCode normalize a blank key to null. CreatureMaterialPalette is a ScriptableObject (runtime assembly so the editor preview and runtime preview resolve through the SAME abstraction) holding ordered Entries {Key, DisplayName, Material} plus an optional DefaultMaterialKey (CC-074, e.g. the Body material under the \u0027body\u0027 key). Lookup is deterministic: ordinal, first match wins; entries with a blank key or null material are unusable and excluded from GetUsableKeys (sorted \u002B deduplicated); TryResolve / HasDuplicateKeys (ordinal duplicate detection) / GetDisplayName (falls back to the key). MaterialResolver.Resolve(palette, key) policy: a blank/unset key returns null (keeps the nearest-part fallback); a SET key requires a non-null palette and a resolvable usable entry and otherwise throws DomainException - never a silent drop (matching the mesh-resolver contract, ADR-002). MaterialResolver.ResolveDefault(palette) is SOFT (returns null when no palette / blank key / unresolvable, never throws) because a missing default must not break the whole preview. Tests (CreatureMaterialPaletteTests) assert ordinal stable lookup (\u0027eye\u0027 resolves, \u0027Eye\u0027 does not), blank/missing/null-material rejection, sorted dedup keys, ordinal duplicate detection, blank-key-null, resolvable key, set-key-without-palette throws, unresolvable-set-key throws, and the Default soft-fallback contract. The serializer emits materialKey by name (JsonDnaSerializerMaterialKeyTests) - see creaturecreator-serialization-contract.\n\n11) MATERIAL-REGION EMISSION ONLY WHEN MaterialKey IS SET (item 0 implicit has none) [C]. In the mesh-asset geometry path (CreatureMeshGenerator.BuildMeshAssetItem, CC-028), a geometry item carries a MaterialRegion ONLY when its part\u0027s Appearance.MaterialKey is non-blank; V1 emits exactly one region covering submesh 0 (the whole item in the common single-material case) with StartIndex 0 and IndexCount = the full triangle count, and the region stores the key only (MaterialRegion{MaterialKey,...}, see GeneratedCreature) - resolution to a UnityEngine.Material stays at the render layer. The IMPLICIT combined item (the single-mesh vertex-color bake result, item index 0) deliberately gets NO material regions and keeps the vertex-color default path. Tests (GeneratedCreatureTests.Generate_MeshPart_WithMaterialKey_PopulatesMaterialRegions) assert geometry[1] (original) and geometry[2] (mirrored) each carry one region keyed \u0027eye_white\u0027 while geometry[0].MaterialRegions.Count == 0; Generate_MeshPart_WithoutMaterialKey_HasNoMaterialRegions asserts a keyless part produces no regions. At render time (CreatureRuntimePreview / editor CreaturePreviewController.AssignItemMaterials) an item with no regions, or a region whose key cannot resolve, falls back to the default surface material via MaterialResolver.ResolveDefault (synthesizing a material only when the palette has no resolvable default); an unresolvable SET key logs a warning and falls back in Play Mode (runtime is resilient) whereas the editor preview treats it as an error.\n\nOPEN QUESTIONS / RESIDUAL [I]: (a) Smooth appearance blending at geometric seams remains unimplemented and is a flagged hardening target, not a tracked behavior; (b) Body-owned vertices are noise-modulated at the fixed seed 0 / scale 1 through the shared BakeVertexColor - whether this fixed-seed noise on the gradient is intended or an incidental coupling is not asserted by any test; (c) nearest-part ties among parts resolve by first-encountered order (strict \u0027\u003C\u0027), so determinism relies on stable compiled-part ordering from CompileIndividualPartsPortable rather than an explicit tie-break rule.",
+  "Title": "CreatureCreator Appearance Resolution: Nearest-Part Sampling, Triplanar Noise, Body Vertical-Gradient, and Per-Part Material-Key Resolution",
+  "Status": 1,
+  "Confidence": 0.9,
+  "Tags": [
+    "kind:fact",
+    "scope:onboarding",
+    "creaturecreator",
+    "appearance",
+    "appearance-resolution",
+    "nearest-part",
+    "triplanar-noise",
+    "vertical-gradient",
+    "material-key",
+    "material-palette",
+    "vertex-color",
+    "bake"
+  ],
+  "References": [
+    "creaturecreator-definition-model",
+    "creaturecreator-generation-morphology",
+    "creaturecreator-serialization-contract"
+  ],
+  "Conflicts": [],
+  "Relationships": [],
+  "SourceLinks": [
+    {
+      "Label": "AppearanceBaker.cs (Bake/BakeBurst/BakePart/BakeVertexColor)",
+      "Uri": "Assets/Scripts/Runtime/Appearance/AppearanceBaker.cs",
+      "StartLine": null,
+      "EndLine": null
+    },
+    {
+      "Label": "PartAppearanceSampler.cs (Resolver nearest-part \u002B AABB broad phase)",
+      "Uri": "Assets/Scripts/Runtime/Appearance/PartAppearanceSampler.cs",
+      "StartLine": null,
+      "EndLine": null
+    },
+    {
+      "Label": "TriplanarNoise.cs (2D Perlin triplanar projection)",
+      "Uri": "Assets/Scripts/Runtime/Appearance/TriplanarNoise.cs",
+      "StartLine": null,
+      "EndLine": null
+    },
+    {
+      "Label": "BodyVerticalGradientSampler.cs (body vertical-gradient resolution)",
+      "Uri": "Assets/Scripts/Runtime/Appearance/BodyVerticalGradientSampler.cs",
+      "StartLine": null,
+      "EndLine": null
+    },
+    {
+      "Label": "AppearanceResolveBurst.cs (distances matrix \u002B merge)",
+      "Uri": "Assets/Scripts/Runtime/Appearance/AppearanceResolveBurst.cs",
+      "StartLine": null,
+      "EndLine": null
+    },
+    {
+      "Label": "CreatureMaterialPalette.cs (keyed submaterial palette)",
+      "Uri": "Assets/Scripts/Runtime/Appearance/CreatureMaterialPalette.cs",
+      "StartLine": null,
+      "EndLine": null
+    },
+    {
+      "Label": "MaterialResolver.cs (key resolution policy)",
+      "Uri": "Assets/Scripts/Runtime/Appearance/MaterialResolver.cs",
+      "StartLine": null,
+      "EndLine": null
+    },
+    {
+      "Label": "AppearanceDefinition.cs (BaseColor/NoiseSeed/NoiseScale/MaterialKey)",
+      "Uri": "Assets/Scripts/Runtime/Definition/AppearanceDefinition.cs",
+      "StartLine": null,
+      "EndLine": null
+    },
+    {
+      "Label": "CreatureMeshGenerator.cs (material-region emission, item 0 implicit none)",
+      "Uri": "Assets/Scripts/Runtime/Generation/CreatureMeshGenerator.cs",
+      "StartLine": null,
+      "EndLine": null
+    },
+    {
+      "Label": "CreatureRuntimePreview.cs (render-layer material resolution/fallback)",
+      "Uri": "Assets/Scripts/Runtime/Generation/CreatureRuntimePreview.cs",
+      "StartLine": null,
+      "EndLine": null
+    },
+    {
+      "Label": "AppearanceBakerTests.cs (nearest-part, broad-phase parity, Burst parity, BakePart)",
+      "Uri": "Assets/Scripts/Tests/Runtime/AppearanceBakerTests.cs",
+      "StartLine": null,
+      "EndLine": null
+    },
+    {
+      "Label": "BodyVerticalGradientAppearanceTests.cs (gradient/curve/sample/bake)",
+      "Uri": "Assets/Scripts/Tests/Runtime/BodyVerticalGradientAppearanceTests.cs",
+      "StartLine": null,
+      "EndLine": null
+    },
+    {
+      "Label": "CreatureMaterialPaletteTests.cs (palette \u002B resolver policy)",
+      "Uri": "Assets/Scripts/Tests/Runtime/CreatureMaterialPaletteTests.cs",
+      "StartLine": null,
+      "EndLine": null
+    },
+    {
+      "Label": "GeneratedCreatureTests.cs (material-region emission, item 0 none)",
+      "Uri": "Assets/Scripts/Tests/Runtime/GeneratedCreatureTests.cs",
+      "StartLine": null,
+      "EndLine": null
+    }
+  ],
+  "UsageCount": 0,
+  "LastUpdated": "2026-09-06T04:56:05.2902442Z"
+}

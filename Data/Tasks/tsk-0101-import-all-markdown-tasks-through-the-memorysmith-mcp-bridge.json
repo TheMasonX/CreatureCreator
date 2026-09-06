@@ -40,15 +40,21 @@
       "author": "anonymous",
       "body": "## User Mandate\n\u003E Ensure all CC legacy task files are captured within the MemorySmith TSK task system as appropriate (cross reference with the actual state) before we delete them (without removing from git history) to ensure we\u0027ve cleanly switched over\n\nSTRICT. Every CC legacy ticket under docs/tasks/tickets/ and docs/tasks/archive/ must have a MemorySmith TSK owner that preserves its source key, content, and status before any working-tree deletion. Deletion must not remove the files from git history. Do not relax scope or drop CC content.\n\n## Capture Reconciliation Evidence (2026-09-06)\n- Enumerated 101 distinct CC ticket files (docs/tasks/tickets/ \u002B docs/tasks/archive/): CC-001..CC-099 plus CC-056A and CC-056B.\n- Cross-referenced every CC file against MemorySmith Data/Tasks/*.json records by source cc-### label and by \u0022Source key: CC-###\u0022 description ownership.\n- Result: CC-001..CC-098 (plus 056A/056B) each already own a dedicated TSK description. The sole unresolved gap, CC-099, was only a secondary label on TSK-0008 and lacked a dedicated record.\n- Fix: created TSK-0119 \u0022Harden fast SDF culling and non-finite field consumers\u0022 preserving CC-099 summary, scope, acceptance criteria, decision, findings, validation, and source labels (cc-099, source-cc, runtime, sdf, culling, non-finite, extraction, regression).\n- Post-fix owner count: 101/101 CC keys are description owners of a TSK record. Test-TaskRecords.ps1: PASS, 119 records, ids/keys unique.\n- Residual (non-blocking) migration artifact: CC-018 was imported three times (TSK-0018 InProgress owner; TSK-0019 and TSK-0020 Archived duplicates). Archived duplicates are harmless; noted for optional later cleanup.\n\n## Next Step\nCapture is complete and verified. Decommissioning (working-tree deletion of the frozen CC ticket files) is the remaining step and is gated on user confirmation of deletion scope and CI/tooling handling.",
       "createdAtUtc": "2026-09-06T04:12:23.9467467Z"
+    },
+    {
+      "id": "c-91d510ebb40d48009f759c6f5b9a0ddb",
+      "author": "anonymous",
+      "body": "Audit synthesis (2026-09-05, deep-dive code reviews): (1) TSK-0123 (new, net-new) owns restoring an enabled GitHub Actions gate that validates Data/Tasks/*.json on push/PR, which CC-093 required but is absent at HEAD after the migration disabled CI. (2) Residual, not re-filed: the live/TSK vs frozen/CC split should end with a generated compatibility view or an unmistakably frozen archive so stale CC status is not read as live; the retired CC Markdown tracker should be decommissioned in the migration/retirement step. Provenance: docs/audits/creaturecreator-deep-dive-code-review-audit-26-09-05-23-07-45.md F1/F6. Do not duplicate.",
+      "createdAtUtc": "2026-09-06T04:26:05.6706821Z"
     }
   ],
   "epicId": null,
   "parentId": null,
   "dueDateUtc": null,
   "createdAtUtc": "2026-09-01T03:20:52.9538742Z",
-  "updatedAtUtc": "2026-09-06T04:12:23.9467467Z",
+  "updatedAtUtc": "2026-09-06T04:26:05.6706821Z",
   "completedAtUtc": null,
-  "revision": 4,
+  "revision": 5,
   "isArchived": false,
   "hasLoadError": false,
   "loadError": null,

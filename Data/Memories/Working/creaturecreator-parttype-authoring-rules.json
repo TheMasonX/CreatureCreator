@@ -1,0 +1,154 @@
+{
+  "Id": "creaturecreator-parttype-authoring-rules",
+  "Content": "FINER slice on CreatureCreator (D:\\UnityProjects\\CreatureCreator) PART-TYPE taxonomy and AUTHORING rules, complementing (not duplicating) the coarse records creaturecreator-definition-model / creaturecreator-definition-mutation-validation / creaturecreator-skeleton-ik-rig-details. Namespace: ProceduralCreature.Definition (Runtime) and ProceduralCreature.Editor (pure authoring helpers). Every claim tagged inline: [C]=Confirmed in source AND a test; [I]=source-supported but not directly test-asserted (or a reasonable reading). All paths repo-relative under Assets/.\n\n## 1. PartType semantic vocabulary \u0026 serialized-by-name stability\n\n- PartType (PartType.cs) is the semantic classification of a CreaturePart, consumed by skeleton inference and locomotion. Enum members in order: Body=0, Limb=1, Leg=2, Arm=3, Tail=4, Foot=5, Root=6, Part=7 (generic, no special locomotion/skeleton meaning), Eye=8 (typically authored on a head or the Body), Hand=9. [C] (enum values \u002B XML docs; editor tests DefaultPartNameFor_MatchesPartTypeName covers author-facing names).\n- The vocabulary is intentionally small: the PartType doc states the design guide (design doc 4.1) is explicit that the vocabulary should stay small for the MVP and to resist adding entries speculatively, because every new value is a new case every downstream consumer (skeleton inferer, gait system, editor palette) must handle deliberately. [C] (PartType.cs class doc).\n- PartType is SERIALIZED BY NAME, not by numeric value. CanonicalJsonWriter writes part.PartType.ToString(); JsonDnaSerializer reads it back via RequireEnum\u003CPartType\u003E(obj,\u0022partType\u0022) which does Enum.TryParse(raw, ignoreCase:false). [C] (CanonicalJsonWriter.cs ~line 235; JsonDnaSerializer.cs ~line 286, ReadEnum helper ~567).\n- The Hand doc is explicit that it is \u0022Serialized by NAME, so the numeric value is stable\u0022; because enums are written by name, adding Hand=9 was a non-breaking, backward-safe extension for the DNA schema. [C] (PartType.cs Hand doc; JsonDnaSerializer enum-by-name path).\n- ShapeType (ShapeType.cs) is the DNA-level primitive SDF shape vocabulary: Sphere=0, Capsule=1, Box=2, Ellipsoid=3. ShapeType.cs also carries the dependency rule: Definition code has NO knowledge of SDF/mesh generation types (the portable SDF ops that interpret a ShapeType belong to Phase 2 and must not be referenced from Definition). [C] (ShapeType.cs doc). ShapeAxis (ShapeAxis.cs) = X=0, Y=1, Z=2, the local axis used by an authored capsule. [C].\n\n## 2. Limb-chain-bearing types vs attachment parts\n\n- Only THREE PartTypes carry a limb joint chain: Limb, Leg, Arm. This predicate is IsLimbChainType, defined ONCE in Editor (LimbAuthoring.IsLimbChainType == type==Limb || type==Leg || type==Arm). [C] (LimbAuthoring.cs; CreatureEditorWindowLimbAuthoringTests.IsLimbChainType_TrueForLimbLegArm).\n- Foot and Hand are TERMINAL ATTACHMENT parts, NOT standalone chains: they never get a LimbChain, and when authored they sit at their parent limb\u0027s terminal joint. LimbAuthoring doc: \u0022Foot and Hand are terminal attachment parts authored against their parent limb\u0027s terminal joint, not standalone chains.\u0022 [C] (LimbAuthoring.cs class doc \u002B IsLimbChainType; tests IsLimbChainType_FalseForAttachmentAndGenericTypes, DefaultLimbChainForType_SeedsOnlyLimbChainTypes which asserts DefaultLimbChainForType(Hand/Foot) is null).\n- Hand (CC-018/CC-036) is authored like a Foot: an attachment part whose skeleton parent resolves to the arm\u0027s terminal limb bone. [C] (PartType.cs Hand doc).\n- IsLimbChainType is DUPLICATED inline in Runtime DefinitionValidator.ValidateLimbChains (the same Limb/Leg/Arm test), because Runtime cannot reference the Editor assembly. Audit CC-090 was synthesized to move this shared PartType classification into the Runtime-owned contract. [C] (DefinitionValidator.cs ~675; code-audit \u002B delta-audit records list this as the Editor/Runtime asmdef-boundary duplication finding).\n- Runtime enforcement: if a part has a non-null Limb chain but its PartType is NOT a chain type (Limb/Leg/Arm), DefinitionValidator reports InvalidLimbChain (\u0022clear the stale limb data before serialization or generation\u0022). [C] (DefinitionValidator.cs ~675-686; DefinitionValidatorLimbTests).\n- A part\u0027s geometry source is mutually exclusive: when LimbChain is non-null the part is a limb and Shape is INERT for generation (geometry and skeleton derive from the joints, ADR-001); when null the part is a plain primitive shaped by Shape. A MeshGeometry (CC-031/ADR-002) is a third exclusive source; declaring Limb \u002B MeshGeometry together is InvalidMeshGeometry. [C] (CreaturePart.cs Limb/MeshGeometry docs; DefinitionValidator.ValidateMeshGeometry ~632; ValidateTransformsAndShapesAndAppearance skips shape-param check when Limb!=null or MeshGeometry!=null).\n\n## 3. Body-as-single-root \u0026 child attach invariants\n\n- The Body is the single authoritative root in schema v2. It is a dedicated BodySpline (not a normal part) keyed by the reserved id constant CreatureDefinition.BodyId == \u0022body\u0022 (CreatureDefinition.CurrentSchemaVersion == 2). [C] (CreatureDefinition.cs BodyId/CurrentSchemaVersion; tests referencing CreatureDefinition.BodyId throughout).\n- Body id is reserved: a normal part whose Id equals \u0022body\u0022 is rejected as ReservedPartId. [C] (DefinitionValidator.cs ~417-423; DefinitionValidatorTests.Validate_RejectsReservedBodyPartId).\n- PartType.Body and PartType.Root are RESERVED part types and cannot be authored on a part in schema v2: the validator reports UnsupportedPartType for any part whose PartType is Body or Root. [C] (DefinitionValidator.ValidatePartTypes ~484-491; DefinitionValidatorTests.Validate_RejectsReservedBodyPartType).\n- Every non-Body part must descend from the Body. A non-Body part with ParentId == null is rejected as InvalidBodyParent (\u0022must be a descendant of the Body\u0022). [C] (DefinitionValidator.ValidateParentsAndCycles ~437-443; DefinitionValidatorTests.Validate_RejectsPartWithNoParent, CC-083).\n- A part whose ParentId references a non-existent part id is rejected as MissingParent. [C] (DefinitionValidator.ValidateParentsAndCycles ~444-450).\n- Parent cycles are rejected: CreatureDefinition.HasParentCycle walks ParentId links and reports any visited-twice id; validator emits ParentCycle for each id in the cycle. [C] (CreaturePartHierarchyIndex.HasParentCycle ~110-131; CreatureDefinition.HasParentCycle; DefinitionValidator ~452-460).\n- Tail is NOT authorable as an independent root: a part with PartType.Tail and ParentId == BodyId is rejected as InvalidBodyParent (\u0022cannot be an independent root Tail\u0022). [C] (DefinitionValidator.ValidatePartTypes ~493-498; DefinitionValidatorTests.Validate_RejectsIndependentRootTail).\n- The authorable PartType set in the editor is exactly {Part, Limb, Leg, Arm, Foot, Hand, Eye} (ValidV2PartTypes). Body, Root, and independent Tail are reserved by the validator and are NOT offered by the authoring UI. [C] (CreatureEditorWindow.cs ValidV2PartTypes ~204-224; PartType change popup DrawPartTypeField iterates only ValidV2PartTypes).\n- A child authored at (0,0,0) under a LIMB parent sits at the parent limb\u0027s TIP, because a limb child\u0027s LOCAL SPACE origin is the parent\u0027s TERMINAL joint (resolver-owned child frame). No per-child placement override is needed. [C] (LimbAuthoring class doc; CreatureEditorWindow.AddNewPart CC-018 note).\n- Editor part creation: AddNewPart attaches to the selected non-Body part, else to the Body. With a non-Body part selected it seeds the new child via ClonePartAsChild (CC-029 Spore-like duplicate-as-child: copies PartType/Shape/Appearance/Mirror/DisplayName; fresh Id/ParentId/identity-Transform/null-ParentAttachment); otherwise NewGenericPart(BodyId) creates a generic PartType.Part with DefaultSphere, MirrorAcrossSymmetryPlane=true. [C] (CreatureEditorWindow.AddNewPart/NewGenericPart ~950-995; CreatureDefinition.ClonePartAsChild).\n- Changing a part\u0027s type in the editor goes through a MutateDefinition closure that sets PartType, reconciles DisplayName (ResolveDisplayNameAfterTypeChange keeps the auto name aligned unless customized), and calls LimbAuthoring.ApplyLimbStateForTypeChange: seeding a default chain when entering a chain type, clearing Limb=null when leaving a chain type. [C] (CreatureEditorWindow.DrawPartTypeField ~1057-1081; LimbAuthoring.ApplyLimbStateForTypeChange; CreatureEditorWindowLimbAuthoringTests.ApplyLimbStateForTypeChange_ClearsChainWhenSwitchingAwayFromLimbType).\n\n## 4. Per-shape parameter authoring (ShapeDefinition)\n\n- ShapeDefinition is the DNA-level per-part shape; it has no SDF/mesh dependency. Fields: Type (ShapeType), PrimarySize (LEGACY single-size value retained for source compatibility), Radius, CapsuleAxis (ShapeAxis), CapsuleHeight, EllipsoidRadii (Vector3 per-axis), BoxHalfExtents (Vector3), SmoothBlendRadius. [C] (ShapeDefinition.cs).\n- Authoring fields by shape (editor DrawShapeFields): Sphere edits Radius only; Capsule edits Axis (ShapeAxis popup) \u002B Radius \u002B Height; Ellipsoid edits the per-axis Radii Vector3; Box edits Half Extents Vector3. [C] (CreatureEditorWindow.DrawShapeFields ~1385-1445). ShapeType is always chosen by an EnumPopup and defaults via WithLegacyDefaults. [C].\n- Capsule semantics: ShapeAxis.X/Y/Z picks the capsule\u0027s long axis; Radius is the sphere-cap radius; CapsuleHeight is the independent height (axis-aligned). The SDF capsule is validated in SdfPrimitiveTests with signed-distance expectations (e.g. a Y-axis capsule of radius 0.5/height 1 gives SDF -0.5 at the local origin). [C] (ShapeAxis.cs; SdfPrimitiveTests.Capsule_HasExpectedSignedDistance; JsonDnaSerializerLimbTests/Canonicalizer round-trip CapsuleAxis=Z).\n- ShapeDefinition.DefaultSphere seeds PrimarySize=0.5, Radius=0.5, CapsuleAxis=Y, CapsuleHeight=1, EllipsoidRadii=(0.5,0.5,0.5), BoxHalfExtents=(0.5,0.5,0.5), SmoothBlendRadius=0.1. [C] (ShapeDefinition.cs).\n- LEGACY PrimarySize migration: WithLegacyDefaults() implements the v1 fallback shared by deserialization, canonicalization, resolved snapshots, and editor presentation. Absent/\u003C=0 legacy size means 0.5; capsule height remains the independent v1 default of 1; if per-axis params are \u003C=0 they are seeded from legacySize (ellipsoid \u0026 box become (legacy,legacy,legacy)). [C] (ShapeDefinition.WithLegacyDefaults ~line 70; DefinitionCanonicalizerTests lines 128-146 assert capsule default height 1 and ellipsoid (0.5,0.5,0.5)).\n- SmoothBlendRadius is the blend radius used by the smooth-min union with connected/parent parts; 0 = HARD union (no smoothing); negative is invalid (ShapeDefinition.HasValidParameters requires \u003E=0; validator InvalidShapeParameter). [C] (ShapeDefinition.cs HasValidParameters; DefinitionValidatorLimbTests uses SmoothBlendRadius=-1 to trigger InvalidShapeParameter; many generation tests set SmoothBlendRadius=0 for hard unions).\n- In the editor, Shape.SmoothBlendRadius is shown DISABLED (inert) when the part has a LimbChain, because the part-to-field blend is then authored in the Limb section (CC-049); it is active only for Shape-rendered parts (limb-typed with no chain still renders from its Shape). [C] (CreatureEditorWindow.DrawShapeFields CC-049 branch ~1426-1442).\n- HasValidParameters: legacy-size path requires finite PrimarySize\u003E0 and blend\u003E=0; modern path requires Radius\u003E0 AND CapsuleHeight\u003E0 AND EllipsoidRadii all positive AND BoxHalfExtents all positive AND blend\u003E=0. UsesLegacySize is true only when Radius/CapsuleHeight==0 and EllipsoidRadii/BoxHalfExtents are Vector3.zero (a fully legacy-authored shape). [C] (ShapeDefinition.cs HasValidParameters/UsesLegacySize).\n- Shape-parameter validity is only enforced when the part is NOT a limb (Limb==null) and NOT a mesh part (MeshGeometry==null); limb geometry derives from the chain so it need not carry a meaningful Shape. [C] (DefinitionValidator.ValidateTransformsAndShapesAndAppearance ~525-535).\n\n## 5. Anatomical foot/ankle validation\n\n- The validator imposes only one anatomical warning relating to foot placement: LegFootChainMissingAnkleJoint. A PartType.Leg with EXACTLY TWO limb joints that has a DIRECT Foot child (child.ParentId==leg \u0026\u0026 child.PartType==Foot) emits a Warning telling the author to add an intermediate ankle joint to create a distinct lower-leg-to-foot node. It is the ONLY current validator check that emits Warning (all others are Error/Info-none). [C] (DefinitionValidator.cs ~710-720 \u0026 HasDirectFootChild ~829-841; ValidationCode.cs; DefinitionValidatorLimbTests.Validate_LegWithDirectFootAndTwoJoints_WarnsThatAnkleJointIsMissing; creaturecreator-definition-mutation-validation KB).\n- There is NO validator rule that strictly REQUIRES a Foot to be the child of a Leg, nor a Hand to be the child of an Arm, nor any rule forbidding a Foot/Hand elsewhere in the tree. Foot/Hand are treated as ordinary attachments; only the two-joint-leg-with-Foot warning and the general missing-parent/cycle/descend-from-body rules constrain them. [I] (validator only special-cases Foot via HasDirectFootChild; no Hand-parent check found in DefinitionValidator.cs).\n- HasDirectFootChild is the ONLY foot-specific structural helper in the validator; there is no Hand analog (no HasDirectHandChild). [C] (DefinitionValidator.cs, only HasDirectFootChild defined ~829).\n- Skeleton inference consumes this model: a Foot/Hand attachment resolves its skeleton parent to the parent limb\u0027s terminal bone; a two-joint leg has no distinct intermediate ankle joint to infer, which is the root cause the LegFootChainMissingAnkleJoint warning (CC-048) addresses. [C] (PartType.cs Hand doc; tsk-0048; SkeletonInferrerLimbTests foot-at-leg tests).\n\n## 6. Editor authoring helpers summary\n\n- LimbAuthoring (Editor, public static, PURE - no UnityEditor API, EditMode-testable, CC-018 Phase 7): IsLimbChainType (Limb/Leg/Arm), ApplyLimbStateForTypeChange, DefaultLimbChainForType (CreateDefault for chain types else null), NextLimbJointId (max existing \u002B1 or 1), ResizeLimbChain (clamps to [GenerationTolerances.MinLimbJointCount, MaxLimbJointCount]; removes tail only, never the root; appends downward local -Y in -0.25 steps with increasing ids), ClampJointToBounds (joint index 0 always clamps to local origin). [C] (LimbAuthoring.cs; CreatureEditorWindowLimbAuthoringTests covers chain seeding/resize/id/root-at-origin/bounds-clamp).\n- Root-at-origin invariant: a limb chain\u0027s root joint (Joints[0]) sits at the local origin (position ~zero); resizing never removes the root and appended joints extend DOWNWARD (local -Y). Default chain = 2 joints (0,0,0) and (0,-1,0) with a two-key tapering thickness profile. [C] (LimbAuthoring.cs; DefaultLimbChainForType_RootAtOriginTerminalDownward test; ResizeLimbChain_Shrinking_RemovesTailOnly_NeverRoot).\n- Joint ids must strictly increase along the chain (validator LimbJointOrderNotDeterministic otherwise); appended joints get max(existing)\u002B1. [C] (LimbAuthoring.cs doc; DefinitionValidator limb check ~755-762).\n- The Body is edited through a separate DrawBodyInspector (selectedPartId==BodyId routes there, not the generic part inspector), reflecting that the Body is not a normal authorable part. [C] (CreatureEditorWindow.DrawPartInspector ~1030-1045; DrawBodyInspector).",
+  "Title": "CreatureCreator PartType taxonomy and authoring rules: PartType semantic vocabulary, limb-chain vs attachment types, body/root/shape authoring invariants, and editor authoring helpers",
+  "Status": 1,
+  "Confidence": 0.92,
+  "Tags": [
+    "creaturecreator",
+    "parttype",
+    "part-type-taxonomy",
+    "limbchain",
+    "limb-authoring",
+    "attachment-parts",
+    "body-root",
+    "shape-definition",
+    "capsule",
+    "ellipsoid",
+    "box",
+    "sphere",
+    "shapetype",
+    "shapeaxis",
+    "definition-validator",
+    "foot-ankle",
+    "hand",
+    "editor-authoring",
+    "kind:fact",
+    "scope:onboarding"
+  ],
+  "References": [
+    "creaturecreator-definition-model",
+    "creaturecreator-definition-mutation-validation",
+    "creaturecreator-skeleton-ik-rig-details"
+  ],
+  "Conflicts": [],
+  "Relationships": [],
+  "SourceLinks": [
+    {
+      "Label": "other:PartType.cs",
+      "Uri": "Assets/Scripts/Runtime/Definition/PartType.cs",
+      "StartLine": null,
+      "EndLine": null
+    },
+    {
+      "Label": "other:ShapeType.cs",
+      "Uri": "Assets/Scripts/Runtime/Definition/ShapeType.cs",
+      "StartLine": null,
+      "EndLine": null
+    },
+    {
+      "Label": "other:ShapeAxis.cs",
+      "Uri": "Assets/Scripts/Runtime/Definition/ShapeAxis.cs",
+      "StartLine": null,
+      "EndLine": null
+    },
+    {
+      "Label": "other:ShapeDefinition.cs",
+      "Uri": "Assets/Scripts/Runtime/Definition/ShapeDefinition.cs",
+      "StartLine": null,
+      "EndLine": null
+    },
+    {
+      "Label": "other:CreaturePart.cs",
+      "Uri": "Assets/Scripts/Runtime/Definition/CreaturePart.cs",
+      "StartLine": null,
+      "EndLine": null
+    },
+    {
+      "Label": "other:CreatureDefinition.cs",
+      "Uri": "Assets/Scripts/Runtime/Definition/CreatureDefinition.cs",
+      "StartLine": null,
+      "EndLine": null
+    },
+    {
+      "Label": "other:CreaturePartHierarchyIndex.cs",
+      "Uri": "Assets/Scripts/Runtime/Definition/CreaturePartHierarchyIndex.cs",
+      "StartLine": null,
+      "EndLine": null
+    },
+    {
+      "Label": "other:DefinitionValidator.cs",
+      "Uri": "Assets/Scripts/Runtime/Definition/DefinitionValidator.cs",
+      "StartLine": null,
+      "EndLine": null
+    },
+    {
+      "Label": "other:ValidationCode.cs",
+      "Uri": "Assets/Scripts/Runtime/Definition/ValidationCode.cs",
+      "StartLine": null,
+      "EndLine": null
+    },
+    {
+      "Label": "other:LimbAuthoring.cs",
+      "Uri": "Assets/Scripts/Editor/LimbAuthoring.cs",
+      "StartLine": null,
+      "EndLine": null
+    },
+    {
+      "Label": "other:CreatureEditorWindow.cs",
+      "Uri": "Assets/Scripts/Editor/CreatureEditorWindow.cs",
+      "StartLine": null,
+      "EndLine": null
+    },
+    {
+      "Label": "other:CanonicalJsonWriter.cs",
+      "Uri": "Assets/Scripts/Runtime/Serialization/CanonicalJsonWriter.cs",
+      "StartLine": null,
+      "EndLine": null
+    },
+    {
+      "Label": "other:JsonDnaSerializer.cs",
+      "Uri": "Assets/Scripts/Runtime/Serialization/JsonDnaSerializer.cs",
+      "StartLine": null,
+      "EndLine": null
+    },
+    {
+      "Label": "test:CreatureEditorWindowLimbAuthoringTests.cs",
+      "Uri": "Assets/Scripts/Tests/Editor/CreatureEditorWindowLimbAuthoringTests.cs",
+      "StartLine": null,
+      "EndLine": null
+    },
+    {
+      "Label": "test:CreatureEditorWindowPartTypeTests.cs",
+      "Uri": "Assets/Scripts/Tests/Editor/CreatureEditorWindowPartTypeTests.cs",
+      "StartLine": null,
+      "EndLine": null
+    },
+    {
+      "Label": "test:DefinitionValidatorTests.cs",
+      "Uri": "Assets/Scripts/Tests/Runtime/DefinitionValidatorTests.cs",
+      "StartLine": null,
+      "EndLine": null
+    },
+    {
+      "Label": "test:DefinitionValidatorLimbTests.cs",
+      "Uri": "Assets/Scripts/Tests/Runtime/DefinitionValidatorLimbTests.cs",
+      "StartLine": null,
+      "EndLine": null
+    },
+    {
+      "Label": "test:SdfPrimitiveTests.cs",
+      "Uri": "Assets/Scripts/Tests/Runtime/SdfPrimitiveTests.cs",
+      "StartLine": null,
+      "EndLine": null
+    },
+    {
+      "Label": "test:DefinitionCanonicalizerTests.cs",
+      "Uri": "Assets/Scripts/Tests/Runtime/DefinitionCanonicalizerTests.cs",
+      "StartLine": null,
+      "EndLine": null
+    }
+  ],
+  "UsageCount": 0,
+  "LastUpdated": "2026-09-06T04:56:05.3002154Z"
+}

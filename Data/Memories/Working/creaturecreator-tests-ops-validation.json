@@ -1,0 +1,70 @@
+{
+  "Id": "creaturecreator-tests-ops-validation",
+  "Content": "Unity version 6000.5.9f1 (authoritative; .github/skills/unity-validation/SKILL.md says 6000.0.35f1 but that doc is STALE - trust 6000.5.9f1 per generated .csproj and repo memory).\n\nTEST ASSEMBLIES: Editor EditMode suite = Assets/Scripts/Tests/Editor/ProceduralCreature.Tests.Editor.asmdef (refs Runtime, Editor, UnityEngine.TestRunner, UnityEditor.TestRunner; includePlatforms [Editor]; nunit). Runtime suite = Assets/Scripts/Tests/Runtime/ProceduralCreature.Tests.Runtime.asmdef (refs Runtime, TestRunner; includePlatforms [] = NOT Editor-only -\u003E runs as PLAYMODe suite; a plain EditMode pass does NOT exercise it). Per .github/skills/unity-validation and /memories/repo/unity-test-gate-2026-09-03, fully-qualified fixture names are required for MCP run_tests filter.\n\nTEST CLASSES - Editor (16 files / ~122 [Test]): BodyEditSolverTests, BodyPlacementAuthoringTests, BodySplineAuthoringTests, CreatureDefinitionClonePartAsChildTests, CreatureEditorSessionTests, CreatureEditorWindowLimbAuthoringTests, CreatureEditorWindowPartsTreeStateTests, CreatureEditorWindowPartTypeTests, CreatureGenerationConfigTests, CreatureMeshPaletteTests, CreaturePreviewAcceptanceStateTests, CreaturePreviewRequestStateTests, CreatureUndoStateTests, GenerationBudgetEstimateTests, PartSiblingOrdererTests, SkeletonDisplayTests.\n\nTEST CLASSES - Runtime (43 files / ~498 [Test]): DNA/definition: CreatureDefinitionTests, DefinitionCanonicalizerTests, DefinitionValidatorTests(\u002BLimb/MeshGeometry), JsonDnaSerializerTests(\u002BLimb/MeshGeometry/MaterialKey). Morphology/SDF: SdfPrimitiveTests, SdfProgramBuilderTests(\u002BLimb), SmoothMinMathTests, SdfCullingModeTests, SdfNonFiniteFieldContractTests. Extraction: MarchingCubesExtractorTests(\u002BParity), CubeTopologyTests, CubeContourResolverTests, AsymptoticDeciderTests, DensityGridTests, ActiveCellBuilderTests. Appearance: AppearanceBakerTests, CreatureMaterialPaletteTests, BodyVerticalGradientAppearanceTests, LimbMetaballSamplerTests. Resolved: ResolvedBodyTests, ResolvedLimbTests, BodyFrameResolverTests, BodySurfaceProjectorTests, PoseRotationResolverTests, GeneratedCreatureTests, CreatureGenerationSchedulerTests, CreaturePartWorldTransformResolverTests. Skeleton: SkeletonInferrerTests(\u002BLimb), SkeletonSnapshotTests, SemanticBoneResolverTests, MirrorUtilityTests, BoneChainTests, CreatureRigTests. IK/skinning: FabrikSolverTests, LinearBlendSkinningTests. (MarchingCubesReferenceExtractor.cs is a helper oracle, not a test.) TOTAL ~59 test files / ~620 [Test], 0 [UnityTest]. Tests have grown past the 2026-09-03 snapshot (112 Edit / 443 Run).\n\nVALIDATION COMMANDS: NO CI pipeline exists (.github has no workflows - only agents/ \u002B skills/). Unity tests run through Unity Test Framework in the real editor via MCP run_tests/get_test_job async tools; there is NO powershell Unity test-runner. Compile/refresh before trusting results (see /memories/repo/unity-branch-switch-stale-assemblies). dotnet STATIC COMPILE CHECK works WITHOUT the editor running: root .csproj files (ProceduralCreature.Runtime.csproj, ProceduralCreature.Editor.csproj, ProceduralCreature.Tests.Runtime.csproj, ProceduralCreature.Tests.Editor.csproj, Assembly-CSharp.csproj, Assembly-CSharp-Editor.csproj) are Unity-generated and hard-reference the installed editor D:\\Program Files\\Unity\\6000.5.9f1\\Editor\\Data\\Managed\\UnityEngine\\UnityEngine.dll (\u002B UnityEditor.dll). Command: dotnet build \u003Ccsproj\u003E --no-restore. Caveats: it is NOT a substitute for Unity execution and depends on that fixed install path. Also run git diff --check after edits.\n\nMEMORYSMITH OPS (CreatureCreator wiki): service = \u0022MemorySmith - CreatureCreator Wiki\u0022, HTTP port 7916 (fallback 4279); engine published from D:\\@Repos\\MemorySmith (MemorySmith.App.csproj) to artifacts/MemorySmith.App/. Scripts (Scripts/): Deploy-CreatureWiki.ps1 (publish\u002Binstall\u002Bstart, admin; -NoBuild reinstall), Bootstrap-CreatureWikiEngine.ps1 (publish only), Stop/Get/Uninstall-CreatureWikiService.ps1, Test-TaskRecords.ps1 (validate Data/Tasks/*.json contract), Normalize-TaskRecords.ps1, Import-OpenTasksFromWorkbench.ps1, Import-CreatureTasksToMemorySmith.ps1 (creates TSK-#### via memorysmith_task_create, state in .service/memorysmith-import-state.json, auth cookie from $env:MEMORYSMITH_AUTH_COOKIE). Data/ layout: Memories/ (Core, Working, Unconsolidated, Deprecated), Pages/ (workbench/tasks.md \u002B empty assets/), Tasks/ (tsk-####-slug.json), Models/ (ONNX embedding - MISSING, so semantic provider unavailable -\u003E lexical-only search), vars.json (empty), Events/, Graph/, Keys/ (runtime). MCP server exposed as mcp_memorysmithwi_memorysmith_*.\n\nMEMORYSMITH RECORD CONTRACT (for authored memories): record = one JSON file \u003CId\u003E.json in the folder matching its Status. FileMemoryStore loads all *.json under Data/Memories recursively; corrupt files skipped. Fields: Id, Content, Title, Status (int 0 Unconsolidated / 1 Working / 2 Core / 3 Deprecated), Confidence (double), Tags[], References[], Conflicts[], Relationships[], SourceLinks[] (Label, Uri, optional StartLine/EndLine; Uri may contain %Variable% tokens), UsageCount, LastUpdated (ISO). MCP memory_create requires Agent auto_accept approval mode (disabled in this environment) - author record files directly as the fallback, matching this schema exactly. Memory state machine thresholds (MemoryStateMachine): Unconsolidated-\u003EWorking score\u003E=0.81; Working-\u003ECore \u003E=1.62; Core-\u003EWorking demotion \u003C1.62; Working-\u003EDeprecated \u003C0.16; Unconsolidated never deprecates directly. Core = authoritative current knowledge agents should prefer. Data/Memories = durable current-state facts/rules; Data/Pages = longer notes/design/roadmaps (future plans belong in pages, not memories).\n\nADR INVENTORY (docs/adr/): ADR-001 limbchain schema \u002B CreaturePart as semantic container (CC-018); ADR-002 composable geometry \u002B GeneratedCreature output (CC-031); ADR-003 material palette/submaterial resolution AND ADR-003 rest-space geometry binding (two ADR-003 files); ADR-004 per-shape parameters/legacy migration AND ADR-004 position-only pose rotation (two ADR-004 files); ADR-005 runtime rig hierarchy \u002B pose application; ADR-006 shared generation configuration; ADR-007 resolved morphology model (CC-056A/056B); ADR-008 MemorySmith task \u002B memory adoption. (ADR-003/004 numbering is duplicated/inconsistent across files.)",
+  "Title": "CreatureCreator Test Surface, Validation Commands, ADRs, MemorySmith Ops",
+  "Status": 1,
+  "Confidence": 0.9,
+  "Tags": [
+    "creaturecreator",
+    "tests",
+    "validation",
+    "ci",
+    "build",
+    "memorysmith",
+    "adr",
+    "ops",
+    "kind:fact",
+    "scope:onboarding"
+  ],
+  "References": [
+    "creaturecreator-architecture-and-invariants",
+    "creaturecreator-definition-model",
+    "creaturecreator-editor-preview"
+  ],
+  "Conflicts": [],
+  "Relationships": [
+    {
+      "sourceId": "creaturecreator-tests-ops-validation",
+      "targetId": "creaturecreator-architecture-and-invariants",
+      "relationType": 0,
+      "origin": 0,
+      "createdAtUtc": "2026-09-06T04:51:15.6992984+00:00"
+    },
+    {
+      "sourceId": "creaturecreator-tests-ops-validation",
+      "targetId": "creaturecreator-definition-model",
+      "relationType": 0,
+      "origin": 0,
+      "createdAtUtc": "2026-09-06T04:51:15.6992985+00:00"
+    },
+    {
+      "sourceId": "creaturecreator-tests-ops-validation",
+      "targetId": "creaturecreator-editor-preview",
+      "relationType": 0,
+      "origin": 0,
+      "createdAtUtc": "2026-09-06T04:51:15.6992985+00:00"
+    }
+  ],
+  "SourceLinks": [
+    {
+      "Label": "other:other:other:Runtime test asmdef",
+      "Uri": "Assets/Scripts/Tests/Runtime/ProceduralCreature.Tests.Runtime.asmdef",
+      "StartLine": null,
+      "EndLine": null
+    },
+    {
+      "Label": "other:other:other:Editor test asmdef",
+      "Uri": "Assets/Scripts/Tests/Editor/ProceduralCreature.Tests.Editor.asmdef",
+      "StartLine": null,
+      "EndLine": null
+    },
+    {
+      "Label": "other:other:other:Deploy-CreatureWiki.ps1",
+      "Uri": "Scripts/Deploy-CreatureWiki.ps1",
+      "StartLine": null,
+      "EndLine": null
+    }
+  ],
+  "UsageCount": 1,
+  "LastUpdated": "2026-09-06T04:56:05.3424277Z"
+}

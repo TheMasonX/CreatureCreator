@@ -1,0 +1,128 @@
+{
+  "Id": "creaturecreator-body-spline-frames",
+  "Content": "Finer slice over the Body SPLINE MODEL (BodySpline / BodySample / BodySurfaceAnchor), the derived BODY FRAMES (BodyFrameResolver / ResolvedBody), and the BODY VERTICAL-GRADIENT APPEARANCE model with its Unity seams (GradientAdapter / CurveAdapter). Supplements the coarse records creaturecreator-definition-model, creaturecreator-generation-morphology, creaturecreator-resolved-model-world-resolver, creaturecreator-editor-authoring-preview-details.\r\n\r\n(1) BODY SPLINE GEOMETRY-APPEARANCE SPLIT [C: source doc-comments \u002B SdfProgramBuilder \u002B BodyFrameResolver] BodySpline (Assets/Scripts/Runtime/Definition/BodySpline.cs) holds two fields: Samples (List\u003CBodySample\u003E, the geometry) and Appearance (BodyVerticalGradientAppearance). The two are kept as separate fields on the Body so the pure geometry consumers (BodyFrameResolver, the SDF compiler) never touch color data. SdfProgramBuilder consumes only ResolvedBody.SamplePositions \u002B SampleRadii (sphere primitives smooth-united along the chain); it never reads Appearance. BodySpline.Clone deep-clones both. The centerline is the authored sample polyline (v1); ResolvedBody makes explicit that authored samples ARE the centerline (a future smooth centerline is deferred to CC-055).\r\n\r\n(2) BODY SAMPLE FIELDS [C: source] BodySample is [Serializable], Id (uint), Position (Vector3), Radius (float), with a shallow-field Clone(). Position is in creature space (the Body is the root part; no parent transform to compose). Radius is the local body thickness. Samples carry no tangent/normal/color themselves; all orientation is derived.\r\n\r\n(3) SAMPLE ORDER IS THE SPLINE; ROOT/TERMINAL [C: source SdfProgramBuilder \u002B ResolvedBody] Sample list order, not sample Id, defines the spline (\u0022sample order IS the spline\u0022). ResolvedBody exposes SamplePositions[i], SampleIds[i], SampleRadii[i], SegmentLengths[i] (Samples[i]-\u003ESamples[i\u002B1]), TotalLength, and NormalizedArcLengthAtSample (0 at the first sample = root, 1 at the last = tip). RootSocket = SamplePositions[0]; TerminalSocket = last sample position. ResolvedBody.Resolve is pure and deterministic; it copies arrays so later spline mutation is invisible to the snapshot (never serialized, never written back into DNA; ADR-001/ADR-007). Resolve throws DomainException on null/empty/null-entry input (the validator rejects these first).\r\n\r\n(4) HEAD/TAIL VERSUS FORWARD ARE NOT STORED; THEY ARE INFERRED AT CONSUMPTION [C: BodyVerticalGradientSampler \u002B test TryGetBodySample_HeadIsForwardEnd] BodySpline does NOT store a head/tail or a forward direction. The body-length parameter t in 0..1 used by appearance is defined as: t = 0 is the HEAD = the spline end having the largest projection onto CreatureDefinition.Forward (the creature faces forward); t = 1 is the TAIL (the opposite end). The sampler projects the surface point onto the closest segment, accumulates arc length from sample 0, and then orients t by comparing Dot(lastSample, forward) vs Dot(firstSample, forward): headForward \u003E= tailForward ? t = 1 - arcFrac : t = arcFrac. Therefore, for a body authored along \u002BForward the head is the LAST stored sample and t runs backwards along stored index; the code is deliberately head-first-agnostic. Confirmed by test: a horizontal body at z=-1..\u002B1 with Forward=\u002BZ has near-head (z=\u002B0.9) t \u003C= 0.1 and near-tail (z=-0.9) t \u003E= 0.9.\r\n\r\n(5) BODY VERTICAL SAMPLE AXIS IS WORLD UP, NORMALIZED BY RADIUS [C: BodyVerticalGradientSampler \u002B tests] For a surface point the raw vertical sample v = (point.y - centerline.y) / localRadius, clamped to -1..\u002B1. World up (Y) is the camouflage-correct axis: -1 = bottom of the surface (world-down side, the underbelly), \u002B1 = top (world-up side). It is independent of the body\u0027s slope, so the top gradient reliably tints the highest side. Tests confirm a point at y=\u002B1 on a radius-1 horizontal tube yields v=\u002B1 and y=-1 yields v=-1.\r\n\r\n(6) VERTICAL-GRADIENT APPEARANCE MODEL (CC-025 \u002B CC-034) [C: source \u002B tests] BodyVerticalGradientAppearance (Assets/Scripts/Runtime/Definition/BodyVerticalGradientAppearance.cs) owns TopGradient and BottomGradient (each a UnityEngine.Gradient keyed over body-length t in 0..1) plus VerticalCurve (a UnityEngine.AnimationCurve). Evaluation (BodyVerticalGradientSampler.EvaluateColor): (a) project to length t and vertical v; (b) remap u = (v \u002B 1) * 0.5 from v in -1..1 to curve input u in 0..1; (c) blend = CurveAdapter.Evaluate(VerticalCurve, u) \u2014 the top/bottom blend factor (default linear y = x reproduces the pre-CC-034 offset-0 look); (d) color = Lerp(GradientAdapter.Evaluate(BottomGradient, t), GradientAdapter.Evaluate(TopGradient, t), blend). This is the camouflage model where underbellies are lighter. Default (CreateDefault) = flat gray on both gradients \u002B linear curve, preserving pre-gradient Body color behavior. The appearance owns no materials/meshes; it is authoritative DNA consumed by the appearance baker (BodyVerticalGradientSampler / vertex-color shader). Tests cover top/bottom/centerline and one-sample bodies.\r\n\r\n(7) GRADIENT ADAPTER SEAM (UnityEngine.Gradient) [C: source \u002B tests] GradientAdapter (Assets/Scripts/Runtime/Definition/GradientAdapter.cs) is the single seam bridging DNA\u0027s plain UnityEngine.Gradient to Unity internals; nothing else reaches into Gradient. Responsibilities: Evaluate (null -\u003E Color.white; delegates to Gradient.Evaluate(Mathf.Clamp01(t)) so authored Blend/Fixed/PerceptualBlend modes render exactly as Unity would \u2014 the future swap point for a Burst/compute baker); Solid(color) builds a two-coincident-key gradient (Unity stores \u003E= 2 keys); Clone; ContentEquals (mode \u002B ordered color/alpha key times\u002Bvalues); IsFinite and HasValidKeys (validation contracts for DefinitionValidator; lenient about the two-key minimum so the validator owns that report); Quantize (canonicalization for DefinitionCanonicalizer \u2014 quantizes each key time/color/alpha via GenerationTolerances.Quantize and stable-sorts keys by time for byte-stable JSON).\r\n\r\n(8) CURVE ADAPTER SEAM \u002B verticalOffset MIGRATION (CC-034) [C: source \u002B tests] CurveAdapter (Assets/Scripts/Runtime/Definition/CurveAdapter.cs) is the single seam bridging DNA\u0027s AnimationCurve to Unity. Evaluate (null -\u003E 0; delegates to AnimationCurve.Evaluate(Mathf.Clamp01)); Linear() (y = x default, every new Body appearance starts here); Clone; ContentEquals (time/value/inTangent/outTangent); IsFinite and HasValidKeys (validation: \u003E= 1 key, times in [0,1], finite values/tangents); Quantize (stable-sort keys by time, free tangents). Documented simplification: only time/value/inTangent/outTangent are canonical \u2014 weighted tangents and constant/infinite-tangent steps are not preserved (keys normalize to free Hermite via numeric tangents); wrap modes never affect evaluation because input is clamped to [0,1] and are not serialized. FromLegacyOffset(float offset in [-1,1]) migrates the pre-CC-034 verticalOffset into an EXACT (not approximate) piecewise-linear 3-key curve: blend(u) = (o\u002B1)*u for u\u003C=0.5, o\u002B(1-o)*u for u\u003E=0.5, with mid value 0.5\u002B0.5*o; offset 0 yields the linear default. Tests assert offset 0 -\u003E linear and that FromLegacyOffset(o) reproduces the offset remap exactly, plus JSON deserialization of a legacy CC-025 file (verticalOffset 0.5 -\u003E curve evaluate 0.375 at u=0.25).\r\n\r\n(9) BODY SURFACE ANCHOR \u002B SegmentStartSampleId [C: source \u002B validator \u002B authoring tests] BodySurfaceAnchor (same file as BodySpline) is [Serializable] with SegmentStartSampleId (uint), SegmentT (float 0..1 within that segment), RadialAngle (float), SurfaceOffset (float), Roll (float), and Clone(). Anchors are expressed in SAMPLE-ID space: SegmentStartSampleId names the start sample of the segment. Because the editor\u0027s single mutation path renumbers samples to canonical 1..N, projection must occur against a clone renumbered 1..N so produced anchors stay valid (BodyPlacementAuthoring \u002B tests \u0022canonical 1..N ID space\u0022; CC-007 review fix). The validator cross-checks that a part referencing a Body sample points at a real sample and that IDs increase with spline order.\r\n\r\n(10) BODY FRAME RESOLVER (CC-056A/CC006-02) [C: source \u002B BodyFrameResolverTests] BodyFrameResolver (Assets/Scripts/Runtime/Definition/BodyFrameResolver.cs) is pure math over the authoritative BodySpline/ResolvedBody; no UnityEditor API, no scene objects, deterministic and unit-testable. BodyFrame struct = Position, Tangent (unit forward along spine), Normal, Binormal (= Cross(Tangent,Normal), right-handed), Radius (local thickness). Tangent is the forward/along-spine heading; local \u002BZ maps to Tangent, local \u002BY to Normal (LookRotation convention). Construction pipeline: per-sample tangent (endpoint handling) -\u003E initial frame seeded by Forward projected onto the tangent plane -\u003E parallel transport (minimal rotation, no roll accumulation) -\u003E per-frame re-orthonormalization. TangentAt: interior samples use central difference P[i\u002B1]-P[i-1]; endpoints use the single adjacent segment; coincident samples scan outward for the nearest valid segment, then fall back to Forward, then a deterministic axis. TransportRotation: parallel tangents -\u003E identity; antiparallel -\u003E 180 deg about DeterministicPerpendicular (smallest-magnitude coordinate-axis cross, deterministic); otherwise AngleAxis(acos(dot), normalized cross). API: ResolveSampleFrame(index), ResolveFrame(t in sample units 0..count-1, Lerp position/radius \u002B Slerp orientation), ResolveSegmentFrame(segmentIndex, segmentT 0..1 -\u003E ResolveFrame(segmentIndex \u002B Clamp01(segmentT))), ComputeSampleFrames (full chain; consumers needing many frames call once). Degenerate input (empty, single, coincident, tangent parallel to all reference axes) resolves to a deterministic fallback BodyFrame.Default instead of NaN/zero. Tests assert orthonormality, right-handedness, in-plane-bend keeps Normal near \u002BY (no roll), interior-vs-endpoint tangents, deterministic fallback for coincident samples, segment interpolation of position/radius, clamping of out-of-range SegmentT, determinism, and Forward-seeded initial normal.\r\n\r\n(11) BODY FRAME CONSUMERS [C: source usages] The doc contract lists SDF generation, skeleton inference, editor placement, and attachment projection. Confirmed concrete callers in current code: BodySurfaceProjector (ResolveSegmentFrame to compute the centerline SurfaceFrame for part attachment projection) and SkeletonInferrer (ComputeSampleFrames). CreaturePartWorldTransformResolver.ResolveBodyChildSurfaceFrame builds a part placement Matrix4x4 from projection.SurfaceFrame.Tangent/Normal/Position, matching BodyFrameResolver\u0027s local \u002BZ-\u003ETangent / \u002BY-\u003ENormal convention (CC-056B). The SDF body field does NOT consume BodyFrame directly \u2014 it unions spheres at ResolvedBody sample positions/radii; BodyFrame-orientation enters SDF only indirectly through the resolved part placement matrices (PartFrameToCreatureSpace).\r\n\r\n(12) EVEN-SPACING \u002B RENUMBER AUTHORING INVARIANT (canonical 1..N) [C: source \u002B tests] DefinitionValidator requires even spacing: it reports ValidationCode.UnevenBodySpacing when any consecutive chord distance (Vector3.Distance between sample positions) deviates from the mean by more than GenerationTolerances.BodySpacingTolerance; it also enforces unique Ids, Ids increasing with spline order, finite positions, positive radius, and a max sample count. Validator reports and never repairs. The authoring-side repair lives in the EDITOR assembly: BodySplineAuthoring (Assets/Scripts/Editor/BodySplineAuthoring.cs) is pure (no UnityEditor API; EditMode-testable in Assets/Scripts/Tests/Editor/BodySplineAuthoringTests.cs). SpaceEvenly re-snaps every sample to EVEN CHORD spacing along the current polyline preserving endpoints, sample order, and radii (equal-chord resampling, not equal-arc, matching the validator\u0027s chord measure); \u003C 3 samples left unchanged (1-2 are trivially even/valid). AppendSample extends the tail at the current average segment length (body grows longer, existing shape unchanged), PrependSample inserts a new head sample at index 0, both copying the adjacent sample\u0027s radius, and RenumberSamplesInOrder(spline) rewrites every sample Id to index\u002B1 (canonical 1..N) after every mutation. The editor runs all of these on a clone inside MutateDefinition so every change flows through validation, Undo, and the session boundary; after CC-016 viewport drags commit via BodyEditSolver and, if they leave the spline uneven, SpaceEvenly repairs so the committed definition stays valid for preview and save. Tests confirm append/prepend/reorder, RenumberSamplesInOrder restores sequential 1..N after removal, and SpaceEvenly preserves endpoints/radii/order while producing even spacing on a bent polyline.",
+  "Title": "CreatureCreator Body Spline Model, Body Samples, Surface Anchors, Body Frames, and Body Vertical-Gradient Appearance",
+  "Status": 1,
+  "Confidence": 0.9,
+  "Tags": [
+    "kind:fact",
+    "scope:onboarding",
+    "body-spline",
+    "body-samples",
+    "body-surface-anchor",
+    "body-frames",
+    "body-frame-resolver",
+    "resolved-body",
+    "body-vertical-gradient",
+    "vertical-gradient-appearance",
+    "gradient-adapter",
+    "curve-adapter",
+    "verticaloffset-migration",
+    "parallel-transport",
+    "even-spacing",
+    "sample-renumber",
+    "cc-025",
+    "cc-034",
+    "cc-056a",
+    "cc-056b",
+    "definition",
+    "morphology",
+    "appearance"
+  ],
+  "References": [
+    "creaturecreator-definition-model",
+    "creaturecreator-generation-morphology",
+    "creaturecreator-resolved-model-world-resolver",
+    "creaturecreator-editor-authoring-preview-details"
+  ],
+  "Conflicts": [],
+  "Relationships": [],
+  "SourceLinks": [
+    {
+      "Label": "BodySpline.cs (BodySpline/BodySample/BodySurfaceAnchor \u002B geometry-appearance split)",
+      "Uri": "Assets/Scripts/Runtime/Definition/BodySpline.cs",
+      "StartLine": null,
+      "EndLine": null
+    },
+    {
+      "Label": "BodyVerticalGradientAppearance.cs (top/bottom gradients over length \u002B vertical curve remap)",
+      "Uri": "Assets/Scripts/Runtime/Definition/BodyVerticalGradientAppearance.cs",
+      "StartLine": null,
+      "EndLine": null
+    },
+    {
+      "Label": "GradientAdapter.cs (UnityEngine.Gradient seam: evaluate/solid/clone/equals/finite/valid/quantize)",
+      "Uri": "Assets/Scripts/Runtime/Definition/GradientAdapter.cs",
+      "StartLine": null,
+      "EndLine": null
+    },
+    {
+      "Label": "CurveAdapter.cs (AnimationCurve seam \u002B FromLegacyOffset migration)",
+      "Uri": "Assets/Scripts/Runtime/Definition/CurveAdapter.cs",
+      "StartLine": null,
+      "EndLine": null
+    },
+    {
+      "Label": "BodyFrameResolver.cs (BodyFrame struct \u002B parallel-transport frame math, CC-056A/CC006-02)",
+      "Uri": "Assets/Scripts/Runtime/Definition/BodyFrameResolver.cs",
+      "StartLine": null,
+      "EndLine": null
+    },
+    {
+      "Label": "DefinitionValidator.cs (even spacing / ids / radius / sample-count validation, UnevenBodySpacing)",
+      "Uri": "Assets/Scripts/Runtime/Definition/DefinitionValidator.cs",
+      "StartLine": null,
+      "EndLine": null
+    },
+    {
+      "Label": "ResolvedBody.cs (derived immutable centerline metrics, normalized arc length, root/terminal)",
+      "Uri": "Assets/Scripts/Runtime/Morphology/ResolvedBody.cs",
+      "StartLine": null,
+      "EndLine": null
+    },
+    {
+      "Label": "BodyVerticalGradientSampler.cs (head/tail vs Forward, world-up vertical sample, u=(v\u002B1)*0.5, top/bottom blend)",
+      "Uri": "Assets/Scripts/Runtime/Appearance/BodyVerticalGradientSampler.cs",
+      "StartLine": null,
+      "EndLine": null
+    },
+    {
+      "Label": "BodySurfaceProjector.cs (frame consumer for attachment projection)",
+      "Uri": "Assets/Scripts/Runtime/Morphology/BodySurfaceProjector.cs",
+      "StartLine": null,
+      "EndLine": null
+    },
+    {
+      "Label": "SkeletonInferrer.cs (frame consumer via ComputeSampleFrames)",
+      "Uri": "Assets/Scripts/Runtime/Skeleton/SkeletonInferrer.cs",
+      "StartLine": null,
+      "EndLine": null
+    },
+    {
+      "Label": "BodySplineAuthoring.cs (EDITOR pure authoring: SpaceEvenly, Append/Prepend, RenumberSamplesInOrder, canonical 1..N)",
+      "Uri": "Assets/Scripts/Editor/BodySplineAuthoring.cs",
+      "StartLine": null,
+      "EndLine": null
+    },
+    {
+      "Label": "Tests Runtime BodyFrameResolverTests.cs (orthonormality, transport, degenerate fallback, determinism)",
+      "Uri": "Assets/Scripts/Tests/Runtime/BodyFrameResolverTests.cs",
+      "StartLine": null,
+      "EndLine": null
+    },
+    {
+      "Label": "Tests Runtime BodyVerticalGradientAppearanceTests.cs (head=forward, world-up vertical, migration, evaluate)",
+      "Uri": "Assets/Scripts/Tests/Runtime/BodyVerticalGradientAppearanceTests.cs",
+      "StartLine": null,
+      "EndLine": null
+    },
+    {
+      "Label": "Tests Editor BodySplineAuthoringTests.cs (even spacing \u002B renumber invariants)",
+      "Uri": "Assets/Scripts/Tests/Editor/BodySplineAuthoringTests.cs",
+      "StartLine": null,
+      "EndLine": null
+    }
+  ],
+  "UsageCount": 0,
+  "LastUpdated": "2026-09-06T04:56:05.2926223Z"
+}
