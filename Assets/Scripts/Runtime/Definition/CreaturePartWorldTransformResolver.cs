@@ -101,6 +101,16 @@ namespace ProceduralCreature.Definition
 
         public readonly bool HasBody;
         public readonly ResolvedBody Body;
+
+        /// <summary>
+        /// One body frame per body sample (tangent/normal/binormal via parallel
+        /// transport), exposing the derived SPINE NORMAL — the dorsal/ventral +Y
+        /// axis the editor gizmo and skeleton share — to any consumer that needs
+        /// the body's own orientation. The Body vertical-gradient sampler reads
+        /// the top/bottom axis from here. Empty when the creature has no Body.
+        /// </summary>
+        public readonly BodyFrame[] BodyFrames;
+
         public readonly BodyVerticalGradientAppearance BodyAppearance;
         public readonly Vector3 Forward;
         public BoundsDefinition Bounds { get; }
@@ -109,7 +119,7 @@ namespace ProceduralCreature.Definition
         public string RevisionId { get; }
         public IReadOnlyDictionary<string, ResolvedPartSnapshot> PartsById => partsById;
 
-        private ResolvedCreatureSnapshot(bool hasBody, ResolvedBody body,
+        private ResolvedCreatureSnapshot(bool hasBody, ResolvedBody body, BodyFrame[] bodyFrames,
             BodyVerticalGradientAppearance bodyAppearance, Vector3 forward,
             BoundsDefinition bounds, GenerationSettings generation, SymmetryMode symmetryMode,
             IReadOnlyDictionary<string, ResolvedPartSnapshot> partsById,
@@ -117,6 +127,7 @@ namespace ProceduralCreature.Definition
         {
             HasBody = hasBody;
             Body = body;
+            BodyFrames = bodyFrames;
             BodyAppearance = bodyAppearance;
             Forward = forward;
             Bounds = bounds;
@@ -145,6 +156,14 @@ namespace ProceduralCreature.Definition
                 && canonical.Body.Samples.Count > 0;
             ResolvedBody body = default;
             if (hasBody) body = ResolvedBody.Resolve(canonical.Body);
+
+            // Derive the per-sample body frames (spine normals) once so every
+            // consumer — the appearance baker's vertical gradient, skeleton, and
+            // future orientation needs — shares the same transported frame chain
+            // instead of each re-deriving it.
+            BodyFrame[] bodyFrames = hasBody
+                ? BodyFrameResolver.ComputeSampleFrames(body, canonical.Forward)
+                : new BodyFrame[0];
 
             var resolvedParts = new Dictionary<string, ResolvedPartSnapshot>(
                 StringComparer.Ordinal);
@@ -180,6 +199,7 @@ namespace ProceduralCreature.Definition
             return new ResolvedCreatureSnapshot(
                 hasBody,
                 body,
+                bodyFrames,
                 canonical.Body?.Appearance?.Clone(),
                 canonical.Forward,
                 canonical.Bounds,

@@ -1,0 +1,43 @@
+﻿{
+  "id": "tsk-0127-body-vertical-gradient-derive-top-bottom-from-spine-normal-no-world-up-fallback",
+  "key": "TSK-0127",
+  "title": "Body vertical gradient: derive top/bottom from spine-normal (no world-up fallback)",
+  "description": "## Summary\nThe Body vertical-gradient appearance computes its top/bottom (dorsal/ventral) blend from a hard-coded WORLD \u002BY axis in \u0060BodyVerticalGradientSampler.TryGetBodySample\u0060 (\u0060verticalRaw = (position.y - centerline.y) / radius\u0060). For the \u0060dinus_uprightus\u0060 creature the gradient does not follow the spine\u0027s perpendicular normal axis; it is simply the Y axis. Fix: derive the top/bottom axis from the body frame spine-normal (seeded from \u0060Forward\u0060, the same axis the editor scale/gizmo and skeleton use), and expose that derived feature for future consumers.\n\n## User Mandate\n\u003E \u0022It needs to allow for defining a \u0027back\u0027 (the top) and a \u0027belly\u0027 (the bottom).\u0022\n\n\u003E \u0022Option B, it should be fully derived. I always intended the spine-normal method, so this is the ONLY implementation, no legacy world up fallback. Back and belly are not the specific terms. Top/bottom are correct, but given a gradient and the proper axis alignment, that is the type of creature this could create that has a lighter belly and darker back like real creatures. The back is seeded from forward, or possibly whatever this scale gizmo uses. The SpineNormal is a derived feature, but is a useful one that should probably be exposed on the creature for other future consumers\u0022\n\nSTRICT. Binding constraints (must not be relaxed/re-scoped without user confirmation):\n- Spine-normal is the ONLY implementation; there is NO legacy world-up fallback in the vertical gradient.\n- The gradient axis is FULLY DERIVED (Option B) \u2014 no authored back/belly vector in DNA.\n- Top/bottom are the correct terms (not back/belly): top gradient = the dorsal/darker side, bottom = the ventral/lighter-belly side, like real creatures.\n- The reference used to seed the derived axis is the creature \u0060Forward\u0060 \u2014 equivalently the same body-frame \u002BY axis the editor scale/gizmo and skeleton already use (\u0060BodyFrame.Normal\u0060).\n- The derived SpineNormal should be exposed on the creature for other future consumers.\n\n## Scope\n- \u0060Assets/Scripts/Runtime/Appearance/BodyVerticalGradientSampler.cs\u0060: replace world-Y vertical sample with the spine-normal projection.\n- \u0060Assets/Scripts/Runtime/Definition/CreaturePartWorldTransformResolver.cs\u0060 (\u0060ResolvedCreatureSnapshot\u0060): expose precomputed per-sample BodyFrames (spine normal) as a derived feature.\n- Thread precomputed frames into the bake call sites (\u0060AppearanceBaker\u0060, \u0060PartAppearanceSampler\u0060) so the per-vertex gradient does not re-transport frames.\n- Update/add tests in \u0060Assets/Scripts/Tests/Runtime/BodyVerticalGradientAppearanceTests.cs\u0060.\n- No DNA schema / serialization / canonicalizer / validator change (Option B = no new authored field).\n\n## Acceptance Criteria\n- \u0060verticalSample\u0060 (\u002B1 top gradient, -1 bottom) is computed from the body-frame spine-normal at the point, not world Y.\n- No authored DNA field added.\n- Per-sample body frames (spine normals) are exposed on \u0060ResolvedCreatureSnapshot\u0060.\n- The gradient bake reuses precomputed frames (no per-vertex O(n) frame transport).\n- Horizontal-body gradient tests still pass; the sloped-body test is updated to spine-normal semantics; a curved/upright-spine test proves top/bottom follows the frame normal where it differs from world Y.\n- Deterministic; Runtime code stays scene/editor-API free.\n\n## Validation\nCompile runtime \u002B test assemblies; run the focused \u0060BodyVerticalGradientAppearanceTests\u0060; then the broader Runtime suite in Unity when available. Record results here.\n\n## Findings\n(implementation evidence added as comments)\n\n## Blockers\nUnity availability for the full Runtime/PlayMode suite is to be confirmed at validation time.\n\n## Next Step\nImplement across sampler, snapshot exposure, bake call sites, and tests.",
+  "type": "Feature",
+  "status": "Done",
+  "priority": "High",
+  "assigneeMode": "Custom",
+  "assigneeDirectoryId": null,
+  "assigneeCustomText": "Agent",
+  "reporter": "anonymous",
+  "labels": [
+    "user-mandated",
+    "appearance",
+    "body-vertical-gradient",
+    "spine-normal",
+    "derived-frame",
+    "runtime"
+  ],
+  "attachments": [],
+  "externalLinks": [],
+  "linkedPages": [],
+  "comments": [
+    {
+      "id": "c-84c03008727c4b76b4c8904da7c965ce",
+      "author": "anonymous",
+      "body": "Implementation complete (Option B, spine-normal only, no world-up fallback).\n\nFiles changed (uncommitted):\n- \u0060Assets/Scripts/Runtime/Appearance/BodyVerticalGradientSampler.cs\u0060: vertical sample is now \u0060Dot(position - centerline, spineNormal)/radius\u0060 where spineNormal is the body-frame Normal (Forward-seeded, parallel-transported), spherically interpolated per segment. Added a frames-aware \u0060TryGetBodySample\u0060/\u0060EvaluateColor\u0060 for the bake so frames are transported once, not per vertex. No authored axis; no world-up gradient branch.\n- \u0060Assets/Scripts/Runtime/Definition/CreaturePartWorldTransformResolver.cs\u0060 (\u0060ResolvedCreatureSnapshot\u0060): exposes derived \u0060BodyFrame[] BodyFrames\u0060 (one per sample) as the shared spine-normal feature for future consumers; computed once in \u0060Resolve\u0060.\n- \u0060Assets/Scripts/Runtime/Appearance/AppearanceBaker.cs\u0060 \u002B \u0060PartAppearanceSampler.cs\u0060: bake reuses \u0060snapshot.BodyFrames\u0060 (or derives once) per bake.\n- \u0060Assets/Scripts/Tests/Runtime/BodyVerticalGradientAppearanceTests.cs\u0060: replaced the world-up sloped-body test with \u0060EvaluateColor_UprightSpine_TopFollowsForwardSeededNormal_NotWorldY\u0060 (discriminates vs world Y on an upright spine) and added \u0060Snapshot_ExposesBodyFrames_SpineNormalsUnitAndPerpendicularToTangents\u0060.\n\nNo DNA schema / serialization / canonicalizer / validator change (Option B).\n\nValidation evidence:\n- \u0060dotnet build ProceduralCreature.Runtime.csproj --no-restore\u0060 -\u003E 0 warnings/0 errors.\n- \u0060dotnet build ProceduralCreature.Tests.Runtime.csproj --no-restore\u0060 -\u003E 0 warnings/0 errors.\n- PlayMode \u0060ProceduralCreature.Tests.Runtime\u0060 in Unity: 520/520 passed, 0 failed, 0 skipped (4.25s), job 6187bb6200b64a4e95d28923c861ff9a.\n- \u0060git diff --check\u0060 clean.\n\nResidual risk: behavior change for any creature whose body is not level (top/bottom now follows the creature\u0027s own dorsal line rather than world height) \u2014 this is the intended mandate. Not committed (commit not requested).",
+      "createdAtUtc": "2026-09-06T16:59:26.0789328Z"
+    }
+  ],
+  "epicId": null,
+  "parentId": null,
+  "dueDateUtc": null,
+  "createdAtUtc": "2026-09-06T16:53:23.1247688Z",
+  "updatedAtUtc": "2026-09-06T16:59:30.5692667Z",
+  "completedAtUtc": "2026-09-06T16:59:30.5692667Z",
+  "revision": 3,
+  "isArchived": false,
+  "hasLoadError": false,
+  "loadError": null,
+  "sourceFilePath": "tsk-0127-body-vertical-gradient-derive-top-bottom-from-spine-normal-no-world-up-fallback.json"
+}

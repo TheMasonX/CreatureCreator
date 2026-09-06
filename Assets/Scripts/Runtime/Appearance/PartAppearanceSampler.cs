@@ -98,6 +98,7 @@ namespace ProceduralCreature.Appearance
             private PartBounds[] _partBounds;
             private SdfProgram _bodyProgram;
             private readonly ResolvedBody _body;
+            private readonly BodyFrame[] _bodyFrames;
             private readonly BodyVerticalGradientAppearance _bodyAppearance;
             private readonly Vector3 _forward;
             private readonly AppearanceDefinition[] _partAppearances;
@@ -135,6 +136,9 @@ namespace ProceduralCreature.Appearance
                 _body = definition.Body != null && definition.Body.Samples != null
                     && definition.Body.Samples.Count > 0
                     ? ResolvedBody.Resolve(definition.Body) : default;
+                _bodyFrames = _body.SamplePositions != null && _body.SamplePositions.Count > 0
+                    ? BodyFrameResolver.ComputeSampleFrames(_body, _forward)
+                    : null;
                 _partAppearances = new AppearanceDefinition[_compiledParts.Count];
                 for (int i = 0; i < _compiledParts.Count; i++)
                 {
@@ -153,6 +157,7 @@ namespace ProceduralCreature.Appearance
                 _bodyAppearance = snapshot.BodyAppearance;
                 _forward = snapshot.Forward;
                 _body = snapshot.Body;
+                _bodyFrames = snapshot.BodyFrames;
                 _partAppearances = new AppearanceDefinition[_compiledParts.Count];
                 for (int i = 0; i < _compiledParts.Count; i++)
                 {
@@ -259,7 +264,7 @@ namespace ProceduralCreature.Appearance
                     && bodyAbsDistance <= nearestAbsDistance)
                 {
                     Color bodyColor = BodyVerticalGradientSampler.EvaluateColor(
-                        _bodyAppearance, _body, _forward, position);
+                        _bodyAppearance, _body, _forward, _bodyFrames, position);
                     return new ResolvedAppearance(bodyColor, 0, 1f);
                 }
 

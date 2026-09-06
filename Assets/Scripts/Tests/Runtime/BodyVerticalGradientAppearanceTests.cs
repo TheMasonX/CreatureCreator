@@ -459,25 +459,55 @@ namespace ProceduralCreature.Tests.Runtime
         }
 
         [Test]
-        public void EvaluateColor_SlopedBody_TopUsesTopGradient()
+        public void EvaluateColor_UprightSpine_TopFollowsForwardSeededNormal_NotWorldY()
         {
-            // A body that slopes upward toward +Z. Its frame Normal would point
-            // downward (the old vertical axis made the gradient flip), but the
-            // vertical sample uses WORLD up, so the highest side of the body must
-            // still take the top gradient.
+            // A spine running vertically along +Y with the creature facing +Z. Its
+            // derived spine normal is therefore +Z (the forward-seeded perpendicular),
+            // NOT world up (+Y). The top gradient must tint the +Z flank (the
+            // forward/dorsal side) and the bottom gradient the -Z flank, proving the
+            // axis is the spine normal rather than the fixed Y axis a world-up
+            // implementation would (incorrectly) use.
             var definition = CreatureDefinition.CreateEmpty();
-            definition.Forward = Vector3.forward;
-            definition.Body.Samples.Add(new BodySample { Id = 1, Position = new Vector3(0f, 0f, -1f), Radius = 0.5f });
-            definition.Body.Samples.Add(new BodySample { Id = 2, Position = new Vector3(0f, 0.3f, 0f), Radius = 0.5f });
-            definition.Body.Samples.Add(new BodySample { Id = 3, Position = new Vector3(0f, 0.6f, 1f), Radius = 0.5f });
+            definition.Forward = Vector3.forward; // +Z
+            definition.Body.Samples.Add(new BodySample { Id = 1, Position = new Vector3(0f, 0f, 0f), Radius = 0.5f });
+            definition.Body.Samples.Add(new BodySample { Id = 2, Position = new Vector3(0f, 1f, 0f), Radius = 0.5f });
+            definition.Body.Samples.Add(new BodySample { Id = 3, Position = new Vector3(0f, 2f, 0f), Radius = 0.5f });
             definition.Body.Appearance.TopGradient = GradientAdapter.Solid(Color.white);
             definition.Body.Appearance.BottomGradient = GradientAdapter.Solid(Color.black);
 
-            Color above = BodyVerticalGradientSampler.EvaluateColor(definition, new Vector3(0f, 0.8f, 0f));
-            Color below = BodyVerticalGradientSampler.EvaluateColor(definition, new Vector3(0f, -0.2f, 0f));
+            // Surface points on the +Z (top/back) and -Z (bottom/belly) flanks of
+            // the middle sample. Both share the SAME world Y (y = 1), so a world-up
+            // gradient could not tell them apart (it would gray both out).
+            Color forwardFlank = BodyVerticalGradientSampler.EvaluateColor(definition, new Vector3(0f, 1f, 0.5f));
+            Color rearFlank = BodyVerticalGradientSampler.EvaluateColor(definition, new Vector3(0f, 1f, -0.5f));
 
-            Assert.GreaterOrEqual(above.r, 0.8f, "The world-up side of the body must take the top gradient.");
-            Assert.LessOrEqual(below.r, 0.2f, "The world-down side of the body must take the bottom gradient.");
+            Assert.GreaterOrEqual(forwardFlank.r, 0.8f, "The +SpineNormal (top) flank must take the top gradient.");
+            Assert.LessOrEqual(rearFlank.r, 0.2f, "The -SpineNormal (bottom) flank must take the bottom gradient.");
+        }
+
+        [Test]
+        public void Snapshot_ExposesBodyFrames_SpineNormalsUnitAndPerpendicularToTangents()
+        {
+            // The derived spine normal (BodyFrames) is exposed on the creature
+            // snapshot for future consumers: one frame per body sample, whose
+            // Normal (spine normal / dorsal axis) is unit and perpendicular to the
+            // along-spine Tangent.
+            CreatureDefinition definition = HorizontalBodyDefinition();
+            ResolvedCreatureSnapshot snapshot = ResolvedCreatureSnapshot.Resolve(definition);
+
+            Assert.IsTrue(snapshot.HasBody);
+            Assert.IsNotNull(snapshot.BodyFrames);
+            Assert.AreEqual(definition.Body.Samples.Count, snapshot.BodyFrames.Length,
+                "One body frame per body sample is exposed on the snapshot.");
+
+            for (int i = 0; i < snapshot.BodyFrames.Length; i++)
+            {
+                Vector3 normal = snapshot.BodyFrames[i].Normal;
+                Vector3 tangent = snapshot.BodyFrames[i].Tangent;
+                Assert.AreEqual(1f, normal.magnitude, 1e-4f, $"sample {i}: the spine normal is unit.");
+                Assert.AreEqual(0f, Vector3.Dot(normal, tangent), 1e-4f,
+                    $"sample {i}: the spine normal is perpendicular to the spine tangent.");
+            }
         }
 
         [Test]

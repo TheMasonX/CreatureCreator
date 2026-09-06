@@ -23,16 +23,23 @@
   "attachments": [],
   "externalLinks": [],
   "linkedPages": [],
-  "comments": [],
+  "comments": [
+    {
+      "id": "c-93c9437383ae45c0b9b1341be132cc9a",
+      "author": "anonymous",
+      "body": "## Reconciliation \u2014 CCWIND triangle-winding/facing audit (2026-09-06, fixed point 4432319)\nAudit: \u0060docs/audits/creaturecreator-triangle-winding-facing-audit-26-09-06-11-22-00.md\u0060. Verified read-only against source; all claims below are Confirmed. This task remains the canonical owner for the orientation-gradient correctness and non-finite-crossing fixes. No net-new task is created (per audit \u00A75) to avoid fragmenting the extraction/culling contract.\n\n## User Mandate\n\u003E Review this audit and capture it in the task system after confirming. There is probably an existing task for this. Capture everything needed to fix it without hurting mesh gen speeds.\n\nSTRICT. The extraction/field-sampling speed already achieved (cached grid, Burst active-cell scan, region-aware sampling, cached-gradient winding) is authoritative and must be preserved. Any correctness fix must NOT reintroduce per-triangle SDF evaluations and must NOT materially regress FieldSampling / MeshExtraction / total preview time without a measured before/after benchmark gate. Fixes must derive orientation from data the extractor already holds.\n\n## Accepted scope (this owner)\n- **W-02 (P1, Confirmed):** \u0060MarchingCubesExtractor.EmitTriangle\u0060 treats a zero/invalid gradient as success: \u0060Dot(faceNormal, gradient) \u003E= 0\u0060 with a zero gradient gives dot == 0 and retains the contour resolver\u0027s arbitrary loop order. Change the orientation API to a validity-bearing result (e.g. \u0060TryEstimateGradient(..., out Vector3 gradient)\u0060); when the gradient is invalid or \u0060sqrMagnitude\u0060 is below a threshold, do NOT silently accept loop order \u2014 use a deterministic local fallback. Do not reintroduce six SDF evaluations per triangle.\n- **W-04 (P1/P2, Confirmed):** \u0060\u002Binf\u0060 (semantic absence/culled per CC-064) can be consumed as a real sign crossing. \u0060ActiveCellBuilder\u0060 classifies \u0060\u002Binf \u003E= 0\u0060 as outside, so a cell with one finite negative and one \u0060\u002Binf\u0060 corner is \u0022mixed\u0022; \u0060CubeContourResolver.InterpolateEdge\u0060 then clamps the crossing to the finite endpoint (t=0/1), fabricating a surface vertex where no valid zero crossing exists. Add a cell-boundary invariant: any cell that contributes a surface triangle must have sufficiently finite corner data for every crossing edge. Prefer expanding the culling halo by enough margin so potentially active cells retain finite corners; classify/clip culling at the cell level rather than per-corner absence; avoid a generic field-value abstraction.\n- **W-07 (P2, strongly plausible):** Smooth-union blend regions and the symmetry \u0060min(field, mirrored)\u0060 crease create legitimate weak-gradient zones that drive W-02. Add fixtures (overlapping smooth spheres through blend center, mirrored sphere intersecting X=0, mirrored limb, smooth-union\u002Bsymmetry) and track min gradient magnitude, near-zero-gradient count, fallback-oriented-triangle count, directed-edge failures, orientation failures \u2014 to separate bad geometry from weak orientation signal before changing the hot path.\n\n## Acceptance / validation gates\n- Fast evaluation parity across the W-04 cell-boundary matrix; no premature \u0060\u002Binf\u0060-as-crossing on culling boundaries; no fake \u0060\u002Binf\u0060 interpolation edges.\n- Orientation never silently accepts a zero/invalid gradient.\n- Deterministic output; no new mutable/generated-DNA path.\n- Benchmark gate (with TSK-0008): FieldSampling / MeshExtraction / TotalGeneration must not materially regress versus the current cached-grid baseline; record before/after stage timings in Unity before accepting any winding change.\n- Full Runtime PlayMode \u002B EditMode suites pass in Unity.\n\nPrimary owner for the extraction-time measurement and the nearest-corner\u2192cell-local derivative change is TSK-0008 (see its reconciliation comment). This task stays InProgress.",
+      "createdAtUtc": "2026-09-06T16:56:02.3344388Z"
+    }
+  ],
   "epicId": null,
   "parentId": null,
   "dueDateUtc": null,
   "createdAtUtc": "2026-09-06T04:11:55.9430719Z",
-  "updatedAtUtc": "2026-09-06T04:11:55.9430719Z",
+  "updatedAtUtc": "2026-09-06T16:56:02.3344388Z",
   "completedAtUtc": null,
-  "revision": 1,
+  "revision": 2,
   "isArchived": false,
   "hasLoadError": false,
   "loadError": null,
-  "sourceFilePath": null
+  "sourceFilePath": "tsk-0119-harden-fast-sdf-culling-and-non-finite-field-consumers.json"
 }
