@@ -2,6 +2,8 @@ using System.Collections.Generic;
 using NUnit.Framework;
 using UnityEngine;
 using ProceduralCreature.Editor;
+using ProceduralCreature.Common;
+using ProceduralCreature.Definition;
 
 namespace ProceduralCreature.Tests.Editor
 {
@@ -348,7 +350,141 @@ namespace ProceduralCreature.Tests.Editor
             Assert.That(endpoint.Positions, Is.Empty);
         }
 
+        // ---- TSK-0128 regression: local tail drag must not move the rest of the body -----
+
+        /// <summary>
+        /// The reported bug (TSK-0128): CommitBodyDrag repaired an uneven spline
+        /// with BodySplineAuthoring.SpaceEvenly, which re-spaces the WHOLE spline,
+        /// so a local tail drag moved every sample and the rest of the body "freaked
+        /// out". This simulates the commit path - write the local BodyEditSolver
+        /// output, then run the free-tail repair (SpaceFreeTailEvenly) - on a long
+        /// tail-to-head body (head = +Forward end, high index) and asserts distant
+        /// head/torso samples never move while the committed spline stays evenly
+        /// spaced.
+        /// </summary>
+        [Test]
+        public void TailSampleDrag_FreeTailRepair_LeavesDistantBodySamplesPut_AndSplineStaysEven()
+        {
+            Vector3[] snapshot = TailToHeadChain(28); // index i at z=i; head (high index) is +Forward
+            const int dragged = 2;                    // a low-index tail sample
+            Vector3 forward = new Vector3(0f, 0f, 1f);
+            Vector3 target = new Vector3(0f, 0.55f, 2f); // lateral bend on the tail sample
+
+            BodyEditResult solved = BodyEditSolver.SolveInteriorDrag(snapshot, dragged, target);
+            BodySpline spline = ToSpline(solved.Positions);
+
+            // Commit-time repair: what CommitBodyDrag now runs instead of the
+            // whole-spline SpaceEvenly.
+            BodySplineAuthoring.SpaceFreeTailEvenly(spline, forward, dragged);
+
+            Vector3[] committed = ToPositions(spline);
+
+            // The dragged (tail) sample did move - the edit actually happened.
+            Assert.That(Vector3.Distance(committed[dragged], snapshot[dragged]),
+                Is.GreaterThan(0.2f), "The dragged tail sample must move.");
+
+            // Distant head/torso samples must be unchanged - this is the regression
+            // that used to fail when the whole spline was re-spaced.
+            for (int i = 7; i < committed.Length; i++)
+            {
+                Assert.That(Vector3.Distance(committed[i], snapshot[i]),
+                    Is.LessThan(PositionTolerance),
+                    $"Distant head/torso sample {i} must not move on a tail drag.");
+            }
+
+            // The committed spline must stay evenly spaced (no UnevenBodySpacing),
+            // matching DefinitionValidator's even-chord tolerance.
+            Assert.That(MaxChordDeviationFromMean(committed),
+                Is.LessThanOrEqualTo(GenerationTolerances.BodySpacingTolerance),
+                "The committed spline must remain evenly spaced after a tail drag.");
+        }
+
+        /// <summary>
+        /// The free-tail repair must never touch the head/torso side: after the
+        /// solver writes its local output, the repair may only re-space the free tail
+        /// (from the tail tip through a fixed head-side anchor just beyond the solver's
+        /// reach), leaving every head/torso sample exactly as the solver wrote it.
+        /// </summary>
+        [Test]
+        public void FreeTailRepair_OnlyTouchesTheTailSide_HeadTorsoSamplesUnchanged()
+        {
+            Vector3[] snapshot = TailToHeadChain(28);
+            const int dragged = 2;
+            Vector3 forward = new Vector3(0f, 0f, 1f);
+            Vector3 target = new Vector3(0f, 0.55f, 2f);
+
+            BodyEditResult solved = BodyEditSolver.SolveInteriorDrag(snapshot, dragged, target);
+            BodySpline spline = ToSpline(solved.Positions);
+
+            // Repair is allowed to touch only the free-tail run [tail tip .. anchor].
+            const int margin = 4;
+            int hi = dragged + margin; // head is the high-index side here
+
+            BodySplineAuthoring.SpaceFreeTailEvenly(spline, forward, dragged);
+
+            Vector3[] committed = ToPositions(spline);
+            for (int i = hi + 1; i < committed.Length; i++)
+            {
+                Assert.That(Vector3.Distance(committed[i], solved.Positions[i]),
+                    Is.LessThan(PositionTolerance),
+                    $"Head/torso sample {i} is outside the free-tail run and must be left exactly as the solver wrote it.");
+            }
+        }
+
         // ---- helpers ----------------------------------------------------------------------
+
+        /// <summary>Tail (index 0) to head (index count-1) straight chain along +Z.</summary>
+        private static Vector3[] TailToHeadChain(int count)
+        {
+            var points = new Vector3[count];
+            for (int i = 0; i < count; i++) points[i] = new Vector3(0f, 0f, i * 1f);
+            return points;
+        }
+
+        private static BodySpline ToSpline(Vector3[] positions)
+        {
+            var spline = new BodySpline();
+            for (int i = 0; i < positions.Length; i++)
+            {
+                spline.Samples.Add(new BodySample { Id = (uint)i + 1u, Position = positions[i], Radius = 1f });
+            }
+            return spline;
+        }
+
+        private static Vector3[] ToPositions(BodySpline spline)
+        {
+            var positions = new Vector3[spline.Samples.Count];
+            for (int i = 0; i < spline.Samples.Count; i++)
+            {
+                positions[i] = spline.Samples[i].Position;
+            }
+            return positions;
+        }
+
+        /// <summary>
+        /// The validator's UnevenBodySpacing model: the max deviation of any
+        /// consecutive chord from the mean chord length. <=
+        /// GenerationTolerances.BodySpacingTolerance means the spline is even.
+        /// </summary>
+        private static float MaxChordDeviationFromMean(Vector3[] positions)
+        {
+            if (positions.Length < 2) return 0f;
+            var chords = new float[positions.Length - 1];
+            float sum = 0f;
+            for (int i = 0; i < chords.Length; i++)
+            {
+                chords[i] = Vector3.Distance(positions[i + 1], positions[i]);
+                sum += chords[i];
+            }
+            float mean = sum / chords.Length;
+            float maxDev = 0f;
+            foreach (float chord in chords)
+            {
+                float dev = Mathf.Abs(chord - mean);
+                if (dev > maxDev) maxDev = dev;
+            }
+            return maxDev;
+        }
 
         private static float SegmentLength(IReadOnlyList<Vector3> points, int a, int b)
         {

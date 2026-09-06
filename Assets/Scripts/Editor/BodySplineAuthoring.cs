@@ -46,6 +46,15 @@ namespace ProceduralCreature.Editor
         private const int ResampleBisectionIterations = 48;
 
         /// <summary>
+        /// Head-side margin (in samples) for the free-tail re-space of a committed
+        /// body drag (TSK-0128). BodyEditSolver touches at most the dragged sample
+        /// plus its +/-3 neighbors, so an anchor placed this many samples toward the
+        /// head is one beyond the solver's reach and is therefore bit-identical to
+        /// the snapshot and already even with the untouched head/torso beyond it.
+        /// </summary>
+        private const int DragJointMargin = 4;
+
+        /// <summary>
         /// Adds a sample at the tail of the spline, extending along the current
         /// tail direction at the current average segment length so even spacing
         /// is preserved and the existing body shape is unchanged (Spore-like:
@@ -217,6 +226,93 @@ namespace ProceduralCreature.Editor
             for (int i = 0; i < count; i++)
             {
                 spline.Samples[i].Position = result[i];
+            }
+        }
+
+        /// <summary>
+        /// Re-spaces ONLY the free-tail side of a committed body-sample drag
+        /// (TSK-0128), replacing the previous whole-spline <see cref="SpaceEvenly"/>
+        /// commit repair that re-spaced EVERY sample on a local tail drag and made
+        /// the rest of the body "freak out" (the reported bug).
+        ///
+        /// After BodyEditSolver writes its local output (it touches at most the
+        /// dragged sample plus its +/-3 neighbors), this re-snaps exactly the run
+        /// from the FREE TAIL TIP up to a fixed head-side anchor that sits just
+        /// beyond the solver's reach. The anchor and every sample head-ward of it
+        /// (the head/torso) are left untouched; only the free-tail run is re-spaced.
+        ///
+        /// To keep the committed spline evenly spaced against an UNMOVED head/torso
+        /// (whose chords are all the body spacing L0), the free tail is re-snapped to
+        /// chords of EXACTLY L0 by walking equal chords of length L0 from the fixed
+        /// anchor toward the tail tip, letting the dangling tail tip float to absorb
+        /// the local drag disturbance. (Re-spacing the tail to its own inflated arc
+        /// instead would leave chords longer than the body and still uneven.) This
+        /// yields equal chords everywhere, so the committed definition stays valid.
+        ///
+        /// HEAD/TAIL CONVENTION: the head is the spline endpoint whose samples have
+        /// the HIGHER dot with <paramref name="forward"/> (the tested appearance
+        /// convention - cf. BodyVerticalGradientSampler, whose test asserts
+        /// "head = +Forward end"); the free tail is the opposite end. The commit
+        /// path passes the definition's Forward.
+        ///
+        /// No-op for fewer than 3 samples, an out-of-range drag index, a free-tail
+        /// run with fewer than 2 samples, or when no untouched even chord is
+        /// available head-ward of the anchor to derive L0 from.
+        /// </summary>
+        public static void SpaceFreeTailEvenly(BodySpline spline, Vector3 forward, int draggedIndex)
+        {
+            if (spline == null || spline.Samples == null || spline.Samples.Count < 3) return;
+            int count = spline.Samples.Count;
+            if (draggedIndex < 0 || draggedIndex >= count) return;
+
+            // Head = endpoint with the higher Forward-dot; the free tail is the other.
+            bool headAtHighIndex =
+                Vector3.Dot(spline.Samples[count - 1].Position, forward)
+                >= Vector3.Dot(spline.Samples[0].Position, forward);
+            int tailTip = headAtHighIndex ? 0 : count - 1;
+            int towardHead = headAtHighIndex ? 1 : -1;
+
+            // The fixed head-side anchor sits beyond the solver's neighborhood, so it
+            // is untouched by the drag and already even with the head/torso beyond it.
+            int anchor = Mathf.Clamp(draggedIndex + towardHead * DragJointMargin, 0, count - 1);
+
+            // The free-tail run to re-space spans the tail tip through the anchor.
+            int lo = Mathf.Min(tailTip, anchor);
+            int hi = Mathf.Max(tailTip, anchor);
+            if (hi - lo < 2) return; // nothing free-tail to re-space
+
+            // L0 = the even chord length of the untouched body just head-ward of the
+            // anchor (the anchor and its head-side neighbor are both unmoved by the
+            // drag).
+            int bodyNeighbor = anchor + towardHead;
+            if (bodyNeighbor < 0 || bodyNeighbor >= count) return;
+            if (spline.Samples[bodyNeighbor] == null) return;
+            float l0 = Vector3.Distance(spline.Samples[anchor].Position, spline.Samples[bodyNeighbor].Position);
+            if (l0 <= MinSpacingSqr) return;
+
+            // Build the free-tail run in ascending index, then walk equal chords of
+            // length l0 from the anchor toward the tip so the anchor (region end on the
+            // head side) stays fixed and the dangling tip floats to absorb the drag.
+            var ascending = new Vector3[hi - lo + 1];
+            for (int i = lo; i <= hi; i++)
+            {
+                if (spline.Samples[i] == null) return;
+                ascending[i - lo] = spline.Samples[i].Position;
+            }
+
+            // Walk from the anchor end (fixed) toward the tip (floating). Reverse so the
+            // anchor is first, run WalkEvenChords at the fixed spacing l0, then map back.
+            var fromAnchor = new Vector3[ascending.Length];
+            for (int i = 0; i < ascending.Length; i++) fromAnchor[i] = ascending[ascending.Length - 1 - i];
+
+            float[] arc = ArcCoordinates(fromAnchor);
+            Vector3[] walked = WalkEvenChords(fromAnchor, arc, fromAnchor.Length, l0, out _, out _);
+
+            // Write the walked free tail back (reversing again so index order matches),
+            // leaving the anchor and everything head-ward of it untouched.
+            for (int i = 0; i < walked.Length; i++)
+            {
+                spline.Samples[hi - i].Position = walked[i];
             }
         }
 

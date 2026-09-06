@@ -2393,16 +2393,20 @@ namespace ProceduralCreature.Editor
                         targetSpline.Samples[j].Position = final.Positions[j];
                     }
 
-                    // Repair/normalize only after the edit, as needed (CC-016): the
-                    // solver preserves segment lengths softly, so the committed
-                    // spline may be uneven. SpaceEvenly rides the edited polyline
-                    // and re-snaps even chords, preserving the edited shape while
-                    // keeping the committed definition valid for preview and save.
-                    // (The future authored-controls / derived-evaluation-samples
-                    // split is a separate schema decision, not part of CC-016.)
+                    // Repair/normalize only after the edit, as needed (CC-016/TSK-0128):
+                    // the solver preserves segment lengths softly, so the committed
+                    // spline may be uneven. Previously this re-spaced the WHOLE spline
+                    // (SpaceEvenly), so a local tail drag re-spaced every sample and
+                    // made the rest of the body "freak out". SpaceFreeTailEvenly instead
+                    // re-spaces ONLY the free-tail side of the dragged sample at the
+                    // body's even chord spacing, leaving the head/torso samples
+                    // untouched, while still keeping the committed definition valid for
+                    // preview and save. (The future authored-controls /
+                    // derived-evaluation-samples split is a separate schema decision,
+                    // not part of CC-016.)
                     if (HasUnevenBodySpacing(definition))
                     {
-                        BodySplineAuthoring.SpaceEvenly(targetSpline);
+                        BodySplineAuthoring.SpaceFreeTailEvenly(targetSpline, definition.Forward, index);
                     }
                 });
 
