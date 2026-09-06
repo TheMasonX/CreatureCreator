@@ -49,7 +49,22 @@ namespace ProceduralCreature.Tests.Editor
             state.BeginRequest(1);
             state.BeginRequest(b);
 
-            Assert.IsTrue(state.IsCurrentRequest(b), "Latest request B is the current, accepted request.");
+            Assert.IsTrue(state.TryAcceptResult(b, "revision-b", "revision-b"),
+                "Latest request B with the current revision must be accepted.");
+            Assert.IsFalse(state.HasPendingRequest);
+        }
+
+        [Test]
+        public void ARequestedThenBRequested_ACompletesIsRejectedAndBRemainsCurrent()
+        {
+            // A requested -> B requested -> A completes: A is stale and B remains current.
+            var state = new CreaturePreviewRequestState();
+            long a = 1;
+            state.BeginRequest(2);
+
+            Assert.IsFalse(state.TryAcceptResult(a, "revision-a", "revision-b"));
+            Assert.IsTrue(state.HasPendingRequest);
+            Assert.AreEqual(2, state.CurrentRequestId);
         }
 
         [Test]
@@ -60,9 +75,7 @@ namespace ProceduralCreature.Tests.Editor
             state.BeginRequest(1);
             state.BeginRequest(2);
 
-            // The controller clears in-flight once the current request's result is
-            // delivered, so a late older completion is no longer current.
-            state.Clear();
+            Assert.IsTrue(state.TryAcceptResult(2, "revision-b", "revision-b"));
             Assert.IsFalse(state.HasPendingRequest);
             Assert.IsFalse(state.IsCurrentRequest(1), "Late older completion A must not be current.");
             Assert.IsFalse(state.IsCurrentRequest(2), "Already-delivered request B is no longer pending.");
@@ -83,6 +96,20 @@ namespace ProceduralCreature.Tests.Editor
 
             Assert.IsFalse(state.HasPendingRequest);
             Assert.IsFalse(state.IsCurrentRequest(a), "Cancelled request A must not be current after Clear.");
+        }
+
+        [Test]
+        public void InvalidOrStaleRevisionIsRejected()
+        {
+            var state = new CreaturePreviewRequestState();
+            state.BeginRequest(1);
+
+            Assert.IsFalse(state.TryAcceptResult(1, null, "revision"));
+            Assert.IsFalse(state.HasPendingRequest);
+
+            state.BeginRequest(2);
+            Assert.IsFalse(state.TryAcceptResult(2, "revision-a", "revision-b"));
+            Assert.IsFalse(state.HasPendingRequest);
         }
 
         [Test]

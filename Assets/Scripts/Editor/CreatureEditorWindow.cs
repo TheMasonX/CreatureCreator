@@ -3001,7 +3001,9 @@ namespace ProceduralCreature.Editor
         private void ProcessGenerationCompletions()
         {
             if (_previewController == null) return;
-            _previewController.ProcessCompletions(result =>
+            _previewController.ProcessCompletions(
+                () => ResolvedCreatureSnapshot.Resolve(_definition).RevisionId,
+                result =>
             {
                 if (!result.Succeeded)
                 {

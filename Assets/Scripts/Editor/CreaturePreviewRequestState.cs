@@ -60,6 +60,23 @@ namespace ProceduralCreature.Editor
         }
 
         /// <summary>
+        /// Accepts a completed generated result only when its request is current
+        /// and its snapshot revision still matches the current definition. A
+        /// current terminal result, including an invalid one, clears the pending
+        /// request; a superseded result leaves the newer request pending.
+        /// </summary>
+        public bool TryAcceptResult(long requestId, string resultRevisionId, string currentRevisionId)
+        {
+            if (!IsCurrentRequest(requestId)) return false;
+
+            bool accepted = !string.IsNullOrEmpty(resultRevisionId)
+                && !string.IsNullOrEmpty(currentRevisionId)
+                && resultRevisionId == currentRevisionId;
+            Clear();
+            return accepted;
+        }
+
+        /// <summary>
         /// Cancels/clears the current request: no completed result is current until
         /// a new <see cref="BeginRequest"/>. Used on teardown and exposed for the
         /// cancel scenario.

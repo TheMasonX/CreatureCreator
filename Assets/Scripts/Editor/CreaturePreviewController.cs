@@ -1,5 +1,6 @@
 using System;
 using System.Collections.Generic;
+using ProceduralCreature.Common;
 using ProceduralCreature.Definition;
 using ProceduralCreature.Generation;
 using UnityEngine;
@@ -39,18 +40,39 @@ namespace ProceduralCreature.Editor
             return requestId;
         }
 
-        public void ProcessCompletions(Action<CreatureGenerationResult> onCompleted)
+        public void ProcessCompletions(Func<string> currentRevisionResolver, Action<CreatureGenerationResult> onCompleted)
         {
+            if (currentRevisionResolver == null) throw new ArgumentNullException(nameof(currentRevisionResolver));
             if (onCompleted == null) throw new ArgumentNullException(nameof(onCompleted));
             if (_disposed) return;
 
             while (_scheduler.TryTakeCompleted(out CreatureGenerationResult result))
             {
-                // A7.1: only the current request's result is delivered. A result
-                // superseded by a newer request, or one that completes after the
-                // current request was cleared, is stale and discarded.
-                if (!_requestState.IsCurrentRequest(result.Sequence)) continue;
-                _requestState.Clear(); // the current request has completed; clear in-flight
+                // A7.2: only a current result whose generated snapshot still
+                // matches the live definition may replace the preview.
+                if (!result.Succeeded)
+                {
+                    bool isCurrent = _requestState.IsCurrentRequest(result.Sequence);
+                    if (isCurrent) _requestState.Clear();
+                    if (isCurrent) onCompleted(result);
+                    continue;
+                }
+
+                string currentRevisionId;
+                try
+                {
+                    currentRevisionId = currentRevisionResolver();
+                }
+                catch (DomainException)
+                {
+                    if (_requestState.IsCurrentRequest(result.Sequence)) _requestState.Clear();
+                    continue;
+                }
+
+                if (!_requestState.TryAcceptResult(
+                        result.Sequence,
+                        result.Data?.Snapshot?.RevisionId,
+                        currentRevisionId)) continue;
                 onCompleted(result);
             }
         }
