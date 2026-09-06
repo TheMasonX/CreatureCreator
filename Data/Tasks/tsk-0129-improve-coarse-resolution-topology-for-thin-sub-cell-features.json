@@ -1,0 +1,43 @@
+﻿{
+  "id": "tsk-0129-improve-coarse-resolution-topology-for-thin-sub-cell-features",
+  "key": "TSK-0129",
+  "title": "Improve coarse-resolution topology for thin sub-cell features",
+  "description": "## Summary\nAt coarse voxel resolutions (preview VPU ~5-10), thin authored parts whose cross-section is at or below the voxel cell size (e.g. a Finger capsule radius ~0.075 at cell 0.1-0.2) under-sample and produce missing triangles / broken / torn topology. This is independent of triangle winding (the W-02/W-03 fix on TSK-0119 is orthogonal) and independent of the skeleton terminal-node work owned by TSK-0048 (which explicitly does not claim an extraction/topology root cause). Reproduced by the user in the editor at Preview Mesh Quality 5-10 on thin fingers and other parts; disappears when the feature is thickened/lengthened or resolution is raised.\n\n## User Mandate\n\u003E \u0022But we still need to be more supportive of lower resolutions until we make generation faster. If your change is more towards correctness, then I think that\u0027s okay. But this is still an active area for making fixes\u0022\n\nSTRICT. Any coarse-resolution robustness change must (1) not materially regress preview generation speed (field sampling / active-cell construction / contour resolution / mesh extraction / total) versus the recorded production baseline \u2014 TSK-0008 owns the benchmark gate; (2) not reintroduce per-triangle SDF evaluations, global orientation traversals, or large hot-path per-triangle allocations; (3) preserve the authoritative CreatureDefinition boundary, deterministic output, watertightness, and symmetry behavior. The resolution-vs-speed tradeoff for the specific approach still needs explicit user direction before a large change is accepted.\n\n## Scope\n- Reproduce the coarse-VPU missing-triangle failure with a minimal fixture: a body/hand \u002B a thin sub-cell feature (e.g. capsule radius ~0.075) at VPU 5 and 10 (and one higher VPU as a control). Measure boundary/non-manifold edges and locate the torn region.\n- Determine the root cause class: uniform-grid under-sampling of sub-cell geometry (likely) vs. a targeted extraction bug. Confirm it is independent of winding by re-running the topology audit with the winding fix applied.\n- Evaluate cheap levers that reuse existing data (no new SDF eval): e.g. thin-feature-aware sampling guarantee, region-aware adaptive cell refinement near small parts, or a documented minimum resolution per feature. Benchmark each against the TSK-0008 baseline before accepting.\n- Add a regression fixture \u002B test asserting watertightness (0 boundary, 0 non-manifold) for a thin sub-cell feature at coarse VPU, and a directed-edge consistency check.\n\n## Acceptance Criteria\n- A minimal coarse-VPU thin-feature fixture reproduces the failure and is captured as a test.\n- Root cause is documented (uniform-grid under-sampling vs. extraction bug), with winding ruled in/out.\n- Any fix is benchmarked before/after and does not materially regress preview generation.\n- The thin-feature coarse-VPU fixture becomes watertight (0 boundary, 0 non-manifold) and deterministically stable.\n- Existing suites (Runtime PlayMode \u002B Editor EditMode) remain green.\n\n## Validation\n- Unity: run the minimal fixture at VPU 5/10 \u002B control; record triangle/boundary/non-manifold counts.\n- Full Runtime PlayMode and Editor EditMode suites.\n- dotnet build clean; git diff --check clean.\n- Benchmark before/after against the TSK-0008 baseline (VPU10 ~204ms, VPU16 ~626ms total; extraction-only VPU16 133.5ms as reference).\n\n## Findings\nNone yet \u2014 open item captured from user testing (2026-09-06).\n\n## Blockers\nResolution-vs-speed approach choice still needs user direction for any large (e.g. adaptive refinement) change. Cheap, well-scoped fixes can proceed under the TSK-0008 perf gate.\n\n## Next Step\nReproduce the coarse-VPU thin-feature failure with a minimal fixture and record the topology numbers; confirm independence from winding; then evaluate the cheapest lever against the benchmark baseline before any implementation.",
+  "type": "Task",
+  "status": "Ready",
+  "priority": "High",
+  "assigneeMode": "Custom",
+  "assigneeDirectoryId": null,
+  "assigneeCustomText": "Agent",
+  "reporter": "anonymous",
+  "labels": [
+    "runtime",
+    "extraction",
+    "topology",
+    "coarse-resolution",
+    "mesh-quality",
+    "user-mandated"
+  ],
+  "attachments": [],
+  "externalLinks": [],
+  "linkedPages": [],
+  "comments": [
+    {
+      "id": "c-a443ca40acc144ff8aba0cc348e02703",
+      "author": "anonymous",
+      "body": "ROUND 2 (BeastMaster) \u2014 bounded repro \u002B root-cause \u002B characterization fixture. No production code changed; test-only. No commit/push (orchestrator commits).\n\n## Measured topology (PlayMode, on main e88ba5d, winding fix e1b078a applied)\nMinimal body/hand \u002B thin-finger fixture (palm sphere r0.4 @ origin \u002B long thin finger capsule r0.075 h2.2 axis Y @ y0.45, blend 0.05; bounds 1/2.2/1):\n- VPU 5 (cell 0.2): tri=120 verts=90 boundary=8 nonManifold=0 totalEdge=184 -\u003E NOT watertight (TORN).\n- VPU 10 (cell 0.1): tri=672 boundary=0 -\u003E watertight.\n- VPU 16 control: tri=2072 boundary=0 -\u003E watertight.\nFree thin finger (r0.075, sub-cell) same bounds at VPU 10: tri=0 (feature DROPPED by under-sampling); VPU 32 control: tri=1504 watertight.\nCharacterization fixture is deterministic (repeat extraction equal).\n\n## Root-cause class \u002B winding\nUniform-grid under-sampling of sub-cell geometry (not a targeted extraction bug, not winding). Evidence: every torn result shows ONLY boundary edges (open holes) with 0 non-manifold edges; a winding inversion cannot open a boundary hole, and results reproduce on current main with W-02/W-03 (e1b078a) applied, so winding is orthogonal and ruled out. Coarse VPU either drops the thin feature (0 tris) or leaves an open boundary; raising resolution resolves it to watertight \u2014 resolution (sampling) dependent, not a geometry defect.\n\n## Changed files (test-only)\n- Assets/Scripts/Tests/Runtime/CoarseThinFeatureTopologyTests.cs (new; characterization gate, green today, documents current torn/dropped coarse-VPU behavior and points at TSK-0129; a robust-coarse fix must update it to watertight/present).\n- Assets/Scripts/Tests/Runtime/CoarseThinFeatureTopologyTests.cs.meta (Unity-generated).\n\n## Validation\n- dotnet build ProceduralCreature.Tests.Runtime.csproj --no-restore: Build succeeded, 0 warnings/0 errors, exit 0.\n- Unity PlayMode focused CoarseThinFeatureTopologyTests: 2/2 passed.\n- Unity PlayMode full ProceduralCreature.Tests.Runtime: 526/526 passed, 0 failed.\n- git diff --check: clean (exit 0).\n\n## No benchmark\nNo production lever added in this round (test-only fixture), so no before/after benchmark vs the TSK-0008 baseline is required per round scope.\n\n## Next step\nFix requires user direction on the resolution-vs-speed tradeoff (mandate \u002B blocker). Cheapest data-reuse levers to evaluate before any implementation: region-aware adaptive cell refinement near small parts, or documented minimum resolution per feature \u2014 each must be benchmarked vs TSK-0008 baseline (VPU10 ~204ms / VPU16 ~626ms total; extraction-only VPU16 133.5ms) before acceptance.",
+      "createdAtUtc": "2026-09-06T19:13:42.7516155Z"
+    }
+  ],
+  "epicId": null,
+  "parentId": "tsk-0008-profile-and-optimize-preview-generation-hotspots",
+  "dueDateUtc": null,
+  "createdAtUtc": "2026-09-06T18:25:33.7318716Z",
+  "updatedAtUtc": "2026-09-06T19:13:42.7516155Z",
+  "completedAtUtc": null,
+  "revision": 2,
+  "isArchived": false,
+  "hasLoadError": false,
+  "loadError": null,
+  "sourceFilePath": "tsk-0129-improve-coarse-resolution-topology-for-thin-sub-cell-features.json"
+}
