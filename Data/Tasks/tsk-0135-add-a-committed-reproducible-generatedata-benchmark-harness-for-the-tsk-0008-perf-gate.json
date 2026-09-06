@@ -1,0 +1,49 @@
+﻿{
+  "id": "tsk-0135-add-a-committed-reproducible-generatedata-benchmark-harness-for-the-tsk-0008-perf-gate",
+  "key": "TSK-0135",
+  "title": "Add a committed, reproducible GenerateData benchmark harness for the TSK-0008 perf gate",
+  "description": "## Summary\n\nThe TSK-0008 performance gate (parent) requires that coarse-resolution / extraction changes do not materially regress preview generation. Reproduced numbers exist in records (VPU10 total ~204ms; VPU16 total ~626ms median GC-clean; VPU16 extraction-only 133.5ms) but there is NO committed, reproducible benchmark harness in-repo that runs GenerateData at those VPUs and reports the per-stage timings on demand. Runtime already has timing instrumentation (GenerationDiagnostics per-stage timings, CreatureMeshGenerator.GenerateData, MarchingCubesExtractor stage stopwatches, editor timing report). This task adds a committed harness so the perf gate is actually verifiable in-repo and future perf-gated work (e.g. TSK-0129) can benchmark before/after.\n\n## Scope\n- Add a benchmark harness (Unity-runnable on demand) that, for one representative creature fixture at VPU 10 and VPU 16, runs CreatureMeshGenerator.GenerateData over N reps and reports per-stage timings (FieldSampling, MeshActiveCellConstruction, contour/extraction, total) with median \u002B allocation handling (GC-clean where possible).\n- Reuse existing instrumentation and the GenerationDiagnostics path. No production behavior change.\n- Record expected baselines from the TSK-0008 records but treat timing as environment-sensitive: assert a generous regression ceiling / ratio rather than a brittle hard ms cutoff, OR make the timing run opt-in (not part of the default green suite) to avoid flakiness. Keep the default Runtime PlayMode suite green and non-flaky.\n- Document the exact command/filter/menu item to run it and where to record results.\n- Add at least one before/after sanity fixture path so a future change can compare.\n\n## Acceptance Criteria\n- One committed harness reproduces GenerateData total \u002B sub-stage timings at VPU10/VPU16 on demand with recorded methodology (reps, median, GC handling).\n- Default Runtime PlayMode suite stays green and non-flaky (no timing test added to the always-run set unless it asserts only a very generous ceiling).\n- No production behavior change; deterministic extraction/topology unaffected.\n- README/validation note documents the run command and result location.\n\n## Validation\n- dotnet build Runtime \u002B Tests.Runtime clean.\n- Unity: run the harness; record VPU10/VPU16 total \u002B sub-stage numbers and methodology. Run the default Runtime PlayMode suite and confirm no new failures/regressions.\n- git diff --check clean.\n\n## Blockers\nNone.\n\n## Next Step\nDesign the harness to reuse GenerationDiagnostics \u002B CreatureMeshGenerator.GenerateData, choose fixture \u002B VPUs, implement as opt-in/lenient, validate, and document.",
+  "type": "Task",
+  "status": "Done",
+  "priority": "High",
+  "assigneeMode": "Custom",
+  "assigneeDirectoryId": null,
+  "assigneeCustomText": "Agent",
+  "reporter": "anonymous",
+  "labels": [
+    "runtime",
+    "generation",
+    "benchmark",
+    "performance",
+    "tsk0008-gate",
+    "test-infrastructure"
+  ],
+  "attachments": [],
+  "externalLinks": [],
+  "linkedPages": [],
+  "comments": [
+    {
+      "id": "c-3a8d64311dd941359aa82542315e9d9b",
+      "author": "anonymous",
+      "body": "ROUND 1 (BeastMaster) implementation evidence.\n\nAdded a committed, on-demand GenerateData benchmark harness (test-infra only; NO production change):\n- Assets/Scripts/Tests/Runtime/GenerateDataBenchmark.cs (\u002B Unity-generated .meta)\n- Assets/Scripts/README.md: concise note (how to run, result location, reference baselines).\n\nDesign decisions (see report):\n1) Opt-in, not in the default suite: the harness class has NO [Test]/[UnityTest] methods, so Unity never auto-discovers it and the always-run Runtime PlayMode suite is unchanged and cannot flake on timing. It is invoked explicitly (Unity MCP execute_code / editor call): GenerateDataBenchmark.Run() (default VPU 10\u002B16, 7 timed reps \u002B 1 warmup per VPU).\n2) Reuses the existing instrumentation: each rep calls CreatureMeshGenerator.GenerateData(definition, diagnostics) and reads GenerationDiagnostics per-stage timings (SdfCompile, FieldSampling, MeshExtraction, and sub-stages ActiveCellConstruction/ContourResolution) \u002B TotalTime. No timing asserts anywhere; no flake risk.\n3) Fixture: deterministic self-contained multi-part creature (torso body spline \u002B fused head/tail/4 legs/2 eyes spheres), built fresh per VPU via BuildFixture(voxelsPerUnit); watertight at both VPUs. Follows the committed CC-091 body-spline \u002B spherical-decoration authoring pattern (no limb-chain machinery), so it is robustly valid. No existing committed dino-like fixture exists in tests to reuse (the authored dino JSON is a concurrent uncommitted workstream file, intentionally not referenced).\n4) GC methodology: \u002B1 warmup discarded; GC.Collect\u002BWaitForPendingFinalizers once before timed reps; median guards occasional GC stalls; \u0027min\u0027 reported as the GC-clean proxy. Managed alloc/rep via Profiler.GetTotalAllocatedMemoryLong deltas; methodology states native/Burst/Unity-object allocations are outside the managed heap and are not captured.",
+      "createdAtUtc": "2026-09-06T21:24:58.164433Z"
+    },
+    {
+      "id": "c-071b391c3efd42d786fc3d43d2da57a1",
+      "author": "anonymous",
+      "body": "ROUND 1 (BeastMaster) validation evidence.\n\nValidation gate (all passed):\n- git diff --check: clean (exit 0). Only new files: Assets/Scripts/Tests/Runtime/GenerateDataBenchmark.cs (\u002B .meta) and the Assets/Scripts/README.md note. No production file touched. All modified/untracked Data/Tasks/*.json, docs/audits/*.md, and Assets/Creatures/dinus_uprightus.json belong to the concurrent animation workstream and were left untouched.\n- dotnet build --no-restore: ProceduralCreature.Runtime.csproj clean (0 warnings/0 errors); ProceduralCreature.Tests.Runtime.csproj clean.\n- Unity harness run (MCP execute_code, Editor, Unity 6000.5.9f1), 7 timed reps \u002B 1 warmup per VPU:\n  VPU 10: grid 80x80x80, samples 531441; 6600 tris / 3302 verts, watertight=True; total median 97.5 ms, min 92.8 ms; SdfCompile 0.1; FieldSampling 28.3 (min 26.0); MeshExtraction 37.4 (min 34.4); ActiveCellConstruction 8.0; ContourResolution 19.0; managed alloc/rep median 2.2 KiB.\n  VPU 16: grid 128x128x128, samples 2146689; 16330 tris / 8167 verts, watertight=True; total median 215.7 ms, min 208.0 ms; FieldSampling 50.2 (min 48.7); MeshExtraction 115.7 (min 113.9); ActiveCellConstruction 40.0; ContourResolution 53.0; managed alloc/rep median 2.2 KiB.\n- Default Runtime PlayMode suite: 526/526 passed, 0 failed, 0 skipped (same total as before this round -\u003E harness adds no auto-run tests; no regression).\n\nMethodology recorded in the report header and Assets/Scripts/README.md.\n\nNote: these numbers are on the new harness fixture, NOT the TSK-0008 creature. TSK-0008\u0027s gate numbers (VPU10 ~204ms; VPU16 ~626ms GC-clean) were measured on a different creature and remain the gate reference. This harness gives a committed, reproducible before/after path for future perf-gated work on a stable fixture.\n\nDid NOT commit or push (orchestrator owns commit).",
+      "createdAtUtc": "2026-09-06T21:25:03.8262197Z"
+    }
+  ],
+  "epicId": null,
+  "parentId": "tsk-0008-profile-and-optimize-preview-generation-hotspots",
+  "dueDateUtc": null,
+  "createdAtUtc": "2026-09-06T21:18:12.8971503Z",
+  "updatedAtUtc": "2026-09-06T21:25:57.0982328Z",
+  "completedAtUtc": "2026-09-06T21:25:57.0982328Z",
+  "revision": 5,
+  "isArchived": false,
+  "hasLoadError": false,
+  "loadError": null,
+  "sourceFilePath": "tsk-0135-add-a-committed-reproducible-generatedata-benchmark-harness-for-the-tsk-0008-perf-gate.json"
+}

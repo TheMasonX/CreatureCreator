@@ -568,3 +568,38 @@ Once that verification pass is done, reasonable next feature work includes
 multi-chain/whole-body IK for actual locomotion (Phase 8), golden JSON
 fixtures (§13.3), and hardening the fan-triangulation/interior-ambiguity
 limitations flagged in the Phase 3 section.
+
+## GenerateData benchmark harness (TSK-0135)
+
+The repo has one committed, on-demand benchmark for the TSK-0008
+preview-generation performance gate. It calls
+`CreatureMeshGenerator.GenerateData(definition, diagnostics)` on one
+deterministic multi-part creature fixture and reports per-VPU timings.
+
+Location: `Assets/Scripts/Tests/Runtime/GenerateDataBenchmark.cs`.
+
+The harness is opt-in. It has no `[Test]` or `[UnityTest]` methods. It never
+runs in the default Runtime PlayMode suite. Timing is environment-sensitive, so
+a timing test would flake the always-run suite.
+
+How to run in the Unity editor, from code or MCP `execute_code`:
+
+    ProceduralCreature.Tests.Runtime.GenerateDataBenchmark.Run();
+
+The default run uses VPU 10 and VPU 16 with 7 timed reps and one warmup rep per
+VPU. The method logs a report and returns it as a string.
+
+What the report shows, per VPU: grid cells, sample count, triangle and vertex
+count, watertight status, and median and minimum total and per-stage timings
+(`SdfCompile`, `FieldSampling`, `MeshExtraction`, and the extraction sub-stages
+`ActiveCellConstruction` and `ContourResolution`). It also reports managed
+allocations per rep. The minimum total is the GC-clean proxy. The methodology
+is printed in the report header.
+
+Record each run's numbers in the MemorySmith task comment for TSK-0135. Treat
+timing as environment-sensitive, not as absolute.
+
+Reference baselines on this fixture, captured 2026-09-06 in Unity 6000.5.9f1:
+VPU 10 median total about 97.5 ms; VPU 16 median total about 215.7 ms. The
+TSK-0008 gate numbers (VPU 10 about 204 ms; VPU 16 about 626 ms) came from a
+different creature and remain the gate reference.
