@@ -34,15 +34,21 @@
       "author": "anonymous",
       "body": "Round 2 audit synthesis evidence (2026-09-05): docs/audits/creaturecreator-audit-synthesis-2026-09-05-round2.md records the migration ledger and confirms CC-099 remains the sole unresolved CC-to-TSK gap. Local task search returns frozen CC-099 as In Progress with no dedicated TSK record. Do not decommission docs/tasks until CC-099 is independently dispositioned.",
       "createdAtUtc": "2026-09-05T07:16:57.6845881Z"
+    },
+    {
+      "id": "c-d62568514a3e4b25a8f7d4a9653c7c96",
+      "author": "anonymous",
+      "body": "## User Mandate\n\u003E Ensure all CC legacy task files are captured within the MemorySmith TSK task system as appropriate (cross reference with the actual state) before we delete them (without removing from git history) to ensure we\u0027ve cleanly switched over\n\nSTRICT. Every CC legacy ticket under docs/tasks/tickets/ and docs/tasks/archive/ must have a MemorySmith TSK owner that preserves its source key, content, and status before any working-tree deletion. Deletion must not remove the files from git history. Do not relax scope or drop CC content.\n\n## Capture Reconciliation Evidence (2026-09-06)\n- Enumerated 101 distinct CC ticket files (docs/tasks/tickets/ \u002B docs/tasks/archive/): CC-001..CC-099 plus CC-056A and CC-056B.\n- Cross-referenced every CC file against MemorySmith Data/Tasks/*.json records by source cc-### label and by \u0022Source key: CC-###\u0022 description ownership.\n- Result: CC-001..CC-098 (plus 056A/056B) each already own a dedicated TSK description. The sole unresolved gap, CC-099, was only a secondary label on TSK-0008 and lacked a dedicated record.\n- Fix: created TSK-0119 \u0022Harden fast SDF culling and non-finite field consumers\u0022 preserving CC-099 summary, scope, acceptance criteria, decision, findings, validation, and source labels (cc-099, source-cc, runtime, sdf, culling, non-finite, extraction, regression).\n- Post-fix owner count: 101/101 CC keys are description owners of a TSK record. Test-TaskRecords.ps1: PASS, 119 records, ids/keys unique.\n- Residual (non-blocking) migration artifact: CC-018 was imported three times (TSK-0018 InProgress owner; TSK-0019 and TSK-0020 Archived duplicates). Archived duplicates are harmless; noted for optional later cleanup.\n\n## Next Step\nCapture is complete and verified. Decommissioning (working-tree deletion of the frozen CC ticket files) is the remaining step and is gated on user confirmation of deletion scope and CI/tooling handling.",
+      "createdAtUtc": "2026-09-06T04:12:23.9467467Z"
     }
   ],
   "epicId": null,
   "parentId": null,
   "dueDateUtc": null,
   "createdAtUtc": "2026-09-01T03:20:52.9538742Z",
-  "updatedAtUtc": "2026-09-05T07:16:57.6845881Z",
+  "updatedAtUtc": "2026-09-06T04:12:23.9467467Z",
   "completedAtUtc": null,
-  "revision": 3,
+  "revision": 4,
   "isArchived": false,
   "hasLoadError": false,
   "loadError": null,
