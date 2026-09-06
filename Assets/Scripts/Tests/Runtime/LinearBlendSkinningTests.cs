@@ -3,6 +3,8 @@ using System.Collections.Generic;
 using NUnit.Framework;
 using UnityEngine;
 using ProceduralCreature.Animation.Binding;
+using ProceduralCreature.Definition;
+using ProceduralCreature.Morphology;
 using ProceduralCreature.Skeleton;
 
 namespace ProceduralCreature.Tests.Runtime
@@ -181,6 +183,67 @@ namespace ProceduralCreature.Tests.Runtime
         }
 
         [Test]
+        public void Deform_ResolvedMirroredLimb_RestAndPosedResultsReflectBySemanticIdentity()
+        {
+            CreatureDefinition definition = CreateResolvedMirroredLimbDefinition();
+            ResolvedCreatureSnapshot resolved = ResolvedCreatureSnapshot.Resolve(definition);
+            Assert.IsTrue(resolved.TryGetPart("part_leg", out ResolvedPartSnapshot limb));
+
+            ProceduralCreature.Skeleton.Skeleton inferred = SkeletonInferrer.Infer(definition);
+            SkeletonSnapshot snapshot = SkeletonSnapshot.Capture(inferred);
+            CreaturePart sourcePart = definition.FindPart("part_leg");
+            string[] sourceIds =
+            {
+                SemanticBoneResolver.ResolveLimbSegmentBoneId(sourcePart, 0, false),
+                SemanticBoneResolver.ResolveLimbSegmentBoneId(sourcePart, 1, false),
+            };
+            string[] mirroredIds =
+            {
+                SemanticBoneResolver.ResolveLimbSegmentBoneId(sourcePart, 0, true),
+                SemanticBoneResolver.ResolveLimbSegmentBoneId(sourcePart, 1, true),
+            };
+
+            int[] sourceIndices = ResolveSemanticIndices(snapshot, inferred, sourceIds, mirrored: false);
+            int[] mirroredIndices = ResolveSemanticIndices(snapshot, inferred, mirroredIds, mirrored: true);
+            Assert.That(sourceIndices[0], Is.Not.EqualTo(mirroredIndices[0]));
+            Assert.That(sourceIndices[1], Is.Not.EqualTo(mirroredIndices[1]));
+
+            Vector3[] sourceVertices = ResolvedLimbVertices(limb);
+            Vector3[] mirroredVertices = ReflectPoints(sourceVertices);
+            IReadOnlyList<IReadOnlyList<VertexInfluence>> sourceBindings =
+                SegmentBindings(sourceIndices);
+            IReadOnlyList<IReadOnlyList<VertexInfluence>> mirroredBindings =
+                SegmentBindings(mirroredIndices);
+
+            BonePose[] rest = SnapshotPoses(snapshot);
+            BonePose[] mirroredRest = SnapshotPoses(snapshot);
+            Vector3[] sourceAtRest = LinearBlendSkinning.Deform(
+                rest, rest, sourceVertices, sourceBindings);
+            Vector3[] mirroredAtRest = LinearBlendSkinning.Deform(
+                mirroredRest, mirroredRest, mirroredVertices, mirroredBindings);
+            AssertVectorArraysEqual(sourceVertices, sourceAtRest, T, "resolved source rest round trip");
+            AssertVectorArraysEqual(mirroredVertices, mirroredAtRest, T, "resolved mirrored rest round trip");
+
+            BonePose[] sourcePosed = (BonePose[])rest.Clone();
+            Quaternion sourcePoseDelta = Quaternion.AngleAxis(47f, Vector3.right);
+            sourcePosed[sourceIndices[1]] = new BonePose(
+                rest[sourceIndices[1]].Position,
+                rest[sourceIndices[1]].Rotation * sourcePoseDelta);
+            BonePose[] mirroredPosed = SnapshotPoses(snapshot);
+            mirroredPosed[mirroredIndices[1]] = ReflectPose(sourcePosed[sourceIndices[1]]);
+
+            Vector3[] sourceResult = LinearBlendSkinning.Deform(
+                rest, sourcePosed, sourceVertices, sourceBindings);
+            Vector3[] mirroredResult = LinearBlendSkinning.Deform(
+                mirroredRest, mirroredPosed, mirroredVertices, mirroredBindings);
+            AssertVectorArraysEqual(
+                ReflectPoints(sourceResult), mirroredResult, T,
+                "resolved mirrored posed result reflects the source result");
+            Assert.That(sourceResult[2].y, Is.Not.EqualTo(sourceVertices[2].y).Within(T),
+                "resolved source terminal must move under the posed segment rotation");
+        }
+
+        [Test]
         public void Deform_BoneCountMismatch_Throws()
         {
             var posed = new[] { new BonePose(Vector3.zero, Quaternion.identity) };
@@ -259,6 +322,101 @@ namespace ProceduralCreature.Tests.Runtime
                         Matrix4x4.TRS(Vector3.zero, bones[i].Rotation, Vector3.one)).rotation);
             }
             return reflected;
+        }
+
+        private static CreatureDefinition CreateResolvedMirroredLimbDefinition()
+        {
+            var definition = CreatureDefinition.CreateEmpty();
+            definition.SymmetryMode = SymmetryMode.MirrorAcrossXAxis;
+            definition.Body.Samples.Add(new BodySample
+            {
+                Id = 1,
+                Position = Vector3.zero,
+                Radius = 1f,
+            });
+            definition.AddPart(new CreaturePart
+            {
+                Id = "part_leg",
+                ParentId = CreatureDefinition.BodyId,
+                PartType = PartType.Limb,
+                Transform = new TransformData
+                {
+                    Position = new Vector3(0.7f, -0.2f, 0.15f),
+                    Rotation = Quaternion.Euler(8f, 17f, 11f),
+                    Scale = Vector3.one,
+                },
+                Shape = ShapeDefinition.DefaultSphere,
+                Appearance = AppearanceDefinition.Default,
+                MirrorAcrossSymmetryPlane = true,
+                Limb = new LimbChain
+                {
+                    Joints =
+                    {
+                        new LimbJoint { Id = 1, Position = Vector3.zero },
+                        new LimbJoint { Id = 2, Position = new Vector3(0.35f, 0.3f, 0.1f) },
+                        new LimbJoint { Id = 3, Position = new Vector3(0.75f, 0.45f, 0.25f) },
+                    },
+                },
+            });
+            return definition;
+        }
+
+        private static int[] ResolveSemanticIndices(
+            SkeletonSnapshot snapshot, ProceduralCreature.Skeleton.Skeleton skeleton,
+            IReadOnlyList<string> ids, bool mirrored)
+        {
+            var indices = new int[ids.Count];
+            for (int i = 0; i < ids.Count; i++)
+            {
+                indices[i] = snapshot.GetIndex(ids[i]);
+                Bone bone = skeleton.FindBone(ids[i]);
+                Assert.IsNotNull(bone, $"resolved semantic bone '{ids[i]}' must exist");
+                Assert.AreEqual("part_leg", bone.SourcePartId);
+                Assert.AreEqual(mirrored, bone.IsMirrored);
+            }
+            return indices;
+        }
+
+        private static Vector3[] ResolvedLimbVertices(ResolvedPartSnapshot limb)
+        {
+            Matrix4x4 frame = limb.PartFrameToCreatureSpace;
+            Vector3 root = limb.Limb.JointPositions[0];
+            Vector3 midpoint = Vector3.Lerp(limb.Limb.JointPositions[0], limb.Limb.JointPositions[1], 0.55f);
+            Vector3 terminal = limb.Limb.JointPositions[limb.Limb.JointPositions.Count - 1];
+            return new[]
+            {
+                frame.MultiplyPoint3x4(root),
+                frame.MultiplyPoint3x4(midpoint),
+                frame.MultiplyPoint3x4(terminal),
+            };
+        }
+
+        private static IReadOnlyList<IReadOnlyList<VertexInfluence>> SegmentBindings(int[] indices)
+        {
+            return new IReadOnlyList<VertexInfluence>[]
+            {
+                new[] { new VertexInfluence(indices[0], 1f) },
+                new[] { new VertexInfluence(indices[0], 0.35f), new VertexInfluence(indices[1], 0.65f) },
+                new[] { new VertexInfluence(indices[1], 1f) },
+            };
+        }
+
+        private static BonePose[] SnapshotPoses(SkeletonSnapshot snapshot)
+        {
+            var poses = new BonePose[snapshot.Count];
+            for (int i = 0; i < snapshot.Count; i++)
+            {
+                poses[i] = new BonePose(snapshot[i].Position, snapshot[i].Rotation);
+            }
+            return poses;
+        }
+
+        private static BonePose ReflectPose(BonePose pose)
+        {
+            return new BonePose(
+                MirrorUtility.ReflectPointAcrossX(pose.Position),
+                MirrorUtility.MirrorAcrossXPlane(
+                    Matrix4x4.TRS(Vector3.zero, pose.Rotation, Vector3.one)).rotation);
         }
 
         private static Vector3[] ReflectPoints(IReadOnlyList<Vector3> points)
