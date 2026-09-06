@@ -311,6 +311,106 @@ namespace ProceduralCreature.Tests.Runtime
                 LinearBlendSkinning.Deform(RestAligned, RestAligned, RestVertices, bindings));
         }
 
+        [Test]
+        public void Deform_TooManyInfluences_Throws()
+        {
+            // F3: MaxBoneInfluencesPerVertex is an enforced invariant. Five otherwise
+            // valid influences on one vertex must be rejected.
+            int cap = LinearBlendSkinning.MaxBoneInfluencesPerVertex;
+            Assert.That(cap, Is.EqualTo(4), "fixture depends on the documented cap value");
+            var five = new VertexInfluence[cap + 1];
+            for (int i = 0; i < five.Length; i++)
+            {
+                five[i] = new VertexInfluence(i % 2, 1f / five.Length);
+            }
+            var bindings = new IReadOnlyList<VertexInfluence>[]
+            {
+                five,
+                new[] { new VertexInfluence(0, 1f) },
+                new[] { new VertexInfluence(0, 1f) },
+                new[] { new VertexInfluence(1, 1f) },
+                new[] { new VertexInfluence(1, 1f) },
+            };
+            Assert.Throws<ProceduralCreature.Common.DomainException>(() =>
+                LinearBlendSkinning.Deform(RestAligned, RestAligned, RestVertices, bindings));
+        }
+
+        [Test]
+        public void Deform_NonFiniteRestVertex_Throws()
+        {
+            // F2: a NaN or Infinity rest vertex must be rejected before it can propagate
+            // through the bind offset math into a non-finite mesh position.
+            var nanVertex = new[]
+            {
+                new Vector3(float.NaN, 0f, 0f),
+                new Vector3(0.8f, 0f, 0f),
+                new Vector3(1.0f, 0f, 0f),
+                new Vector3(1.5f, 0f, 0f),
+                new Vector3(2.0f, 0f, 0f),
+            };
+            Assert.Throws<ProceduralCreature.Common.DomainException>(() =>
+                LinearBlendSkinning.Deform(RestAligned, RestAligned, nanVertex, RestBindings));
+
+            var infVertex = new[]
+            {
+                new Vector3(float.PositiveInfinity, 0f, 0f),
+                new Vector3(0.8f, 0f, 0f),
+                new Vector3(1.0f, 0f, 0f),
+                new Vector3(1.5f, 0f, 0f),
+                new Vector3(2.0f, 0f, 0f),
+            };
+            Assert.Throws<ProceduralCreature.Common.DomainException>(() =>
+                LinearBlendSkinning.Deform(RestAligned, RestAligned, infVertex, RestBindings));
+        }
+
+        [Test]
+        public void Deform_NonFiniteRestPosition_Throws()
+        {
+            var badRest = new[]
+            {
+                new BonePose(new Vector3(float.NaN, 0f, 0f), Quaternion.identity),
+                Bone1Rest,
+            };
+            Assert.Throws<ProceduralCreature.Common.DomainException>(() =>
+                LinearBlendSkinning.Deform(badRest, RestAligned, RestVertices, RestBindings));
+        }
+
+        [Test]
+        public void Deform_NonFiniteRestRotation_Throws()
+        {
+            var badRest = new[]
+            {
+                new BonePose(Vector3.zero, new Quaternion(0f, 0f, 0f, float.NaN)),
+                Bone1Rest,
+            };
+            Assert.Throws<ProceduralCreature.Common.DomainException>(() =>
+                LinearBlendSkinning.Deform(badRest, RestAligned, RestVertices, RestBindings));
+        }
+
+        [Test]
+        public void Deform_NonFinitePosedPosition_Throws()
+        {
+            var badPosed = new[]
+            {
+                new BonePose(new Vector3(0f, float.NegativeInfinity, 0f), Quaternion.identity),
+                Bone1Rest,
+            };
+            Assert.Throws<ProceduralCreature.Common.DomainException>(() =>
+                LinearBlendSkinning.Deform(RestAligned, badPosed, RestVertices, RestBindings));
+        }
+
+        [Test]
+        public void Deform_NonFinitePosedRotation_Throws()
+        {
+            var badPosed = new[]
+            {
+                new BonePose(Vector3.zero, new Quaternion(float.NaN, 0f, 0f, 0f)),
+                Bone1Rest,
+            };
+            Assert.Throws<ProceduralCreature.Common.DomainException>(() =>
+                LinearBlendSkinning.Deform(RestAligned, badPosed, RestVertices, RestBindings));
+        }
+
         private static BonePose[] ReflectBones(IReadOnlyList<BonePose> bones)
         {
             var reflected = new BonePose[bones.Count];

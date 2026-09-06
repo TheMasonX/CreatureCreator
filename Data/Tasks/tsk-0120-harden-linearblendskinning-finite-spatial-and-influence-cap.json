@@ -4,7 +4,7 @@
   "title": "Enforce finite spatial inputs and the influence cap in LinearBlendSkinning",
   "description": "## Summary\n\nMake the geometry-binding/skinning contract reject the invalid spatial inputs it currently trusts, and make the advertised influence-count cap an enforced invariant. Two independent external audits converged on this at the same code site.\n\nProvenance: \u0060docs/audits/creaturecreator-deep-dive-code-review-audit-26-09-05-23-07-45.md\u0060 F2 (P1/P2) and F3 (P2); \u0060docs/audits/creaturecreator-deep-dive-code-review-2026-09-05.md\u0060 P1 (influence count) and P1 (binding finite inputs). Verified at current HEAD \u006099fe6ad\u0060; no existing TSK owns this bounded scope (broad owner family: TSK-0077 / CC-073).\n\n## Scope\n\n\u0060Assets/Scripts/Runtime/Animation/Binding/LinearBlendSkinning.cs\u0060 (\u0060Deform\u0060, \u0060BonePose\u0060):\n\n- Reject non-finite values in \u0060restVertices\u0060 and in every \u0060rest\u0060/\u0060posed\u0060 bone frame (\u0060BonePose.Position\u0060, \u0060BonePose.Rotation\u0060) using the existing shared guard \u0060ProceduralCreature.Common.NumericValidity.IsFinite(Vector3)\u0060 / \u0060IsFinite(Quaternion)\u0060. Do not add a new finite utility; one already exists.\n- Make the \u0060MaxBoneInfluencesPerVertex = 4\u0060 contract an executable invariant. Choose and record one contract: reject \u0060influences.Count \u003E MaxBoneInfluencesPerVertex\u0060 inside \u0060Deform\u0060, or enforce the cap at the binding authoring/build stage and document that \u0060Deform\u0060 accepts the already-validated representation. Keep the chosen contract explicit in the XML docs.\n- Decide and state whether a bone rotation must be only finite, or finite and normalized/non-degenerate; document that invariant on \u0060BonePose\u0060.\n- Do not change weighting math, rest-pose round-trip behavior, or the welded-Body out-of-scope note.\n\n## Acceptance Criteria\n\n- \u0060Deform\u0060 throws \u0060DomainException\u0060 on a NaN/Infinity in a rest vertex, a rest \u0060BonePose.Position\u0060, a rest \u0060BonePose.Rotation\u0060, a posed \u0060BonePose.Position\u0060, or a posed \u0060BonePose.Rotation\u0060 (one focused test per field).\n- \u0060Deform\u0060 throws \u0060DomainException\u0060 for a vertex with five otherwise-valid influences when the hard-invariant contract is chosen (or, if the authoring-stage contract is chosen, the authoring/validation path rejects \u003E4 and a test proves it).\n- A valid finite binding still passes and reproduces the existing rest-pose round-trip result.\n- No behavior change outside the corrected non-finite and over-cap cases.\n\n## Validation\n\nFocused runtime tests under \u0060Assets/Scripts/Tests/Runtime/\u0060 (the existing skinning test fixture) covering each non-finite field and the \u003E4-influence case. Then run the full runtime EditMode/PlayMode suites in Unity. Static source inspection alone cannot close this task.\n\n## Findings\n\n- \u0060Deform\u0060 validates null/count/weight/bone-index but never validates \u0060restVertices\u0060, \u0060rest[].Position/Rotation\u0060, or \u0060posed[].Position/Rotation\u0060; a single NaN propagates through \u0060Quaternion.Inverse\u0060 and blending into a non-finite mesh position.\n- \u0060MaxBoneInfluencesPerVertex\u0060 appears only in the declaration/docs and TSK-0077 evidence; no production check or test references the constant.\n- The module already uses a strict finite-weight contract, so accepting non-finite geometry is inconsistent with its own defensive contract.\n\n## Blockers\n\nNone known. Shared \u0060NumericValidity.IsFinite\u0060 already exists.\n\n## Next Step\n\nImplement the finite guards and the influence-cap decision, then add the focused tests above.",
   "type": "Bug Fix",
-  "status": "Backlog",
+  "status": "Done",
   "priority": "High",
   "assigneeMode": "Custom",
   "assigneeDirectoryId": null,
@@ -23,16 +23,23 @@
   "attachments": [],
   "externalLinks": [],
   "linkedPages": [],
-  "comments": [],
+  "comments": [
+    {
+      "id": "c-786918710c6c45db8a4c97fb1b0b6eb8",
+      "author": "anonymous",
+      "body": "## Sprint Round 1 evidence (2026-09-05/06, deep-dive hardening sprint, fixed point 5f7205f)\n\nImplemented finite spatial-input validation and influence-cap enforcement in LinearBlendSkinning.\n\nChanged files:\n- Assets/Scripts/Runtime/Animation/Binding/LinearBlendSkinning.cs \u2014 added ValidateBoneFrame finite checks (rest and posed Position/Rotation) applied to the whole arrays in the single pre-loop that builds inverseRestRotation (no extra O(bones) pass); per-vertex finite rest-vertex check and influences.Count \u003E MaxBoneInfluencesPerVertex rejection before bind math; documented the FINITE CONTRACT (F2/F3) and WEIGHT CONVENTION on the class and BonePose.\n- Assets/Scripts/Tests/Runtime/LinearBlendSkinningTests.cs \u2014 6 focused tests: Deform_TooManyInfluences_Throws, Deform_NonFiniteRestVertex_Throws (NaN\u002BInf), Deform_NonFiniteRestPosition_Throws, Deform_NonFiniteRestRotation_Throws, Deform_NonFinitePosedPosition_Throws, Deform_NonFinitePosedRotation_Throws (all Assert.Throws\u003CDomainException\u003E).\n\nDecisions (flagged, non-obvious):\n1. Influence-cap contract = reject inside Deform, not at an authoring/build stage: no production binding-authoring stage exists (all VertexInfluence construction is test-only), so Deform is the single enforcement boundary and already validates per-vertex there. Documented on the const and WEIGHT CONVENTION.\n2. Rotations enforced finite-only, NOT normalized: bounded scope forbids changing normalization behavior; documented on BonePose that rotations are expected to be proper unit rotations kept normalized by the caller.\n3. Shared guard reused: NumericValidity.IsFinite(Vector3/Quaternion); no new finite utility, no competing binding path.\n\nValidation:\n- dotnet build ProceduralCreature.Runtime.csproj --no-restore: 0 errors/0 warnings.\n- dotnet build ProceduralCreature.Tests.Runtime.csproj --no-restore: 0 errors/0 warnings.\n- git diff --check: clean.\n- Unity connected (port 6401): refresh compile 0 console errors; PlayMode runtime assembly ProceduralCreature.Tests.Runtime passed 501/501 (run twice, consistent), including the new cases. (Note: EditMode does not discover the runtime assembly in this project; narrow PlayMode test_names filters timed out at MCP init, so validated via full-assembly PlayMode run.)\n\nResidual risk: finite-only enforcement means a zero/degenerate (finite, length-0) quaternion would still make Quaternion.Inverse return NaN downstream; rotations expected to be kept proper/normalized by callers. This is documented and consistent with the out-of-scope \u0022do not change normalization\u0022 constraint. No commit/push made by subagent.",
+      "createdAtUtc": "2026-09-06T05:09:58.701724Z"
+    }
+  ],
   "epicId": null,
   "parentId": null,
   "dueDateUtc": null,
   "createdAtUtc": "2026-09-06T04:25:11.3966143Z",
-  "updatedAtUtc": "2026-09-06T04:25:11.3966143Z",
-  "completedAtUtc": null,
-  "revision": 1,
+  "updatedAtUtc": "2026-09-06T05:10:01.6262979Z",
+  "completedAtUtc": "2026-09-06T05:10:01.6262979Z",
+  "revision": 3,
   "isArchived": false,
   "hasLoadError": false,
   "loadError": null,
-  "sourceFilePath": null
+  "sourceFilePath": "tsk-0120-harden-linearblendskinning-finite-spatial-and-influence-cap.json"
 }

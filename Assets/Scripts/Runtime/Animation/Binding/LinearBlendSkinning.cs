@@ -12,13 +12,22 @@ namespace ProceduralCreature.Animation.Binding
     /// hierarchy-relative frame. Using absolute frames is what makes per-vertex
     /// linear-blend interpolation well defined across a chain whose bones share no
     /// common parent transform.
+    ///
+    /// INVARIANT (enforced by <see cref="LinearBlendSkinning.Deform"/>): both
+    /// <see cref="Position"/> and <see cref="Rotation"/> must be FINITE — no NaN or
+    /// Infinity in any component — for every rest and posed frame.
+    /// <see cref="LinearBlendSkinning.Deform"/> enforces finiteness only; it does not
+    /// enforce that <see cref="Rotation"/> is a normalized (unit-length) rotation.
+    /// Rotations are expected to be proper unit rotations, and keeping them normalized
+    /// is the caller's responsibility, not re-normalized here.
     /// </summary>
     public readonly struct BonePose
     {
-        /// <summary>Creature-space origin of the bone frame.</summary>
+        /// <summary>Creature-space origin of the bone frame. Must be finite.</summary>
         public readonly Vector3 Position;
 
-        /// <summary>Creature-space orientation of the bone frame.</summary>
+        /// <summary>Creature-space orientation of the bone frame. Must be finite and,
+        /// by convention, a normalized (unit-length) rotation.</summary>
         public readonly Quaternion Rotation;
 
         public BonePose(Vector3 position, Quaternion rotation)
@@ -83,10 +92,17 @@ namespace ProceduralCreature.Animation.Binding
     ///   scale, bind and posed frames are pure rotation + translation, so the inverse
     ///   is the quaternion inverse — exact, no matrix inversion error.
     /// * WEIGHT CONVENTION: per-vertex influences are non-negative and authored to sum
-    ///   to 1; <see cref="MaxBoneInfluencesPerVertex"/> caps standard authored
-    ///   influence count. <see cref="Deform"/> normalizes by the total weight so a
-    ///   partially-authored sum still yields a unit blend rather than a second,
-    ///   unnormalized convention. A vertex with no net weight is an error.
+    ///   to 1; <see cref="MaxBoneInfluencesPerVertex"/> caps authored influence count
+    ///   and is ENFORCED inside <see cref="Deform"/> (a vertex with more influences
+    ///   throws <c>DomainException</c>). <see cref="Deform"/> normalizes by the total
+    ///   weight so a partially-authored sum still yields a unit blend rather than a
+    ///   second, unnormalized convention. A vertex with no net weight is an error.
+    /// * FINITE CONTRACT (F2/F3): rest vertices and every rest and posed
+    ///   <c>BonePose</c> frame must be finite. <see cref="Deform"/> rejects a NaN or
+    ///   Infinity in a rest vertex or in any bone frame's <c>Position</c>/<c>Rotation</c>
+    ///   with <c>DomainException</c> before deformation math runs, so a bad value cannot
+    ///   propagate through <c>Quaternion.Inverse</c> and the bind-&gt;posed carry into a
+    ///   non-finite mesh position.
     /// * MIRROR CONVENTION: a mirrored limb flows through the EXISTING semantic
     ///   resolution and <c>Skeleton.MirrorUtility</c>. Positions reflect across the
     ///   X = 0 plane (<c>ReflectPointAcrossX</c>); rotations are conjugated across that
@@ -110,7 +126,9 @@ namespace ProceduralCreature.Animation.Binding
     {
         /// <summary>
         /// Standard ceiling on authored bone influences per vertex (the weight
-        /// convention's bind limit). The two-segment fixture uses at most two.
+        /// convention's bind limit). This is an ENFORCED invariant: <see cref="Deform"/>
+        /// throws <c>DomainException</c> when a vertex carries more influences than this.
+        /// The two-segment fixture uses at most two.
         /// </summary>
         public const int MaxBoneInfluencesPerVertex = 4;
 
@@ -156,6 +174,12 @@ namespace ProceduralCreature.Animation.Binding
             var inverseRestRotation = new Quaternion[rest.Count];
             for (int bone = 0; bone < rest.Count; bone++)
             {
+                // Total finite contract: every rest and posed bone frame must be finite
+                // before any deformation math runs (F2/F3). A non-finite quaternion would
+                // otherwise poison Quaternion.Inverse and surface far away at the mesh
+                // consumer, not here.
+                ValidateBoneFrame(rest[bone], $"rest[{bone}]");
+                ValidateBoneFrame(posed[bone], $"posed[{bone}]");
                 inverseRestRotation[bone] = Quaternion.Inverse(rest[bone].Rotation);
             }
 
@@ -168,8 +192,18 @@ namespace ProceduralCreature.Animation.Binding
                 {
                     throw new DomainException($"Rest vertex {vertex} has no bone influences.");
                 }
+                if (influences.Count > MaxBoneInfluencesPerVertex)
+                {
+                    throw new DomainException(
+                        $"Rest vertex {vertex} has {influences.Count} influences, exceeding " +
+                        $"MaxBoneInfluencesPerVertex ({MaxBoneInfluencesPerVertex}).");
+                }
 
                 Vector3 restVertex = restVertices[vertex];
+                if (!NumericValidity.IsFinite(restVertex))
+                {
+                    throw new DomainException($"Rest vertex {vertex} is not finite.");
+                }
                 Vector3 blended = Vector3.zero;
                 float totalWeight = 0f;
                 for (int influenceIndex = 0; influenceIndex < influences.Count; influenceIndex++)
@@ -195,6 +229,18 @@ namespace ProceduralCreature.Animation.Binding
                 output[vertex] = blended / totalWeight;
             }
             return output;
+        }
+
+        private static void ValidateBoneFrame(BonePose frame, string label)
+        {
+            if (!NumericValidity.IsFinite(frame.Position))
+            {
+                throw new DomainException($"{label} bone frame has a non-finite Position.");
+            }
+            if (!NumericValidity.IsFinite(frame.Rotation))
+            {
+                throw new DomainException($"{label} bone frame has a non-finite Rotation.");
+            }
         }
 
         private static void ValidateInfluence(VertexInfluence influence, int vertex, int boneCount)
