@@ -1,0 +1,19 @@
+{
+  "id": "tsk-0161-stop-canonicalizer-from-repairing-invalid-shape-axis",
+  "key": "TSK-0161",
+  "title": "Stop canonicalization from silently repairing invalid ShapeAxis values",
+  "description": "Council multi-round semantic-integrity review confirmed a contract contradiction in DefinitionCanonicalizer.CanonicalizeShape: the file states canonicalization is non-repairing, but invalid CapsuleAxis values are silently rewritten to ShapeAxis.Y. Directly malformed definitions can therefore serialize as a different definition instead of failing.\n\nScope: remove the repair behavior and replace it with a DomainException (or a clearly documented legacy-only normalization path if evidence proves one is required). Add a regression proving invalid enum values are rejected and valid legacy/default behavior remains unchanged. Coordinate with TSK-0094 utility/consolidation work and TSK-0093 malformed-definition validation; do not add another normalization layer.\n\nValidation gate: focused canonicalizer/validator tests, round-trip regression coverage, runtime build, Unity execution.",
+  "type": "Bug Fix",
+  "status": "Backlog",
+  "priority": "Medium",
+  "assigneeMode": "Custom",
+  "assigneeDirectoryId": null,
+  "assigneeCustomText": "Unassigned",
+  "reporter": "council-audit",
+  "labels": ["council", "canonicalization", "validation", "data-integrity", "TSK-0093", "TSK-0094"],
+  "attachments": [],
+  "externalLinks": [],
+  "linkedPages": [],
+  "comments": [],
+  "parentId": "tsk-0094-consolidate-shared-runtime-utilities-and-tolerances"
+}
