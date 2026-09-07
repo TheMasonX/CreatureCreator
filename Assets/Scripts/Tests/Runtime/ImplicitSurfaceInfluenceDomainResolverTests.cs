@@ -115,5 +115,38 @@ namespace ProceduralCreature.Tests.Runtime
             Assert.IsTrue(domains[0].Allows("leg_left_mirror"), "mirrored geometry may blend with its mirrored parent chain");
             Assert.IsFalse(domains[0].Allows("leg_left"), "mirrored geometry must not inherit the original-side limb domain");
         }
+
+        [Test]
+        public void Resolve_DeepOwnedHierarchy_IncludesEachNonBodyAncestor()
+        {
+            CreatureDefinition definition = BuildHierarchy();
+            definition.AddPart(new CreaturePart
+            {
+                Id = "toe_left",
+                ParentId = "foot_left",
+                PartType = PartType.Part,
+                Transform = new TransformData
+                {
+                    Position = new Vector3(0f, -0.55f, 0f),
+                    Rotation = Quaternion.identity,
+                    Scale = Vector3.one,
+                },
+                Shape = new ShapeDefinition { Type = ShapeType.Sphere, Radius = 0.35f },
+                Appearance = AppearanceDefinition.Default,
+            });
+
+            ResolvedCreatureSnapshot snapshot = ResolvedCreatureSnapshot.Resolve(definition);
+            InfluenceDomain[] domains = ImplicitSurfaceInfluenceDomainResolver.Resolve(
+                definition,
+                snapshot,
+                new[] { new Vector3(2f, -0.55f, 0f) });
+
+            Assert.AreEqual(1, domains.Length);
+            Assert.AreEqual("toe_left", domains[0].DomainId);
+            Assert.IsTrue(domains[0].Allows("toe_left"));
+            Assert.IsTrue(domains[0].Allows("foot_left"));
+            Assert.IsTrue(domains[0].Allows("leg_left"));
+            Assert.IsFalse(domains[0].Allows("neighbor_leg"));
+        }
     }
 }
