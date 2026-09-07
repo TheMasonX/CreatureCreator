@@ -294,10 +294,8 @@ namespace ProceduralCreature.Skeleton
         {
             if (positions.Count < 2) return true;
             // Creature Forward points from tail toward head. Therefore sample 0 is
-            // headward when it has the greater projection, not the last sample.
-            float startProjection = Vector3.Dot(positions[0], forward);
-            float endProjection = Vector3.Dot(positions[positions.Count - 1], forward);
-            return startProjection >= endProjection;
+            // headward when it has the GREATER projection, not the last sample.
+            return Vector3.Dot(positions[0], forward) >= Vector3.Dot(positions[positions.Count - 1], forward);
         }
 
         private static Vector3 NormalizeForward(Vector3 forward)
@@ -305,26 +303,5 @@ namespace ProceduralCreature.Skeleton
 
         private static float ClampInterior(float value)
             => Mathf.Clamp(value, InteriorMinT, InteriorMaxT);
-
-        private static float SqrDistanceToSegment(Vector3 point, Vector3 a, Vector3 b)
-        {
-            Vector3 ab = b - a;
-            float lengthSqr = ab.sqrMagnitude;
-            if (lengthSqr <= 1e-12f) return (point - a).sqrMagnitude;
-            float t = Mathf.Clamp01(Vector3.Dot(point - a, ab) / lengthSqr);
-            Vector3 closest = a + t * ab;
-            return (point - closest).sqrMagnitude;
-        }
-
-        private static List<BodySample> BuildSyntheticSamples(
-            IReadOnlyList<Vector3> positions, IReadOnlyList<uint> ids)
-        {
-            var samples = new List<BodySample>(positions.Count);
-            for (int i = 0; i < positions.Count; i++)
-            {
-                samples.Add(new BodySample { Id = ids[i], Position = positions[i], Radius = 1f });
-            }
-            return samples;
-        }
     }
 }
