@@ -106,7 +106,7 @@ namespace ProceduralCreature.Editor
             ClearGeometryObjects();
             BindImplicitSurface(implicitSurface.Mesh, definition, snapshot);
 
-            CreatureRig rig = PreviewGameObject.GetComponent<CreatureRig>();
+            CreatureRig rig = GetSingleOwnedComponent<CreatureRig>();
             if (rig == null || rig.RestSkeleton == null)
             {
                 throw new DomainException("Preview rig must be built before mesh-asset geometry is attached.");
@@ -143,6 +143,40 @@ namespace ProceduralCreature.Editor
             if (binding == null || rig == null) return false;
             string boneId = SemanticBoneResolver.ResolvePartRootBoneId(binding.SourcePartId, binding.IsMirrored);
             return rig.TryGetBone(boneId, out bone);
+        }
+
+        private T GetSingleOwnedComponent<T>() where T : Component
+        {
+            if (PreviewGameObject == null) return null;
+
+            T[] components = PreviewGameObject.GetComponents<T>();
+            if (components == null || components.Length == 0) return null;
+
+            // The preview root is exclusively owned by this controller. Clear every
+            // duplicate before removing it so each component has a chance to release
+            // generated child objects it tracks internally. Keep the first component
+            // deterministicly; no per-frame path calls this helper.
+            T retained = components[0];
+            for (int i = 0; i < components.Length; i++)
+            {
+                T component = components[i];
+                if (component == null) continue;
+
+                if (component is CreatureRig rig)
+                {
+                    rig.Clear();
+                }
+                else if (component is CreatureSkinnedMeshRenderer skinned)
+                {
+                    skinned.Clear();
+                }
+
+                if (component != retained)
+                {
+                    UnityEngine.Object.DestroyImmediate(component);
+                }
+            }
+            return retained;
         }
 
         public GameObject RecoverExistingPreview()
@@ -190,9 +224,8 @@ namespace ProceduralCreature.Editor
             if (collider == null) collider = PreviewGameObject.AddComponent<MeshCollider>();
             collider.sharedMesh = sourceMesh;
 
-            // The editor preview consumes the exact resolved snapshot produced by
-            // generation. Do not re-infer from the raw definition here: that would
-            // create a second derivation path that can diverge after authoring.
+            // Consume the exact resolved snapshot produced by generation. Do not
+            // re-infer from raw DNA at this presentation boundary.
             SkeletonModel skeleton = SkeletonInferrer.Infer(snapshot);
             if (skeleton == null || skeleton.Bones.Count == 0)
             {
@@ -200,13 +233,15 @@ namespace ProceduralCreature.Editor
             }
 
             SkeletonSnapshot snapshotForBinding = SkeletonSnapshot.Capture(skeleton);
-            CreatureRig rig = PreviewGameObject.GetComponent<CreatureRig>();
-            if (rig == null) rig = PreviewGameObject.AddComponent<CreatureRig>();
+            CreatureRig rig = GetSingleOwnedComponent<CreatureRig>();
+            if (rig == null)
+            {
+                rig = PreviewGameObject.AddComponent<CreatureRig>();
+            }
             rig.Build(skeleton);
             rig.ApplyPose(PosedSkeleton.FromRestPose(skeleton));
 
-            CreatureSkinnedMeshRenderer skinnedRenderer =
-                PreviewGameObject.GetComponent<CreatureSkinnedMeshRenderer>();
+            CreatureSkinnedMeshRenderer skinnedRenderer = GetSingleOwnedComponent<CreatureSkinnedMeshRenderer>();
             if (skinnedRenderer == null)
             {
                 skinnedRenderer = PreviewGameObject.AddComponent<CreatureSkinnedMeshRenderer>();
@@ -254,12 +289,8 @@ namespace ProceduralCreature.Editor
             }
             PersistOwnedGeometryEntities(new List<ulong>());
 
-            CreatureSkinnedMeshRenderer skinnedRenderer =
-                PreviewGameObject != null ? PreviewGameObject.GetComponent<CreatureSkinnedMeshRenderer>() : null;
-            if (skinnedRenderer != null) skinnedRenderer.Clear();
-
-            CreatureRig rig = PreviewGameObject != null ? PreviewGameObject.GetComponent<CreatureRig>() : null;
-            if (rig != null) rig.Clear();
+            GetSingleOwnedComponent<CreatureSkinnedMeshRenderer>()?.Clear();
+            GetSingleOwnedComponent<CreatureRig>()?.Clear();
         }
 
         private static void RegisterOwnedGeometry(GameObject child)
