@@ -1,0 +1,36 @@
+﻿{
+  "id": "tsk-0136-fix-rig-bone-selection-pivot-and-body-root-naming",
+  "key": "TSK-0136",
+  "title": "Fix rig bone selection pivots and rename body pelvis root",
+  "description": "## Summary\n\nThe `dinus_uprightus` SceneView rig overlay can show a selected Body/neck bone line correctly while Unity's Rotate Tool is anchored at an unrelated point near the head/eye area. Rotating the selected bone therefore moves the chain around the wrong pivot. The custom rig selector currently changes only `Selection.activeGameObject`, which can preserve a pre-existing multi-object selection while the tool remains in `Center` pivot mode. The current compact body root is also misleadingly named `body_pelvis`.\n\n## Implementation requirements\n- Trace the authoritative skeleton position from `AnatomicalBodyRigLayout` through `SkeletonInferrer`, `SkeletonSnapshot`, and `CreatureRig.Build/ApplyPose`; do not mask a runtime transform-placement defect with an editor-only workaround.\n- Fix the SceneView bone selection path so an explicit click on a rig bone collapses Unity selection to that single generated bone GameObject. This must make the standard Rotate/Move tools operate on that bone's own transform when the user's pivot mode is `Center`, without globally changing the user's pivot preference.\n- Rename the compact non-anatomical root concept from `body_pelvis` / `PelvisBoneId` to `body_root` / `BodyRootBoneId`, including debug labels and tests. Do not pretend it is an anatomical pelvis.\n- Preserve existing limb, head, mirrored-bone, pose, attachment, and segmented-body behavior.\n- Add or strengthen regression coverage for the compact-body root naming/position/parent relationships.\n\n## Adversarial validation\nAfter each implementation round, perform a separate peer-review pass against the diff and surrounding systems. Explicitly challenge: coordinate-space assumptions; Unity parent/child Transform semantics; `Selection.objects` versus `Selection.activeGameObject`; global Center/Pivot preference behavior; stale multi-selection; body segment start/end positions; pose application versus rest positions; mirrored limbs; attachment-bone resolution; and coupling of the root identifier to tests/data. Fix confirmed findings before advancing the task.\n\n## Acceptance criteria\n- A single explicit click on any generated Body/neck bone through the Rig Debug overlay produces a single-object selection containing that bone.\n- With Unity pivot mode set to Center, the built-in transform gizmo is consequently centered on the selected bone's transform rather than the old shared/stale selection center.\n- Generated Body/neck Transform positions continue to equal their semantic `BoneSnapshot.Position`; no eye attachment point is reused.\n- Compact body root is consistently identified as `body_root` / `BodyRootBoneId`; no `body_pelvis` code reference remains in the implemented path.\n- Existing limb/head pivots and mirrored behavior remain intact.\n- Focused tests and the default validation suite remain green.\n- `git diff --check` is clean.\n- An independent adversarial review is recorded after implementation.\n\n## Tracking\nGitHub issue #10: https://github.com/TheMasonX/CreatureCreator/issues/10\n\nTarget base workstream at task creation: `audit/skeleton-animation-improvements-2026-09-07` @ `d24abffbeb51226f35c7ed4980950264ae5d2f11`.\n\n## Next step\nRound 1: implement the smallest correct selection fix and body-root naming change, then run the adversarial review and validation before any merge/close decision.",
+  "type": "Task",
+  "status": "InProgress",
+  "priority": "High",
+  "assigneeMode": "Custom",
+  "assigneeDirectoryId": null,
+  "assigneeCustomText": "Agent",
+  "reporter": "anonymous",
+  "labels": ["editor", "animation", "bug"],
+  "attachments": [],
+  "externalLinks": ["https://github.com/TheMasonX/CreatureCreator/issues/10"],
+  "linkedPages": [],
+  "comments": [
+    {
+      "id": "c-0136-round1-start",
+      "author": "anonymous",
+      "body": "ROUND 1 START. Reproduction supplied by user was reviewed against the actual SceneView implementation. The affected overlay uses `Selection.activeGameObject` only; the screenshot shows the Unity transform toolbar in Center mode, making a stale multi-object selection a concrete root-cause candidate. The runtime rig path is also independently being checked so the editor fix cannot conceal a bad `Bone.Position` / `Transform.position`. Work is isolated on `fix/tsk-0136-rig-bone-pivot-audit`, branched directly from the relevant animation workstream commit `d24abffbeb51226f35c7ed4980950264ae5d2f11`."
+      ,"createdAtUtc": "2026-09-07T23:45:00Z"
+    }
+  ],
+  "epicId": null,
+  "parentId": null,
+  "dueDateUtc": null,
+  "createdAtUtc": "2026-09-07T23:45:00Z",
+  "updatedAtUtc": "2026-09-07T23:45:00Z",
+  "completedAtUtc": null,
+  "revision": 1,
+  "isArchived": false,
+  "hasLoadError": false,
+  "loadError": null,
+  "sourceFilePath": "tsk-0136-fix-rig-bone-selection-pivot-and-body-root-naming.json"
+}
