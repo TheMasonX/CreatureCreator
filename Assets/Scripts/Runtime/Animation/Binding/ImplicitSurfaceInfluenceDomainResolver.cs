@@ -46,6 +46,21 @@ namespace ProceduralCreature.Animation.Binding
                 var scratch = new NativeArray<float>(scratchLength, Allocator.Temp);
                 try
                 {
+                    // Build the hierarchy domains once per resolved part/side. Domain
+                    // membership is independent of the vertex; the previous path
+                    // allocated a List and string array for every welded vertex.
+                    // Keeping these small immutable structs shared across vertices
+                    // removes a potentially huge bind-time GC cost without changing
+                    // the domain decisions or the per-frame path.
+                    var normalDomains = new InfluenceDomain[parts.Count];
+                    var mirroredDomains = new InfluenceDomain[parts.Count];
+                    for (int partIndex = 0; partIndex < parts.Count; partIndex++)
+                    {
+                        ResolvedPartSnapshot part = parts[partIndex].Part;
+                        normalDomains[partIndex] = BuildHierarchyDomain(snapshot, part, mirrored: false);
+                        mirroredDomains[partIndex] = BuildHierarchyDomain(snapshot, part, mirrored: true);
+                    }
+
                     var domains = new InfluenceDomain[vertices.Count];
                     for (int vertexIndex = 0; vertexIndex < vertices.Count; vertexIndex++)
                     {
@@ -56,8 +71,7 @@ namespace ProceduralCreature.Animation.Binding
                         }
 
                         float nearest = float.PositiveInfinity;
-                        ResolvedPartSnapshot nearestPart = default;
-                        bool hasPart = false;
+                        int nearestPartIndex = -1;
                         for (int partIndex = 0; partIndex < parts.Count; partIndex++)
                         {
                             float distance = Mathf.Abs(SdfProgramEvaluator.Evaluate(
@@ -66,8 +80,7 @@ namespace ProceduralCreature.Animation.Binding
                                 scratch));
                             if (float.IsPositiveInfinity(distance) || distance >= nearest) continue;
                             nearest = distance;
-                            nearestPart = parts[partIndex].Part;
-                            hasPart = true;
+                            nearestPartIndex = partIndex;
                         }
 
                         float bodyDistance = Mathf.Abs(SdfProgramEvaluator.Evaluate(
@@ -78,12 +91,13 @@ namespace ProceduralCreature.Animation.Binding
                         {
                             domains[vertexIndex] = new InfluenceDomain(CreatureDefinition.BodyId);
                         }
-                        else if (hasPart)
+                        else if (nearestPartIndex >= 0)
                         {
-                            domains[vertexIndex] = BuildHierarchyDomain(
-                                snapshot,
-                                nearestPart,
-                                vertex);
+                            ResolvedPartSnapshot nearestPart = parts[nearestPartIndex].Part;
+                            bool mirrored = IsMirroredInstance(nearestPart, vertex);
+                            domains[vertexIndex] = mirrored
+                                ? mirroredDomains[nearestPartIndex]
+                                : normalDomains[nearestPartIndex];
                         }
                         else
                         {
@@ -108,9 +122,8 @@ namespace ProceduralCreature.Animation.Binding
         private static InfluenceDomain BuildHierarchyDomain(
             ResolvedCreatureSnapshot snapshot,
             ResolvedPartSnapshot primaryPart,
-            Vector3 vertex)
+            bool mirrored)
         {
-            bool mirrored = IsMirroredInstance(primaryPart, vertex);
             string primaryDomain = ResolveDomainForInstance(primaryPart, mirrored);
             var allowedDomains = new List<string>(4) { primaryDomain };
 
