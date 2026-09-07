@@ -66,7 +66,7 @@ namespace ProceduralCreature.Generation
                 MeshTopologyReport topology = result.Data.TopologyReport;
 
                 DestroyGeneratedGeometry();
-                BindImplicitSurfaceToRig(generated, result.Data.Snapshot);
+                BindImplicitSurfaceToRig(generated, result.Data.Definition, result.Data.Snapshot);
 
                 int implicitTriangles = 0;
                 if (generated.TryGetImplicitSurface(out GeometryItem implicitSurface) && implicitSurface.Mesh != null)
@@ -175,9 +175,12 @@ namespace ProceduralCreature.Generation
             if (material != null) renderer.sharedMaterial = material;
         }
 
-        private void BindImplicitSurfaceToRig(GeneratedCreature generated, ResolvedCreatureSnapshot snapshot)
+        private void BindImplicitSurfaceToRig(
+            GeneratedCreature generated,
+            CreatureDefinition definition,
+            ResolvedCreatureSnapshot snapshot)
         {
-            if (generated == null || snapshot == null)
+            if (generated == null || definition == null || snapshot == null)
             {
                 return;
             }
@@ -212,7 +215,7 @@ namespace ProceduralCreature.Generation
             float[] radiiByBoneIndex = MorphologyInfluenceRadiusBridge.BuildRadiiByBoneIndex(
                 skeletonSnapshot, snapshot);
             InfluenceDomain[] vertexDomains = ImplicitSurfaceInfluenceDomainResolver.Resolve(
-                snapshot, implicitItem.Mesh.vertices);
+                definition, snapshot, implicitItem.Mesh.vertices);
             Material defaultMaterial = MaterialResolver.ResolveDefault(ResolveMaterialPalette());
             Material[] materials = defaultMaterial != null ? new[] { defaultMaterial } : null;
             _skinnedRenderer.Bind(
