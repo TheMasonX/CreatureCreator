@@ -60,7 +60,7 @@ namespace ProceduralCreature.Tests.Runtime
             IReadOnlyList<AnatomicalBodyRigLayout.BoneSpec> bones =
                 AnatomicalBodyRigLayout.Build(BuildBody(5), Vector3.forward);
 
-            Assert.AreEqual(1, CountExactId(bones, AnatomicalBodyRigLayout.PelvisBoneId));
+            Assert.AreEqual(1, CountExactId(bones, AnatomicalBodyRigLayout.BodyRootBoneId));
             Assert.GreaterOrEqual(CountByPrefix(bones, AnatomicalBodyRigLayout.SpineBoneId), 3,
                 "Headward Body curvature must not collapse to one chest-to-head segment.");
             Assert.GreaterOrEqual(CountByPrefix(bones, AnatomicalBodyRigLayout.TailBoneId), 3,
@@ -73,7 +73,7 @@ namespace ProceduralCreature.Tests.Runtime
                 if (bones[i].ParentBoneId == null)
                 {
                     rootCount++;
-                    Assert.AreEqual(AnatomicalBodyRigLayout.PelvisBoneId, bones[i].Id);
+                    Assert.AreEqual(AnatomicalBodyRigLayout.BodyRootBoneId, bones[i].Id);
                 }
             }
             Assert.AreEqual(1, rootCount);
@@ -163,7 +163,7 @@ namespace ProceduralCreature.Tests.Runtime
                 body, Vector3.forward, new Vector3(0f, 0f, 1.25f), mirrored: false);
 
             StringAssert.StartsWith(AnatomicalBodyRigLayout.SpineBoneId, headward);
-            Assert.AreEqual(AnatomicalBodyRigLayout.PelvisBoneId, middle);
+            Assert.AreEqual(AnatomicalBodyRigLayout.BodyRootBoneId, middle);
             StringAssert.StartsWith(AnatomicalBodyRigLayout.TailBoneId, tailward);
         }
 
@@ -174,7 +174,7 @@ namespace ProceduralCreature.Tests.Runtime
             string boneId = AnatomicalBodyRigLayout.ResolveAttachmentBoneId(
                 body, Vector3.forward, Vector3.zero, mirrored: false, anchorSampleId: 3u);
 
-            Assert.AreEqual(AnatomicalBodyRigLayout.PelvisBoneId, boneId);
+            Assert.AreEqual(AnatomicalBodyRigLayout.BodyRootBoneId, boneId);
             StringAssert.DoesNotContain("body_j", boneId);
         }
 
@@ -226,8 +226,8 @@ namespace ProceduralCreature.Tests.Runtime
             string limbAParent = skeleton.FindBone("limb_a_j0").ParentBoneId;
             Assert.IsTrue(limbAParent.StartsWith(AnatomicalBodyRigLayout.SpineBoneId),
                 "limb attachment should remain on the headward Body branch rather than a legacy body_j id");
-            Assert.IsTrue(skeleton.FindBone("limb_b_j0").ParentBoneId.StartsWith(AnatomicalBodyRigLayout.PelvisBoneId));
-            Assert.IsTrue(skeleton.FindBone("limb_c_j0").ParentBoneId.StartsWith(AnatomicalBodyRigLayout.PelvisBoneId));
+            Assert.IsTrue(skeleton.FindBone("limb_b_j0").ParentBoneId.StartsWith(AnatomicalBodyRigLayout.BodyRootBoneId));
+            Assert.IsTrue(skeleton.FindBone("limb_c_j0").ParentBoneId.StartsWith(AnatomicalBodyRigLayout.BodyRootBoneId));
             Assert.IsTrue(skeleton.FindBone("limb_d_j0").ParentBoneId.StartsWith(AnatomicalBodyRigLayout.TailBoneId));
             Assert.IsTrue(skeleton.FindBone("limb_e_j0").ParentBoneId.StartsWith(AnatomicalBodyRigLayout.TailBoneId));
         }
