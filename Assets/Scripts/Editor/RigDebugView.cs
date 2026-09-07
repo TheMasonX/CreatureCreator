@@ -146,7 +146,13 @@ namespace ProceduralCreature.Editor
             Transform parent = bones[parentIndex];
             if (parent == null) return;
 
-            Vector3 attachment = ResolveParentAttachmentPoint(parentIndex, boneData.Position, bones[parentIndex], snapshot[parentIndex]);
+            Vector3 attachment = ResolveParentAttachmentPoint(
+                parentIndex,
+                boneData.Position,
+                bones[parentIndex],
+                snapshot[parentIndex],
+                bones,
+                snapshot);
             if ((attachment - bone.position).sqrMagnitude <= GeometryEpsilonSqr) return;
 
             Handles.DrawAAPolyLine(width, attachment, bone.position);
@@ -161,13 +167,15 @@ namespace ProceduralCreature.Editor
             int parentIndex,
             Vector3 childPosition,
             Transform parentTransform,
-            BoneSnapshot parentData)
+            BoneSnapshot parentData,
+            IReadOnlyList<Transform> bones,
+            SkeletonSnapshot snapshot)
         {
             if (!parentData.HasSegment)
                 return parentTransform.position;
 
             Vector3 start = parentTransform.position;
-            Vector3 end = ResolveCurrentSegmentEnd(parentIndex, parentData, null, null);
+            Vector3 end = ResolveCurrentSegmentEnd(parentIndex, parentData, bones, snapshot);
             Vector3 segment = end - start;
             float segmentLengthSqr = segment.sqrMagnitude;
             if (segmentLengthSqr <= GeometryEpsilonSqr)
