@@ -51,15 +51,21 @@
       "author": "anonymous",
       "body": "Synthesis evidence (2026-09-06 audit batch; see docs/audits/creaturecreator-audit-synthesis-2026-09-06-batch.md). LinearBlendSkinning / bind-contract corroborations:\n- whole-codebase F-25 (P2/P3): LBS Deform enforces finiteness only, not unit-length rotation; this is a DOCUMENTED contract (BonePose doc) - treat as contract-gap, not bug. Corroborate TSK-0120/TSK-0077.\n- whole-codebase F-26 (P3): no duplicate bone-index rejection in the documented binding contract. Low-value; add a validation rule only if bind-weight authoring (TSK-0130/0131) can produce duplicates. No duplicate task created.",
       "createdAtUtc": "2026-09-06T22:44:41.6468452Z"
+    },
+    {
+      "id": "c-edba62f3ed7f46568ea4950be3ef11c9",
+      "author": "anonymous",
+      "body": "Audit synthesis 2026-09-07: retain this as the binding owner. Completed TSK-0131 is a valid geometric MVP using closest-point-on-segment distance, morphology-derived radius falloff, deterministic top-four selection, normalization, mirror parity, and build-time ownership. The remaining quality mechanism is anatomical influence locality at hip, shoulder, mirrored-limb, and neighboring-limb junctions. New bounded child owner: TSK-0147, which must preserve the TSK-0131 contract and add explicit chain/domain metadata rather than replacing segment-distance weighting. Synthesis report: docs/audits/creaturecreator-audit-synthesis-2026-09-07-skeleton-animation.md.",
+      "createdAtUtc": "2026-09-07T06:28:30.1843997Z"
     }
   ],
   "epicId": null,
   "parentId": null,
   "dueDateUtc": null,
   "createdAtUtc": "2026-09-01T03:20:52.269603Z",
-  "updatedAtUtc": "2026-09-06T22:44:41.6468452Z",
+  "updatedAtUtc": "2026-09-07T06:28:30.1843997Z",
   "completedAtUtc": null,
-  "revision": 7,
+  "revision": 8,
   "isArchived": false,
   "hasLoadError": false,
   "loadError": null,

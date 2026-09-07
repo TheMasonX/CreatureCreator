@@ -70,15 +70,33 @@
       "author": "anonymous",
       "body": "Round 2 sequential review (2026-09-07): reviewed current uncommitted TSK-0118 slice only; no files edited, no commit/push. Changed named source files: Assets/Scripts/Runtime/Skeleton/SkeletonSnapshot.cs, Assets/Scripts/Runtime/Skeleton/SemanticBoneResolver.cs, Assets/Scripts/Runtime/Animation/Skinned/CreatureSkinnedMeshRenderer.cs. Changed focused tests: Assets/Scripts/Tests/Runtime/SkeletonSnapshotTests.cs and Assets/Scripts/Tests/Runtime/SemanticBoneResolverTests.cs; CreatureSkinnedMeshRendererTests.cs was inspected and unchanged.\n\nSource review result: hypothesis supported. SkeletonSnapshot.Capture rejects null/empty IDs, duplicate IDs, missing parents, cycles, zero roots, and multi-root graphs; RootIndex and RootBone expose the semantic root; HasSameBoneOrder compares ordered IDs, parent indices/topology, SourcePartId, PartType, IsMirrored, rest position/rotation, segment/end data, and child-attachment data. CreatureSkinnedMeshRenderer.Bind consumes snapshot.RootIndex for rootBone and retains index-parallel rig transforms. Runtime ownership remains intact: resolver uses authoritative definition only at compatibility entry points and resolved snapshots for generation paths; no pose state or mutable generated state moved into the runtime snapshot boundary.\n\nExact validation: \u0060get_errors\u0060 on all six reviewed files -\u003E no errors; \u0060dotnet build ProceduralCreature.Runtime.csproj --no-restore\u0060 -\u003E exit 0; \u0060dotnet build ProceduralCreature.Tests.Runtime.csproj --no-restore\u0060 -\u003E exit 0; \u0060git diff --check\u0060 -\u003E exit 0. Unity test attempt: \u0060run_tests(mode=PlayMode, test_names=[SkeletonSnapshotTests, SemanticBoneResolverTests, CreatureSkinnedMeshRendererTests], init_timeout=120000)\u0060 started job \u006026d5531809684fd3a9230e76d8913844\u0060; \u0060get_test_job(wait_timeout=60, include_details=true)\u0060 failed with \u0060Could not connect to Unity\u0060. Project validation contract identifies Unity 6000.0.35f1; no connected editor was available to prove the PlayMode result. Static/source review did not identify a remaining TSK-0118 structural gap. Residual risk: Unity execution and the repeated ApplyPose allocation measurement remain unverified in this round; prior Round 1 evidence recorded 28/28 focused PlayMode and 0 allocated bytes, but this review does not re-claim it as a new run. Existing unrelated worktree changes were not touched. Next step: reconnect Unity 6000.0.35f1 and rerun the three focused PlayMode fixtures, then close TSK-0118 only after that gate.",
       "createdAtUtc": "2026-09-07T05:57:26.2497826Z"
+    },
+    {
+      "id": "c-8042b706024c448abe9b006ea84fa3c3",
+      "author": "anonymous",
+      "body": "Audit synthesis 2026-09-07: supplied sources S01/S02 and direct source review confirm the segmented-bone pose defect remains owned here. \u0060PoseRotationResolver.ResolveInto\u0060 uses \u0060position \u002B (bone.EndPosition - bone.Position)\u0060 for \u0060HasSegment\u0060, so the target is rest-space data rather than the posed continuation child. \u0060PosedSkeleton\u0060 already exposes indexed posed positions. Required closure: explicit continuation-child metadata covering Body and limb segment bones, bent two- and three-segment regression tests including an attachment branch, runtime build, and Unity PlayMode validation. Correction: the audit claim that \u0060SkeletonSnapshot.HasSameBoneOrder\u0060 is ID-only is refuted; current code compares topology and semantic/rest fields. Synthesis report: docs/audits/creaturecreator-audit-synthesis-2026-09-07-skeleton-animation.md.",
+      "createdAtUtc": "2026-09-07T06:28:30.1480859Z"
+    },
+    {
+      "id": "c-7b28a96555244772a45ba622e3560dcf",
+      "author": "anonymous",
+      "body": "Sprint Orchestration Round 1 pose-rotation slice evidence (2026-09-07): PoseRotationResolver now resolves a segmented bone\u0027s continuation child by rest endpoint, preferring matching SourcePartId and then deterministic child ID, and uses that child\u0027s posed position; isolated segmented bones retain the EndPosition rest fallback. Added deterministic runtime regressions for a bent three-segment chain, attachment child with reversed insertion order, while existing straight-rest, terminal-rest-rotation, coincident-position, and non-mutation tests remain. Validation: Unity PlayMode focused \u0060ProceduralCreature.Tests.Runtime.PoseRotationResolverTests\u0060 passed 10/10; \u0060dotnet build ProceduralCreature.Runtime.csproj --no-restore\u0060 passed; \u0060dotnet build ProceduralCreature.Tests.Runtime.csproj --no-restore\u0060 passed; get_errors found none for both changed files. Unity console had no errors/warnings after the focused run. No commit/push. Residual scope: broader task items and unrelated audit/task/worktree changes remain untouched.",
+      "createdAtUtc": "2026-09-07T06:53:25.9958782Z"
+    },
+    {
+      "id": "c-dfc241abfd6b4d868b6c0cd27d63892e",
+      "author": "anonymous",
+      "body": "Sprint round 1 implementation evidence (uncommitted): PoseRotationResolver now resolves a segmented bone\u0027s target from the posed position of a deterministic continuation child whose rest position matches EndPosition, preferring matching SourcePartId and then ordinal bone ID. It retains the rest EndPosition fallback for isolated segmented bones, terminal rest rotations, non-mutation, and existing deterministic ordering behavior. Added bent-chain and attachment-child regression fixtures in PoseRotationResolverTests.\n\nValidation: connected Unity bridge focused PlayMode \u0060ProceduralCreature.Tests.Runtime.PoseRotationResolverTests\u0060 passed 10/10, 0 failed, 0 skipped; Unity console had no errors or warnings afterward. \u0060dotnet build ProceduralCreature.Runtime.csproj --no-restore\u0060 passed. \u0060dotnet build ProceduralCreature.Tests.Runtime.csproj --no-restore\u0060 passed. Scoped \u0060git diff --check\u0060 passed. \u0060get_errors\u0060 reported no errors for both changed files. Unity.exe was not present in standard paths, but the connected Unity bridge executed the focused job. Evidence confidence: report-trusted for Unity result, spot-checked source/diff by orchestrator. Residual risk: continuation identity is inferred from existing endpoint and SourcePartId metadata rather than new explicit metadata; broader TSK-0118 root-contract work remains.",
+      "createdAtUtc": "2026-09-07T06:54:17.9641964Z"
     }
   ],
   "epicId": null,
   "parentId": "TSK-0073",
   "dueDateUtc": null,
   "createdAtUtc": "2026-09-06T03:06:41.5219151Z",
-  "updatedAtUtc": "2026-09-07T05:57:26.2497826Z",
+  "updatedAtUtc": "2026-09-07T06:54:17.9641964Z",
   "completedAtUtc": null,
-  "revision": 11,
+  "revision": 15,
   "isArchived": false,
   "hasLoadError": false,
   "loadError": null,

@@ -1,0 +1,31 @@
+﻿{
+  "id": "tsk-0151-bone-name-improvements",
+  "key": "TSK-0151",
+  "title": "Bone Name Improvements",
+  "description": "Instead of just the part_hash style bone object naming, add the actual human assignable part name, such as arm, hip, foot, etc. Leave the part name as a postfix for disambiguation",
+  "type": "Task",
+  "status": "Backlog",
+  "priority": "Medium",
+  "assigneeMode": "Directory",
+  "assigneeDirectoryId": "ccead9074fa2419e8c162e1e65f5e6d4",
+  "assigneeCustomText": null,
+  "reporter": "TheMasonX",
+  "labels": [
+    "future"
+  ],
+  "attachments": [],
+  "externalLinks": [],
+  "linkedPages": [],
+  "comments": [],
+  "epicId": null,
+  "parentId": null,
+  "dueDateUtc": null,
+  "createdAtUtc": "2026-09-07T07:35:23.5336695Z",
+  "updatedAtUtc": "2026-09-07T07:35:23.5336695Z",
+  "completedAtUtc": null,
+  "revision": 1,
+  "isArchived": false,
+  "hasLoadError": false,
+  "loadError": null,
+  "sourceFilePath": null
+}

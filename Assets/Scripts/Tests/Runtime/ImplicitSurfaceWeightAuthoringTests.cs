@@ -32,12 +32,14 @@ namespace ProceduralCreature.Tests.Runtime
 
         // ---- Skeleton helpers ---------------------------------------------------
 
-        private static Bone SegmentBone(string id, Vector3 position, Vector3 end, bool mirrored = false)
+        private static Bone SegmentBone(string id, Vector3 position, Vector3 end,
+            bool mirrored = false, string sourcePartId = "part", string parentBoneId = null)
         {
             return new Bone
             {
                 Id = id,
-                SourcePartId = "part",
+                ParentBoneId = parentBoneId,
+                SourcePartId = sourcePartId,
                 IsMirrored = mirrored,
                 Position = position,
                 HasSegment = true,
@@ -392,6 +394,95 @@ namespace ProceduralCreature.Tests.Runtime
                     Assert.AreEqual(bulk[v][i].Weight, single[0][i].Weight, T, $"vertex {v} locality weight");
                 }
             }
+        }
+
+        [Test]
+        public void Author_HipTransition_ExcludesUnrelatedNeighbor_AndBlendsAdjacentDomains()
+        {
+            SkeletonSnapshot snapshot = Capture(
+                SegmentBone("body_j0", new Vector3(-1f, 0f, 0f), new Vector3(1f, 0f, 0f), sourcePartId: "body"),
+                SegmentBone("hip_left_j0", new Vector3(0f, 0f, 0f), new Vector3(0f, -1f, 0f), sourcePartId: "hip_left", parentBoneId: "body_j0"),
+                SegmentBone("shoulder_right_j0", new Vector3(0f, 0.15f, 0f), new Vector3(0f, 1.15f, 0f), sourcePartId: "shoulder_right", parentBoneId: "body_j0"));
+            List<BoneSegmentInfluence> segments = ImplicitSurfaceWeightAuthoring.BuildSegmentInfluences(
+                snapshot, new[] { 0.25f, 0.25f, 0.25f });
+            int body = snapshot.GetIndex("body_j0");
+            int hip = snapshot.GetIndex("hip_left_j0");
+            int unrelated = snapshot.GetIndex("shoulder_right_j0");
+
+            Vector3[] vertices = { new Vector3(0f, 0f, 0f), new Vector3(0f, -0.5f, 0f) };
+            var domains = new[]
+            {
+                new InfluenceDomain("hip_left", "body", "hip_left"),
+                new InfluenceDomain("hip_left", "hip_left"),
+            };
+            VertexInfluence[][] weights = ImplicitSurfaceWeightAuthoring.Author(segments, vertices, domains);
+
+            AssertStructural(snapshot, weights, vertices.Length);
+            Assert.IsTrue(HasBone(weights[0], body));
+            Assert.IsTrue(HasBone(weights[0], hip));
+            Assert.IsFalse(HasBone(weights[0], unrelated), "shoulder domain must be excluded at the hip");
+            Assert.AreEqual(1, weights[1].Length, "deep hip vertex stays in its own domain");
+            Assert.AreEqual(hip, weights[1][0].BoneIndex);
+        }
+
+        [Test]
+        public void Author_MirroredTransition_UsesConfiguredMirroredAndNeighborDomainsDeterministically()
+        {
+            SkeletonSnapshot snapshot = Capture(
+                SegmentBone("body_j0", Vector3.zero, Vector3.right, sourcePartId: "body"),
+                SegmentBone("leg_j0", Vector3.zero, Vector3.down, sourcePartId: "leg", parentBoneId: "body_j0"),
+                SegmentBone("leg_j0_mirror", Vector3.zero, Vector3.up, mirrored: true, sourcePartId: "leg_mirror", parentBoneId: "body_j0"),
+                SegmentBone("arm_j0", new Vector3(0f, 0f, 0.1f), new Vector3(0f, 1f, 0.1f), sourcePartId: "arm", parentBoneId: "body_j0"));
+            List<BoneSegmentInfluence> segments = ImplicitSurfaceWeightAuthoring.BuildSegmentInfluences(
+                snapshot, new[] { 0.2f, 0.2f, 0.2f, 0.2f });
+            int mirrored = snapshot.GetIndex("leg_j0_mirror");
+            int arm = snapshot.GetIndex("arm_j0");
+
+            var vertexDomains = new[]
+            {
+                new InfluenceDomain("leg_mirror", "leg_mirror", "body"),
+            };
+            VertexInfluence[][] first = ImplicitSurfaceWeightAuthoring.Author(
+                segments, new[] { new Vector3(0f, 0f, 0f) }, vertexDomains);
+            VertexInfluence[][] second = ImplicitSurfaceWeightAuthoring.Author(
+                segments, new[] { new Vector3(0f, 0f, 0f) }, vertexDomains);
+
+            AssertStructural(snapshot, first, 1);
+            Assert.IsTrue(HasBone(first[0], mirrored));
+            Assert.IsFalse(HasBone(first[0], arm), "unrelated arm domain must be excluded");
+            Assert.AreEqual(first[0].Length, second[0].Length);
+            for (int i = 0; i < first[0].Length; i++)
+            {
+                Assert.AreEqual(first[0][i].BoneIndex, second[0][i].BoneIndex);
+                Assert.AreEqual(first[0][i].Weight, second[0][i].Weight, T);
+            }
+        }
+
+        [Test]
+        public void BuildSegmentInfluences_MirroredBonesGetDistinctDomainsFromSameSourcePart()
+        {
+            SkeletonSnapshot snapshot = Capture(
+                SegmentBone("hip_j0", new Vector3(0.5f, 0f, 0f), new Vector3(0.5f, -1f, 0f),
+                    sourcePartId: "hip"),
+                SegmentBone("hip_j0_mirror", new Vector3(-0.5f, 0f, 0f), new Vector3(-0.5f, -1f, 0f),
+                    mirrored: true, sourcePartId: "hip"));
+            List<BoneSegmentInfluence> segments =
+                ImplicitSurfaceWeightAuthoring.BuildSegmentInfluences(snapshot, new[] { 0.2f, 0.2f });
+
+            Assert.AreEqual("hip", segments[0].DomainId);
+            Assert.AreEqual("hip_mirror", segments[1].DomainId);
+
+            VertexInfluence[][] weights = ImplicitSurfaceWeightAuthoring.Author(
+                segments,
+                new[] { new Vector3(0.5f, -0.5f, 0f), new Vector3(-0.5f, -0.5f, 0f) },
+                new[]
+                {
+                    new InfluenceDomain("hip"),
+                    new InfluenceDomain("hip_mirror"),
+                });
+
+            Assert.AreEqual(snapshot.GetIndex("hip_j0"), weights[0][0].BoneIndex);
+            Assert.AreEqual(snapshot.GetIndex("hip_j0_mirror"), weights[1][0].BoneIndex);
         }
 
         [Test]

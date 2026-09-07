@@ -1,0 +1,31 @@
+﻿{
+  "id": "tsk-0152-more-segmented-types",
+  "key": "TSK-0152",
+  "title": "More Segmented Types",
+  "description": "Similar to arm/leg limbs, we should have further options like finger/toe/tail/etc. These would allow us to animate further, especially as things like fingers get attached to hands. These would reuse the arm/leg limb controls",
+  "type": "Task",
+  "status": "Backlog",
+  "priority": "High",
+  "assigneeMode": "Directory",
+  "assigneeDirectoryId": "ccead9074fa2419e8c162e1e65f5e6d4",
+  "assigneeCustomText": null,
+  "reporter": "TheMasonX",
+  "labels": [
+    "future"
+  ],
+  "attachments": [],
+  "externalLinks": [],
+  "linkedPages": [],
+  "comments": [],
+  "epicId": null,
+  "parentId": null,
+  "dueDateUtc": null,
+  "createdAtUtc": "2026-09-07T07:37:41.8568965Z",
+  "updatedAtUtc": "2026-09-07T07:38:05.7726776Z",
+  "completedAtUtc": null,
+  "revision": 2,
+  "isArchived": false,
+  "hasLoadError": false,
+  "loadError": null,
+  "sourceFilePath": "tsk-0152-more-segmented-types.json"
+}

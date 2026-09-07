@@ -169,17 +169,6 @@ namespace ProceduralCreature.Appearance
                         compiledParts, bodyProgram, vertices, programCount, maxOps,
                         distances, outBase, outSeed, outScale, outBody);
 
-                    // Body vertical-gradient axis: derive the spine-normal frames
-                    // ONCE per bake (from the snapshot's cached frames when
-                    // available) and reuse them for every Body-owned vertex so the
-                    // per-vertex gradient never re-transports frames.
-                    Vector3 forward = snapshot == null ? definition.Forward : snapshot.Forward;
-                    BodyFrame[] bodyFrames = snapshot?.BodyFrames;
-                    if (bodyFrames == null && body.SamplePositions != null && body.SamplePositions.Count > 0)
-                    {
-                        bodyFrames = BodyFrameResolver.ComputeSampleFrames(body, forward);
-                    }
-
                     for (int i = 0; i < vertexCount; i++)
                     {
                         if (outBody[i])
@@ -187,8 +176,7 @@ namespace ProceduralCreature.Appearance
                             Color bodyColor = BodyVerticalGradientSampler.EvaluateColor(
                                 snapshot == null ? definition.Body?.Appearance : snapshot.BodyAppearance,
                                 body,
-                                forward,
-                                bodyFrames,
+                                snapshot == null ? definition.Forward : snapshot.Forward,
                                 mesh.Positions[i]);
                             colors[i] = BakeVertexColor(mesh.Positions[i], mesh.Normals[i], bodyColor, 0, 1f);
                         }

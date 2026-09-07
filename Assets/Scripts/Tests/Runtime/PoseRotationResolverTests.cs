@@ -115,6 +115,53 @@ namespace ProceduralCreature.Tests.Runtime
             Assert.Greater(Vector3.Dot(firstRotation * Vector3.forward, Vector3.forward), 0.999f);
         }
 
+        [Test]
+        public void Resolve_SegmentedChainUsesPosedContinuationChild()
+        {
+            Skeleton.Skeleton skeleton = BuildBentSegmentChain(reverseChildren: false, includeAttachment: false);
+            PosedSkeleton pose = PosedSkeleton.FromRestPose(skeleton).WithUpdatedPositions(
+                new Dictionary<string, Vector3>
+                {
+                    ["segment_1"] = Vector3.up,
+                    ["segment_2"] = Vector3.up + Vector3.right,
+                    ["terminal"] = Vector3.up + Vector3.right * 2f,
+                });
+
+            Dictionary<string, Quaternion> rotations = PoseRotationResolver.Resolve(skeleton, pose);
+
+            Assert.Greater(Vector3.Dot(rotations["segment_0"] * Vector3.forward, Vector3.up), 0.999f);
+            Assert.Greater(Vector3.Dot(rotations["segment_1"] * Vector3.forward, Vector3.right), 0.999f);
+        }
+
+        [Test]
+        public void Resolve_SegmentedChainIgnoresAttachmentChildAndInsertionOrder()
+        {
+            Skeleton.Skeleton first = BuildBentSegmentChain(reverseChildren: false, includeAttachment: true);
+            Skeleton.Skeleton second = BuildBentSegmentChain(reverseChildren: true, includeAttachment: true);
+            PosedSkeleton firstPose = PosedSkeleton.FromRestPose(first).WithUpdatedPositions(
+                new Dictionary<string, Vector3>
+                {
+                    ["segment_1"] = Vector3.up,
+                    ["segment_2"] = Vector3.up + Vector3.right,
+                    ["terminal"] = Vector3.up + Vector3.right * 2f,
+                    ["attachment"] = Vector3.up + Vector3.right * 0.5f,
+                });
+            PosedSkeleton secondPose = PosedSkeleton.FromRestPose(second).WithUpdatedPositions(
+                new Dictionary<string, Vector3>
+                {
+                    ["segment_1"] = Vector3.up,
+                    ["segment_2"] = Vector3.up + Vector3.right,
+                    ["terminal"] = Vector3.up + Vector3.right * 2f,
+                    ["attachment"] = Vector3.up + Vector3.right * 0.5f,
+                });
+
+            Quaternion firstRotation = PoseRotationResolver.Resolve(first, firstPose)["segment_0"];
+            Quaternion secondRotation = PoseRotationResolver.Resolve(second, secondPose)["segment_0"];
+
+            Assert.Less(Quaternion.Angle(firstRotation, secondRotation), 1e-5f);
+            Assert.Greater(Vector3.Dot(firstRotation * Vector3.forward, Vector3.up), 0.999f);
+        }
+
         private static Skeleton.Skeleton BuildSegmentBranch(bool reverseChildren)
         {
             var skeleton = new Skeleton.Skeleton();
@@ -142,6 +189,63 @@ namespace ProceduralCreature.Tests.Runtime
             };
             skeleton.Bones.Add(reverseChildren ? second : first);
             skeleton.Bones.Add(reverseChildren ? first : second);
+            return skeleton;
+        }
+
+        private static Skeleton.Skeleton BuildBentSegmentChain(bool reverseChildren, bool includeAttachment)
+        {
+            var skeleton = new Skeleton.Skeleton();
+            Bone segment0 = new Bone
+            {
+                Id = "segment_0",
+                SourcePartId = "limb",
+                Position = Vector3.zero,
+                EndPosition = Vector3.forward,
+                HasSegment = true,
+                Rotation = Quaternion.identity,
+            };
+            Bone segment1 = new Bone
+            {
+                Id = "segment_1",
+                ParentBoneId = "segment_0",
+                SourcePartId = "limb",
+                Position = Vector3.forward,
+                EndPosition = Vector3.forward + Vector3.right,
+                HasSegment = true,
+                Rotation = Quaternion.identity,
+            };
+            Bone segment2 = new Bone
+            {
+                Id = "segment_2",
+                ParentBoneId = "segment_1",
+                SourcePartId = "limb",
+                Position = Vector3.forward + Vector3.right,
+                EndPosition = Vector3.forward + Vector3.right * 2f,
+                HasSegment = true,
+                Rotation = Quaternion.identity,
+            };
+            Bone terminal = new Bone
+            {
+                Id = "terminal",
+                ParentBoneId = "segment_2",
+                SourcePartId = "limb",
+                Position = Vector3.forward + Vector3.right * 2f,
+                Rotation = Quaternion.Euler(0f, 90f, 0f),
+            };
+            Bone attachment = new Bone
+            {
+                Id = "attachment",
+                ParentBoneId = "segment_0",
+                SourcePartId = "attachment",
+                Position = Vector3.forward,
+                Rotation = Quaternion.identity,
+            };
+            skeleton.Bones.Add(segment0);
+            if (reverseChildren && includeAttachment) skeleton.Bones.Add(attachment);
+            skeleton.Bones.Add(segment1);
+            skeleton.Bones.Add(segment2);
+            skeleton.Bones.Add(terminal);
+            if (!reverseChildren && includeAttachment) skeleton.Bones.Add(attachment);
             return skeleton;
         }
 
