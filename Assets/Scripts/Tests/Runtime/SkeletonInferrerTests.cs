@@ -70,7 +70,7 @@ namespace ProceduralCreature.Tests.Runtime
                     Scale = Vector3.one,
                 },
                 Limb = LimbChain.CreateDefault(),
-                Shape = ShapeDefinition.DefaultCapsule,
+                Shape = ShapeDefinition.DefaultSphere,
                 Appearance = AppearanceDefinition.Default,
                 MirrorAcrossSymmetryPlane = mirror,
             };
