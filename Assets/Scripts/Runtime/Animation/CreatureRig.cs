@@ -1,4 +1,5 @@
 using System.Collections.Generic;
+using System.Collections.ObjectModel;
 using ProceduralCreature.Animation.Ik;
 using ProceduralCreature.Common;
 using ProceduralCreature.Skeleton;
@@ -12,33 +13,36 @@ namespace ProceduralCreature.Animation
     /// hierarchy and applies poses in world space.
     ///
     /// Space contract: pose coordinates are creature-space. This adapter applies
-    /// them directly as world positions/rotations on the generated bone
-    /// Transforms without composing the rig host GameObject's own transform
-    /// (CreatureRig is not a world-space adapter that offsets creature-space
-    /// coordinates by a rig root transform). The host GameObject's transform
-    /// must therefore remain at identity (position zero, rotation identity,
-    /// scale one) for the generated hierarchy to be placed and driven
-    /// predictably. Keeping the host at identity is an explicit invariant; do
-    /// not move, rotate, or scale the GameObject that owns this component.
+    /// them directly as world positions/rotations on the generated bone Transforms.
+    /// The host GameObject must remain at identity (position zero, rotation identity,
+    /// scale one) for generated hierarchy placement and pose application to be
+    /// predictable. A future root-motion layer can replace this deliberately.
     /// </summary>
     public sealed class CreatureRig : MonoBehaviour
     {
         private const string BoneObjectPrefix = "Bone_";
         private readonly Dictionary<string, Transform> _bones = new Dictionary<string, Transform>();
+        private ReadOnlyDictionary<string, Transform> _readOnlyBones;
         private readonly List<GameObject> _generatedObjects = new List<GameObject>();
         private SkeletonSnapshot _restSkeleton;
         private Transform[] _indexedBones = new Transform[0];
         private Quaternion[] _indexedRotations = new Quaternion[0];
 
-        public IReadOnlyDictionary<string, Transform> Bones => _bones;
+        public IReadOnlyDictionary<string, Transform> Bones =>
+            _readOnlyBones ?? (_readOnlyBones = new ReadOnlyDictionary<string, Transform>(_bones));
 
-        /// <summary>
-        /// The generated bone Transforms in <see cref="SkeletonSnapshot.Capture"/>
-        /// order — index-parallel to the shared bind-index contract (TSK-0131). Read-only
-        /// view for the presentation adapter (<c>SkinnedMeshRenderer.bones</c>); the
-        /// adapter stays outside this component.
-        /// </summary>
+        public SkeletonSnapshot RestSkeleton => _restSkeleton;
         public IReadOnlyList<Transform> IndexedBones => _indexedBones;
+
+        public bool TryGetBone(string boneId, out Transform bone)
+        {
+            if (boneId == null)
+            {
+                bone = null;
+                return false;
+            }
+            return _bones.TryGetValue(boneId, out bone);
+        }
 
         public void Build(Skeleton.Skeleton restSkeleton)
         {
@@ -89,7 +93,7 @@ namespace ProceduralCreature.Animation
             if (_restSkeleton == null) throw new DomainException("Build must be called before ApplyPose.");
             if (pose == null) throw new DomainException("pose must not be null.");
 
-            Ik.PoseRotationResolver.ResolveInto(_restSkeleton, pose, _indexedRotations);
+            PoseRotationResolver.ResolveInto(_restSkeleton, pose, _indexedRotations);
             for (int i = 0; i < _restSkeleton.Count; i++)
             {
                 Transform boneTransform = _indexedBones[i];

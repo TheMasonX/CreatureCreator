@@ -25,9 +25,9 @@ namespace ProceduralCreature.Tests.Runtime
         [Test]
         public void Solve_ReachableTarget_EndEffectorConvergesWithinTolerance()
         {
-            Vector3[] initial = StraightChain(4, 1f); // total reach = 3
+            Vector3[] initial = StraightChain(4, 1f);
             float[] lengths = UniformLinkLengths(3, 1f);
-            Vector3 target = new Vector3(1.5f, 1.5f, 0f); // well within reach
+            Vector3 target = new Vector3(1.5f, 1.5f, 0f);
 
             Vector3[] result = FabrikSolver.Solve(initial, lengths, target, maxIterations: 20, tolerance: 0.001f);
 
@@ -65,23 +65,20 @@ namespace ProceduralCreature.Tests.Runtime
         [Test]
         public void Solve_UnreachableTarget_StretchesChainStraightTowardTarget()
         {
-            Vector3[] initial = StraightChain(3, 1f); // total reach = 2
+            Vector3[] initial = StraightChain(3, 1f);
             float[] lengths = UniformLinkLengths(2, 1f);
-            Vector3 farTarget = new Vector3(100f, 0f, 0f); // far beyond reach, along +X
+            Vector3 farTarget = new Vector3(100f, 0f, 0f);
 
             Vector3[] result = FabrikSolver.Solve(initial, lengths, farTarget, 20, 0.001f);
 
             Vector3 root = result[0];
             Vector3 endEffector = result[^1];
-
             float totalLength = lengths[0] + lengths[1];
-            Assert.AreEqual(totalLength, Vector3.Distance(root, endEffector), 1e-3f,
-                "An unreachable chain should stretch to its full length, not reach the target.");
+            Assert.AreEqual(totalLength, Vector3.Distance(root, endEffector), 1e-3f);
 
             Vector3 actualDirection = (endEffector - root).normalized;
             Vector3 expectedDirection = (farTarget - root).normalized;
-            Assert.LessOrEqual(Vector3.Distance(expectedDirection, actualDirection), 1e-3f,
-                "A stretched chain should point straight at the target.");
+            Assert.LessOrEqual(Vector3.Distance(expectedDirection, actualDirection), 1e-3f);
         }
 
         [Test]
@@ -110,6 +107,36 @@ namespace ProceduralCreature.Tests.Runtime
             {
                 Assert.IsFalse(float.IsNaN(p.x) || float.IsNaN(p.y) || float.IsNaN(p.z));
             }
+        }
+
+        [Test]
+        public void Solve_RejectsNonFiniteInitialPosition()
+        {
+            Vector3[] initial = StraightChain(3, 1f);
+            initial[1] = new Vector3(float.NaN, 0f, 0f);
+            float[] lengths = UniformLinkLengths(2, 1f);
+
+            Assert.Throws<DomainException>(() => FabrikSolver.Solve(initial, lengths, Vector3.one, 20, 0.001f));
+        }
+
+        [Test]
+        public void Solve_RejectsNonFiniteTarget()
+        {
+            Vector3[] initial = StraightChain(3, 1f);
+            float[] lengths = UniformLinkLengths(2, 1f);
+
+            Assert.Throws<DomainException>(() => FabrikSolver.Solve(
+                initial, lengths, new Vector3(0f, float.PositiveInfinity, 0f), 20, 0.001f));
+        }
+
+        [Test]
+        public void Solve_RejectsNonFiniteTolerance()
+        {
+            Vector3[] initial = StraightChain(3, 1f);
+            float[] lengths = UniformLinkLengths(2, 1f);
+
+            Assert.Throws<DomainException>(() => FabrikSolver.Solve(
+                initial, lengths, Vector3.one, 20, float.PositiveInfinity));
         }
 
         [Test]

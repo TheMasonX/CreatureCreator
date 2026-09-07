@@ -1,11 +1,9 @@
 using System;
-using System.Collections.Generic;
 using NUnit.Framework;
 using UnityEngine;
 using ProceduralCreature.Animation.Binding;
 using ProceduralCreature.Common;
 using ProceduralCreature.Definition;
-using ProceduralCreature.Morphology;
 using ProceduralCreature.Skeleton;
 using SkeletonModel = ProceduralCreature.Skeleton.Skeleton;
 
@@ -17,7 +15,7 @@ namespace ProceduralCreature.Tests.Runtime
         private const float Tolerance = 1e-4f;
 
         [Test]
-        public void BuildRadii_ValidBodyAndLimbMorphology_UsesFiniteResolvedValues()
+        public void BuildRadii_ValidBodyAndLimbMorphology_UsesCompactBodyAndLimbValues()
         {
             CreatureDefinition definition = CreateDefinition(
                 bodyRadius: 0.85f,
@@ -31,7 +29,8 @@ namespace ProceduralCreature.Tests.Runtime
                 snapshot, ResolvedCreatureSnapshot.Resolve(definition));
 
             AssertFiniteAndDeterministic(first, second);
-            Assert.That(first[snapshot.GetIndex("body_j2")], Is.EqualTo(0.85f).Within(Tolerance));
+            Assert.That(first[snapshot.GetIndex(AnatomicalBodyRigLayout.PelvisBoneId)],
+                Is.EqualTo(0.85f).Within(Tolerance));
             Assert.That(first[snapshot.GetIndex("limb_j0")], Is.EqualTo(0.10f).Within(Tolerance));
         }
 
@@ -71,7 +70,7 @@ namespace ProceduralCreature.Tests.Runtime
                 snapshot, ResolvedCreatureSnapshot.Resolve(definition));
 
             AssertFiniteAndDeterministic(first, second);
-            Assert.That(first[snapshot.GetIndex("body_j2")],
+            Assert.That(first[snapshot.GetIndex(AnatomicalBodyRigLayout.PelvisBoneId)],
                 Is.EqualTo(ImplicitSurfaceWeightAuthoring.DefaultInfluenceRadius).Within(Tolerance));
         }
 
@@ -94,6 +93,7 @@ namespace ProceduralCreature.Tests.Runtime
         {
             var definition = CreatureDefinition.CreateEmpty();
             definition.Forward = Vector3.forward;
+            definition.Body.Samples.Clear();
             definition.Body.Samples.Add(new BodySample
             {
                 Id = 1,
@@ -121,7 +121,12 @@ namespace ProceduralCreature.Tests.Runtime
                     ParentId = CreatureDefinition.BodyId,
                     PartType = PartType.Limb,
                     Limb = limb,
-                    Shape = new ShapeDefinition { Type = ShapeType.Capsule, PrimarySize = 0.1f, Radius = 0.1f },
+                    Shape = new ShapeDefinition
+                    {
+                        Type = ShapeType.Capsule,
+                        PrimarySize = 0.1f,
+                        Radius = 0.1f,
+                    },
                     Appearance = AppearanceDefinition.Default,
                 });
             }

@@ -2,9 +2,9 @@
   "id": "tsk-0148-separate-anatomical-rig-from-body-sampling",
   "key": "TSK-0148",
   "title": "Separate anatomical rig segmentation from dense Body sampling",
-  "description": "## User Mandate\n\n\u003E Sythesize these audits of the skeeltal mesh system and then help improve the bone vertex weights. The feet are also no longer flat on the ground, but that\u0027s a seperate issue, I think\n\nSTRICT. Keep the separate foot-grounding issue outside this rig-topology task.\n\n## Summary\nIntroduce a compact anatomical rig segmentation layer so dense Body morphology samples no longer define the long-term character skeleton topology.\n\n## Scope\n- Preserve dense Body samples for morphology, SDF generation, and appearance.\n- Derive a compact body rig with a pelvis/hip region, torso/spine segments, and applicable neck/head/tail regions.\n- Select the pelvis/root region from stable limb attachment evidence, with a documented fallback only when anatomy is insufficient.\n- Preserve semantic limb chains, mirror contracts, stable IDs, and the pure runtime/editor boundary.\n- Define the future synthetic Root and local-space pose contract as a later decision, not an incidental hierarchy change.\n\n## Acceptance Criteria\n- Changing Body morphology sample density does not change compact rig topology or semantic bone IDs for the same authored anatomy.\n- Valid generated creatures have a documented single anatomical root contract.\n- Limb attachment and mirror behavior remain deterministic and source-verified.\n- Weight authoring receives stable domain metadata suitable for the child weighting refinement task.\n- Focused runtime tests and Unity validation cover representative biped and quadruped-like definitions.\n\n## Validation\nRun runtime builds and focused skeleton tests. Run Unity PlayMode or editor validation for representative generated creatures and record the exact result.\n\n## Findings\nBoth supplied audits independently identify one-bone-per-Body-sample as an architectural coupling. This is an accepted P1 design follow-up, separate from the confirmed pose-rotation defect and the completed MVP weighting task.\n\n## Blockers\nThe current world-space identity-host contract must be retained or deliberately replaced with a documented local-space pose contract. Do not add a cosmetic synthetic root.\n\n## Next Step\nWrite the rig segmentation contract and compare compact topology against two Body sample densities before implementation.",
+  "description": "## Explicit anatomy requirement\n\nThe rigging system must be Spore-like in its generality: it must NOT be modeled as a biped-vs-quadruped system. Any authored creature may have any number of limbs, in any authored order, of any supported limb part type, attached at any valid position along the Body. Limb count, ordering, and placement are data; they must never select a hard-coded locomotion/anatomy mode.\n\n## Summary\nIntroduce a compact anatomical rig layer so dense Body morphology samples no longer define long-term character-rig topology.\n\n## Current implementation\n`AnatomicalBodyRigLayout` derives `body_pelvis`, `body_spine`, `body_head`, and `body_tail`. Direct Body-rooted limb attachment evidence is treated uniformly regardless of limb count or part type. Body-rooted attachments resolve to the compact backbone segment containing their Body-space position, allowing arbitrary attachment locations instead of biped/quadruped landmark modes. Dense Body samples remain the morphology/SDF representation.\n\n## Acceptance\n- Compact topology is stable across Body sampling density.\n- The implementation contains no biped/quadruped topology branch or limb-count mode.\n- Any number of direct Body-rooted limb chains can coexist and remain independently addressable.\n- Authored limb order does not affect semantic bone identity or parent selection.\n- Valid limb attachments at arbitrary Body positions resolve deterministically to the containing anatomical backbone segment.\n- Valid generated skeletons retain a single semantic root.\n- Limb/mirror attachment behavior remains deterministic.\n- Weight preparation consumes compact Body metadata rather than legacy body_j sample IDs.\n- Representative multi-limb runtime validation is still required before closure.\n\n## Design limits\nDo not add a cosmetic synthetic locomotion root. The current world-space identity-host pose contract remains in force until a deliberate local/root-relative pose-space design is introduced. Foot grounding remains separate.\n\n## Status\nInProgress: generalized arbitrary-limb policy implemented; final Unity/generated-creature validation remains open.\n\n## Evidence\nSee the skeleton/animation visualization and next-round audit documents under `docs/audits/` on branch `audit/skeleton-animation-improvements-2026-09-07`.",
   "type": "Task",
-  "status": "Backlog",
+  "status": "InProgress",
   "priority": "High",
   "assigneeMode": "Custom",
   "assigneeDirectoryId": null,
@@ -22,16 +22,23 @@
   "attachments": [],
   "externalLinks": [],
   "linkedPages": [],
-  "comments": [],
+  "comments": [
+    {
+      "id": "c-20260907-arbitrary-limbs",
+      "author": "anonymous",
+      "body": "New explicit requirement from user: like Spore, the system must support any number of limbs in any order at any valid position on the body; it must not collapse into biped-vs-quadruped-specific rigging modes. Generalized `AnatomicalBodyRigLayout` accordingly: all direct Body-rooted limb attachments contribute uniformly, pelvis derivation uses robust median attachment evidence without part-type checks, and attachment selection uses the containing compact backbone segment. Added multi-limb arbitrary-order/position regression coverage.",
+      "createdAtUtc": "2026-09-07T11:55:00Z"
+    }
+  ],
   "epicId": null,
   "parentId": "TSK-0073",
   "dueDateUtc": null,
   "createdAtUtc": "2026-09-07T06:27:32.3467338Z",
-  "updatedAtUtc": "2026-09-07T06:27:32.3467338Z",
+  "updatedAtUtc": "2026-09-07T11:55:00Z",
   "completedAtUtc": null,
-  "revision": 1,
+  "revision": 4,
   "isArchived": false,
   "hasLoadError": false,
   "loadError": null,
-  "sourceFilePath": null
+  "sourceFilePath": "tsk-0148-separate-anatomical-rig-from-body-sampling.json"
 }
