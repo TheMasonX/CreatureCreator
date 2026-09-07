@@ -114,16 +114,43 @@ namespace ProceduralCreature.Editor
             ClearGeometryObjects();
             BindImplicitSurface(implicitSurface.Mesh, definition, snapshot);
 
+            CreatureRig rig = PreviewGameObject.GetComponent<CreatureRig>();
+            if (rig == null || rig.RestSkeleton == null)
+            {
+                throw new DomainException("Preview rig must be built before mesh-asset geometry is attached.");
+            }
+
             for (int i = 1; i < generated.Geometry.Count; i++)
             {
                 GeometryItem item = generated.Geometry[i];
+                if (item.Mesh == null) throw new DomainException($"Generated mesh asset item {i} has no mesh.");
+                if (item.RigBinding == null)
+                {
+                    throw new DomainException($"Generated mesh asset item {i} has no rig binding metadata.");
+                }
+
+                if (!TryResolveGeometryBone(rig, item.RigBinding, out Transform bone))
+                {
+                    throw new DomainException(
+                        $"Generated mesh asset '{item.RigBinding.SourcePartId}' could not resolve its rig bone " +
+                        $"(mirrored={item.RigBinding.IsMirrored}).");
+                }
+
                 var child = new GameObject("Preview Mesh " + i);
-                child.transform.SetParent(PreviewGameObject.transform, worldPositionStays: false);
+                child.transform.SetParent(bone, worldPositionStays: true);
                 child.AddComponent<MeshFilter>().sharedMesh = item.Mesh;
                 MeshRenderer renderer = child.AddComponent<MeshRenderer>();
                 AssignMaterials(renderer, item);
                 RegisterOwnedGeometry(child);
             }
+        }
+
+        private static bool TryResolveGeometryBone(CreatureRig rig, RigBindingMetadata binding, out Transform bone)
+        {
+            bone = null;
+            if (binding == null || rig == null) return false;
+            string boneId = SemanticBoneResolver.ResolvePartRootBoneId(binding.SourcePartId, binding.IsMirrored);
+            return rig.TryGetBone(boneId, out bone);
         }
 
         public GameObject RecoverExistingPreview()
@@ -193,12 +220,6 @@ namespace ProceduralCreature.Editor
             float[] radiiByBoneIndex = MorphologyInfluenceRadiusBridge.BuildRadiiByBoneIndex(
                 snapshotForBinding, snapshot);
 
-            // IMPORTANT: the editor preview must use the same resolved influence-domain
-            // contract as the runtime preview. Without this, the welded implicit surface
-            // is globally weighted against every bone, so a mirrored attachment (for
-            // example the right fox foot) can select the unmirrored/left leg as one of
-            // its top-four influences and move when only the opposite leg is posed.
-            // Domain resolution is build-time only; it adds no work to ApplyPose.
             InfluenceDomain[] vertexDomains = ImplicitSurfaceInfluenceDomainResolver.Resolve(
                 definition, snapshot, sourceMesh.vertices);
 
