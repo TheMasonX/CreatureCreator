@@ -49,9 +49,6 @@ namespace ProceduralCreature.Animation.Binding
                     // Build the hierarchy domains once per resolved part/side. Domain
                     // membership is independent of the vertex; the previous path
                     // allocated a List and string array for every welded vertex.
-                    // Keeping these small immutable structs shared across vertices
-                    // removes a potentially huge bind-time GC cost without changing
-                    // the domain decisions or the per-frame path.
                     var normalDomains = new InfluenceDomain[parts.Count];
                     var mirroredDomains = new InfluenceDomain[parts.Count];
                     for (int partIndex = 0; partIndex < parts.Count; partIndex++)
@@ -61,6 +58,10 @@ namespace ProceduralCreature.Animation.Binding
                         mirroredDomains[partIndex] = BuildHierarchyDomain(snapshot, part, mirrored: true);
                     }
 
+                    // The Body domain is also invariant across vertices. Keep one
+                    // struct instance rather than constructing a new params-array-backed
+                    // InfluenceDomain for every Body-domain vertex.
+                    InfluenceDomain bodyDomain = new InfluenceDomain(CreatureDefinition.BodyId);
                     var domains = new InfluenceDomain[vertices.Count];
                     for (int vertexIndex = 0; vertexIndex < vertices.Count; vertexIndex++)
                     {
@@ -89,7 +90,7 @@ namespace ProceduralCreature.Animation.Binding
                             scratch));
                         if (!float.IsPositiveInfinity(bodyDistance) && bodyDistance <= nearest)
                         {
-                            domains[vertexIndex] = new InfluenceDomain(CreatureDefinition.BodyId);
+                            domains[vertexIndex] = bodyDomain;
                         }
                         else if (nearestPartIndex >= 0)
                         {
