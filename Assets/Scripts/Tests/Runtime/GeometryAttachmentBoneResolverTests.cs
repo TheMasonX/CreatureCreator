@@ -52,7 +52,7 @@ namespace ProceduralCreature.Tests.Runtime
             Assert.AreEqual("part_limb_j0", normalId);
             Assert.AreEqual("part_limb_j0_mirror", mirroredId);
 
-            SkeletonModel skeleton = SkeletonInferrer.Infer(snapshot);
+            ProceduralCreature.Skeleton.Skeleton skeleton = SkeletonInferrer.Infer(snapshot);
             Assert.IsNotNull(skeleton.FindBone(normalId));
             Assert.IsNotNull(skeleton.FindBone(mirroredId));
         }
