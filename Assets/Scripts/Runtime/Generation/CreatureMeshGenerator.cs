@@ -170,7 +170,7 @@ namespace ProceduralCreature.Generation
             if (data == null) throw new DomainException("generation data must not be null.");
 
             Mesh mesh = data.MeshResult.ToUnityMesh();
-            mesh.SetColors(data.Colors);
+            mesh.SetColors(data.Colors.ToArray());
 
             var generated = new GeneratedCreature();
             generated.AddGeometry(new GeometryItem(
