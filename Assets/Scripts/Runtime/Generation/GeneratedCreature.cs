@@ -115,8 +115,8 @@ namespace ProceduralCreature.Generation
 
         public RigBindingMetadata RigBinding { get; }
 
-        /// <summary>Build-time per-vertex influences in SkeletonSnapshot capture order.</summary>
-        public IReadOnlyList<VertexInfluence[]> VertexInfluences { get; }
+        /// <summary>Build-time per-vertex influences in SkeletonSnapshot capture order. Returned as nested read-only lists.</summary>
+        public IReadOnlyList<IReadOnlyList<VertexInfluence>> VertexInfluences { get; }
 
         internal GeometryItem(
             string sourcePartId,
@@ -145,24 +145,25 @@ namespace ProceduralCreature.Generation
             VertexInfluences = CloneInfluences(vertexInfluences);
         }
 
-        private static IReadOnlyList<VertexInfluence[]> CloneInfluences(
+        private static IReadOnlyList<IReadOnlyList<VertexInfluence>> CloneInfluences(
             IReadOnlyList<VertexInfluence[]> influences)
         {
             if (influences == null || influences.Count == 0)
             {
-                return Array.Empty<VertexInfluence[]>();
+                return Array.Empty<IReadOnlyList<VertexInfluence>>();
             }
 
-            var copy = new VertexInfluence[influences.Count][];
+            var copy = new IReadOnlyList<VertexInfluence>[influences.Count];
             for (int i = 0; i < influences.Count; i++)
             {
-                if (influences[i] == null)
+                VertexInfluence[] vertexInfluences = influences[i];
+                if (vertexInfluences == null)
                 {
                     throw new DomainException($"geometry item vertex influences {i} must not be null.");
                 }
-                copy[i] = (VertexInfluence[])influences[i].Clone();
+                copy[i] = Array.AsReadOnly((VertexInfluence[])vertexInfluences.Clone());
             }
-            return copy;
+            return Array.AsReadOnly(copy);
         }
 
         private void ValidateMaterialRegions(Mesh mesh)
