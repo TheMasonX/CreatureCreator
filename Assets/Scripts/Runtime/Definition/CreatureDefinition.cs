@@ -2,6 +2,7 @@ using System;
 using System.Collections.Generic;
 using System.Linq;
 using UnityEngine;
+using ProceduralCreature.Common;
 
 namespace ProceduralCreature.Definition
 {
@@ -38,6 +39,9 @@ namespace ProceduralCreature.Definition
         /// Deep clone. Used at mutation boundaries so in-progress edits (e.g. a
         /// viewport drag) can operate on a scratch copy before being committed
         /// (implementation guide §16: "one mutation path").
+        /// Null collections and null elements are preserved deliberately: cloning
+        /// does not repair malformed authoring state; validation remains responsible
+        /// for reporting it (TSK-0093).
         /// </summary>
         public CreatureDefinition Clone()
         {
@@ -49,7 +53,7 @@ namespace ProceduralCreature.Definition
                 Generation = Generation,
                 Body = Body == null ? null : Body.Clone(),
                 Forward = Forward,
-                Parts = (Parts ?? new List<CreaturePart>()).Select(p => p == null ? null : p.Clone()).ToList(),
+                Parts = CollectionCloneUtility.DeepClone(Parts, part => part.Clone()),
             };
         }
 
