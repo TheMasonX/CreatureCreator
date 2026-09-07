@@ -108,6 +108,27 @@ namespace ProceduralCreature.Tests.Runtime
         }
 
         [Test]
+        public void Infer_ResolvedSnapshotPathMatchesDefinitionPath()
+        {
+            var definition = CreatureDefinition.CreateEmpty();
+            AddBody(definition, count: 7, halfLength: 3f);
+            definition.AddPart(MakeLimb("limb", PartType.Arm, new Vector3(0.5f, 0f, 0.75f)));
+
+            Skeleton.Skeleton fromDefinition = SkeletonInferrer.Infer(definition);
+            ResolvedCreatureSnapshot snapshot = ResolvedCreatureSnapshot.Resolve(definition);
+            Skeleton.Skeleton fromSnapshot = SkeletonInferrer.Infer(snapshot);
+
+            Assert.AreEqual(fromDefinition.Bones.Count, fromSnapshot.Bones.Count);
+            for (int i = 0; i < fromDefinition.Bones.Count; i++)
+            {
+                Assert.AreEqual(fromDefinition.Bones[i].Id, fromSnapshot.Bones[i].Id);
+                Assert.AreEqual(fromDefinition.Bones[i].ParentBoneId, fromSnapshot.Bones[i].ParentBoneId);
+                Assert.AreEqual(fromDefinition.Bones[i].Position, fromSnapshot.Bones[i].Position);
+                Assert.AreEqual(fromDefinition.Bones[i].EndPosition, fromSnapshot.Bones[i].EndPosition);
+            }
+        }
+
+        [Test]
         public void Infer_BodyUsesCompactAnatomicalTopology()
         {
             var definition = CreatureDefinition.CreateEmpty();
@@ -172,9 +193,6 @@ namespace ProceduralCreature.Tests.Runtime
             var definition = CreatureDefinition.CreateEmpty();
             AddBody(definition, count: 9, halfLength: 2f);
 
-            // The five limbs deliberately use different supported semantic types,
-            // non-spatial authored order, and five distinct Body attachment locations.
-            // The skeleton policy must treat them uniformly as authored limb chains.
             definition.AddPart(MakeLimb("limb_e", PartType.Arm, new Vector3(0.5f, 0f, 1.5f)));
             definition.AddPart(MakeLimb("limb_a", PartType.Leg, new Vector3(-0.5f, 0f, -1.75f)));
             definition.AddPart(MakeLimb("limb_d", PartType.Limb, new Vector3(0.5f, 0f, 0.75f)));
@@ -263,7 +281,7 @@ namespace ProceduralCreature.Tests.Runtime
         [Test]
         public void Infer_NullDefinition_ThrowsDomainException()
         {
-            Assert.Throws<DomainException>(() => SkeletonInferrer.Infer(null));
+            Assert.Throws<DomainException>(() => SkeletonInferrer.Infer((CreatureDefinition)null));
         }
 
         [Test]
