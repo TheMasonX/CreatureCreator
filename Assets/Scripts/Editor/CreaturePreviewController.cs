@@ -17,14 +17,6 @@ namespace ProceduralCreature.Editor
     /// <summary>
     /// Owns the editor preview root and its generated geometry children, and the
     /// runtime generation lifecycle that produces them.
-    ///
-    /// Ownership is structural, not name-based (TSK-0122). The controller records
-    /// the preview root's entity identity and each owned geometry child's entity
-    /// identity in <see cref="SessionState"/> (the editor store that survives
-    /// domain reload). A reloaded controller recovers its root by that recorded
-    /// handle via <see cref="EditorUtility.EntityIdToObject"/> and destroys
-    /// exactly the children it registered — never an unrelated object that merely
-    /// shares the preview display name or a geometry name prefix.
     /// </summary>
     internal sealed class CreaturePreviewController : IDisposable
     {
@@ -112,7 +104,7 @@ namespace ProceduralCreature.Editor
             }
 
             ClearGeometryObjects();
-            BindImplicitSurface(implicitSurface.Mesh, snapshot);
+            BindImplicitSurface(implicitSurface.Mesh, definition, snapshot);
 
             CreatureRig rig = PreviewGameObject.GetComponent<CreatureRig>();
             if (rig == null || rig.RestSkeleton == null)
@@ -184,6 +176,7 @@ namespace ProceduralCreature.Editor
 
         private void BindImplicitSurface(
             Mesh sourceMesh,
+            CreatureDefinition definition,
             ResolvedCreatureSnapshot snapshot)
         {
             EnsurePreviewRoot();
@@ -197,6 +190,9 @@ namespace ProceduralCreature.Editor
             if (collider == null) collider = PreviewGameObject.AddComponent<MeshCollider>();
             collider.sharedMesh = sourceMesh;
 
+            // The editor preview consumes the exact resolved snapshot produced by
+            // generation. Do not re-infer from the raw definition here: that would
+            // create a second derivation path that can diverge after authoring.
             SkeletonModel skeleton = SkeletonInferrer.Infer(snapshot);
             if (skeleton == null || skeleton.Bones.Count == 0)
             {
@@ -220,7 +216,7 @@ namespace ProceduralCreature.Editor
                 snapshotForBinding, snapshot);
 
             InfluenceDomain[] vertexDomains = ImplicitSurfaceInfluenceDomainResolver.Resolve(
-                snapshotDefinition: null, snapshot, sourceMesh.vertices);
+                definition, snapshot, sourceMesh.vertices);
 
             Material defaultMaterial = _defaultMaterialResolver();
             Material[] materials = defaultMaterial != null ? new[] { defaultMaterial } : null;
