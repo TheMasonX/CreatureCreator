@@ -55,7 +55,7 @@ namespace ProceduralCreature.Editor
             DrawOverlayControls(sceneView);
             if (!_enabled) return;
 
-            CreatureRig[] rigs = Object.FindObjectsByType<CreatureRig>();
+            CreatureRig[] rigs = UnityEngine.Object.FindObjectsByType<CreatureRig>();
             for (int i = 0; i < rigs.Length; i++)
             {
                 CreatureRig rig = rigs[i];
@@ -87,7 +87,7 @@ namespace ProceduralCreature.Editor
 
                 if (boneData.HasSegment && (boneData.EndPosition - boneData.Position).sqrMagnitude > 1e-10f)
                 {
-                    Vector3 end = ResolveCurrentSegmentEnd(rig, i, boneData, bones, snapshot);
+                    Vector3 end = ResolveCurrentSegmentEnd(i, boneData, bones, snapshot);
                     Handles.DrawAAPolyLine(width, bone.position, end);
                 }
                 else if (boneData.ParentIndex >= 0 && boneData.ParentIndex < bones.Count)
@@ -132,7 +132,6 @@ namespace ProceduralCreature.Editor
         }
 
         private static Vector3 ResolveCurrentSegmentEnd(
-            CreatureRig rig,
             int boneIndex,
             BoneSnapshot boneData,
             IReadOnlyList<Transform> bones,
@@ -145,6 +144,7 @@ namespace ProceduralCreature.Editor
                 int childIndex = children[i];
                 BoneSnapshot childData = snapshot[childIndex];
                 if (!string.Equals(childData.SourcePartId, boneData.SourcePartId, StringComparison.Ordinal)) continue;
+                if (childData.IsMirrored != boneData.IsMirrored) continue;
                 if ((childData.Position - boneData.EndPosition).sqrMagnitude > 1e-8f) continue;
                 if (bestChild < 0 || string.CompareOrdinal(childData.Id, snapshot[bestChild].Id) < 0)
                     bestChild = childIndex;
@@ -153,8 +153,9 @@ namespace ProceduralCreature.Editor
             if (bestChild >= 0 && bones[bestChild] != null)
                 return bones[bestChild].position;
 
+            Transform current = bones[boneIndex];
             Vector3 restOffset = boneData.EndPosition - boneData.Position;
-            return bone.position + bone.rotation * restOffset;
+            return current.position + current.rotation * restOffset;
         }
 
         private static string GetBoneLabel(BoneSnapshot bone)
@@ -265,7 +266,7 @@ namespace ProceduralCreature.Editor
         private static List<Transform> GetAllBones()
         {
             var result = new List<Transform>();
-            CreatureRig[] rigs = Object.FindObjectsByType<CreatureRig>();
+            CreatureRig[] rigs = UnityEngine.Object.FindObjectsByType<CreatureRig>();
             for (int r = 0; r < rigs.Length; r++)
             {
                 if (rigs[r] == null) continue;
@@ -281,7 +282,7 @@ namespace ProceduralCreature.Editor
             Transform selected = Selection.activeTransform;
             if (selected == null) return new List<Transform>();
 
-            CreatureRig[] rigs = Object.FindObjectsByType<CreatureRig>();
+            CreatureRig[] rigs = UnityEngine.Object.FindObjectsByType<CreatureRig>();
             for (int r = 0; r < rigs.Length; r++)
             {
                 CreatureRig rig = rigs[r];
@@ -328,7 +329,7 @@ namespace ProceduralCreature.Editor
         private static List<Transform> GetLimbBones()
         {
             var result = new List<Transform>();
-            CreatureRig[] rigs = Object.FindObjectsByType<CreatureRig>();
+            CreatureRig[] rigs = UnityEngine.Object.FindObjectsByType<CreatureRig>();
             for (int r = 0; r < rigs.Length; r++)
             {
                 CreatureRig rig = rigs[r];
@@ -346,7 +347,7 @@ namespace ProceduralCreature.Editor
         private static List<Transform> GetBodyBones()
         {
             var result = new List<Transform>();
-            CreatureRig[] rigs = Object.FindObjectsByType<CreatureRig>();
+            CreatureRig[] rigs = UnityEngine.Object.FindObjectsByType<CreatureRig>();
             for (int r = 0; r < rigs.Length; r++)
             {
                 CreatureRig rig = rigs[r];
@@ -362,7 +363,7 @@ namespace ProceduralCreature.Editor
         {
             if (sceneView == null || bones == null || bones.Count == 0) return;
 
-            Object[] previousSelection = Selection.objects;
+            UnityEngine.Object[] previousSelection = Selection.objects;
             try
             {
                 Selection.objects = bones.ConvertAll(b => b.gameObject).ToArray();
