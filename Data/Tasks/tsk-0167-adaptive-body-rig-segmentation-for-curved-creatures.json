@@ -1,0 +1,43 @@
+{
+  "id": "tsk-0167-adaptive-body-rig-segmentation-for-curved-creatures",
+  "key": "TSK-0167",
+  "title": "Validate and tune adaptive compact Body rig segmentation for curved creatures",
+  "description": "## Summary\nThe compact anatomical Body rig must be density-independent without collapsing strongly curved anatomy into long straight chords. The current implementation subdivides the canonical headward and tailward spans at a fixed normalized arc step, with bounded segment counts. This task owns validation and tuning of that segmentation policy against real creatures.\n\n## User-visible requirement\nA generated creature such as `dinus_uprightus` must retain enough Body joints from pelvis through chest/neck/head and along the tail that rig manipulation follows the authored centerline rather than cutting across the mesh.\n\n## Scope\n- Validate current `AnatomicalBodyRigLayout` segmentation on real generated creatures, especially curved bodies and long tails.\n- Tune segment count/placement based on canonical arc length and/or measured curvature while remaining independent of dense morphology sample count.\n- Preserve stable semantic anchors (`body_pelvis`, `body_head`, `body_tail`) and deterministic indexed ordering.\n- Ensure attachment-bone resolution selects the correct segment after segmentation changes.\n- Ensure morphology radius bridging and skin weights remain consistent with the final segment intervals.\n- Add compact-rig structural tests and generated-creature validation fixtures.\n\n## Non-goals\n- Do not restore one-bone-per-morphology-sample topology.\n- Do not add biped/quadruped species modes.\n- Do not replace the semantic skeleton with render-mesh-derived bones.\n- Do not move locomotion or external animation-driver logic into this task.\n\n## Acceptance Criteria\n- Strongly curved Body regions contain multiple articulated segments whose rest positions remain on/near the authored centerline.\n- Segment count is independent of raw Body sample count for proportional morphology.\n- Head/tail canonical orientation remains correct for both stored spline directions.\n- Attachments resolve to the intended segment.\n- Compact Body pose tests demonstrate reduced long-segment deformation compared with the prior four-bone chord implementation.\n- No regression to generation performance beyond the agreed compact-rig budget.\n\n## Validation\nRuntime/editor tests plus Unity SceneView validation on `dinus_uprightus` and at least one differently curved creature. Record segment count, attachment mapping, and controlled pose/deformation observations.\n\n## Status\nInProgress.\n",
+  "type": "Task",
+  "status": "InProgress",
+  "priority": "High",
+  "assigneeMode": "Custom",
+  "assigneeDirectoryId": null,
+  "assigneeCustomText": "Agent",
+  "reporter": "anonymous",
+  "labels": [
+    "runtime",
+    "animation",
+    "skeleton",
+    "body-rig",
+    "skinning",
+    "editor",
+    "user-mandated"
+  ],
+  "attachments": [],
+  "externalLinks": [],
+  "linkedPages": [],
+  "comments": [
+    {
+      "id": "c-20260907-body-segmentation-visual",
+      "author": "anonymous",
+      "body": "Created from live `dinus_uprightus` validation: the earlier compact four-bone Body topology collapsed curved chest/neck/tail geometry into long chords. Current branch retains multiple density-independent segments; this task owns validation/tuning of the final adaptive density policy rather than reverting to one-bone-per-sample.",
+      "createdAtUtc": "2026-09-07T20:15:00Z"
+    }
+  ],
+  "epicId": null,
+  "parentId": "TSK-0148",
+  "dueDateUtc": null,
+  "createdAtUtc": "2026-09-07T20:15:00Z",
+  "updatedAtUtc": "2026-09-07T20:15:00Z",
+  "completedAtUtc": null,
+  "revision": 1,
+  "isArchived": false,
+  "hasLoadError": false,
+  "sourceFilePath": "tsk-0167-adaptive-body-rig-segmentation-for-curved-creatures.json"
+}
