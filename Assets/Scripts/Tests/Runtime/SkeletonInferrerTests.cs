@@ -52,13 +52,17 @@ namespace ProceduralCreature.Tests.Runtime
             definition.SymmetryMode = SymmetryMode.None;
         }
 
-        private static CreaturePart MakeLeg(string id, Vector3 position, bool mirror = false)
+        private static CreaturePart MakeLimb(
+            string id,
+            PartType type,
+            Vector3 position,
+            bool mirror = false)
         {
             return new CreaturePart
             {
                 Id = id,
                 ParentId = CreatureDefinition.BodyId,
-                PartType = PartType.Leg,
+                PartType = type,
                 Transform = new TransformData
                 {
                     Position = position,
@@ -163,28 +167,30 @@ namespace ProceduralCreature.Tests.Runtime
         }
 
         [Test]
-        public void Infer_ArbitraryLimbCountAndPlacementDoesNotSelectBipedOrQuadrupedMode()
+        public void Infer_ArbitraryLimbCountPlacementOrderAndTypeDoesNotSelectSpeciesMode()
         {
             var definition = CreatureDefinition.CreateEmpty();
             AddBody(definition, count: 9, halfLength: 2f);
 
-            // Five limbs are deliberately placed at five different body locations.
-            // Their authored order is intentionally unrelated to their spatial order.
-            definition.AddPart(MakeLeg("limb_e", new Vector3(0.5f, 0f, 1.5f)));
-            definition.AddPart(MakeLeg("limb_a", new Vector3(-0.5f, 0f, -1.75f)));
-            definition.AddPart(MakeLeg("limb_d", new Vector3(0.5f, 0f, 0.75f)));
-            definition.AddPart(MakeLeg("limb_b", new Vector3(-0.5f, 0f, -0.75f)));
-            definition.AddPart(MakeLeg("limb_c", new Vector3(0f, 0f, 0f)));
+            // The five limbs deliberately use different supported semantic types,
+            // non-spatial authored order, and five distinct Body attachment locations.
+            // The skeleton policy must treat them uniformly as authored limb chains.
+            definition.AddPart(MakeLimb("limb_e", PartType.Arm, new Vector3(0.5f, 0f, 1.5f)));
+            definition.AddPart(MakeLimb("limb_a", PartType.Leg, new Vector3(-0.5f, 0f, -1.75f)));
+            definition.AddPart(MakeLimb("limb_d", PartType.Limb, new Vector3(0.5f, 0f, 0.75f)));
+            definition.AddPart(MakeLimb("limb_b", PartType.Leg, new Vector3(-0.5f, 0f, -0.75f)));
+            definition.AddPart(MakeLimb("limb_c", PartType.Arm, new Vector3(0f, 0f, 0f)));
 
             Skeleton.Skeleton skeleton = SkeletonInferrer.Infer(definition);
 
             Assert.AreEqual(4 + 5 * 3, skeleton.Bones.Count,
                 "Five independent three-joint limb chains must all be represented alongside the compact Body backbone.");
-            Assert.IsNotNull(skeleton.FindBone("limb_a_j0"));
-            Assert.IsNotNull(skeleton.FindBone("limb_b_j0"));
-            Assert.IsNotNull(skeleton.FindBone("limb_c_j0"));
-            Assert.IsNotNull(skeleton.FindBone("limb_d_j0"));
-            Assert.IsNotNull(skeleton.FindBone("limb_e_j0"));
+            foreach (string id in new[] { "limb_a", "limb_b", "limb_c", "limb_d", "limb_e" })
+            {
+                Assert.IsNotNull(skeleton.FindBone(id + "_j0"));
+                Assert.IsNotNull(skeleton.FindBone(id + "_j1"));
+                Assert.IsNotNull(skeleton.FindBone(id + "_j2"));
+            }
         }
 
         [Test]
@@ -193,7 +199,7 @@ namespace ProceduralCreature.Tests.Runtime
             var definition = CreatureDefinition.CreateEmpty();
             AddBody(definition);
             definition.SymmetryMode = SymmetryMode.MirrorAcrossXAxis;
-            definition.AddPart(MakeLeg("leg", new Vector3(0.8f, 0f, 0.1f), mirror: true));
+            definition.AddPart(MakeLimb("leg", PartType.Leg, new Vector3(0.8f, 0f, 0.1f), mirror: true));
 
             Skeleton.Skeleton skeleton = SkeletonInferrer.Infer(definition);
 
