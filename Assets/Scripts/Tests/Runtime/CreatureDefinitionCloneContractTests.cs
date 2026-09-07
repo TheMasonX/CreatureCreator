@@ -8,10 +8,8 @@ namespace ProceduralCreature.Tests.Runtime
         [Test]
         public void Clone_NullPartsCollection_PreservesNullState()
         {
-            var definition = CreatureDefinition.CreateEmpty
-            {
-                Parts = null,
-            };
+            var definition = CreatureDefinition.CreateEmpty();
+            definition.Parts = null;
 
             CreatureDefinition clone = definition.Clone();
 
