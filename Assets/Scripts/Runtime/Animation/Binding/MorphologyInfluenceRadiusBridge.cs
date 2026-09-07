@@ -56,12 +56,24 @@ namespace ProceduralCreature.Animation.Binding
                 for (int i = 0; i < bodyBones.Count; i++)
                 {
                     AnatomicalBodyRigLayout.BoneSpec spec = bodyBones[i];
-                    if (skeleton.TryGetIndex(spec.Id, out int boneIndex))
+                    if (!skeleton.TryGetIndex(spec.Id, out int boneIndex)) continue;
+
+                    float radius = NumericValidity.IsFinite(spec.Radius) && spec.Radius > 0f
+                        ? spec.Radius
+                        : ImplicitSurfaceWeightAuthoring.DefaultInfluenceRadius;
+
+                    // The compact anatomical rig intentionally reduces a dense Body
+                    // spline to a few long bones. A bone is a skinning proxy for the
+                    // entire spline interval it represents, so its influence tube must
+                    // also cover the curvature between the authored centerline and the
+                    // straight bone chord. Otherwise valid Body surface vertices can
+                    // fall outside every compact-bone influence range.
+                    if (spec.HasSegment && spec.EndT > spec.StartT)
                     {
-                        result[boneIndex] = NumericValidity.IsFinite(spec.Radius) && spec.Radius > 0f
-                            ? spec.Radius
-                            : ImplicitSurfaceWeightAuthoring.DefaultInfluenceRadius;
+                        radius = Mathf.Max(radius, ResolveBodyProxyRadius(spec, snapshot.Body, snapshot.Forward));
                     }
+
+                    result[boneIndex] = radius;
                 }
             }
 
@@ -92,6 +104,67 @@ namespace ProceduralCreature.Animation.Binding
             }
 
             return result;
+        }
+
+        private static float ResolveBodyProxyRadius(
+            AnatomicalBodyRigLayout.BoneSpec bone,
+            ResolvedBody body,
+            Vector3 forward)
+        {
+            if (body.SamplePositions == null || body.SamplePositions.Count == 0)
+            {
+                return bone.Radius;
+            }
+
+            bool storedHeadToTail = IsStoredHeadToTail(body.SamplePositions, forward);
+            float minT = Mathf.Min(bone.StartT, bone.EndT);
+            float maxT = Mathf.Max(bone.StartT, bone.EndT);
+            float radius = bone.Radius;
+
+            for (int i = 0; i < body.SamplePositions.Count; i++)
+            {
+                float storedT = body.NormalizedArcLengthAtSample != null
+                    && i < body.NormalizedArcLengthAtSample.Count
+                    ? body.NormalizedArcLengthAtSample[i]
+                    : (body.SamplePositions.Count == 1 ? 0f : (float)i / (body.SamplePositions.Count - 1));
+                float canonicalT = storedHeadToTail ? storedT : 1f - storedT;
+                if (canonicalT < minT || canonicalT > maxT) continue;
+
+                float distance = DistanceToSegment(
+                    body.SamplePositions[i], bone.Position, bone.EndPosition);
+                float sampleRadius = body.SampleRadii != null && i < body.SampleRadii.Count
+                    ? body.SampleRadii[i]
+                    : bone.Radius;
+                if (!NumericValidity.IsFinite(sampleRadius) || sampleRadius <= 0f)
+                {
+                    sampleRadius = bone.Radius;
+                }
+
+                float requiredRadius = distance + sampleRadius;
+                if (NumericValidity.IsFinite(requiredRadius))
+                {
+                    radius = Mathf.Max(radius, requiredRadius);
+                }
+            }
+
+            return Mathf.Max(0.001f, radius);
+        }
+
+        private static float DistanceToSegment(Vector3 point, Vector3 a, Vector3 b)
+        {
+            Vector3 ab = b - a;
+            float lengthSquared = ab.sqrMagnitude;
+            if (lengthSquared <= 1e-10f) return Vector3.Distance(point, a);
+
+            float t = Mathf.Clamp01(Vector3.Dot(point - a, ab) / lengthSquared);
+            return Vector3.Distance(point, a + ab * t);
+        }
+
+        private static bool IsStoredHeadToTail(IReadOnlyList<Vector3> positions, Vector3 forward)
+        {
+            if (positions == null || positions.Count < 2) return true;
+            return Vector3.Dot(positions[positions.Count - 1], forward)
+                >= Vector3.Dot(positions[0], forward);
         }
 
         private static float ResolveSegmentRadius(ResolvedLimb limb, int segmentIndex)
