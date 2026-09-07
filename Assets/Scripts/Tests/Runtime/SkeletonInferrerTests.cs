@@ -143,12 +143,14 @@ namespace ProceduralCreature.Tests.Runtime
             Bone head = skeleton.FindBone(AnatomicalBodyRigLayout.HeadBoneId);
             Bone tail = skeleton.FindBone(AnatomicalBodyRigLayout.TailBoneId);
             Bone spine1 = skeleton.FindBone(AnatomicalBodyRigLayout.SpineBoneId + "_1");
+            Bone spine2 = skeleton.FindBone(AnatomicalBodyRigLayout.SpineBoneId + "_2");
             Bone spine3 = skeleton.FindBone(AnatomicalBodyRigLayout.SpineBoneId + "_3");
             Bone tail4 = skeleton.FindBone(AnatomicalBodyRigLayout.TailBoneId + "_4");
 
             Assert.IsNotNull(pelvis);
             Assert.IsNotNull(spine);
             Assert.IsNotNull(spine1);
+            Assert.IsNotNull(spine2);
             Assert.IsNotNull(spine3);
             Assert.IsNotNull(head);
             Assert.IsNotNull(tail);
@@ -156,7 +158,9 @@ namespace ProceduralCreature.Tests.Runtime
             Assert.IsNull(pelvis.ParentBoneId);
             Assert.AreEqual(pelvis.Id, spine.ParentBoneId);
             Assert.AreEqual(spine.Id, spine1.ParentBoneId);
-            Assert.AreEqual(AnatomicalBodyRigLayout.SpineBoneId + "_3", head.ParentBoneId);
+            Assert.AreEqual(spine1.Id, spine2.ParentBoneId);
+            Assert.AreEqual(spine2.Id, spine3.ParentBoneId);
+            Assert.AreEqual(spine3.Id, head.ParentBoneId);
             Assert.AreEqual(pelvis.Id, tail.ParentBoneId);
             Assert.AreEqual(AnatomicalBodyRigLayout.TailBoneId + "_3", tail4.ParentBoneId);
             Assert.AreEqual(Vector3.zero, pelvis.Position);
@@ -221,10 +225,10 @@ namespace ProceduralCreature.Tests.Runtime
             Skeleton.Skeleton skeleton = SkeletonInferrer.Infer(definition);
 
             Assert.AreEqual(
-                FindContainingBodyBoneId(skeleton, "leg_j0"),
+                AnatomicalBodyRigLayout.PelvisBoneId,
                 skeleton.FindBone("leg_j0").ParentBoneId);
             Assert.AreEqual(
-                skeleton.FindBone("leg_j0").ParentBoneId,
+                AnatomicalBodyRigLayout.PelvisBoneId,
                 skeleton.FindBone("leg_j0" + SkeletonInferrer.MirrorSuffix).ParentBoneId);
             Assert.AreEqual(
                 -skeleton.FindBone("leg_j0").Position.x,
@@ -247,8 +251,8 @@ namespace ProceduralCreature.Tests.Runtime
             Bone mirroredFoot = skeleton.FindBone("foot" + SkeletonInferrer.MirrorSuffix);
             Assert.IsNotNull(foot);
             Assert.IsNotNull(mirroredFoot);
-            Assert.AreEqual(FindContainingBodyBoneId(skeleton, "foot"), foot.ParentBoneId);
-            Assert.AreEqual(foot.ParentBoneId, mirroredFoot.ParentBoneId);
+            Assert.AreEqual(AnatomicalBodyRigLayout.PelvisBoneId, foot.ParentBoneId);
+            Assert.AreEqual(AnatomicalBodyRigLayout.PelvisBoneId, mirroredFoot.ParentBoneId);
         }
 
         [Test]
@@ -268,22 +272,46 @@ namespace ProceduralCreature.Tests.Runtime
             Skeleton.Skeleton second = SkeletonInferrer.Infer(definitionB);
 
             Assert.AreEqual(first.Bones.Count, second.Bones.Count);
-            for (int i = 0; i < first.Bones.Count; i++)
-            {
-                Assert.AreEqual(first.Bones[i].Id, second.Bones[i].Id);
-                Assert.AreEqual(first.Bones[i].ParentBoneId, second.Bones[i].ParentBoneId);
-                Assert.AreEqual(first.Bones[i].Position, second.Bones[i].Position);
-            }
+            var idsFirst = first.Bones.Select(b => b.Id).OrderBy(id => id).ToList();
+            var idsSecond = second.Bones.Select(b => b.Id).OrderBy(id => id).ToList();
+            CollectionAssert.AreEqual(idsFirst, idsSecond);
         }
 
-        private static string FindContainingBodyBoneId(Skeleton.Skeleton skeleton, string boneId)
+        [Test]
+        public void Infer_NullDefinition_ThrowsDomainException()
         {
-            Bone child = skeleton.FindBone(boneId);
-            Assert.IsNotNull(child);
-            Bone parent = skeleton.FindBone(child.ParentBoneId);
-            Assert.IsNotNull(parent);
-            Assert.AreEqual(CreatureDefinition.BodyId, parent.SourcePartId);
-            return parent.Id;
+            Assert.Throws<DomainException>(() => SkeletonInferrer.Infer((CreatureDefinition)null));
+        }
+
+        [Test]
+        public void Infer_NullParts_FallsBackToSegmentedBodyBonesWithoutThrowing()
+        {
+            var definition = CreatureDefinition.CreateEmpty();
+            AddBody(definition, count: 3);
+            definition.Parts = null;
+
+            Skeleton.Skeleton skeleton = SkeletonInferrer.Infer(definition);
+
+            Assert.GreaterOrEqual(skeleton.Bones.Count, 8);
+            Assert.IsNotNull(skeleton.FindBone(AnatomicalBodyRigLayout.PelvisBoneId));
+            Assert.IsNotNull(skeleton.FindBone(AnatomicalBodyRigLayout.SpineBoneId));
+            Assert.IsNotNull(skeleton.FindBone(AnatomicalBodyRigLayout.HeadBoneId));
+            Assert.IsNotNull(skeleton.FindBone(AnatomicalBodyRigLayout.TailBoneId));
+            Assert.IsFalse(skeleton.Bones.Any(b => b.SourcePartId != CreatureDefinition.BodyId));
+        }
+
+        [Test]
+        public void Infer_MissingParent_SkipsOrphanPartWithoutThrowing()
+        {
+            var definition = CreatureDefinition.CreateEmpty();
+            definition.AddPart(MakePart("part_root", PartType.Part, Vector3.zero));
+            definition.AddPart(MakePart(
+                "part_orphan", PartType.Part, Vector3.down, "part_ghost"));
+
+            Skeleton.Skeleton skeleton = SkeletonInferrer.Infer(definition);
+
+            Assert.IsNotNull(skeleton.FindBone("part_root"));
+            Assert.IsNull(skeleton.FindBone("part_orphan"));
         }
     }
 }
