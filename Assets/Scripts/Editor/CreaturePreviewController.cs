@@ -112,7 +112,7 @@ namespace ProceduralCreature.Editor
             }
 
             ClearGeometryObjects();
-            BindImplicitSurface(implicitSurface.Mesh, definition, snapshot);
+            BindImplicitSurface(implicitSurface.Mesh, snapshot);
 
             CreatureRig rig = PreviewGameObject.GetComponent<CreatureRig>();
             if (rig == null || rig.RestSkeleton == null)
@@ -184,7 +184,6 @@ namespace ProceduralCreature.Editor
 
         private void BindImplicitSurface(
             Mesh sourceMesh,
-            CreatureDefinition definition,
             ResolvedCreatureSnapshot snapshot)
         {
             EnsurePreviewRoot();
@@ -198,10 +197,10 @@ namespace ProceduralCreature.Editor
             if (collider == null) collider = PreviewGameObject.AddComponent<MeshCollider>();
             collider.sharedMesh = sourceMesh;
 
-            SkeletonModel skeleton = SkeletonInferrer.Infer(definition);
+            SkeletonModel skeleton = SkeletonInferrer.Infer(snapshot);
             if (skeleton == null || skeleton.Bones.Count == 0)
             {
-                throw new DomainException("Preview definition did not produce a skeleton for the implicit surface.");
+                throw new DomainException("Preview snapshot did not produce a skeleton for the implicit surface.");
             }
 
             SkeletonSnapshot snapshotForBinding = SkeletonSnapshot.Capture(skeleton);
@@ -221,7 +220,7 @@ namespace ProceduralCreature.Editor
                 snapshotForBinding, snapshot);
 
             InfluenceDomain[] vertexDomains = ImplicitSurfaceInfluenceDomainResolver.Resolve(
-                definition, snapshot, sourceMesh.vertices);
+                snapshot, sourceMesh.vertices);
 
             Material defaultMaterial = _defaultMaterialResolver();
             Material[] materials = defaultMaterial != null ? new[] { defaultMaterial } : null;
