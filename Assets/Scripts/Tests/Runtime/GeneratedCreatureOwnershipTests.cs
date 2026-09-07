@@ -1,5 +1,6 @@
 using System.Collections.Generic;
 using NUnit.Framework;
+using ProceduralCreature.Animation.Binding;
 using ProceduralCreature.Generation;
 using UnityEngine;
 
@@ -30,6 +31,36 @@ namespace ProceduralCreature.Tests.Runtime
             Assert.AreEqual("body", item.MaterialRegions[0].MaterialKey);
             Assert.IsTrue(item.MaterialRegions is IList<MaterialRegion>);
             Assert.IsTrue(((IList<MaterialRegion>)item.MaterialRegions).IsReadOnly);
+        }
+
+        [Test]
+        public void GeometryItem_DeeplyProtectsVertexInfluencesFromCallerMutation()
+        {
+            Mesh mesh = CreateTriangleMesh();
+            VertexInfluence[][] influences =
+            {
+                new[] { new VertexInfluence(0, 1f) },
+            };
+            var item = new GeometryItem(
+                "part",
+                GeometryType.MeshAsset,
+                mesh,
+                mesh,
+                Matrix4x4.identity,
+                null,
+                new RigBindingMetadata("part", "body", false),
+                influences);
+
+            influences[0][0] = new VertexInfluence(1, 0f);
+
+            Assert.AreEqual(1, item.VertexInfluences.Count);
+            Assert.AreEqual(1, item.VertexInfluences[0].Count);
+            Assert.AreEqual(0, item.VertexInfluences[0][0].BoneIndex);
+            Assert.AreEqual(1f, item.VertexInfluences[0][0].Weight);
+            Assert.IsTrue(item.VertexInfluences[0] is IList<VertexInfluence>);
+            Assert.IsTrue(((IList<VertexInfluence>)item.VertexInfluences[0]).IsReadOnly);
+            Assert.IsTrue(item.VertexInfluences is IList<IReadOnlyList<VertexInfluence>>);
+            Assert.IsTrue(((IList<IReadOnlyList<VertexInfluence>>)item.VertexInfluences).IsReadOnly);
         }
 
         private static Mesh CreateTriangleMesh()
