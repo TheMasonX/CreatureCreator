@@ -4,7 +4,7 @@
   "title": "Add a committed-DNA load-sweep regression under the stricter MiniJsonReader grammar",
   "description": "## Summary\nTSK-0136 (Done) hardened MiniJsonReader.cs to strict JSON (duplicate-key rejection, raw control-char rejection, strict number grammar). JsonDnaSerializer round-trip tests pass because canonical output is strict-grammar valid, but there is no regression that sweeps every committed DNA/creature fixture (e.g. Assets/Creatures/*.json and test fixtures) to prove none relied on the previously-loose grammar (leading zeros, leading \u0027\u002B\u0027, raw control chars, or duplicate keys). A single hand-authored file that violated the old grammar would now fail to load \u2014 a silent data-regression risk.\n\n## Scope\n- Add a focused EditMode/pure regression that deserializes every committed DNA/creature fixture through the reader and asserts success (or a documented allow-list for intentionally-invalid fixtures).\n- If a committed fixture currently fails under the strict reader, report it (do not silently relax the reader); repair the fixture to valid JSON or surface it for a migration decision.\n\n## Acceptance Criteria\n- All committed DNA fixtures load under the strict grammar; the sweep is part of the test suite so future strictness/loosening cannot regress silently.\n\n## Validation\nFocused EditMode reader sweep; dotnet Tests build; git diff --check.",
   "type": "Task",
-  "status": "Backlog",
+  "status": "Done",
   "priority": "Medium",
   "assigneeMode": "Custom",
   "assigneeDirectoryId": null,
@@ -21,16 +21,23 @@
   "attachments": [],
   "externalLinks": [],
   "linkedPages": [],
-  "comments": [],
+  "comments": [
+    {
+      "id": "c-6ea4ae7dbc3640569b81a1220291e210",
+      "author": "anonymous",
+      "body": "Implementation and validation evidence (2026-09-07): Added Assets/Scripts/Tests/Editor/CommittedCreatureFixtureLoadTests.cs. The EditMode regression discovers all JSON TextAssets under Assets/Creatures through AssetDatabase, reports the discovered count, deserializes every current fixture through JsonDnaSerializer, and asserts the two historical schema-v1 fixtures (first_creature.json and first_creature_bak.json) remain explicitly rejected with the serializer\u0027s documented migration error. Focused Unity EditMode test passed 1/1 and reported exactly 17 fixtures: 15 schema-v2 fixtures loaded; 2 schema-v1 fixtures matched the explicit migration allow-list. \u0060dotnet build ProceduralCreature.Tests.Editor.csproj --no-restore\u0060 passed with 0 warnings/errors. \u0060git diff --check\u0060 passed. Unity console showed no errors or warnings. Residual risk: the two v1 files remain migration fixtures and are not loadable until an author-intent-preserving migration is defined.",
+      "createdAtUtc": "2026-09-07T03:38:36.2228135Z"
+    }
+  ],
   "epicId": null,
   "parentId": null,
   "dueDateUtc": null,
   "createdAtUtc": "2026-09-06T23:55:28.9785801Z",
-  "updatedAtUtc": "2026-09-06T23:55:28.9785801Z",
-  "completedAtUtc": null,
-  "revision": 1,
+  "updatedAtUtc": "2026-09-07T03:38:36.2494366Z",
+  "completedAtUtc": "2026-09-07T03:38:36.2494366Z",
+  "revision": 4,
   "isArchived": false,
   "hasLoadError": false,
   "loadError": null,
-  "sourceFilePath": null
+  "sourceFilePath": "tsk-0144-add-a-committed-dna-load-sweep-regression-under-the-stricter-minijsonreader-grammar.json"
 }
