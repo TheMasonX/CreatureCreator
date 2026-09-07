@@ -18,7 +18,6 @@ namespace ProceduralCreature.Generation
     {
         [SerializeField] private TextAsset definitionJson;
         [SerializeField] private bool generateOnStart = true;
-
         [SerializeField] private CreatureGenerationConfig generationConfig;
 
         private const string GeometryChildPrefix = "GeneratedGeometry_";
@@ -29,10 +28,7 @@ namespace ProceduralCreature.Generation
         private CreatureRig _rig;
         private CreatureSkinnedMeshRenderer _skinnedRenderer;
 
-        private void Awake()
-        {
-            _generationScheduler = new CreatureGenerationScheduler();
-        }
+        private void Awake() => _generationScheduler = new CreatureGenerationScheduler();
 
         private void Start()
         {
@@ -44,9 +40,7 @@ namespace ProceduralCreature.Generation
         {
             CreatureDefinition definition = LoadDefinition().Clone();
             if (generationConfig != null)
-            {
                 definition.Generation.VoxelsPerUnit = generationConfig.DefaultVoxelsPerUnit;
-            }
             _generationScheduler.Enqueue(definition, new GenerationDiagnostics(collectTimings: false));
         }
 
@@ -67,6 +61,7 @@ namespace ProceduralCreature.Generation
 
                 DestroyGeneratedGeometry();
                 BindImplicitSurfaceToRig(generated, result.Data.Definition, result.Data.Snapshot);
+                CreateRigAttachedGeometry(generated);
 
                 int implicitTriangles = 0;
                 if (generated.TryGetImplicitSurface(out GeometryItem implicitSurface) && implicitSurface.Mesh != null)
@@ -86,14 +81,19 @@ namespace ProceduralCreature.Generation
         {
             _generationScheduler?.Dispose();
             _generationScheduler = null;
+            DestroyGeneratedGeometry();
+            if (_previewMaterial != null)
+            {
+                if (Application.isPlaying) Destroy(_previewMaterial);
+                else DestroyImmediate(_previewMaterial);
+                _previewMaterial = null;
+            }
         }
 
         private CreatureDefinition LoadDefinition()
         {
             if (definitionJson != null)
-            {
                 return new JsonDnaSerializer().Deserialize(definitionJson.text);
-            }
             return CreateDemoDefinition();
         }
 
@@ -105,33 +105,49 @@ namespace ProceduralCreature.Generation
         }
 
         private CreatureMaterialPalette ResolveMaterialPalette()
-        {
-            return generationConfig != null ? generationConfig.MaterialPalette : null;
-        }
+            => generationConfig != null ? generationConfig.MaterialPalette : null;
 
-        private void CreateGeometryObject(int index, GeometryItem item)
+        private void CreateRigAttachedGeometry(GeneratedCreature generated)
         {
-            if (item.GeometryType == GeometryType.Implicit)
+            if (generated == null || _rig == null) return;
+
+            for (int index = 1; index < generated.Geometry.Count; index++)
             {
-                return;
-            }
+                GeometryItem item = generated.Geometry[index];
+                if (item.GeometryType == GeometryType.Implicit) continue;
+                if (item.Mesh == null)
+                    throw new DomainException($"Generated geometry item {index} has no mesh.");
+                if (item.RigBinding == null)
+                    throw new DomainException($"Generated geometry item {index} has no RigBinding metadata.");
 
-            var go = new GameObject($"{GeometryChildPrefix}{index}");
-            go.transform.SetParent(transform, worldPositionStays: false);
-            go.AddComponent<MeshFilter>().sharedMesh = item.Mesh;
-            MeshRenderer renderer = go.AddComponent<MeshRenderer>();
-            AssignItemMaterials(renderer, item);
-            go.AddComponent<MeshCollider>().sharedMesh = item.Mesh;
-            _geometryObjects.Add(go);
+                if (!TryResolveGeometryBone(item.RigBinding, out Transform bone))
+                {
+                    throw new DomainException(
+                        $"Generated mesh asset '{item.RigBinding.SourcePartId}' could not resolve its rig bone " +
+                        $"(mirrored={item.RigBinding.IsMirrored}).");
+                }
+
+                var go = new GameObject($"{GeometryChildPrefix}{index}");
+                // Generated mesh vertices are already in creature/world rest space.
+                // Preserve that placement while making the semantic bone the owner so
+                // one-bone accessories follow the rig with no second skinning path.
+                go.transform.SetParent(bone, worldPositionStays: true);
+                go.AddComponent<MeshFilter>().sharedMesh = item.Mesh;
+                MeshRenderer renderer = go.AddComponent<MeshRenderer>();
+                AssignItemMaterials(renderer, item);
+                go.AddComponent<MeshCollider>().sharedMesh = item.Mesh;
+                _geometryObjects.Add(go);
+            }
         }
 
-        /// <summary>
-        /// CC-028: a mesh-asset item whose part carries a submaterial key resolves
-        /// it through the shared palette. A set-but-unresolvable key logs a warning
-        /// and falls back to the default surface material (the editor preview
-        /// treats it as an error; Play Mode stays resilient). Items with no region
-        /// keep the default surface material too.
-        /// </summary>
+        private bool TryResolveGeometryBone(RigBindingMetadata binding, out Transform bone)
+        {
+            bone = null;
+            if (_rig == null || binding == null) return false;
+            string boneId = SemanticBoneResolver.ResolvePartRootBoneId(binding.SourcePartId, binding.IsMirrored);
+            return _rig.TryGetBone(boneId, out bone);
+        }
+
         private void AssignItemMaterials(MeshRenderer renderer, GeometryItem item)
         {
             if (item.MaterialRegions.Count == 0)
@@ -180,11 +196,7 @@ namespace ProceduralCreature.Generation
             CreatureDefinition definition,
             ResolvedCreatureSnapshot snapshot)
         {
-            if (generated == null || definition == null || snapshot == null)
-            {
-                return;
-            }
-
+            if (generated == null || definition == null || snapshot == null) return;
             if (!generated.TryGetImplicitSurface(out GeometryItem implicitItem))
             {
                 Debug.LogWarning("[CreatureCreator] Runtime preview has no implicit surface to bind to a SkinnedMeshRenderer.", this);
@@ -199,9 +211,7 @@ namespace ProceduralCreature.Generation
             }
 
             if (_rig == null)
-            {
                 _rig = gameObject.GetComponent<CreatureRig>() ?? gameObject.AddComponent<CreatureRig>();
-            }
             _rig.Build(skeleton);
             _rig.ApplyPose(PosedSkeleton.FromRestPose(skeleton));
 
@@ -220,10 +230,7 @@ namespace ProceduralCreature.Generation
             Material[] materials = defaultMaterial != null ? new[] { defaultMaterial } : null;
             _skinnedRenderer.Bind(
                 _rig, skeleton, implicitItem.Mesh, radiiByBoneIndex, materials, vertexDomains);
-            if (_skinnedRenderer.Renderer != null)
-            {
-                _skinnedRenderer.Renderer.enabled = true;
-            }
+            if (_skinnedRenderer.Renderer != null) _skinnedRenderer.Renderer.enabled = true;
         }
 
         private void DestroyGeneratedGeometry()
@@ -271,24 +278,9 @@ namespace ProceduralCreature.Generation
             var definition = CreatureDefinition.CreateEmpty();
             definition.Generation = new GenerationSettings { VoxelsPerUnit = 12f };
             definition.Forward = Vector3.forward;
-            definition.Body.Samples.Add(new BodySample
-            {
-                Id = 1,
-                Position = new Vector3(0f, 0f, -1f),
-                Radius = 1.1f,
-            });
-            definition.Body.Samples.Add(new BodySample
-            {
-                Id = 2,
-                Position = new Vector3(0f, 0f, 0f),
-                Radius = 1.3f,
-            });
-            definition.Body.Samples.Add(new BodySample
-            {
-                Id = 3,
-                Position = new Vector3(0f, 0f, 1f),
-                Radius = 1.0f,
-            });
+            definition.Body.Samples.Add(new BodySample { Id = 1, Position = new Vector3(0f, 0f, -1f), Radius = 1.1f });
+            definition.Body.Samples.Add(new BodySample { Id = 2, Position = new Vector3(0f, 0f, 0f), Radius = 1.3f });
+            definition.Body.Samples.Add(new BodySample { Id = 3, Position = new Vector3(0f, 0f, 1f), Radius = 1.0f });
             definition.AddPart(new CreaturePart
             {
                 Id = "runtime_head",
