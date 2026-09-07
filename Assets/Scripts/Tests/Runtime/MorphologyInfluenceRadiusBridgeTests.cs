@@ -29,7 +29,7 @@ namespace ProceduralCreature.Tests.Runtime
                 snapshot, ResolvedCreatureSnapshot.Resolve(definition));
 
             AssertFiniteAndDeterministic(first, second);
-            Assert.That(first[snapshot.GetIndex(AnatomicalBodyRigLayout.PelvisBoneId)],
+            Assert.That(first[snapshot.GetIndex(AnatomicalBodyRigLayout.BodyRootBoneId)],
                 Is.EqualTo(0.85f).Within(Tolerance));
             Assert.That(first[snapshot.GetIndex("limb_j0")], Is.EqualTo(0.10f).Within(Tolerance));
         }
@@ -70,7 +70,7 @@ namespace ProceduralCreature.Tests.Runtime
                 snapshot, ResolvedCreatureSnapshot.Resolve(definition));
 
             AssertFiniteAndDeterministic(first, second);
-            Assert.That(first[snapshot.GetIndex(AnatomicalBodyRigLayout.PelvisBoneId)],
+            Assert.That(first[snapshot.GetIndex(AnatomicalBodyRigLayout.BodyRootBoneId)],
                 Is.EqualTo(ImplicitSurfaceWeightAuthoring.DefaultInfluenceRadius).Within(Tolerance));
         }
 
