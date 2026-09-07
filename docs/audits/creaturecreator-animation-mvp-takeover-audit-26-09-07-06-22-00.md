@@ -4,8 +4,8 @@
 **Report ID:** `CC-AUDIT-20260907-7B2E4D91`  
 **Branch:** `audit/skeleton-animation-improvements-2026-09-07`  
 **Base:** `main`  
-**Head:** `c6f74f427c9b05570974808262b4750c58a29f89`  
-**Branch state:** 29 commits ahead, 0 behind `main` at review completion.
+**Head at report completion:** `998505c74b5b448e57486a769027df8df61c31f3`  
+**Branch state:** 30 commits ahead, 0 behind `main` at report completion.
 
 ## Scope
 
@@ -13,9 +13,9 @@ Took over the animation-MVP side branch from the preceding implementation agent 
 
 ## Verified branch state
 
-The branch is still isolated from `main`. The current comparison reports **29 commits ahead / 0 behind**, with merge base `83b1cbed767a8f58900ca6a82b06a028c3032ca7`.
+The branch remains isolated from `main`. The comparison before this report update showed 29 commits ahead / 0 behind; writing this audit added the report commit, leaving the branch at 30 commits ahead / 0 behind. Merge base is `83b1cbed767a8f58900ca6a82b06a028c3032ca7`.
 
-The branch now contains the compact anatomical rig, resolved-snapshot skeleton path, explicit limb terminal-joint nodes, chain-aware influence domains, runtime SMR adapter, pose application path, rig debug tooling, and the new grounding task `TSK-0153`. Those areas were reviewed against the actual source rather than relying only on task descriptions.
+The branch contains the compact anatomical rig, resolved-snapshot skeleton path, explicit limb terminal-joint nodes, chain-aware influence domains, runtime SMR adapter, pose application path, rig debug tooling, and the new grounding task `TSK-0153`. Those areas were reviewed against actual source rather than relying only on task descriptions.
 
 ## Implemented this takeover
 
@@ -47,11 +47,11 @@ The debug overlay no longer constructs a `GUIStyle` during static initialization
 
 ### 4. Simplified influence-domain collection
 
-Removed an unused `ResolvePartDomain` helper from `ImplicitSurfaceInfluenceDomainResolver` and simplified the parent-domain membership check to the normal string equality operation. No behavioral change is intended; this is a local consolidation of already-correct logic.
+Removed an unused `ResolvePartDomain` helper from `ImplicitSurfaceInfluenceDomainResolver` and simplified the parent-domain membership check to ordinary string equality. No behavioral change is intended; this is a local consolidation of already-correct logic.
 
 ### 5. Added deep ancestry regression coverage
 
-`ImplicitSurfaceInfluenceDomainResolverTests` now includes a nested `toe -> foot -> leg -> Body` case. The test verifies that the selected geometry domain may blend through every intended non-Body ancestor while continuing to exclude a sibling chain.
+`ImplicitSurfaceInfluenceDomainResolverTests` now includes a nested `toe -> foot -> leg -> Body` case. The test verifies that selected geometry may blend through every intended non-Body ancestor while continuing to exclude a sibling chain.
 
 ## Important source-level confirmations
 
@@ -101,6 +101,7 @@ The source-level changes in this takeover are deliberately small and covered by 
 | Cover anatomical bone-specific radius sampling | `b00afd4b412c2b176f04577f12199ce7a2cd8158` |
 | Simplify influence-domain collection logic | `cca4b6f629ac926045a552d2da530ee7bec7e897` |
 | Cover deep influence-domain ancestry | `c6f74f427c9b05570974808262b4750c58a29f89` |
+| Record takeover delta audit | `998505c74b5b448e57486a769027df8df61c31f3` |
 
 ## Disposition
 
