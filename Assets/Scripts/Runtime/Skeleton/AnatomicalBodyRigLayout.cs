@@ -21,7 +21,7 @@ namespace ProceduralCreature.Skeleton
     /// </summary>
     public static class AnatomicalBodyRigLayout
     {
-        public const string PelvisBoneId = "body_pelvis";
+        public const string BodyRootBoneId = "body_root";
         public const string SpineBoneId = "body_spine";
         public const string HeadBoneId = "body_head";
         public const string TailBoneId = "body_tail";
@@ -29,7 +29,7 @@ namespace ProceduralCreature.Skeleton
         private const float EpsilonSqr = 1e-10f;
         private const float InteriorMinT = 0.05f;
         private const float InteriorMaxT = 0.95f;
-        private const float DefaultPelvisT = 0.5f;
+        private const float DefaultBodyRootT = 0.5f;
         private const float BodySegmentArcStep = 0.12f;
         private const int MaxBodyBranchSegments = 8;
 
@@ -126,19 +126,19 @@ namespace ProceduralCreature.Skeleton
                 }
             }
 
-            float pelvisT = DeterminePelvisT(attachmentTs);
-            float pelvisHeadStepT = Mathf.Max(0f, pelvisT - BodySegmentArcStep);
-            Vector3 pelvis = EvaluateCanonical(body, storedHeadToTail, pelvisT);
+            float bodyRootT = DetermineBodyRootT(attachmentTs);
+            float bodyRootHeadStepT = Mathf.Max(0f, bodyRootT - BodySegmentArcStep);
+            Vector3 bodyRoot = EvaluateCanonical(body, storedHeadToTail, bodyRootT);
             Vector3 head = EvaluateCanonical(body, storedHeadToTail, 0f);
             Vector3 tail = EvaluateCanonical(body, storedHeadToTail, 1f);
             var result = new List<BoneSpec>(16);
 
-            Vector3 firstSpine = EvaluateCanonical(body, storedHeadToTail, pelvisHeadStepT);
-            result.Add(CreateSpec(PelvisBoneId, null, pelvis, firstSpine, pelvisT, pelvisHeadStepT,
-                EvaluateRadiusCanonical(body, storedHeadToTail, (pelvisT + pelvisHeadStepT) * 0.5f), axis));
+            Vector3 firstSpine = EvaluateCanonical(body, storedHeadToTail, bodyRootHeadStepT);
+            result.Add(CreateSpec(BodyRootBoneId, null, bodyRoot, firstSpine, bodyRootT, bodyRootHeadStepT,
+                EvaluateRadiusCanonical(body, storedHeadToTail, (bodyRootT + bodyRootHeadStepT) * 0.5f), axis));
 
-            float previousT = pelvisHeadStepT;
-            string previousId = PelvisBoneId;
+            float previousT = bodyRootHeadStepT;
+            string previousId = BodyRootBoneId;
             int spineIndex = 0;
             while (previousT > 0f && spineIndex < MaxBodyBranchSegments)
             {
@@ -156,8 +156,8 @@ namespace ProceduralCreature.Skeleton
             result.Add(CreateTerminalSpec(HeadBoneId, previousId, head, 0f,
                 EvaluateRadiusCanonical(body, storedHeadToTail, 0f), axis));
 
-            previousT = pelvisT;
-            previousId = PelvisBoneId;
+            previousT = bodyRootT;
+            previousId = BodyRootBoneId;
             int tailIndex = 0;
             while (previousT < 1f && tailIndex < MaxBodyBranchSegments)
             {
@@ -189,13 +189,13 @@ namespace ProceduralCreature.Skeleton
         private static BoneSpec CreateTerminalSpec(string id, string parentId, Vector3 position, float t, float radius, Vector3 fallbackAxis)
             => new BoneSpec(id, parentId, position, position, false, ResolveRotation(fallbackAxis, fallbackAxis), t, t, Mathf.Max(0.001f, radius));
 
-        private static float DeterminePelvisT(IReadOnlyList<float> attachmentTs)
+        private static float DetermineBodyRootT(IReadOnlyList<float> attachmentTs)
         {
-            if (attachmentTs == null || attachmentTs.Count == 0) return DefaultPelvisT;
+            if (attachmentTs == null || attachmentTs.Count == 0) return DefaultBodyRootT;
             var sorted = new List<float>(attachmentTs.Count);
             for (int i = 0; i < attachmentTs.Count; i++)
                 if (NumericValidity.IsFinite(attachmentTs[i])) sorted.Add(Mathf.Clamp01(attachmentTs[i]));
-            if (sorted.Count == 0) return DefaultPelvisT;
+            if (sorted.Count == 0) return DefaultBodyRootT;
             sorted.Sort();
             int middle = sorted.Count / 2;
             float median = sorted.Count % 2 == 1 ? sorted[middle] : (sorted[middle - 1] + sorted[middle]) * 0.5f;
@@ -210,7 +210,7 @@ namespace ProceduralCreature.Skeleton
             for (int i = 0; i < bones.Count; i++)
                 if (bones[i].Id == TailBoneId || bones[i].Id.StartsWith(TailBoneId + "_", StringComparison.Ordinal)) terminalTailId = bones[i].Id;
             if (t >= 1f) return terminalTailId;
-            string best = PelvisBoneId;
+            string best = BodyRootBoneId;
             float bestDistance = float.PositiveInfinity;
             for (int i = 0; i < bones.Count; i++)
             {

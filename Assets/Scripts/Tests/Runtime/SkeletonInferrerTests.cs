@@ -136,9 +136,9 @@ namespace ProceduralCreature.Tests.Runtime
 
             Skeleton.Skeleton skeleton = SkeletonInferrer.Infer(definition);
             Assert.AreEqual(11, skeleton.Bones.Count,
-                "Five-sample Body should produce one pelvis root, four headward spine segments, one head terminal, and five tail segments.");
+                "Five-sample Body should produce one body-root, four headward spine segments, one head terminal, and five tail segments.");
 
-            Bone pelvis = skeleton.FindBone(AnatomicalBodyRigLayout.PelvisBoneId);
+            Bone bodyRoot = skeleton.FindBone(AnatomicalBodyRigLayout.BodyRootBoneId);
             Bone spine = skeleton.FindBone(AnatomicalBodyRigLayout.SpineBoneId);
             Bone head = skeleton.FindBone(AnatomicalBodyRigLayout.HeadBoneId);
             Bone tail = skeleton.FindBone(AnatomicalBodyRigLayout.TailBoneId);
@@ -147,7 +147,7 @@ namespace ProceduralCreature.Tests.Runtime
             Bone spine3 = skeleton.FindBone(AnatomicalBodyRigLayout.SpineBoneId + "_3");
             Bone tail4 = skeleton.FindBone(AnatomicalBodyRigLayout.TailBoneId + "_4");
 
-            Assert.IsNotNull(pelvis);
+            Assert.IsNotNull(bodyRoot);
             Assert.IsNotNull(spine);
             Assert.IsNotNull(spine1);
             Assert.IsNotNull(spine2);
@@ -155,15 +155,15 @@ namespace ProceduralCreature.Tests.Runtime
             Assert.IsNotNull(head);
             Assert.IsNotNull(tail);
             Assert.IsNotNull(tail4);
-            Assert.IsNull(pelvis.ParentBoneId);
-            Assert.AreEqual(pelvis.Id, spine.ParentBoneId);
+            Assert.IsNull(bodyRoot.ParentBoneId);
+            Assert.AreEqual(bodyRoot.Id, spine.ParentBoneId);
             Assert.AreEqual(spine.Id, spine1.ParentBoneId);
             Assert.AreEqual(spine1.Id, spine2.ParentBoneId);
             Assert.AreEqual(spine2.Id, spine3.ParentBoneId);
             Assert.AreEqual(spine3.Id, head.ParentBoneId);
-            Assert.AreEqual(pelvis.Id, tail.ParentBoneId);
+            Assert.AreEqual(bodyRoot.Id, tail.ParentBoneId);
             Assert.AreEqual(AnatomicalBodyRigLayout.TailBoneId + "_3", tail4.ParentBoneId);
-            Assert.AreEqual(Vector3.zero, pelvis.Position);
+            Assert.AreEqual(Vector3.zero, bodyRoot.Position);
             Assert.AreEqual(new Vector3(0f, 0f, -0.48f), spine.Position);
             Assert.AreEqual(new Vector3(0f, 0f, -2f), head.Position);
             Assert.AreEqual(Vector3.zero, tail.Position);
@@ -225,10 +225,10 @@ namespace ProceduralCreature.Tests.Runtime
             Skeleton.Skeleton skeleton = SkeletonInferrer.Infer(definition);
 
             Assert.AreEqual(
-                AnatomicalBodyRigLayout.PelvisBoneId,
+                AnatomicalBodyRigLayout.BodyRootBoneId,
                 skeleton.FindBone("leg_j0").ParentBoneId);
             Assert.AreEqual(
-                AnatomicalBodyRigLayout.PelvisBoneId,
+                AnatomicalBodyRigLayout.BodyRootBoneId,
                 skeleton.FindBone("leg_j0" + SkeletonInferrer.MirrorSuffix).ParentBoneId);
             Assert.AreEqual(
                 -skeleton.FindBone("leg_j0").Position.x,
@@ -251,8 +251,8 @@ namespace ProceduralCreature.Tests.Runtime
             Bone mirroredFoot = skeleton.FindBone("foot" + SkeletonInferrer.MirrorSuffix);
             Assert.IsNotNull(foot);
             Assert.IsNotNull(mirroredFoot);
-            Assert.AreEqual(AnatomicalBodyRigLayout.PelvisBoneId, foot.ParentBoneId);
-            Assert.AreEqual(AnatomicalBodyRigLayout.PelvisBoneId, mirroredFoot.ParentBoneId);
+            Assert.AreEqual(AnatomicalBodyRigLayout.BodyRootBoneId, foot.ParentBoneId);
+            Assert.AreEqual(AnatomicalBodyRigLayout.BodyRootBoneId, mirroredFoot.ParentBoneId);
         }
 
         [Test]
@@ -293,7 +293,7 @@ namespace ProceduralCreature.Tests.Runtime
             Skeleton.Skeleton skeleton = SkeletonInferrer.Infer(definition);
 
             Assert.GreaterOrEqual(skeleton.Bones.Count, 8);
-            Assert.IsNotNull(skeleton.FindBone(AnatomicalBodyRigLayout.PelvisBoneId));
+            Assert.IsNotNull(skeleton.FindBone(AnatomicalBodyRigLayout.BodyRootBoneId));
             Assert.IsNotNull(skeleton.FindBone(AnatomicalBodyRigLayout.SpineBoneId));
             Assert.IsNotNull(skeleton.FindBone(AnatomicalBodyRigLayout.HeadBoneId));
             Assert.IsNotNull(skeleton.FindBone(AnatomicalBodyRigLayout.TailBoneId));
