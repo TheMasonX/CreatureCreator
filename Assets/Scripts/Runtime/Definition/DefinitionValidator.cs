@@ -204,7 +204,8 @@ namespace ProceduralCreature.Definition
                 {
                     issues.Add(new ValidationIssue(
                         ValidationSeverity.Error, ValidationCode.InvalidBodySample,
-                        $"Body sample at index {i} is null."));
+                        $"Body sample at index {i} is null.",
+                        location: new ValidationIssueLocation(ValidationLocationKind.BodySample, i)));
                     continue;
                 }
 
@@ -765,7 +766,8 @@ namespace ProceduralCreature.Definition
                     {
                         issues.Add(new ValidationIssue(
                             ValidationSeverity.Error, ValidationCode.InvalidLimbChain,
-                            $"Part '{part.Id}' has a null limb joint at index {i}.", part.Id));
+                            $"Part '{part.Id}' has a null limb joint at index {i}.", part.Id,
+                            new ValidationIssueLocation(ValidationLocationKind.LimbJoint, i)));
                         continue;
                     }
 

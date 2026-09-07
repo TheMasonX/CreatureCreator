@@ -51,15 +51,21 @@
       "author": "anonymous",
       "body": "Audit synthesis (2026-09-05, deep-dive code reviews): preview/generated Unity-object ownership is coordinated across TSK-0104 and TSK-0122. TSK-0122 (child of TSK-0098) owns making CreaturePreviewController root ownership structural (marker-based, not name/prefix-based). Coordinate with this task\u0027s \u0022define generated Unity-object ownership\u0022 scope to avoid two competing ownership schemes. Provenance: docs/audits/creaturecreator-deep-dive-code-review-audit-26-09-05-23-07-45.md F4. Do not duplicate.",
       "createdAtUtc": "2026-09-06T04:26:05.7229276Z"
+    },
+    {
+      "id": "c-4790806f2e9a4cc59cec6ee76a39f8a5",
+      "author": "anonymous",
+      "body": "Synthesis evidence (2026-09-06 audit batch; see docs/audits/creaturecreator-audit-synthesis-2026-09-06-batch.md). This task is the correct owner for async-preview bounding/cancellation/disposal AND generated Unity-object ownership (not TSK-0103, which is Done). Corroborating findings consolidated here:\n- Scheduler unbounded/latest-wins-at-application-layer F-08 (whole-codebase) \u002B scheduler slice F6; Dispose does not cancel in-flight \u002B no domain-reload handling F-10 \u002B scheduler F7; post-dispose Enqueue-vs-TryTakeCompleted asymmetry scheduler F8; failure/disposal test gaps scheduler F9 \u002B whole-codebase F-11/F-12.\n- Double definition.Clone across preview\u002Bscheduler: whole-codebase F-09, second-order F-227.\n- Preview weak generated-Mesh ownership F-30/F-215 \u002B runtime-preview synthetic Material leak F-216 (net-new sub) \u002B generated-output resource boundary F-229 (data-vs-resource split also touches TSK-0095).\nDo NOT redirect to TSK-0134 (that is the per-frame skinning benchmark, unrelated). No duplicate scheduler task created. Scheduler evidence and acceptance criteria (bounded queue, cancellation, domain-reload, late-result disposal, tests) all belong on this task.",
+      "createdAtUtc": "2026-09-06T22:44:28.3151442Z"
     }
   ],
   "epicId": null,
   "parentId": "tsk-0098-decompose-creatureeditorwindow-responsibilities",
   "dueDateUtc": null,
   "createdAtUtc": "2026-09-03T22:37:19.7381337Z",
-  "updatedAtUtc": "2026-09-06T04:26:05.7229276Z",
+  "updatedAtUtc": "2026-09-06T22:44:28.3151442Z",
   "completedAtUtc": null,
-  "revision": 5,
+  "revision": 6,
   "isArchived": false,
   "hasLoadError": false,
   "loadError": null,

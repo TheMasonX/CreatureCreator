@@ -229,12 +229,12 @@ namespace ProceduralCreature.Definition
             var frames = new BodyFrame[count];
 
             Vector3 tangent0 = TangentAt(positions, 0, forward);
-            Vector3 reference = NormalizeOr(forward, Vector3.forward);
+            Vector3 reference = NumericValidity.NormalizeOr(forward, Vector3.forward, EpsilonSqr);
             if (IsParallel(reference, tangent0)) reference = Vector3.up;
             if (IsParallel(reference, tangent0)) reference = Vector3.right;
 
             Vector3 normal = (reference - tangent0 * Vector3.Dot(reference, tangent0));
-            normal = NormalizeOr(normal, Vector3.up);
+            normal = NumericValidity.NormalizeOr(normal, Vector3.up, EpsilonSqr);
             Vector3 binormal = Vector3.Cross(tangent0, normal);
             if (binormal.sqrMagnitude < EpsilonSqr) binormal = DeterministicPerpendicular(tangent0);
 
@@ -249,7 +249,7 @@ namespace ProceduralCreature.Definition
 
                 // Re-orthonormalize so floating-point drift never accumulates
                 // across a long chain.
-                normal = NormalizeOr(normal - tangent * Vector3.Dot(normal, tangent), DeterministicPerpendicular(tangent));
+                normal = NumericValidity.NormalizeOr(normal - tangent * Vector3.Dot(normal, tangent), DeterministicPerpendicular(tangent), EpsilonSqr);
                 binormal = Vector3.Cross(tangent, normal);
                 if (binormal.sqrMagnitude < EpsilonSqr) binormal = DeterministicPerpendicular(tangent);
                 binormal = binormal.normalized;
@@ -286,7 +286,7 @@ namespace ProceduralCreature.Definition
             int count = positions.Count;
             if (count == 1)
             {
-                Vector3 fallback = NormalizeOr(forward, Vector3.forward);
+                Vector3 fallback = NumericValidity.NormalizeOr(forward, Vector3.forward, EpsilonSqr);
                 return fallback;
             }
 
@@ -323,7 +323,7 @@ namespace ProceduralCreature.Definition
                 }
             }
 
-            return NormalizeOr(forward, Vector3.forward);
+            return NumericValidity.NormalizeOr(forward, Vector3.forward, EpsilonSqr);
         }
 
         /// <summary>
@@ -410,11 +410,6 @@ namespace ProceduralCreature.Definition
         private static bool IsParallel(Vector3 a, Vector3 b)
         {
             return Mathf.Abs(Vector3.Dot(a.normalized, b.normalized)) > 0.999999f;
-        }
-
-        private static Vector3 NormalizeOr(Vector3 v, Vector3 fallback)
-        {
-            return v.sqrMagnitude <= EpsilonSqr ? fallback.normalized : v.normalized;
         }
     }
 }

@@ -238,15 +238,21 @@
       "author": "anonymous",
       "body": "Audit synthesis (2026-09-05, deep-dive code reviews): two new children own bounded mechanisms \u2014 TSK-0124 (SemanticBoneResolver raw/snapshot duplication to snapshot-authoritative) and TSK-0125 (GeneratedCreature/GeometryItem/MaterialRegion output-contract hardening \u002B MaterialRegion submesh semantics). Residual within TSK-0095, not re-filed: CreatureMeshGenerator still passes raw CreatureDefinition alongside the resolved snapshot into appearance code (AppearanceBaker raw overloads as legacy-exit target). Provenance: docs/audits/creaturecreator-deep-dive-code-review-2026-09-05.md P2 items. Do not duplicate.",
       "createdAtUtc": "2026-09-06T04:25:59.3449203Z"
+    },
+    {
+      "id": "c-7c707d33a8e547bf884ef1e892ab3573",
+      "author": "anonymous",
+      "body": "Synthesis evidence (2026-09-06 audit batch, fixed point d3c7f12e; see docs/audits/creaturecreator-audit-synthesis-2026-09-06-batch.md). This task is the immutable-artifact/stage-boundary umbrella. Corroborating findings verified Confirmed against source and consolidated here:\n- GeneratedCreatureData shallow immutability \u002B raw vs snapshot dual input: whole-codebase F-01/F-02/F-03, second-order F-212/F-213/F-220; MeshExtractionResult mutable Lists F-02; ResolvedCreatureSnapshot.BodyFrames[]/BodyAppearance mutable F-04/F-05 (\u002BF-212/F-213), also second-order F-230 \u002B next-slice F-308 (repository-wide read-only policy).\n- canonicalize-after-validate F-13; batch resolved graph context F-19/F-44; Resolve() god method F-222; mutable GenerationDiagnostics F-41/F-205/F-206; failure channel disagreement F-205/F-206; CreatureRig.Bones facade F-211 (also overlaps rig/animation); resolved-boundary SDF one-arg entry points F-16/F-221; revision identity coupled to JSON F-223 (note under TSK-0112 too).\nRecommended: when implementing the immutable-artifact rule, treat F-201 (ValidationResult.Issues) and the generated-output data-vs-resource split as owned here; a bounded ValidationResult contract task was filed as TSK-0138 and the GeneratedCreature output-contract/MainMesh exit as TSK-0140. No duplicate task created on this umbrella.",
+      "createdAtUtc": "2026-09-06T22:44:28.2288473Z"
     }
   ],
   "epicId": null,
   "parentId": null,
   "dueDateUtc": null,
   "createdAtUtc": "2026-09-01T03:20:52.7496119Z",
-  "updatedAtUtc": "2026-09-06T04:25:59.3449203Z",
+  "updatedAtUtc": "2026-09-06T22:44:28.2288473Z",
   "completedAtUtc": "2026-09-02T03:10:44.2511455Z",
-  "revision": 40,
+  "revision": 41,
   "isArchived": false,
   "hasLoadError": false,
   "loadError": null,

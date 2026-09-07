@@ -40,15 +40,21 @@
       "author": "anonymous",
       "body": "Audit synthesis 2026-09-06 (council-reviewed): round-1 evidence is strong (indexed ResolveInto/Transform[]/Quaternion[] path; SkeletonInferrer terminal-rotation fix; SkeletonSnapshot contract tests incl. duplicate-ID/missing-parent/bone-order-mismatch/invalid-child; repeated-ApplyPose 0-bytes/0.555ms; focused PlayMode 28/28; dotnet builds clean). If the round-1 scope is confirmed landed on HEAD, close this task with a final focused PlayMode confirmation before the SkinnedMeshRenderer adapter (TSK-0132) builds on the finalized indexed hot path. Do not combine with renderer/locomotion work. Parent TSK-0073.",
       "createdAtUtc": "2026-09-06T19:15:24.6308537Z"
+    },
+    {
+      "id": "c-882d81127a47496f8327a7e67de0a878",
+      "author": "anonymous",
+      "body": "Synthesis evidence (2026-09-06 audit batch; see docs/audits/creaturecreator-audit-synthesis-2026-09-06-batch.md). second-order F-207 (P1): SkeletonSnapshot.HasSameBoneOrder only compares count \u002B ordered IDs (SkeletonSnapshot.cs:191-199); it is used as the pose-compatibility gate in PoseRotationResolver (cs:33,62) but does not compare parent indices/IDs, SourcePartId, terminal/segment semantics, mirrored state, or rest pose/bind. Two snapshots with equal ordered IDs but different topology/bind would be accepted. Extend here (indexed pose hot path \u002B skeleton compatibility). Downstream consumer TSK-0077 also relevant. F-208 (SkeletonSnapshot.Capture list-as-priority-queue readability, cs:109-123) is low-value; parent-before-child invariant already Done under TSK-0114 - optional. No duplicate task created.",
+      "createdAtUtc": "2026-09-06T22:44:41.4008236Z"
     }
   ],
   "epicId": null,
   "parentId": "TSK-0073",
   "dueDateUtc": null,
   "createdAtUtc": "2026-09-06T03:06:41.5219151Z",
-  "updatedAtUtc": "2026-09-06T19:15:24.6308537Z",
+  "updatedAtUtc": "2026-09-06T22:44:41.4008236Z",
   "completedAtUtc": null,
-  "revision": 5,
+  "revision": 6,
   "isArchived": false,
   "hasLoadError": false,
   "loadError": null,

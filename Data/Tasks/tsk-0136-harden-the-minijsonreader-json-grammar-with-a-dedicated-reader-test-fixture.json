@@ -1,0 +1,48 @@
+﻿{
+  "id": "tsk-0136-harden-the-minijsonreader-json-grammar-with-a-dedicated-reader-test-fixture",
+  "key": "TSK-0136",
+  "title": "Harden the MiniJsonReader JSON grammar with a dedicated reader test fixture",
+  "description": "## Summary\nThe 2026-09-06 next-slice audit (creaturecreator-next-slice-audit-26-09-06-16-00-00.md) found the MiniJsonReader DNA JSON parser accepts input that is not strict JSON, which can silently corrupt or mis-parse authored DNA. No dedicated MiniJsonReaderTests fixture exists.\n\n## Scope\nHarden \u0060Runtime/Definition/MiniJsonReader.cs\u0060 grammar at the parser level (not in DefinitionValidator):\n- F-303 (P1): Duplicate object member names silently last-write-wins (\u0060MiniJsonReader.cs:102\u0060, \u0060result[key]=value\u0060). Reject duplicate keys with DnaDeserializationException.\n- F-304 (P2): Raw control characters (\u003C 0x20) accepted inside strings (\u0060MiniJsonReader.cs:194\u0060). Reject them.\n- F-305 (P2): Number grammar is looser than documented (\u0060MiniJsonReader.cs:204,208\u0060 broad scan \u002B double.TryParse). Implement strict \u0060-? int frac? exp?\u0060 grammar, keep invariant conversion.\n- F-310: Add a pure \u0060MiniJsonReaderTests\u0060 grammar fixture (duplicate key, control char/newline/tab/NUL, numeric grammar, escaped strings). Keep \u0060JsonDnaSerializerTests\u0060 focused on DNA semantics.\n\n## Acceptance Criteria\n- Duplicate JSON object keys produce a deterministic deserialization error (no last-write-wins) with a focused test.\n- Control chars inside strings are rejected; valid escapes still parse.\n- Strict JSON number grammar is enforced; invalid numbers rejected.\n- A \u0060MiniJsonReaderTests\u0060 fixture covers the grammar boundaries above and passes in EditMode/play runtime.\n\n## Validation\nFocused EditMode/pure reader unit tests (no Unity scene required); dotnet Tests build clean.\n\n## Findings\nConfirmed at HEAD d3c7f12e. No existing MemorySmith task owns parser grammar (TSK-0126 IDnaSerializer seam and TSK-0088 DisplayName are Done and unrelated). See docs/audits/creaturecreator-audit-synthesis-2026-09-06-batch.md.\n\n## Blockers\nNone.\n\n## Next Step\nImplement parser rejection rules and the reader test fixture; run focused tests.",
+  "type": "Task",
+  "status": "Done",
+  "priority": "High",
+  "assigneeMode": "Custom",
+  "assigneeDirectoryId": null,
+  "assigneeCustomText": "Agent",
+  "reporter": "anonymous",
+  "labels": [
+    "audit-synthesis",
+    "serialization",
+    "parser",
+    "net-new",
+    "2026-09-06"
+  ],
+  "attachments": [],
+  "externalLinks": [],
+  "linkedPages": [],
+  "comments": [
+    {
+      "id": "c-273cc6e02acf4e449c5e1eb4b9273120",
+      "author": "anonymous",
+      "body": "## Implementation (worktree, uncommitted)\nHardened parser-level grammar in \u0060Assets/Scripts/Runtime/Serialization/MiniJsonReader.cs\u0060 only (no DefinitionValidator/DNA-semantics change):\n- F-303: ParseObject rejects duplicate member names via \u0060result.ContainsKey(key)\u0060 -\u003E throws \u0060DnaDeserializationException(\u0022Duplicate JSON object member \u0027\u003Ckey\u003E\u0027 at position \u003Ci\u003E.\u0022)\u0060 then \u0060result.Add\u0060. Memory stays bounded by the object\u0027s own member count (Dictionary already holds first value; ContainsKey adds no storage); deterministic \u2014 always throws on second occurrence.\n- F-304: ParseString rejects raw control chars (c \u003C 0x20) in the non-escape path with \u0060Unescaped control character (U\u002BXXXX) ...\u0060. Escaped forms (\\n \\t \\\u0022 \\\\ \\/ \\b \\f \\r \\uXXXX) still decode via the existing escape branch (unchanged).\n- F-305: ParseNumber rewritten to strict JSON \u0060-? int frac? exp?\u0060: optional \u0060-\u0060 only (no leading \u0060\u002B\u0060); integer part \u00600\u0060 or non-zero digit\u002Bd; leading-zero rejection (\u006001\u0060,\u0060-01\u0060,\u006000\u0060); frac requires \u0060.\u0060 \u002B one\u002B ASCII digit; exponent \u0060e\u0060/\u0060E\u0060 \u002B optional sign \u002B one\u002B digit; rejects hex/NaN/Infinity/trailing junk. Added ASCII-only digit helper (char.IsDigit would accept non-ASCII digits). Added post-conversion guard rejecting exponent overflow to \u002B/-Infinity (\u00601e999\u0060). Conversion stays invariant (\u0060double.TryParse(token, NumberStyles.Float, CultureInfo.InvariantCulture)\u0060).\n\nAdded pure grammar fixture \u0060Assets/Scripts/Tests/Runtime/MiniJsonReaderTests.cs\u0060 (49 cases): duplicate keys (top/nested/type-change/deterministic message), raw control chars (newline/tab/CR/NUL/0x01/0x02/object value), valid escapes decode (\\n,\\t,\u0022,\\,/,b,f,r,\\uXXXX), and numeric grammar (13 valid forms \u002B 18 invalid forms \u002B overflow \u002B trailing-junk \u002B in-object). JsonDnaSerializerTests left untouched (still DNA-semantics only).\n\n## Validation (real Unity, PlayMode)\nNote: \u0060ProceduralCreature.Tests.Runtime\u0060 assembly tests are discovered under PlayMode in this project (EditMode filter returned 0 tests), so the pure-reader fixture ran in PlayMode as the repo\u0027s runtime suite does \u2014 no scene dependency (fixture is plain [Test], no [UnityTest]/scene).\n- Gate 1: \u0060dotnet build ProceduralCreature.Tests.Runtime.csproj --no-restore\u0060 -\u003E exit 0 (Runtime \u002B Tests.Runtime succeed); explicit \u0060dotnet build ProceduralCreature.Runtime.csproj --no-restore\u0060 -\u003E exit 0.\n- Gate 2a: \u0060MiniJsonReaderTests\u0060 PlayMode -\u003E 49 passed / 0 failed / 0 skipped.\n- Gate 2b: \u0060JsonDnaSerializerTests\u0060 PlayMode -\u003E 11 passed / 0 failed / 0 skipped (round-trip, byte-stability, legacy migration preserved =\u003E strict grammar accepts all CanonicalJsonWriter output: fixed-point \u0060F4\u0060/default \u0060G\u0060 invariant forms, \u0060-?\u0060 minus only, no leading zero/exponent).\n- Gate 3: \u0060git diff --check\u0060 -\u003E exit 0 (no whitespace errors).\nNo console errors after compile.\n\n## Non-obvious decisions\n1) Duplicate keys: reject with \u0060ContainsKey\u0060 then \u0060Add\u0060 (bounded memory, deterministic second-occurrence throw, names the key). Not using \u0060Dictionary.Add\u0060\u0027s raw ArgumentException so the message is stable and the outer Parse wrapper doesn\u0027t mask it with a generic \u0022Malformed JSON near position\u0022 wrap.\n2) Number grammar edge handling: ASCII-only digits (not char.IsDigit); leading-zero integer rule follows JSON (\u00600\u0060 ok, \u006001\u0060 bad); fraction/exponent require at least one digit; a leading \u0060\u002B\u0060 and bare \u0060.5\u0060/\u00601.\u0060 are rejected; exponent overflow to \u002B/-Infinity rejected as non-finite (digits can\u0027t spell NaN/Infinity literally, but \u00601e999\u0060 can overflow).\n3) Preserving existing valid DNAs: CanonicalJsonWriter only emits invariant \u0060-?\u0060 fixed-point/\u0060G\u0060 numbers (e.g. \u00600.7500\u0060, \u0060-0.2500\u0060, \u00602\u0060) \u2014 all strict-grammar valid, confirmed by 11/11 JsonDnaSerializerTests including byte-stable round-trip. No authored file should rely on leading \u0060\u002B\u0060, leading zeros, hex, or raw control chars; such inputs were previously mis-parsed and are the defect being fixed.\n\n## Residual risk\n- The \u00601e999\u0060 overflow rejection is a deliberate strictness beyond \u0022loose grammar\u0022 (documented) \u2014 an extreme but finite-looking exponent now errors instead of silently producing Infinity. No valid DNA uses it.\n- Control-char rejection also applies to any human-authored JSON that embedded a literal newline inside a string (invalid JSON); such files now fail at load rather than mis-parse.\n\n## Next step\nOrchestrator review of the working-tree diff (uncommitted, per round rules).",
+      "createdAtUtc": "2026-09-06T23:26:47.6725678Z"
+    },
+    {
+      "id": "c-886726076dca4b57b70985894328c477",
+      "author": "anonymous",
+      "body": "Sprint R3 orchestrator review: diff bounded to MiniJsonReader.cs \u002B new MiniJsonReaderTests.cs; grep confirms all three guards (duplicate-key reject via ContainsKey, control-char reject, strict JSON number grammar with leading-zero and 1e999-overflow handling). git diff --check clean (benign LF-\u003ECRLF note only). Validation (subagent-run): dotnet Runtime \u002B Tests.Runtime clean; Unity PlayMode MiniJsonReaderTests 49/49, JsonDnaSerializerTests 11/11 (round-trip/byte-stability intact, proving canonical output stays strict-grammar valid). Parser-level only; DefinitionValidator and DNA semantics untouched.",
+      "createdAtUtc": "2026-09-06T23:27:11.5922882Z"
+    }
+  ],
+  "epicId": null,
+  "parentId": null,
+  "dueDateUtc": null,
+  "createdAtUtc": "2026-09-06T22:44:12.6998389Z",
+  "updatedAtUtc": "2026-09-06T23:27:14.2452519Z",
+  "completedAtUtc": "2026-09-06T23:27:14.2452519Z",
+  "revision": 6,
+  "isArchived": false,
+  "hasLoadError": false,
+  "loadError": null,
+  "sourceFilePath": "tsk-0136-harden-the-minijsonreader-json-grammar-with-a-dedicated-reader-test-fixture.json"
+}

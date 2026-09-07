@@ -16,12 +16,27 @@ namespace ProceduralCreature.Definition
 
         public string Message { get; }
 
-        public ValidationIssue(ValidationSeverity severity, ValidationCode code, string message, string partId = null)
+        /// <summary>
+        /// Optional typed structural location (body-sample or limb-joint index) for
+        /// findings whose target the validator knows structurally (audit F-203).
+        /// Supplements — never replaces — <see cref="Message"/>, whose human-readable
+        /// text is unchanged. Null for definition-wide, part-wide, or otherwise
+        /// unscoped findings.
+        /// </summary>
+        public ValidationIssueLocation? Location { get; }
+
+        public ValidationIssue(
+            ValidationSeverity severity,
+            ValidationCode code,
+            string message,
+            string partId = null,
+            ValidationIssueLocation? location = null)
         {
             Severity = severity;
             Code = code;
             Message = message;
             PartId = partId;
+            Location = location;
         }
 
         public override string ToString()

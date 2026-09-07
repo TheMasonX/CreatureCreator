@@ -119,15 +119,21 @@
       "author": "anonymous",
       "body": "Audit synthesis (2026-09-05, deep-dive code reviews): TSK-0122 (child) owns making CreaturePreviewController root ownership structural (marker, not GameObject.Find(\u0022CreatureCreator Preview\u0022) \u002B name-prefix destruction). Residual, not re-filed: preview revision identity is correct but is computed by cloning \u002B fully resolving the whole definition; a compact preview-generation fingerprint/value object is a later cleanup under this owner (TSK-0098 / CC-094). Provenance: docs/audits/creaturecreator-deep-dive-code-review-audit-26-09-05-23-07-45.md F4 and code-review 2026-09-05 preview-fingerprint item. Do not duplicate.",
       "createdAtUtc": "2026-09-06T04:25:59.3723444Z"
+    },
+    {
+      "id": "c-e05aab5611b44fef8132345f4c997442",
+      "author": "anonymous",
+      "body": "Synthesis evidence (2026-09-06 audit batch; see docs/audits/creaturecreator-audit-synthesis-2026-09-06-batch.md). Corroborating findings consolidated to this editor/decomposition owner:\n- CreaturePreviewController responsibility accumulation \u002B not-transactional apply: whole-codebase F-31/F-50, second-order F-214 (ApplyPreviewGeometry non-transactional), F-217 (editor vs runtime material policy divergence).\n- CreatureDefinition mutation boundary is convention-only (single-mutation-path invariant): next-slice F-301 (extend here as next hardening after current decomposition wave).\n- CreatureEditorWindow god-object decomposition progress: round2-F3 (informational; already owned here; success metric is live delegation, not file size).\n- Preview weak generated-Mesh ownership F-30 and Mesh lifetime ownership F-215 are owned by TSK-0104 (child of this task) - see TSK-0104 comment.\nNo duplicate task created; filed follow-ups belong to TSK-0104 child.",
+      "createdAtUtc": "2026-09-06T22:44:28.2753467Z"
     }
   ],
   "epicId": null,
   "parentId": null,
   "dueDateUtc": null,
   "createdAtUtc": "2026-09-01T03:20:52.8300758Z",
-  "updatedAtUtc": "2026-09-06T04:25:59.3723444Z",
+  "updatedAtUtc": "2026-09-06T22:44:28.2753467Z",
   "completedAtUtc": null,
-  "revision": 19,
+  "revision": 20,
   "isArchived": false,
   "hasLoadError": false,
   "loadError": null,

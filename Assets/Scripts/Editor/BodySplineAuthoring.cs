@@ -81,7 +81,7 @@ namespace ProceduralCreature.Editor
             {
                 // No segment direction yet; extend along the creature Forward
                 // (or a fixed fallback) at unit length.
-                Vector3 direction = NormalizedOrFallback(fallbackDirection, Vector3.forward);
+                Vector3 direction = NumericValidity.NormalizeOr(fallbackDirection, Vector3.forward, MinSpacingSqr);
                 BodySample only = spline.Samples[0];
                 position = only.Position + direction;
                 radius = only.Radius;
@@ -96,7 +96,7 @@ namespace ProceduralCreature.Editor
                 Vector3 tailDirection;
                 if (spacing <= MinSpacingSqr)
                 {
-                    tailDirection = NormalizedOrFallback(fallbackDirection, Vector3.forward);
+                    tailDirection = NumericValidity.NormalizeOr(fallbackDirection, Vector3.forward, MinSpacingSqr);
                     spacing = 1f;
                 }
                 else
@@ -130,7 +130,7 @@ namespace ProceduralCreature.Editor
             }
             else if (spline.Samples.Count == 1)
             {
-                Vector3 direction = NormalizedOrFallback(fallbackDirection, Vector3.forward);
+                Vector3 direction = NumericValidity.NormalizeOr(fallbackDirection, Vector3.forward, MinSpacingSqr);
                 BodySample only = spline.Samples[0];
                 position = only.Position - direction;
                 radius = only.Radius;
@@ -145,7 +145,7 @@ namespace ProceduralCreature.Editor
                 Vector3 direction;
                 if (spacing <= MinSpacingSqr)
                 {
-                    direction = NormalizedOrFallback(fallbackDirection, Vector3.forward);
+                    direction = NumericValidity.NormalizeOr(fallbackDirection, Vector3.forward, MinSpacingSqr);
                     spacing = 1f;
                 }
                 else
@@ -533,7 +533,7 @@ namespace ProceduralCreature.Editor
         public static void RespaceToTargetSpacing(BodySpline spline, float targetSpacing)
         {
             if (spline == null || spline.Samples == null || spline.Samples.Count < 2) return;
-            if (!IsFinite(targetSpacing) || targetSpacing <= 0f) return;
+            if (!NumericValidity.IsFinite(targetSpacing) || targetSpacing <= 0f) return;
 
             int count = spline.Samples.Count;
             var positions = new Vector3[count];
@@ -575,15 +575,6 @@ namespace ProceduralCreature.Editor
             }
             spline.Samples.Clear();
             spline.Samples.AddRange(newSamples);
-        }
-
-        /// <summary>
-        /// Walks <paramref name="steps"/> chords of length <paramref name="d"/>
-        /// from (<paramref name="sCur"/>, <paramref name="origin"/>), following
-        /// the polyline and extending straight past its end (in the last segment
-        private static bool IsFinite(float value)
-        {
-            return !float.IsNaN(value) && !float.IsInfinity(value);
         }
 
         /// <summary>
@@ -672,11 +663,6 @@ namespace ProceduralCreature.Editor
             {
                 spline.Samples[i].Position = positions[i] + downstreamDelta;
             }
-        }
-
-        private static Vector3 NormalizedOrFallback(Vector3 direction, Vector3 fallback)
-        {
-            return direction.sqrMagnitude <= MinSpacingSqr ? fallback : direction.normalized;
         }
     }
 }

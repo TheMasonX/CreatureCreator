@@ -1,0 +1,48 @@
+﻿{
+  "id": "tsk-0139-consolidate-duplicated-finite-normalize-numeric-helpers-across-editor-and-runtime",
+  "key": "TSK-0139",
+  "title": "Consolidate duplicated finite/normalize numeric helpers across Editor and Runtime",
+  "description": "## Summary\nThe 2026-09-06 round-2 audit (creaturecreator-exhaustive-audit-2026-09-06-round2.md) and addendum (creaturecreator-audit-addendum-2026-09-06.md) found duplicated finite/normalize helpers with one divergent contract.\n\n## Scope\n- round2-F1: Three independent normalize-with-fallback helpers where one is behaviorally different: \u0060BodyFrameResolver.NormalizeOr\u0060 (Runtime, \u0060BodyFrameResolver.cs:415-418\u0060, fallback.normalized), \u0060BodyEditSolver.NormalizeOr\u0060 (Editor, ~526-528, fallback.normalized), and \u0060BodySplineAuthoring.NormalizedOrFallback\u0060 (Editor, \u0060:678-680\u0060, returns fallback AS-IS). Unify on the majority \u0060fallback.normalized\u0060 contract in one shared helper; threshold constants differ (\u0060EpsilonSqr\u0060/\u0060Epsilon\u0060/\u0060MinSpacingSqr\u0060).\n- round2-F2: Editor never adopted shared \u0060NumericValidity\u0060; \u0060BodySplineAuthoring.cs:584-587\u0060 duplicates \u0060NumericValidity.IsFinite\u0060 (\u0060NumericValidity.cs:6-8\u0060). Reference the shared type (no Editor file uses \u0060using static NumericValidity\u0060).\n- addendum A-F5: Third runtime \u0060IsFinite(float)\u0060 copy at \u0060DensityGrid.cs:275\u0060 (corner checks at \u0060:258\u0060) duplicates \u0060NumericValidity.IsFinite\u0060; file already references shared bounds/settings IsFinite. Delete copy, reference NumericValidity. Confirmed not inside a Burst job.\n\n## Acceptance Criteria\n- A single shared NormalizeOr (or equivalent) with one documented fallback contract is used by all three call sites; behavior tests cover the divergent case.\n- No duplicated private IsFinite(float) remains in BodySplineAuthoring or DensityGrid; both reference shared NumericValidity.\n- Focused Editor \u002B Runtime unit tests pass.\n\n## Validation\nFocused unit tests for the shared helpers (Editor and Runtime); dotnet Runtime \u002B Tests Editor builds clean.\n\n## Findings\nConfirmed at HEAD d3c7f12e. Prior Runtime-only finite consolidation shipped under TSK-0094/CC-090; this crosses into Editor and adds DensityGrid. TSK-0105 is palette/geometry-utility, not a numeric-helper fit. See docs/audits/creaturecreator-audit-synthesis-2026-09-06-batch.md.\n\n## Blockers\nNone.\n\n## Next Step\nAdd shared helpers, migrate the three call sites, add focused tests.",
+  "type": "Task",
+  "status": "Done",
+  "priority": "Medium",
+  "assigneeMode": "Custom",
+  "assigneeDirectoryId": null,
+  "assigneeCustomText": "Agent",
+  "reporter": "anonymous",
+  "labels": [
+    "audit-synthesis",
+    "common-utility",
+    "deduplication",
+    "net-new",
+    "2026-09-06"
+  ],
+  "attachments": [],
+  "externalLinks": [],
+  "linkedPages": [],
+  "comments": [
+    {
+      "id": "c-27271750f29a4947aafa2178a57bad64",
+      "author": "anonymous",
+      "body": "Implementation complete (BeastMaster round). Not committed; left in working tree per instruction.\n\n## Shared helper (locked decision)\nAdded \u0060NumericValidity.NormalizeOr(Vector3 value, Vector3 fallback, float sqrMagnitudeEpsilon)\u0060 in Runtime/Common/NumericValidity.cs. Contract: returns \u0060fallback.normalized\u0060 when value is non-finite OR \u0060sqrMagnitude \u003C= epsilon\u0060; else \u0060value.normalized\u0060. Result is always a normalized vector. Epsilon is a per-call-site parameter because thresholds differ (BodyFrameResolver EpsilonSqr=1e-10, BodyEditSolver Epsilon=1e-6, BodySplineAuthoring MinSpacingSqr=1e-10) \u2014 did NOT force one epsilon. Finite guard is an intentional, strictly-safer tightening: the two majority sites previously returned \u0060v.normalized\u0060 (NaN) on non-finite input; they now return \u0060fallback.normalized\u0060.\n\n## Behavior change (flagged for orchestrator)\nBodySplineAuthoring.NormalizedOrFallback was the DIVERGENT site: it returned the fallback AS-IS (un-normalized). It now routes to the shared helper and returns fallback.normalized. At the actual BodySplineAuthoring call sites the fallback is always Vector3.forward (already unit), so no observable output change there, but the CONTRACT is unified. Covered by focused regression test \u0060NormalizeOr_DivergentNonUnitFallback_ReturnsNormalizedFallback\u0060.\n\n## round2-F2\nDeleted BodySplineAuthoring private IsFinite(float) (was duplicated at ~:584); RespaceToTargetSpacing now calls NumericValidity.IsFinite.\n\n## addendum A-F5 (Burst verified)\nDeleted DensityGrid private IsFinite(float) (~:275); 8 corner checks in TryEstimateGradient now call NumericValidity.IsFinite. VERIFIED: no [BurstCompile] anywhere in DensityGrid.cs; the only call site is the managed public TryEstimateGradient method (line ~258), NOT inside a Burst job \u2014 safe to route through the managed static.\n\n## Changed files\n- Runtime/Common/NumericValidity.cs (add NormalizeOr)\n- Runtime/Definition/BodyFrameResolver.cs (delete private NormalizeOr; 5 call sites -\u003E shared)\n- Editor/BodyEditSolver.cs (delete private NormalizeOr; 2 call sites -\u003E shared; add using Common)\n- Editor/BodySplineAuthoring.cs (delete NormalizedOrFallback \u002B private IsFinite; 4 \u002B 1 call sites -\u003E shared)\n- Runtime/Morphology/Extraction/DensityGrid.cs (delete private IsFinite; 8 corner checks -\u003E shared)\n- Tests/Editor/NumericValidityTests.cs (NEW, EditMode-reachable per CC-006/CC-014 note that Runtime assembly is not discovered by MCP runner)\n\n## Validation (exact commands \u002B results)\n- dotnet build --no-restore: Runtime 0w/0e; Editor 0w/0e; Tests.Runtime 0w/0e; Tests.Editor 0w/0e \u2014 all PASS.\n- Unity EditMode NumericValidityTests: 7/7 PASS (incl. divergent non-unit fallback regression).\n- Unity EditMode BodySplineAuthoringTests \u002B BodyEditSolverTests: 32/32 PASS.\n- Unity PlayMode BodyFrameResolverTests \u002B DensityGridTests \u002B DensityGridGradientPolicyTests: 26/26 PASS.\n- Unity full EditMode suite: 138/138 PASS.\n- Unity full Runtime PlayMode suite: 548/548 PASS.\n- git diff --check: clean (exit 0).\n\n## Residual risk\nBodyFrameResolver/BodyEditSolver non-finite input behavior changed from NaN-propagating to fallback.normalized (safe tightening, no test regressions across full suites). The BodySplineAuthoring orphan doc comment (\u0022Walks steps chords...\u0022) above the deleted IsFinite was pre-existing cruft at HEAD and was removed with the duplicate block (no owner method).",
+      "createdAtUtc": "2026-09-06T23:20:59.4326917Z"
+    },
+    {
+      "id": "c-8d4da595d7f04dbb8fdae503253fe6ce",
+      "author": "anonymous",
+      "body": "Sprint R2 orchestrator review: spot-checked NumericValidity.NormalizeOr (shared helper correctly finite-guards and always returns a normalized vector; per-call-site epsilon preserved). Grep confirms zero remaining private NormalizeOr/NormalizedOrFallback/IsFinite duplicates across BodyFrameResolver, BodyEditSolver, BodySplineAuthoring, DensityGrid; all call sites route through NumericValidity.NormalizeOr/IsFinite. git diff --check clean. Validation (subagent-run): dotnet Runtime/Editor/Tests 4/4 clean; Unity EditMode 138/138, PlayMode Runtime 548/548. Intentional behavior change: BodySplineAuthoring.NormalizedOrFallback now returns fallback.normalized (was as-is); at real sites fallback is unit Vector3.forward so no observable change.",
+      "createdAtUtc": "2026-09-06T23:21:31.6620082Z"
+    }
+  ],
+  "epicId": null,
+  "parentId": null,
+  "dueDateUtc": null,
+  "createdAtUtc": "2026-09-06T22:44:12.7935458Z",
+  "updatedAtUtc": "2026-09-06T23:21:33.6953767Z",
+  "completedAtUtc": "2026-09-06T23:21:33.6953767Z",
+  "revision": 6,
+  "isArchived": false,
+  "hasLoadError": false,
+  "loadError": null,
+  "sourceFilePath": "tsk-0139-consolidate-duplicated-finite-normalize-numeric-helpers-across-editor-and-runtime.json"
+}

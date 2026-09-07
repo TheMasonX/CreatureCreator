@@ -99,7 +99,17 @@ namespace ProceduralCreature.Serialization
                 SkipWhitespace(s, ref i);
                 ExpectChar(s, ref i, ':');
                 object value = ParseValue(s, ref i);
-                result[key] = value;
+                if (result.ContainsKey(key))
+                {
+                    // F-303: JSON object member names must be unique. Last-write-wins
+                    // silently corrupts authored DNA, so reject the duplicate here. The
+                    // Dictionary already holds the first value, so this adds no extra
+                    // storage (bounded by the object's own member count) and is
+                    // deterministic — we always throw on the second occurrence.
+                    throw new DnaDeserializationException(
+                        $"Duplicate JSON object member '{key}' at position {i}.");
+                }
+                result.Add(key, value);
                 SkipWhitespace(s, ref i);
 
                 if (i >= s.Length)
@@ -191,6 +201,15 @@ namespace ProceduralCreature.Serialization
                 }
                 else
                 {
+                    // F-304: raw control characters (U+0000..U+001F) are not valid inside
+                    // a JSON string; they must appear as escapes (handled above, e.g.
+                    // \n, \t, \r, \u0000). Reject the raw form to stop corrupted/mis-
+                    // parsed authored DNA.
+                    if (c < 0x20)
+                    {
+                        throw new DnaDeserializationException(
+                            $"Unescaped control character (U+{(int)c:X4}) in JSON string at position {i - 1}.");
+                    }
                     sb.Append(c);
                 }
             }
@@ -200,16 +219,90 @@ namespace ProceduralCreature.Serialization
         private static double ParseNumber(string s, ref int i)
         {
             int start = i;
-            if (i < s.Length && (s[i] == '-' || s[i] == '+')) i++;
-            while (i < s.Length && (char.IsDigit(s[i]) || s[i] == '.' || s[i] == 'e' || s[i] == 'E'
-                                     || s[i] == '+' || s[i] == '-')) i++;
+
+            // F-305: strict JSON number grammar: -? int frac? exp?
+            // (int has no leading zeros; frac/exp require digits; no hex, no
+            // NaN/Infinity, no leading '+', no trailing junk).
+
+            // Optional minus sign. JSON does not allow a leading '+'.
+            if (i < s.Length && s[i] == '-')
+            {
+                i++;
+            }
+
+            // Integer part: '0', or a non-zero digit followed by more digits.
+            if (i >= s.Length || !IsAsciiDigit(s[i]))
+            {
+                throw new DnaDeserializationException($"Invalid number literal at position {start}.");
+            }
+            if (s[i] == '0')
+            {
+                i++;
+                // A leading zero may not be followed by more digits (rejects '01', '-01').
+                if (i < s.Length && IsAsciiDigit(s[i]))
+                {
+                    throw new DnaDeserializationException($"Invalid number literal at position {start}.");
+                }
+            }
+            else
+            {
+                while (i < s.Length && IsAsciiDigit(s[i]))
+                {
+                    i++;
+                }
+            }
+
+            // Optional fraction: '.' followed by one or more digits.
+            if (i < s.Length && s[i] == '.')
+            {
+                i++;
+                if (i >= s.Length || !IsAsciiDigit(s[i]))
+                {
+                    throw new DnaDeserializationException($"Invalid number literal at position {start}.");
+                }
+                while (i < s.Length && IsAsciiDigit(s[i]))
+                {
+                    i++;
+                }
+            }
+
+            // Optional exponent: 'e'/'E', optional sign, one or more digits.
+            if (i < s.Length && (s[i] == 'e' || s[i] == 'E'))
+            {
+                i++;
+                if (i < s.Length && (s[i] == '+' || s[i] == '-'))
+                {
+                    i++;
+                }
+                if (i >= s.Length || !IsAsciiDigit(s[i]))
+                {
+                    throw new DnaDeserializationException($"Invalid number literal at position {start}.");
+                }
+                while (i < s.Length && IsAsciiDigit(s[i]))
+                {
+                    i++;
+                }
+            }
 
             string token = s.Substring(start, i - start);
             if (!double.TryParse(token, NumberStyles.Float, CultureInfo.InvariantCulture, out double value))
             {
                 throw new DnaDeserializationException($"Invalid number literal '{token}' at position {start}.");
             }
+            if (double.IsNaN(value) || double.IsInfinity(value))
+            {
+                // Digits can never spell NaN, but an exponent can overflow double to
+                // +/-Infinity (e.g. 1e999), which would otherwise deserialize to a
+                // non-finite value. Reject it.
+                throw new DnaDeserializationException(
+                    $"Number literal '{token}' overflows the supported range at position {start}.");
+            }
             return value;
+        }
+
+        private static bool IsAsciiDigit(char c)
+        {
+            return c >= '0' && c <= '9';
         }
 
         private static void SkipWhitespace(string s, ref int i)

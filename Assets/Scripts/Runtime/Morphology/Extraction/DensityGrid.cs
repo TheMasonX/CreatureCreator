@@ -255,8 +255,8 @@ namespace ProceduralCreature.Morphology.Extraction
             float c011 = _samples[Index(x, y1, z1)];
             float c111 = _samples[Index(x1, y1, z1)];
 
-            if (!IsFinite(c000) || !IsFinite(c100) || !IsFinite(c010) || !IsFinite(c110) ||
-                !IsFinite(c001) || !IsFinite(c101) || !IsFinite(c011) || !IsFinite(c111))
+            if (!NumericValidity.IsFinite(c000) || !NumericValidity.IsFinite(c100) || !NumericValidity.IsFinite(c010) || !NumericValidity.IsFinite(c110) ||
+                !NumericValidity.IsFinite(c001) || !NumericValidity.IsFinite(c101) || !NumericValidity.IsFinite(c011) || !NumericValidity.IsFinite(c111))
             {
                 return false;
             }
@@ -270,11 +270,6 @@ namespace ProceduralCreature.Morphology.Extraction
 
             gradient = new Vector3(du / CellSize, dv / CellSize, dw / CellSize);
             return true;
-        }
-
-        private static bool IsFinite(float value)
-        {
-            return !float.IsNaN(value) && !float.IsInfinity(value);
         }
 
         private static float EstimateAxis(float previous, float center, float next, float span)

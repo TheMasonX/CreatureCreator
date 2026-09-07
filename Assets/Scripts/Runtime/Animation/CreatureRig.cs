@@ -32,6 +32,14 @@ namespace ProceduralCreature.Animation
 
         public IReadOnlyDictionary<string, Transform> Bones => _bones;
 
+        /// <summary>
+        /// The generated bone Transforms in <see cref="SkeletonSnapshot.Capture"/>
+        /// order — index-parallel to the shared bind-index contract (TSK-0131). Read-only
+        /// view for the presentation adapter (<c>SkinnedMeshRenderer.bones</c>); the
+        /// adapter stays outside this component.
+        /// </summary>
+        public IReadOnlyList<Transform> IndexedBones => _indexedBones;
+
         public void Build(Skeleton.Skeleton restSkeleton)
         {
             if (restSkeleton == null) throw new DomainException("restSkeleton must not be null.");

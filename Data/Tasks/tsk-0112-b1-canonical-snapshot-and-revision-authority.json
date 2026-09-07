@@ -28,15 +28,21 @@
       "author": "anonymous",
       "body": "## Implementation Evidence\n- Updated \u0060ResolvedCreatureSnapshot.Resolve\u0060 to canonicalize a detached \u0060CreatureDefinition\u0060 once and use that canonical input for revision hashing, body resolution, ordered parts, frame resolution, appearance, bounds, generation settings, forward, and symmetry.\n- Changed revision hashing to write the already-canonical definition directly, avoiding a second canonicalization path.\n- Extended \u0060ResolvedCreatureSnapshot_CanonicalizationParity_MatchesCanonicalizedResolve\u0060 with quantization-sensitive position, rotation, and scale values.\n- Preserved the existing snapshot type, raw-definition compatibility entry points, and authoritative authored DNA ownership.\n\n## Validation Evidence\n- \u0060dotnet build ProceduralCreature.Tests.Runtime.csproj --no-restore\u0060: passed, 0 errors, 0 warnings.\n- Focused Unity PlayMode test \u0060ResolvedCreatureSnapshot_CanonicalizationParity_MatchesCanonicalizedResolve\u0060: 1/1 passed.\n- Full Unity PlayMode assembly \u0060ProceduralCreature.Tests.Runtime\u0060: 466/466 passed, 0 failed, 0 skipped.\n- Unity console after focused and full runs: no product errors or warnings; only test-result and cleanup logs.\n- \u0060dotnet build CreatureCreator.slnx --no-restore\u0060: passed, 0 errors, 0 warnings.\n- \u0060git diff --check\u0060: passed; only existing line-ending normalization warnings were reported.\n\n## Findings\nThe original resolver hashed serializer-canonicalized data but resolved morphology from the authored definition. B1 now gives revision and resolved output one canonical source of truth while leaving the authored definition unmodified.\n\n## Residual Risk\nUnity editor EditMode tests were not rerun because this slice changes runtime snapshot resolution only. Existing unrelated worktree changes remain untouched and are outside TSK-0112.",
       "createdAtUtc": "2026-09-05T03:08:44.1349267Z"
+    },
+    {
+      "id": "c-50db7076eb604d0387ba21000afdadc4",
+      "author": "anonymous",
+      "body": "Synthesis evidence (2026-09-06 audit batch; see docs/audits/creaturecreator-audit-synthesis-2026-09-06-batch.md). whole-codebase F-223 (P2): ComputeRevisionId hashes canonical JSON (CreaturePartWorldTransformResolver.cs), so revision identity is coupled to the serialization representation; a serialization-only change alters identity. Recorded as a residual identity-architecture observation under this revision-authority record. No new task created (low leverage); keep as finding unless the identity contract becomes load-bearing for the animation/skinning path.",
+      "createdAtUtc": "2026-09-06T22:44:41.6178373Z"
     }
   ],
   "epicId": null,
   "parentId": null,
   "dueDateUtc": null,
   "createdAtUtc": "2026-09-05T03:06:23.9573922Z",
-  "updatedAtUtc": "2026-09-05T03:08:46.1768156Z",
+  "updatedAtUtc": "2026-09-06T22:44:41.6178373Z",
   "completedAtUtc": "2026-09-05T03:08:46.1768156Z",
-  "revision": 3,
+  "revision": 4,
   "isArchived": false,
   "hasLoadError": false,
   "loadError": null,

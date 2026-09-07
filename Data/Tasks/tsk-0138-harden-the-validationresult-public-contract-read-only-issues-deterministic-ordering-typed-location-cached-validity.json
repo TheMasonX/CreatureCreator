@@ -1,0 +1,48 @@
+﻿{
+  "id": "tsk-0138-harden-the-validationresult-public-contract-read-only-issues-deterministic-ordering-typed-location-cached-validity",
+  "key": "TSK-0138",
+  "title": "Harden the ValidationResult public contract (read-only issues, deterministic ordering, typed location, cached validity)",
+  "description": "## Summary\nThe 2026-09-06 second-order audit (creaturecreator-second-order-codebase-audit-26-09-06-17-18-00.md) found ValidationResult exposes an immutable-looking facade over a mutable list and over-claims ordering independence.\n\n## Scope\nRuntime/Definition/ValidationResult.cs and ValidationIssue.cs:\n- F-201 (P1): \u0060Issues =\u003E _issues\u0060 returns the mutable \u0060List\u0060 behind \u0060IReadOnlyList\u0060 (\u0060ValidationResult.cs:18,22\u0060). Make the issue collection genuinely read-only after construction.\n- F-202 (P1/P2): Sorting is only by PartId-\u003ECode-\u003ESeverity (\u0060ValidationResult.cs:26-35\u0060), but the header doc claims full order-independence (\u0060ValidationResult.cs:8-15\u0060). Make ordering deterministic (document tie-break or total order) and align the doc.\n- F-203 (P2): Semantic locations are embedded in free-text \u0060Message\u0060 (\u0060ValidationIssue.cs:31-37\u0060). Introduce typed location data (body-sample index / limb-joint index / field name) where the validator has it.\n- F-204 (P3): \u0060IsValid =\u003E !_issues.Any(...)\u0060 recomputes on every access (\u0060ValidationResult.cs:20\u0060); compute once at construction.\n\n## Acceptance Criteria\n- Issues cannot be mutated through the returned view; a focused test asserts immutability.\n- Issue ordering is deterministic and matches a documented total order.\n- A typed location field exists for at least one issue kind that currently embeds location in Message.\n- IsValid is a stable cached value.\n\n## Validation\nFocused DefinitionValidator/Runtime tests; dotnet Tests build clean.\n\n## Findings\nConfirmed at HEAD d3c7f12e. No existing task owns the ValidationResult contract (TSK-0082 is Done and unrelated). Note: F-201 also sits under the TSK-0095 immutable-artifact umbrella; this task is the narrowest owner. See docs/audits/creaturecreator-audit-synthesis-2026-09-06-batch.md.\n\n## Blockers\nNone.\n\n## Next Step\nImplement the ValidationResult contract hardening; add focused tests.",
+  "type": "Task",
+  "status": "Done",
+  "priority": "Medium",
+  "assigneeMode": "Custom",
+  "assigneeDirectoryId": null,
+  "assigneeCustomText": "Agent",
+  "reporter": "anonymous",
+  "labels": [
+    "audit-synthesis",
+    "validation",
+    "contract",
+    "net-new",
+    "2026-09-06"
+  ],
+  "attachments": [],
+  "externalLinks": [],
+  "linkedPages": [],
+  "comments": [
+    {
+      "id": "c-a3c1b4b985ab448e99404eb1b7d85b1a",
+      "author": "anonymous",
+      "body": "Implemented contract hardening (working tree only; NOT committed). Owning task TSK-0138.\n\nChanged files:\n- Assets/Scripts/Runtime/Definition/ValidationResult.cs (F-201/F-202/F-204)\n- Assets/Scripts/Runtime/Definition/ValidationIssue.cs (F-203 property \u002B non-breaking ctor param)\n- Assets/Scripts/Runtime/Definition/ValidationIssueLocation.cs (NEW)\n- Assets/Scripts/Runtime/Definition/DefinitionValidator.cs (2 issue sites now emit typed location; messages unchanged)\n- Assets/Scripts/Tests/Runtime/ValidationResultContractTests.cs (NEW focused tests)\n\nDesign decisions (flagging for orchestrator):\n- F-201 read-only: backing field retyped \u0060List\u003C\u003E\u0060 -\u003E \u0060IReadOnlyList\u003C\u003E\u0060, assigned via \u0060sorted.AsReadOnly()\u0060 (ReadOnlyCollection). No element copy cost (sort ToList was already done; AsReadOnly is a zero-copy wrapper). Callers mutating through the IList\u003CT\u003E facet get NotSupportedException.\n- F-202 total order: PartId(ordinal, null-first) -\u003E Code -\u003E Severity -\u003E Message(ordinal) final tie-break; XML doc rewritten to state the total order and that only fully-identical issues are unordered (immaterial). Adding Message tie-break only reorders prior exact ties, so existing elementwise A-vs-B determinism tests still pass.\n- F-203 typed location: new nullable ValidationIssueLocation? on ValidationIssue carrying Kind (BodySample | LimbJoint) \u002B Index; enum has ONLY the two kinds actually emitted (no dead/speculative members). Populated at two real validator sites that embed the index in Message: null body sample (InvalidBodySample, index i) and null limb joint (InvalidLimbChain, index i). Messages unchanged (location supplements, never replaces text). Optional ctor param keeps all existing call sites compiling.\n- F-204 IsValid cached: private readonly bool computed once in ctor from the sorted list.\n\nValidation gate:\n- dotnet build --no-restore: ProceduralCreature.Runtime.csproj 0 err/0 warn; ProceduralCreature.Tests.Runtime.csproj 0 err/0 warn; ProceduralCreature.Editor.csproj 0 err/0 warn. EXIT 0 each.\n- get_errors: no diagnostics in the 5 touched files.\n- Unity refresh (force, scope all, compile requested): bridge idle, Unity console 0 errors/0 warnings; Unity generated .meta for both new files (ValidationIssueLocation.cs.meta, ValidationResultContractTests.cs.meta).\n- git diff --check: EXIT 0 (only benign LF-\u003ECRLF warnings on pre-existing line endings).\n\nNot executed (blocker): Unity Test Runner run of the focused tests and existing DefinitionValidator tests could not be performed \u2014 no test-run tool is exposed in this session. Tests compile clean via Tests.Runtime csproj. Next step: run ValidationResultContractTests \u002B DefinitionValidator* tests in Unity EditMode/PlayMode once a test-runner is available.",
+      "createdAtUtc": "2026-09-06T23:52:33.8983182Z"
+    },
+    {
+      "id": "c-5e900a227c1d4414b2496e50d8e2d28f",
+      "author": "anonymous",
+      "body": "Sprint R5 orchestrator review: independently ran focused PlayMode ValidationResultContractTests -\u003E 7/7 passed (Issues read-only view immutability; total-order deterministic across construction with Message final tie-break; IsValid cached; typed BodySample \u002B LimbJoint location; null-when-not-provided). Then ran FULL Runtime PlayMode suite (ProceduralCreature.Tests.Runtime) -\u003E 617/617 passed, 0 failed (~6.0s) \u2014 confirms the ValidationResult ordering/immutability change causes no regression in existing DefinitionValidator/validation tests. Implementation: ValidationResult backing List-\u003EIReadOnlyList via AsReadOnly (zero-copy), documented total order (PartId ordinal-\u003ECode-\u003ESeverity-\u003EMessage), readonly cached _isValid; new immutable ValidationIssueLocation(Kind BodySample|LimbJoint, Index) populated at two real validator sites (messages untouched); optional trailing ctor param preserves all existing call sites. dotnet Runtime/Tests/Editor builds clean; Unity compiles 0 errors; git diff --check clean.",
+      "createdAtUtc": "2026-09-06T23:53:49.4716498Z"
+    }
+  ],
+  "epicId": null,
+  "parentId": null,
+  "dueDateUtc": null,
+  "createdAtUtc": "2026-09-06T22:44:12.7579912Z",
+  "updatedAtUtc": "2026-09-06T23:53:52.349332Z",
+  "completedAtUtc": "2026-09-06T23:53:52.349332Z",
+  "revision": 5,
+  "isArchived": false,
+  "hasLoadError": false,
+  "loadError": null,
+  "sourceFilePath": "tsk-0138-harden-the-validationresult-public-contract-read-only-issues-deterministic-ordering-typed-location-cached-validity.json"
+}

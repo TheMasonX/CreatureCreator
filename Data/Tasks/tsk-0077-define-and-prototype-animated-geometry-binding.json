@@ -45,15 +45,21 @@
       "author": "anonymous",
       "body": "Audit synthesis 2026-09-06 (SkinnedMeshRenderer animation-MVP audits; council-reviewed): TSK-0077 stays InProgress as the geometry-binding owner. The C4.5 mirror proof is closed on the synthetic fixture. The remaining distance to the real MVP is real-geometry weighting \u002B SkinnedMeshRenderer wiring, now filed as children under this owner: TSK-0130 (rigid mesh-asset bind weights, de-risking), TSK-0131 (deterministic implicit welded-surface weights, MVP-critical), TSK-0132 (runtime SkinnedMeshRenderer adapter), TSK-0134 (per-frame perf budget). 0133 (external-driver decision) sits under TSK-0073. Council disposition: tighten this task\u0027s acceptance from \u0022SkinnedMeshRenderer OR documented equivalent\u0022 to a live SMR-parity-with-LBS-oracle gate on real generated geometry, delivered by child TSK-0132; do NOT close on the LBS-only branch because the user MVP requires a real SkinnedMeshRenderer. Source-verified: implicit surface is one welded mesh (body\u002Blimbs), so TSK-0131 is not optional for idle/walk. Keep GeneratedCreature pose-free; binding/weights are build-time pure data.",
       "createdAtUtc": "2026-09-06T19:15:24.6006141Z"
+    },
+    {
+      "id": "c-243831eae8a04bbabbd891aa81c3337b",
+      "author": "anonymous",
+      "body": "Synthesis evidence (2026-09-06 audit batch; see docs/audits/creaturecreator-audit-synthesis-2026-09-06-batch.md). LinearBlendSkinning / bind-contract corroborations:\n- whole-codebase F-25 (P2/P3): LBS Deform enforces finiteness only, not unit-length rotation; this is a DOCUMENTED contract (BonePose doc) - treat as contract-gap, not bug. Corroborate TSK-0120/TSK-0077.\n- whole-codebase F-26 (P3): no duplicate bone-index rejection in the documented binding contract. Low-value; add a validation rule only if bind-weight authoring (TSK-0130/0131) can produce duplicates. No duplicate task created.",
+      "createdAtUtc": "2026-09-06T22:44:41.6468452Z"
     }
   ],
   "epicId": null,
   "parentId": null,
   "dueDateUtc": null,
   "createdAtUtc": "2026-09-01T03:20:52.269603Z",
-  "updatedAtUtc": "2026-09-06T19:15:24.6006141Z",
+  "updatedAtUtc": "2026-09-06T22:44:41.6468452Z",
   "completedAtUtc": null,
-  "revision": 6,
+  "revision": 7,
   "isArchived": false,
   "hasLoadError": false,
   "loadError": null,

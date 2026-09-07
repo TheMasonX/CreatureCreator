@@ -4,7 +4,7 @@
   "title": "Deterministic skeleton-aware weights for the implicit welded surface (MVP-critical)",
   "description": "## Summary\nBuild a deterministic, skeleton-aware, build-time weighting model that authors per-vertex \u0060VertexInfluence[]\u0060 for the implicit welded surface (Body \u002B all SDF limb metaballs welded into one \u0060GeometryType.Implicit\u0060 mesh). This is the deferred hard case TSK-0077 scoped out and is the MVP-critical enabler: real generated creature limbs are welded into this surface, so idle/walk is undemonstrable without it.\n\n## Scope\n- Consume the resolved rest-space implicit mesh vertices \u002B \u0060ResolvedCreatureSnapshot\u0060/\u0060SkeletonSnapshot\u0060.\n- Model: nearest point on eligible bone segment(s)/capsule axis, smoothly blended near joints; select up to 4 local influences and normalize deterministically. Restrict eligible influences to the vertex\u0027s source-part resolved semantic chain \u002B nearby chain segments. Do NOT use nearest-bone-center Euclidean distance alone (bent chains).\n- Resolve welded-surface mirrored contributions to mirrored semantic bones via \u0060SemanticBoneResolver\u0060/\u0060MirrorUtility\u0060 reflection; no mirror-identity rediscovery; do not alter \u0060RigBindingMetadata\u0060.\n- Weights are pose-independent build-time pure data on generation output; cached/precomputed; never recomputed per frame.\n- Preserve the shared \u0060SkeletonSnapshot.Capture\u0060 bone-index ordering invariant with the adapter (0132) and rigid weighting (0130).\n\n## Acceptance Criteria\n- Fixture matrix passes: straight limb, single bend, branch point, vertex near a joint seam, mirrored limb, and the generated Body/welded surface.\n- Rest-pose equivalence and known-pose deformation match the \u0060LinearBlendSkinning.Deform\u0060 oracle; \u003C=4 influences/vertex; normalized; deterministic repeated generation.\n- Mirror-consistent; invariant under stable canonical ordering and Unity scene order.\n- No weight calculation during pose application; welded-surface mirror identity exercised (closes the deferred TSK-0054/TSK-0077 mirror gap on real geometry).\n\n## Validation\nPure Tests.Runtime (headless; pure math): synthetic resolved-part fixtures for the matrix above \u002B parity against LinearBlendSkinning. Real \u0060GeneratedCreature\u0060 implicit surface PlayMode parity when Unity is available. dotnet Runtime \u002B Tests.Runtime build and git diff --check.\n\n## Findings\nConfirmed (source/HEAD e88ba5d): generated implicit surface is ONE welded marching-cubes mesh (\u0060SourcePartId=\u0022\u0022\u0060) containing body \u002B limb surfaces; no per-vertex part attribution; no weighting code exists anywhere. LinearBlendSkinning doc explicitly leaves the welded Body surface out of scope until this model is validated.\n\n## Blockers\nNeeds a resolved skeleton \u002B rest vertices; pure math so headless-testable. The welded mesh has no per-primitive memory, so weights are geometric (segment nearest-point), the accepted documented approach.\n\n## Next Step\nCo-schedule with the SkinnedMeshRenderer adapter (0132); do NOT gate behind rigid mesh-asset weighting (0130). This is the primary MVP weighting task.",
   "type": "Task",
-  "status": "Backlog",
+  "status": "Done",
   "priority": "High",
   "assigneeMode": "Custom",
   "assigneeDirectoryId": null,
@@ -23,16 +23,29 @@
   "attachments": [],
   "externalLinks": [],
   "linkedPages": [],
-  "comments": [],
+  "comments": [
+    {
+      "id": "c-beae8b62917f443587fc101cd7d1f830",
+      "author": "anonymous",
+      "body": "R1 implementation landed (working tree, not committed). New: Assets/Scripts/Runtime/Animation/Binding/ImplicitSurfaceWeightAuthoring.cs (pure) \u002B Assets/Scripts/Tests/Runtime/ImplicitSurfaceWeightAuthoringTests.cs.\n\nMODEL (design decisions to review):\n- Welded surface has no per-vertex part attribution (SourcePartId=\u0022\u0022), so weights are GEOMETRIC nearest-point-on-segment, the accepted documented approach. Eligibility = welded rig segment bones (Body spine \u002B limb segment bones). No fabricated per-part attribution.\n- BoneSegmentInfluence = bone segment [Position,EndPosition] \u002B influence Radius. Radius is morphology (Body sample radius / limb thickness), NOT on Bone =\u003E supplied by caller; the morphology-\u003Eradius bridge is the TSK-0132 adapter\u0027s job. DefaultInfluenceRadius=0.5 fallback keeps the skeleton-only helper total.\n- Per vertex: weight = max(0, 1 - d/(Radius*RadiusScale=3))^2, d = closest point on segment (NOT bone center =\u003E bent chains bind correctly, joint seams blend). Select top-4 by (weight desc, BoneIndex asc) =\u003E deterministic and invariant to segment/vertex ordering. Normalize by selected sum. No eligible influence or non-finite vertex/non-positive radius =\u003E DomainException.\n- Mirror: SkeletonSnapshot already holds BOTH authored \u002B reflected chains (SkeletonInferrer); nearest-segment auto-binds mirrored-side verts to mirrored bones. NO mirror-identity rediscovery; RigBindingMetadata untouched.\n- Ordering contract locked\u002Bdocumented: VertexInfluence.BoneIndex = index into SkeletonSnapshot.Capture (BFS id-sorted) order; exposed via BuildSegmentInfluences. Consumed by TSK-0132/0130.\n- Build-time only; Author is the sole weight computation; never run during pose application.\n\nVALIDATION:\n- dotnet build ProceduralCreature.Runtime.csproj --no-restore: SUCCESS 0 err/0 warn.\n- dotnet build ProceduralCreature.Tests.Runtime.csproj --no-restore: SUCCESS 0 err/0 warn.\n- git diff --check: clean (exit 0).\n- Unity console: 0 errors after auto-compile of new files.\n- BLOCKER (honest): actual PlayMode fixture execution NOT yet run \u2014 Unity MCP bridge returned \u0022Connection closed before reading expected bytes\u0022 (shared editor held by concurrent rounds); refused to run a disruptive domain-reload/play-mode batch over them. dotnet test has no NUnit adapter in these Unity-generated csproj (no-op, exit 0, no tests). Residual risk: fixture-matrix logic is compiled but not yet executed; needs the focused PlayMode run of ImplicitSurfaceWeightAuthoringTests.\n\nNext step: run focused Unity PlayMode fixture (ImplicitSurfaceWeightAuthoringTests) when the shared editor is free; then mark Done.",
+      "createdAtUtc": "2026-09-06T23:02:41.3989992Z"
+    },
+    {
+      "id": "c-00c6926dcb834faf8d64a9e1f12be9e1",
+      "author": "anonymous",
+      "body": "Sprint R1 validation (orchestrator independently re-ran). Implemented ImplicitSurfaceWeightAuthoring.cs (pure build-time segment-axis weighting core) \u002B ImplicitSurfaceWeightAuthoringTests.cs. dotnet Runtime \u002B Tests.Runtime build 0 err/0 warn; git diff --check clean; Unity compiles 0 errors. Focused PlayMode fixture ProceduralCreature.Tests.Runtime.ImplicitSurfaceWeightAuthoringTests: 10/10 passed (bent chain binds correct segment not bone center; branch blends Body\u002Btwo limbs; generated Body surface all vertices valid\u002Bdeterministic; mirrored limb binds mirrored bone with no identity rediscovery; straight-limb rigid \u002B rest-pose LBS roundtrip; single-bend known-pose only distal moves; ordering-independence; no-eligible \u002B non-finite throws; BuildSegmentInfluences bone-ordering contract stable across insertion order). Locked shared bind-index ordering contract (VertexInfluence.BoneIndex = SkeletonSnapshot.Capture order) for TSK-0132/0130. Mirror via skeleton-reflected chain (no RigBindingMetadata change). No per-frame weight calc (build-time pure data). Whole-creature SMR-vs-LBS parity is the TSK-0132 gate, not this task.",
+      "createdAtUtc": "2026-09-06T23:04:42.2768121Z"
+    }
+  ],
   "epicId": null,
   "parentId": "TSK-0077",
   "dueDateUtc": null,
   "createdAtUtc": "2026-09-06T19:14:53.1562258Z",
-  "updatedAtUtc": "2026-09-06T19:14:53.1562258Z",
-  "completedAtUtc": null,
-  "revision": 1,
+  "updatedAtUtc": "2026-09-06T23:04:44.5194308Z",
+  "completedAtUtc": "2026-09-06T23:04:44.5194308Z",
+  "revision": 5,
   "isArchived": false,
   "hasLoadError": false,
   "loadError": null,
-  "sourceFilePath": null
+  "sourceFilePath": "tsk-0131-deterministic-skeleton-aware-weights-for-the-implicit-welded-surface-mvp-critical.json"
 }

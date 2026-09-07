@@ -27,15 +27,21 @@
       "author": "anonymous",
       "body": "Implementation complete (Option B, spine-normal only, no world-up fallback).\n\nFiles changed (uncommitted):\n- \u0060Assets/Scripts/Runtime/Appearance/BodyVerticalGradientSampler.cs\u0060: vertical sample is now \u0060Dot(position - centerline, spineNormal)/radius\u0060 where spineNormal is the body-frame Normal (Forward-seeded, parallel-transported), spherically interpolated per segment. Added a frames-aware \u0060TryGetBodySample\u0060/\u0060EvaluateColor\u0060 for the bake so frames are transported once, not per vertex. No authored axis; no world-up gradient branch.\n- \u0060Assets/Scripts/Runtime/Definition/CreaturePartWorldTransformResolver.cs\u0060 (\u0060ResolvedCreatureSnapshot\u0060): exposes derived \u0060BodyFrame[] BodyFrames\u0060 (one per sample) as the shared spine-normal feature for future consumers; computed once in \u0060Resolve\u0060.\n- \u0060Assets/Scripts/Runtime/Appearance/AppearanceBaker.cs\u0060 \u002B \u0060PartAppearanceSampler.cs\u0060: bake reuses \u0060snapshot.BodyFrames\u0060 (or derives once) per bake.\n- \u0060Assets/Scripts/Tests/Runtime/BodyVerticalGradientAppearanceTests.cs\u0060: replaced the world-up sloped-body test with \u0060EvaluateColor_UprightSpine_TopFollowsForwardSeededNormal_NotWorldY\u0060 (discriminates vs world Y on an upright spine) and added \u0060Snapshot_ExposesBodyFrames_SpineNormalsUnitAndPerpendicularToTangents\u0060.\n\nNo DNA schema / serialization / canonicalizer / validator change (Option B).\n\nValidation evidence:\n- \u0060dotnet build ProceduralCreature.Runtime.csproj --no-restore\u0060 -\u003E 0 warnings/0 errors.\n- \u0060dotnet build ProceduralCreature.Tests.Runtime.csproj --no-restore\u0060 -\u003E 0 warnings/0 errors.\n- PlayMode \u0060ProceduralCreature.Tests.Runtime\u0060 in Unity: 520/520 passed, 0 failed, 0 skipped (4.25s), job 6187bb6200b64a4e95d28923c861ff9a.\n- \u0060git diff --check\u0060 clean.\n\nResidual risk: behavior change for any creature whose body is not level (top/bottom now follows the creature\u0027s own dorsal line rather than world height) \u2014 this is the intended mandate. Not committed (commit not requested).",
       "createdAtUtc": "2026-09-06T16:59:26.0789328Z"
+    },
+    {
+      "id": "c-9ec390e8c662400097318ca8a64278d6",
+      "author": "anonymous",
+      "body": "Synthesis evidence (2026-09-06 audit batch; see docs/audits/creaturecreator-audit-synthesis-2026-09-06-batch.md). Body-frame / vertical-gradient corroborations:\n- F-22/F-46 (whole-codebase): Body frames should be a first-class resolved feature; BodyVerticalGradientSampler overlapping convenience paths. Extend here.\n- F-224 (second-order): convenience body-frame APIs (TryGetBodySample/EvaluateColor with forward) re-transport frames per call; the main bake reuses snapshot.BodyFrames. API-naming follow-up so the expensive overload is not picked accidentally in per-point loops.\n- F-226 (second-order): head/tail lengthT orientation heuristic lives inside the sampler (Dot of endpoints with forward). Recorded as a single-owner body-orientation candidate. NOTE: F-225 (claim \u0027forward\u0027 unused in frames-aware overload) is REFUTED - forward is load-bearing for lengthT orientation; do NOT remove it. Fold F-225 into F-226. Whole-codebase F-21 (redundant forward params) also refuted for the same reason. No new task created for F-226 to avoid speculative abstraction; keep as finding here unless a clean morphology owner emerges.",
+      "createdAtUtc": "2026-09-06T22:44:41.2614658Z"
     }
   ],
   "epicId": null,
   "parentId": null,
   "dueDateUtc": null,
   "createdAtUtc": "2026-09-06T16:53:23.1247688Z",
-  "updatedAtUtc": "2026-09-06T16:59:30.5692667Z",
+  "updatedAtUtc": "2026-09-06T22:44:41.2614658Z",
   "completedAtUtc": "2026-09-06T16:59:30.5692667Z",
-  "revision": 3,
+  "revision": 4,
   "isArchived": false,
   "hasLoadError": false,
   "loadError": null,

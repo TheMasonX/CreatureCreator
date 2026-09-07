@@ -141,15 +141,21 @@
       "author": "anonymous",
       "body": "Implementation/validation update 2026-09-04: closed the \u0022hierarchy read-only aliasing\u0022 residual (audit F-03). CreaturePartHierarchyIndex.Parts previously returned the definition\u0027s live List\u003CCreaturePart\u003E (aliasing), so (a) a downcast caller could mutate the authoritative model through the \u0022read-only\u0022 index view, and (b) the Parts enumeration could drift from the first-wins/children/duplicate maps snapshotted at construction if definition.Parts mutated afterward. The index now detaches at construction: it copies the list into a private array and exposes Array.AsReadOnly (genuinely read-only IList surface), so Parts is never a live alias and the cached maps always agree with the Parts enumeration. Keep the tolerant index as the single graph-mechanics owner; no second path added. New regression tests in CreatureDefinitionTests: HierarchyIndex_Parts_IsDetachedSnapshotOfDefinition (add/remove on definition.Parts after index construction does not change Parts count/content or TryResolve) and HierarchyIndex_Parts_CannotBeMutatedThroughReadOnlyView (Parts is IList.IsReadOnly; indexer set throws NotSupportedException; definition unchanged). Evidence (Unity 6000.5.9f1): focused PlayMode CreatureDefinitionTests 12/12 passed; full ProceduralCreature.Tests.Runtime PlayMode 454/454 (was 452, \u002B2) 0 failed 0 skipped; EditMode 115/115; dotnet build Tests.Runtime 0 warnings/errors; git diff --check clean. Remaining CC-089 residuals: validator split/context and authoring-vs-resolved bounds diagnostics both need a scoping decision before code (per handoff, do not invent a second graph-mechanics path).",
       "createdAtUtc": "2026-09-04T23:24:24.2925409Z"
+    },
+    {
+      "id": "c-cdb95f105ff04185a212ee4341a8623c",
+      "author": "anonymous",
+      "body": "Synthesis evidence (2026-09-06 audit batch; see docs/audits/creaturecreator-audit-synthesis-2026-09-06-batch.md). next-slice F-302 (P2): BodySpline.Clone() iterates Samples with no null guard (BodySpline.cs:39-46) while CreatureDefinition.Clone() tolerates Body==null/Parts==null (:50,:52). Adopt one null policy (preserve vs normalize-to-empty) \u002B a reusable CloneList helper. Folded into this clone-totality task (do not create a separate task; route the CloneList helper to the shared-utility owner TSK-0094/0105). No duplicate task created.",
+      "createdAtUtc": "2026-09-06T22:44:41.5726455Z"
     }
   ],
   "epicId": null,
   "parentId": null,
   "dueDateUtc": null,
   "createdAtUtc": "2026-09-01T03:20:52.6991944Z",
-  "updatedAtUtc": "2026-09-04T23:24:24.2925409Z",
+  "updatedAtUtc": "2026-09-06T22:44:41.5726455Z",
   "completedAtUtc": "2026-09-02T04:58:18.0043074Z",
-  "revision": 26,
+  "revision": 27,
   "isArchived": false,
   "hasLoadError": false,
   "loadError": null,

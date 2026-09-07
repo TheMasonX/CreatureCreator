@@ -1,6 +1,7 @@
 using System;
 using System.Collections.Generic;
 using UnityEngine;
+using ProceduralCreature.Common;
 
 namespace ProceduralCreature.Editor
 {
@@ -340,7 +341,7 @@ namespace ProceduralCreature.Editor
                     {
                         // Degenerate (samples coincide): recover along the snapshot
                         // segment direction so the pair separates again.
-                        Vector3 fallback = NormalizeOr(snapshot[j + 1] - snapshot[j], Vector3.up);
+                        Vector3 fallback = NumericValidity.NormalizeOr(snapshot[j + 1] - snapshot[j], Vector3.up, Epsilon);
                         float push = rest * CompressionCorrectionStrength;
                         positions[j] -= fallback * (push * 0.5f);
                         positions[j + 1] += fallback * (push * 0.5f);
@@ -408,7 +409,7 @@ namespace ProceduralCreature.Editor
 
                 Vector3 dir = length > Epsilon
                     ? delta / length
-                    : NormalizeOr(snapshot[j + 1] - snapshot[j], Vector3.up);
+                    : NumericValidity.NormalizeOr(snapshot[j + 1] - snapshot[j], Vector3.up, Epsilon);
                 float correction = (floor - length) * 0.5f;
                 positions[j] -= dir * correction;
                 positions[j + 1] += dir * correction;
@@ -522,11 +523,6 @@ namespace ProceduralCreature.Editor
             if (sqr <= Epsilon) return a;
             float t = Mathf.Clamp01(Vector3.Dot(point - a, ab) / sqr);
             return a + ab * t;
-        }
-
-        private static Vector3 NormalizeOr(Vector3 v, Vector3 fallback)
-        {
-            return v.sqrMagnitude <= Epsilon ? fallback.normalized : v.normalized;
         }
     }
 }
