@@ -54,7 +54,7 @@ namespace ProceduralCreature.Editor
             DrawOverlayControls(sceneView);
             if (!_enabled) return;
 
-            CreatureRig[] rigs = Object.FindObjectsByType<CreatureRig>(FindObjectsSortMode.None);
+            CreatureRig[] rigs = Object.FindObjectsByType<CreatureRig>();
             for (int i = 0; i < rigs.Length; i++)
             {
                 CreatureRig rig = rigs[i];
@@ -236,7 +236,7 @@ namespace ProceduralCreature.Editor
         private static List<Transform> GetAllBones()
         {
             var result = new List<Transform>();
-            CreatureRig[] rigs = Object.FindObjectsByType<CreatureRig>(FindObjectsSortMode.None);
+            CreatureRig[] rigs = Object.FindObjectsByType<CreatureRig>();
             for (int r = 0; r < rigs.Length; r++)
             {
                 if (rigs[r] == null) continue;
@@ -254,7 +254,7 @@ namespace ProceduralCreature.Editor
             Transform selected = Selection.activeTransform;
             if (selected == null) return new List<Transform>();
 
-            CreatureRig[] rigs = Object.FindObjectsByType<CreatureRig>(FindObjectsSortMode.None);
+            CreatureRig[] rigs = Object.FindObjectsByType<CreatureRig>();
             for (int r = 0; r < rigs.Length; r++)
             {
                 CreatureRig rig = rigs[r];
@@ -307,7 +307,7 @@ namespace ProceduralCreature.Editor
         private static List<Transform> GetLimbBones()
         {
             var result = new List<Transform>();
-            CreatureRig[] rigs = Object.FindObjectsByType<CreatureRig>(FindObjectsSortMode.None);
+            CreatureRig[] rigs = Object.FindObjectsByType<CreatureRig>();
             for (int r = 0; r < rigs.Length; r++)
             {
                 CreatureRig rig = rigs[r];
@@ -328,7 +328,7 @@ namespace ProceduralCreature.Editor
         private static List<Transform> GetBodyBones()
         {
             var result = new List<Transform>();
-            CreatureRig[] rigs = Object.FindObjectsByType<CreatureRig>(FindObjectsSortMode.None);
+            CreatureRig[] rigs = Object.FindObjectsByType<CreatureRig>();
             for (int r = 0; r < rigs.Length; r++)
             {
                 CreatureRig rig = rigs[r];
@@ -349,7 +349,7 @@ namespace ProceduralCreature.Editor
         {
             if (sceneView == null || bones == null || bones.Count == 0) return;
 
-            GameObject[] previousSelection = Selection.objects;
+            Object[] previousSelection = Selection.objects;
             try
             {
                 Selection.objects = bones.ConvertAll(b => b.gameObject).ToArray();
