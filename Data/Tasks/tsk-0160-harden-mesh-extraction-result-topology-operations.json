@@ -1,0 +1,19 @@
+{
+  "id": "tsk-0160-harden-mesh-extraction-result-topology-operations",
+  "key": "TSK-0160",
+  "title": "Harden MeshExtractionResult topology-consuming operations",
+  "description": "Council multi-round audit confirms MeshExtractionResult intentionally remains a mutable construction DTO, but its public ComputeAngleWeightedNormals and ToUnityMesh methods assume Triangles contains a multiple-of-three set of in-range indices and Positions is internally consistent. Manually malformed data currently leaks incidental IndexOutOfRangeException or Unity mesh errors. Add one small topology validation helper used by public topology-consuming methods, preserving the current mutable construction API and not introducing a second builder abstraction.\n\nParent/coordination: existing utility/code-health family TSK-0094/TSK-0105; historical finding F-39.\n\nValidation gate: focused malformed-topology tests, normal extraction regressions, runtime build, and Unity test execution before closure.",
+  "type": "Bug Fix",
+  "status": "Backlog",
+  "priority": "Low",
+  "assigneeMode": "Custom",
+  "assigneeDirectoryId": null,
+  "assigneeCustomText": "Unassigned",
+  "reporter": "council-audit",
+  "labels": ["council", "morphology", "extraction", "robustness", "TSK-0094"],
+  "attachments": [],
+  "externalLinks": [],
+  "linkedPages": [],
+  "comments": [],
+  "parentId": "tsk-0094-consolidate-shared-runtime-utilities-and-tolerances"
+}
