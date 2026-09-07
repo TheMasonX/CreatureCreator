@@ -97,6 +97,26 @@ namespace ProceduralCreature.Tests.Runtime
         }
 
         [Test]
+        public void Build_SamplesEachBoneRadiusFromItsOwnSegment()
+        {
+            var samples = new List<BodySample>
+            {
+                new BodySample { Id = 1, Position = new Vector3(0f, 0f, -2f), Radius = 0.4f },
+                new BodySample { Id = 2, Position = new Vector3(0f, 0f, 0f), Radius = 1.0f },
+                new BodySample { Id = 3, Position = new Vector3(0f, 0f, 2f), Radius = 1.6f },
+            };
+            ResolvedBody body = ResolvedBody.Resolve(samples);
+
+            IReadOnlyList<AnatomicalBodyRigLayout.BoneSpec> bones =
+                AnatomicalBodyRigLayout.Build(body, Vector3.forward);
+
+            Assert.That(bones[0].Radius, Is.EqualTo(1.0f).Within(1e-4f), "pelvis radius");
+            Assert.That(bones[1].Radius, Is.EqualTo(0.55f).Within(1e-4f), "spine radius must sample the spine->head segment midpoint");
+            Assert.That(bones[2].Radius, Is.EqualTo(0.4f).Within(1e-4f), "head radius");
+            Assert.That(bones[3].Radius, Is.EqualTo(1.3f).Within(1e-4f), "tail radius");
+        }
+
+        [Test]
         public void ResolveAttachment_AnyBodyPositionMapsToContainingBackboneSegment()
         {
             ResolvedBody body = BuildBody(9);
