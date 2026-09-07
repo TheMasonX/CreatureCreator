@@ -8,12 +8,12 @@ namespace ProceduralCreature.Tests.Runtime
         [Test]
         public void Clone_NullPartsCollection_PreservesNullState()
         {
-            var definition = CreatureDefinition.CreateEmpty();
+            CreatureDefinition definition = CreatureDefinition.CreateEmpty();
             definition.Parts = null;
 
             CreatureDefinition clone = definition.Clone();
 
-            Assert.IsNull(clone.Parts,
+            Assert.That(clone.Parts, Is.Null,
                 "Cloning malformed authoring data must not silently normalize Parts to an empty collection.");
         }
     }
