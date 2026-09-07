@@ -1,6 +1,7 @@
 using System.Collections.Generic;
 using NUnit.Framework;
 using ProceduralCreature.Animation.Binding;
+using ProceduralCreature.Definition;
 using ProceduralCreature.Generation;
 using ProceduralCreature.Common;
 using UnityEngine;
