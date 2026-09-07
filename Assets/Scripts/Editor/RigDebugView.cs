@@ -260,17 +260,41 @@ namespace ProceduralCreature.Editor
                 for (int i = 0; i < bones.Count; i++)
                 {
                     if (bones[i] != selected) continue;
-                    BoneSnapshot selectedBone = rig.RestSkeleton[i];
+
                     var result = new List<Transform>();
+                    int current = i;
+                    int guard = 0;
+                    while (current >= 0 && current < rig.RestSkeleton.Count)
+                    {
+                        if (++guard > rig.RestSkeleton.Count) break;
+                        Transform currentTransform = bones[current];
+                        if (currentTransform != null && !result.Contains(currentTransform))
+                        {
+                            result.Add(currentTransform);
+                        }
+
+                        int parent = rig.RestSkeleton[current].ParentIndex;
+                        if (parent < 0 || rig.RestSkeleton[parent].SourcePartId == CreatureDefinition.BodyId)
+                        {
+                            break;
+                        }
+                        current = parent;
+                    }
+
+                    BoneSnapshot anchor = rig.RestSkeleton[current];
                     for (int j = 0; j < bones.Count; j++)
                     {
                         BoneSnapshot candidate = rig.RestSkeleton[j];
-                        if (string.Equals(candidate.SourcePartId, selectedBone.SourcePartId, System.StringComparison.Ordinal)
-                            && candidate.IsMirrored == selectedBone.IsMirrored)
+                        if (string.Equals(candidate.SourcePartId, anchor.SourcePartId, System.StringComparison.Ordinal)
+                            && candidate.IsMirrored == anchor.IsMirrored
+                            && candidate.HasSegment
+                            && bones[j] != null
+                            && !result.Contains(bones[j]))
                         {
                             result.Add(bones[j]);
                         }
                     }
+
                     return result;
                 }
             }
