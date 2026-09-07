@@ -1,0 +1,18 @@
+{
+  "id": "tsk-0164-make-canonical-json-writer-escape-all-control-characters",
+  "key": "TSK-0164",
+  "title": "Make CanonicalJsonWriter escape all JSON control characters",
+  "description": "Council serialization review found a reader/writer contract mismatch. MiniJsonReader now rejects raw characters below U+0020 inside JSON strings, but CanonicalJsonWriter.Escape only emits named escapes for newline, carriage return, and tab; the default branch appends other control characters unchanged. Authored strings containing NUL, backspace-like controls, or other U+0000..U+001F values can therefore be serialized as invalid JSON. Harden Escape to emit valid JSON unicode escapes for all remaining control characters and add round-trip regressions. Keep the existing named escapes for readability and preserve byte-stable canonical output for normal DNA. Parent owner: TSK-0136 parser/grammar hardening. Unity execution is required before closure.",
+  "type": "Bug Fix",
+  "status": "Backlog",
+  "priority": "Medium",
+  "assigneeMode": "Custom",
+  "assigneeDirectoryId": null,
+  "assigneeCustomText": "Unassigned",
+  "reporter": "council-exhaustive-audit",
+  "labels": ["council", "serialization", "json", "parser", "writer", "TSK-0136"],
+  "attachments": [],
+  "externalLinks": [],
+  "linkedPages": [],
+  "parentId": "tsk-0136-harden-the-minijsonreader-json-grammar-with-a-dedicated-reader-test-fixture"
+}
