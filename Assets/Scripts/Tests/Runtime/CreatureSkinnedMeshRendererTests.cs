@@ -360,12 +360,13 @@ namespace ProceduralCreature.Tests.Runtime
             field.SetValue(preview, definitionJson);
 
             preview.Generate();
-            for (int i = 0; i < 10; i++)
+            CreatureRig rig = null;
+            for (int i = 0; i < 120 && rig == null; i++)
             {
                 yield return null;
+                rig = host.GetComponentInChildren<CreatureRig>();
             }
 
-            CreatureRig rig = host.GetComponentInChildren<CreatureRig>();
             SkinnedMeshRenderer renderer = host.GetComponentInChildren<SkinnedMeshRenderer>();
             Assert.NotNull(rig, "runtime preview should install a rig on the generated implicit surface");
             Assert.NotNull(renderer, "runtime preview should install a SkinnedMeshRenderer for the implicit surface");

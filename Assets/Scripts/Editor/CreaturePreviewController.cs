@@ -1,10 +1,16 @@
 using System;
 using System.Collections.Generic;
+using ProceduralCreature.Animation;
+using ProceduralCreature.Animation.Ik;
+using ProceduralCreature.Animation.Skinned;
+using ProceduralCreature.Animation.Binding;
 using ProceduralCreature.Common;
 using ProceduralCreature.Definition;
 using ProceduralCreature.Generation;
+using ProceduralCreature.Skeleton;
 using UnityEditor;
 using UnityEngine;
+using SkeletonModel = ProceduralCreature.Skeleton.Skeleton;
 
 namespace ProceduralCreature.Editor
 {
@@ -102,9 +108,14 @@ namespace ProceduralCreature.Editor
             }
         }
 
-        public void ApplyPreviewGeometry(GeneratedCreature generated)
+        public void ApplyPreviewGeometry(
+            GeneratedCreature generated,
+            CreatureDefinition definition,
+            ResolvedCreatureSnapshot snapshot)
         {
             if (generated == null) throw new ArgumentNullException(nameof(generated));
+            if (definition == null) throw new ArgumentNullException(nameof(definition));
+            if (snapshot == null) throw new ArgumentNullException(nameof(snapshot));
             if (_disposed) throw new ObjectDisposedException(nameof(CreaturePreviewController));
 
             if (!generated.TryGetImplicitSurface(out GeometryItem implicitSurface))
@@ -113,8 +124,8 @@ namespace ProceduralCreature.Editor
                 return;
             }
 
-            ApplyPreviewMesh(implicitSurface.Mesh);
             ClearGeometryObjects();
+            BindImplicitSurface(implicitSurface.Mesh, definition, snapshot);
 
             for (int i = 1; i < generated.Geometry.Count; i++)
             {
@@ -165,25 +176,50 @@ namespace ProceduralCreature.Editor
             if (PreviewGameObject != null) return;
 
             PreviewGameObject = new GameObject(PreviewObjectName);
-            PreviewGameObject.AddComponent<MeshFilter>();
-            PreviewGameObject.AddComponent<MeshRenderer>();
             PreviewGameObject.AddComponent<MeshCollider>();
             PersistRootEntity(PreviewGameObject.GetEntityId());
         }
 
-        private void ApplyPreviewMesh(Mesh mesh)
+        private void BindImplicitSurface(
+            Mesh sourceMesh,
+            CreatureDefinition definition,
+            ResolvedCreatureSnapshot snapshot)
         {
             EnsurePreviewRoot();
 
-            PreviewGameObject.GetComponent<MeshFilter>().sharedMesh = mesh;
-            MeshRenderer renderer = PreviewGameObject.GetComponent<MeshRenderer>();
-            if (renderer == null) renderer = PreviewGameObject.AddComponent<MeshRenderer>();
-            Material defaultMaterial = _defaultMaterialResolver();
-            if (defaultMaterial != null) renderer.sharedMaterial = defaultMaterial;
+            MeshFilter legacyFilter = PreviewGameObject.GetComponent<MeshFilter>();
+            if (legacyFilter != null) UnityEngine.Object.DestroyImmediate(legacyFilter);
+            MeshRenderer legacyRenderer = PreviewGameObject.GetComponent<MeshRenderer>();
+            if (legacyRenderer != null) UnityEngine.Object.DestroyImmediate(legacyRenderer);
 
             MeshCollider collider = PreviewGameObject.GetComponent<MeshCollider>();
             if (collider == null) collider = PreviewGameObject.AddComponent<MeshCollider>();
-            collider.sharedMesh = mesh;
+            collider.sharedMesh = sourceMesh;
+
+            SkeletonModel skeleton = SkeletonInferrer.Infer(definition);
+            if (skeleton == null || skeleton.Bones.Count == 0)
+            {
+                throw new DomainException("Preview definition did not produce a skeleton for the implicit surface.");
+            }
+
+            CreatureRig rig = PreviewGameObject.GetComponent<CreatureRig>();
+            if (rig == null) rig = PreviewGameObject.AddComponent<CreatureRig>();
+            rig.Build(skeleton);
+            rig.ApplyPose(PosedSkeleton.FromRestPose(skeleton));
+
+            CreatureSkinnedMeshRenderer skinnedRenderer =
+                PreviewGameObject.GetComponent<CreatureSkinnedMeshRenderer>();
+            if (skinnedRenderer == null)
+            {
+                skinnedRenderer = PreviewGameObject.AddComponent<CreatureSkinnedMeshRenderer>();
+            }
+
+            float[] radiiByBoneIndex = MorphologyInfluenceRadiusBridge.BuildRadiiByBoneIndex(
+                SkeletonSnapshot.Capture(skeleton), snapshot);
+            Material defaultMaterial = _defaultMaterialResolver();
+            Material[] materials = defaultMaterial != null ? new[] { defaultMaterial } : null;
+            skinnedRenderer.Bind(rig, skeleton, sourceMesh, radiiByBoneIndex, materials);
+            if (skinnedRenderer.Renderer != null) skinnedRenderer.Renderer.enabled = true;
         }
 
         private void AssignMaterials(MeshRenderer renderer, GeometryItem item)
@@ -218,6 +254,13 @@ namespace ProceduralCreature.Editor
                 if (child != null) UnityEngine.Object.DestroyImmediate(child);
             }
             PersistOwnedGeometryEntities(new List<ulong>());
+
+            CreatureSkinnedMeshRenderer skinnedRenderer =
+                PreviewGameObject != null ? PreviewGameObject.GetComponent<CreatureSkinnedMeshRenderer>() : null;
+            if (skinnedRenderer != null) skinnedRenderer.Clear();
+
+            CreatureRig rig = PreviewGameObject != null ? PreviewGameObject.GetComponent<CreatureRig>() : null;
+            if (rig != null) rig.Clear();
         }
 
         private static void RegisterOwnedGeometry(GameObject child)

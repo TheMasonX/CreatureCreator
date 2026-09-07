@@ -3030,7 +3030,10 @@ namespace ProceduralCreature.Editor
                     {
                         unityMesh = implicitSurface.Mesh;
                     }
-                    _previewController.ApplyPreviewGeometry(generated);
+                    _previewController.ApplyPreviewGeometry(
+                        generated,
+                        result.Data.Definition,
+                        result.Data.Snapshot);
                     _previewGameObject = _previewController.PreviewGameObject;
                     _previewAcceptance.Accept(
                         result.Data.Snapshot.RevisionId,

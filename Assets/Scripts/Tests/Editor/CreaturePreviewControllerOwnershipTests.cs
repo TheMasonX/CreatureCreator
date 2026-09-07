@@ -111,12 +111,11 @@ namespace ProceduralCreature.Tests.Editor
 
             // Regenerating twice forces the controller to clear and rebuild its own
             // geometry while the unrelated root/child keep the old names.
-            controller.ApplyPreviewGeometry(BuildGenerated(extraItems: 2));
+            ApplyPreview(controller, extraItems: 2);
             GameObject ownedRoot = Track(controller.PreviewGameObject);
             Assert.IsNotNull(ownedRoot);
-            controller.ApplyPreviewGeometry(BuildGenerated(extraItems: 1));
 
-            // Never adopted: the controller created and registered its own root
+            ApplyPreview(controller, extraItems: 1);
             // rather than reusing the unrelated, unregistered, same-named one.
             Assert.AreNotSame(unrelatedRoot, ownedRoot);
             Assert.AreSame(ownedRoot, controller.PreviewGameObject,
@@ -140,7 +139,7 @@ namespace ProceduralCreature.Tests.Editor
         public void RecoverExistingPreview_FindsOwnRootByHandleAcrossSimulatedReload()
         {
             CreaturePreviewController first = CreateController();
-            first.ApplyPreviewGeometry(BuildGenerated(extraItems: 1));
+            ApplyPreview(first, extraItems: 1);
             GameObject root = Track(first.PreviewGameObject);
             Assert.IsNotNull(root);
 
@@ -168,7 +167,7 @@ namespace ProceduralCreature.Tests.Editor
                 "An unregistered same-named root must not be recovered as the preview root.");
 
             // Even after a regeneration the unrelated root is not adopted.
-            controller.ApplyPreviewGeometry(BuildGenerated(extraItems: 0));
+            ApplyPreview(controller, extraItems: 0);
             Assert.IsNotNull(controller.PreviewGameObject);
             Assert.AreEqual(2, CountSceneObjectsNamed("CreatureCreator Preview"),
                 "Regeneration must create its own root, not reuse the unrelated one.");
@@ -179,9 +178,9 @@ namespace ProceduralCreature.Tests.Editor
         public void RegenerationDestroysOnlyRegisteredGeometryChildren()
         {
             CreaturePreviewController controller = CreateController();
-            controller.ApplyPreviewGeometry(BuildGenerated(extraItems: 2));
+            ApplyPreview(controller, extraItems: 2);
             GameObject root = Track(controller.PreviewGameObject);
-            Assert.AreEqual(2, root.transform.childCount,
+            Assert.AreEqual(2, CountChildrenNamed(root, "Preview Mesh "),
                 "Two owned geometry children should be created and parented under the root.");
 
             // A foreign, unregistered child nested under the owned root must
@@ -191,12 +190,12 @@ namespace ProceduralCreature.Tests.Editor
             foreign.AddComponent<MeshFilter>();
 
             // Trigger a cleanup + rebuild with one owned geometry child.
-            controller.ApplyPreviewGeometry(BuildGenerated(extraItems: 1));
+            ApplyPreview(controller, extraItems: 1);
 
             Assert.IsNotNull(foreign, "An unregistered foreign child must survive cleanup.");
             Assert.IsTrue(foreign.transform.IsChildOf(root.transform));
-            Assert.AreEqual(2, root.transform.childCount,
-                "After regeneration the root should hold only the foreign child and the single new owned child.");
+            Assert.AreEqual(1, CountChildrenNamed(root, "Preview Mesh "),
+                "After regeneration the root should hold one new owned geometry child.");
 
             controller.Dispose();
         }
@@ -209,6 +208,38 @@ namespace ProceduralCreature.Tests.Editor
                 if (root.name == name) count++;
             }
             return count;
+        }
+
+        private static int CountChildrenNamed(GameObject parent, string prefix)
+        {
+            int count = 0;
+            for (int i = 0; i < parent.transform.childCount; i++)
+            {
+                if (parent.transform.GetChild(i).name.StartsWith(prefix, System.StringComparison.Ordinal)) count++;
+            }
+            return count;
+        }
+
+        private static void ApplyPreview(CreaturePreviewController controller, int extraItems)
+        {
+            CreatureDefinition definition = CreatureDefinition.CreateEmpty();
+            definition.Forward = Vector3.forward;
+            definition.Body.Samples.Add(new BodySample
+            {
+                Id = 1,
+                Position = new Vector3(0f, 0f, -1f),
+                Radius = 1f,
+            });
+            definition.Body.Samples.Add(new BodySample
+            {
+                Id = 2,
+                Position = new Vector3(0f, 0f, 1f),
+                Radius = 1f,
+            });
+            controller.ApplyPreviewGeometry(
+                BuildGenerated(extraItems),
+                definition,
+                ResolvedCreatureSnapshot.Resolve(definition));
         }
     }
 }
