@@ -1,5 +1,6 @@
 using System;
 using System.Collections.Generic;
+using ProceduralCreature.Common;
 using UnityEngine;
 
 namespace ProceduralCreature.Definition
@@ -38,15 +39,11 @@ namespace ProceduralCreature.Definition
 
         public BodySpline Clone()
         {
-            var clone = new BodySpline
+            return new BodySpline
             {
                 Appearance = Appearance == null ? null : Appearance.Clone(),
+                Samples = CollectionCloneUtility.DeepClone(Samples, sample => sample.Clone()),
             };
-            foreach (BodySample sample in Samples)
-            {
-                clone.Samples.Add(sample == null ? null : sample.Clone());
-            }
-            return clone;
         }
     }
 
