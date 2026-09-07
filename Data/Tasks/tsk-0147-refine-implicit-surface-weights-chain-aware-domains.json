@@ -2,7 +2,7 @@
   "id": "tsk-0147-refine-implicit-surface-weights-chain-aware-domains",
   "key": "TSK-0147",
   "title": "Refine implicit-surface weights with chain-aware influence domains",
-  "description": "## Explicit anatomy requirement\n\nThe weighting system must remain general-purpose: it must not assume biped or quadruped topology. Any number of limbs, in any authored order and at any valid Body position, must be supported without limb-count modes or species-specific branches.\n\n## Summary\nRefine the MVP welded-surface weighting model with explicit anatomical influence domains.\n\n## Current state\nThe domain-aware refinement is implemented. `InfluenceDomain[]` is supplied by the live runtime preview to `CreatureSkinnedMeshRenderer.Bind`; Body radius preparation uses the compact anatomical Body rig; and the topology dependency is resolved. `ImplicitSurfaceInfluenceDomainResolver` now resolves a primary geometry domain plus its intended non-Body authored ancestors. Child geometry therefore may blend with its owning limb chain while sibling and opposite-side chains remain ineligible.\n\n## Acceptance\nPreserve TSK-0131 closest-segment distance, morphology radii, deterministic top-four selection, normalization, mirror behavior, and build-time ownership. Prove hip, shoulder, mirrored, branch, knee, elbow, and child-geometry locality plus generated-geometry deformation. The domain contract must remain independent of limb count, authored order, and attachment position.\n\n## Remaining gate\nExecutable Unity generated-geometry validation is still required. The task must not be marked Done based solely on source/build inspection. Foot-grounding remains separate.\n\n## Evidence\nFocused resolver regression coverage now proves child-domain inclusion, sibling exclusion, and mirrored parent-chain isolation. See the skeleton/animation audit documents under `docs/audits/` on `audit/skeleton-animation-improvements-2026-09-07`.",
+  "description": "## Explicit anatomy requirement\n\nThe weighting system must remain general-purpose: it must not assume biped or quadruped topology. Any number of limbs, in any authored order and at any valid Body position, must be supported without limb-count modes or species-specific branches.\n\n## Summary\nRefine the MVP welded-surface weighting model with explicit anatomical influence domains and prove that posed body/limb motion does not create visibly incorrect cross-body smearing.\n\n## Current state\nThe domain-aware refinement is implemented. `InfluenceDomain[]` is supplied by the live runtime preview to `CreatureSkinnedMeshRenderer.Bind`; Body radius preparation uses the compact anatomical Body rig; and the topology dependency is resolved. `ImplicitSurfaceInfluenceDomainResolver` now resolves a primary geometry domain plus its intended non-Body authored ancestors. Child geometry therefore may blend with its owning limb chain while sibling and opposite-side chains remain ineligible.\n\n## Newly observed risk\nUser visual validation on `dinus_uprightus` shows general mesh smearing/weird deformation when Body rig parts are moved. Do not assume this is caused by chain-domain attribution alone. Characterize actual generated `BoneWeight` distributions and a controlled one-bone pose before changing the falloff radius or introducing another heuristic. The current closest-point-on-segment weighting model must be preserved unless measured evidence identifies it as the source.\n\n## Acceptance\nPreserve TSK-0131 closest-segment distance, morphology radii, deterministic top-four selection, normalization, mirror behavior, and build-time ownership. Prove hip, shoulder, mirrored, branch, knee, elbow, child-geometry, and controlled Body-segment deformation locality. A one-bone pose must not produce long-range smearing into unrelated Body regions beyond the documented blend neighborhood. The domain contract must remain independent of limb count, authored order, and attachment position.\n\n## Remaining gate\nExecutable Unity generated-geometry validation is still required. The task must not be marked Done based solely on source/build inspection. Foot-grounding remains separate.\n\n## Evidence\nFocused resolver regression coverage proves child-domain inclusion, sibling exclusion, and mirrored parent-chain isolation. Generated-creature visual validation is now also required for deformation locality. See the skeleton/animation audit documents under `docs/audits/` on `audit/skeleton-animation-improvements-2026-09-07`.",
   "type": "Task",
   "status": "InProgress",
   "priority": "High",
@@ -34,15 +34,21 @@
       "author": "anonymous",
       "body": "Hierarchy-domain hardening: welded-surface geometry now resolves its own part domain plus non-Body authored ancestor domains. This allows foot/hand child geometry to blend with its owning limb chain while excluding sibling and opposite-side chains. Added focused runtime resolver coverage for owned-parent inclusion, sibling exclusion, and mirrored-parent isolation. Unity/generated-creature validation remains the closure gate.",
       "createdAtUtc": "2026-09-07T12:35:00Z"
+    },
+    {
+      "id": "c-20260907-body-smear-followup",
+      "author": "anonymous",
+      "body": "User visual validation (2026-09-07): moving Body rig parts causes noticeable mesh smearing/weird deformation on `dinus_uprightus`. This is not yet assigned to a specific algorithmic cause. Next validation must inspect actual bone weights and use controlled isolated bone poses before changing falloff/weight policy. Preserve performance by keeping any repair build-time only.",
+      "createdAtUtc": "2026-09-07T17:10:00Z"
     }
   ],
   "epicId": null,
   "parentId": "TSK-0077",
   "dueDateUtc": null,
   "createdAtUtc": "2026-09-07T06:27:32.3039768Z",
-  "updatedAtUtc": "2026-09-07T12:35:00Z",
+  "updatedAtUtc": "2026-09-07T17:10:00Z",
   "completedAtUtc": null,
-  "revision": 10,
+  "revision": 11,
   "isArchived": false,
   "hasLoadError": false,
   "sourceFilePath": "tsk-0147-refine-implicit-surface-weights-chain-aware-domains.json"
