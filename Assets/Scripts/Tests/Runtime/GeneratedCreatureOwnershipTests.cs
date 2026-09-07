@@ -66,9 +66,20 @@ namespace ProceduralCreature.Tests.Runtime
         [Test]
         public void GeneratedCreature_GeometryViewIsReadOnly()
         {
-            var generated = new GeneratedCreature();
             Mesh mesh = CreateTriangleMesh();
-            generated.AddGeometryForTest(new GeometryItemForTest());
+            var generated = new GeneratedCreature();
+            generated.AddGeometry(new GeometryItem(
+                "part",
+                GeometryType.MeshAsset,
+                mesh,
+                mesh,
+                Matrix4x4.identity,
+                null,
+                new RigBindingMetadata("part", "body", false)));
+
+            Assert.AreEqual(1, generated.Geometry.Count);
+            Assert.IsTrue(generated.Geometry is IList<GeometryItem>);
+            Assert.IsTrue(((IList<GeometryItem>)generated.Geometry).IsReadOnly);
         }
 
         private static Mesh CreateTriangleMesh()
