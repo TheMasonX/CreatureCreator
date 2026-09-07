@@ -66,7 +66,7 @@ namespace ProceduralCreature.Generation
                 MeshTopologyReport topology = result.Data.TopologyReport;
 
                 DestroyGeneratedGeometry();
-                BindImplicitSurfaceToRig(generated, result.Data.Definition, result.Data.Snapshot);
+                BindImplicitSurfaceToRig(generated, result.Data.Snapshot);
 
                 int implicitTriangles = 0;
                 if (generated.TryGetImplicitSurface(out GeometryItem implicitSurface) && implicitSurface.Mesh != null)
@@ -166,10 +166,6 @@ namespace ProceduralCreature.Generation
 
         private void AssignFallbackMaterial(MeshRenderer renderer)
         {
-            // CC-074: prefer the palette's default surface material (for example
-            // the Body material) so runtime surfaces use the authored palette
-            // instead of a synthetic white material. Only synthesize a shader
-            // fallback when the palette has no resolvable default.
             Material material = MaterialResolver.ResolveDefault(ResolveMaterialPalette());
             if (material == null)
             {
@@ -179,9 +175,9 @@ namespace ProceduralCreature.Generation
             if (material != null) renderer.sharedMaterial = material;
         }
 
-        private void BindImplicitSurfaceToRig(GeneratedCreature generated, CreatureDefinition definition, ResolvedCreatureSnapshot snapshot)
+        private void BindImplicitSurfaceToRig(GeneratedCreature generated, ResolvedCreatureSnapshot snapshot)
         {
-            if (generated == null || definition == null)
+            if (generated == null || snapshot == null)
             {
                 return;
             }
@@ -192,7 +188,7 @@ namespace ProceduralCreature.Generation
                 return;
             }
 
-            SkeletonModel skeleton = SkeletonInferrer.Infer(definition);
+            SkeletonModel skeleton = SkeletonInferrer.Infer(snapshot);
             if (skeleton == null || skeleton.Bones.Count == 0)
             {
                 Debug.LogWarning("[CreatureCreator] Runtime preview could not infer a skeleton for the implicit surface.", this);
@@ -212,10 +208,11 @@ namespace ProceduralCreature.Generation
                     ?? gameObject.AddComponent<CreatureSkinnedMeshRenderer>();
             }
 
+            SkeletonSnapshot skeletonSnapshot = SkeletonSnapshot.Capture(skeleton);
             float[] radiiByBoneIndex = MorphologyInfluenceRadiusBridge.BuildRadiiByBoneIndex(
-                SkeletonSnapshot.Capture(skeleton), snapshot);
+                skeletonSnapshot, snapshot);
             InfluenceDomain[] vertexDomains = ImplicitSurfaceInfluenceDomainResolver.Resolve(
-                definition, snapshot, implicitItem.Mesh.vertices);
+                snapshot, implicitItem.Mesh.vertices);
             Material defaultMaterial = MaterialResolver.ResolveDefault(ResolveMaterialPalette());
             Material[] materials = defaultMaterial != null ? new[] { defaultMaterial } : null;
             _skinnedRenderer.Bind(
