@@ -215,10 +215,19 @@ namespace ProceduralCreature.Editor
         {
             EnsurePreviewRoot();
 
-            MeshFilter legacyFilter = PreviewGameObject.GetComponent<MeshFilter>();
-            if (legacyFilter != null) UnityEngine.Object.DestroyImmediate(legacyFilter);
-            MeshRenderer legacyRenderer = PreviewGameObject.GetComponent<MeshRenderer>();
-            if (legacyRenderer != null) UnityEngine.Object.DestroyImmediate(legacyRenderer);
+            // Keep the raw rest mesh on the preview root as a diagnostic view. It is
+            // disabled during normal rendering but can be toggled by RigDebugView to
+            // distinguish generation artifacts from skinning artifacts without a
+            // second generation pass or another copy of the mesh.
+            MeshFilter rawFilter = PreviewGameObject.GetComponent<MeshFilter>();
+            if (rawFilter == null) rawFilter = PreviewGameObject.AddComponent<MeshFilter>();
+            rawFilter.sharedMesh = sourceMesh;
+
+            MeshRenderer rawRenderer = PreviewGameObject.GetComponent<MeshRenderer>();
+            if (rawRenderer == null) rawRenderer = PreviewGameObject.AddComponent<MeshRenderer>();
+            Material rawMaterial = _defaultMaterialResolver();
+            if (rawMaterial != null) rawRenderer.sharedMaterial = rawMaterial;
+            rawRenderer.enabled = false;
 
             MeshCollider collider = PreviewGameObject.GetComponent<MeshCollider>();
             if (collider == null) collider = PreviewGameObject.AddComponent<MeshCollider>();
@@ -288,6 +297,11 @@ namespace ProceduralCreature.Editor
                 if (child != null) UnityEngine.Object.DestroyImmediate(child);
             }
             PersistOwnedGeometryEntities(new List<ulong>());
+
+            MeshFilter rawFilter = PreviewGameObject != null ? PreviewGameObject.GetComponent<MeshFilter>() : null;
+            if (rawFilter != null) rawFilter.sharedMesh = null;
+            MeshRenderer rawRenderer = PreviewGameObject != null ? PreviewGameObject.GetComponent<MeshRenderer>() : null;
+            if (rawRenderer != null) rawRenderer.enabled = false;
 
             GetSingleOwnedComponent<CreatureSkinnedMeshRenderer>()?.Clear();
             GetSingleOwnedComponent<CreatureRig>()?.Clear();
