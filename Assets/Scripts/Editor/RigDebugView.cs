@@ -26,6 +26,8 @@ namespace ProceduralCreature.Editor
         private const string SelectableKey = "ProceduralCreature.RigDebug.Selectable";
         private const string WidthKey = "ProceduralCreature.RigDebug.LineWidth";
         private const string RawMeshKey = "ProceduralCreature.RigDebug.ShowRawMesh";
+        private const float GeometryEpsilonSqr = 1e-10f;
+        private const float AttachmentMarkerScale = 0.06f;
 
         private static bool _enabled = EditorPrefs.GetBool(EnabledKey, false);
         private static bool _alwaysOnTop = EditorPrefs.GetBool(AlwaysOnTopKey, true);
@@ -88,19 +90,14 @@ namespace ProceduralCreature.Editor
                 float width = selected ? _lineWidth * 2f : _lineWidth;
                 Handles.color = selected ? Color.yellow : Color.white;
 
-                if (boneData.HasSegment && (boneData.EndPosition - boneData.Position).sqrMagnitude > 1e-10f)
+                if (boneData.HasSegment && (boneData.EndPosition - boneData.Position).sqrMagnitude > GeometryEpsilonSqr)
                 {
                     Vector3 end = ResolveCurrentSegmentEnd(i, boneData, bones, snapshot);
-                    Handles.DrawAAPolyLine(width, bone.position, end);
+                    if ((end - bone.position).sqrMagnitude > GeometryEpsilonSqr)
+                        Handles.DrawAAPolyLine(width, bone.position, end);
                 }
-                else if (boneData.ParentIndex >= 0 && boneData.ParentIndex < bones.Count)
-                {
-                    Transform parent = bones[boneData.ParentIndex];
-                    if (parent != null)
-                    {
-                        Handles.DrawAAPolyLine(width, parent.position, bone.position);
-                    }
-                }
+
+                DrawParentAttachment(i, boneData, bone, bones, snapshot, handleSize, width);
 
                 if (_selectable)
                 {
@@ -134,31 +131,95 @@ namespace ProceduralCreature.Editor
             Handles.zTest = previousZTest;
         }
 
+        private static void DrawParentAttachment(
+            int boneIndex,
+            BoneSnapshot boneData,
+            Transform bone,
+            IReadOnlyList<Transform> bones,
+            SkeletonSnapshot snapshot,
+            float handleSize,
+            float width)
+        {
+            int parentIndex = boneData.ParentIndex;
+            if (parentIndex < 0 || parentIndex >= bones.Count) return;
+
+            Transform parent = bones[parentIndex];
+            if (parent == null) return;
+
+            Vector3 attachment = ResolveParentAttachmentPoint(parentIndex, boneData.Position, bones[parentIndex], snapshot[parentIndex]);
+            if ((attachment - bone.position).sqrMagnitude <= GeometryEpsilonSqr) return;
+
+            Handles.DrawAAPolyLine(width, attachment, bone.position);
+
+            // A small marker makes off-center Body/limb attachments obvious without
+            // obscuring the selectable child joint. This is editor-only visualization.
+            float markerSize = handleSize * AttachmentMarkerScale;
+            Handles.SphereHandleCap(0, attachment, Quaternion.identity, markerSize, EventType.Repaint);
+        }
+
+        private static Vector3 ResolveParentAttachmentPoint(
+            int parentIndex,
+            Vector3 childPosition,
+            Transform parentTransform,
+            BoneSnapshot parentData)
+        {
+            if (!parentData.HasSegment)
+                return parentTransform.position;
+
+            Vector3 start = parentTransform.position;
+            Vector3 end = ResolveCurrentSegmentEnd(parentIndex, parentData, null, null);
+            Vector3 segment = end - start;
+            float segmentLengthSqr = segment.sqrMagnitude;
+            if (segmentLengthSqr <= GeometryEpsilonSqr)
+                return start;
+
+            float t = Mathf.Clamp01(Vector3.Dot(childPosition - start, segment) / segmentLengthSqr);
+            return start + segment * t;
+        }
+
         private static Vector3 ResolveCurrentSegmentEnd(
             int boneIndex,
             BoneSnapshot boneData,
             IReadOnlyList<Transform> bones,
             SkeletonSnapshot snapshot)
         {
-            IReadOnlyList<int> children = snapshot.GetChildren(boneIndex);
-            int bestChild = -1;
-            for (int i = 0; i < children.Count; i++)
+            if (bones != null && snapshot != null)
             {
-                int childIndex = children[i];
-                BoneSnapshot childData = snapshot[childIndex];
-                if (!string.Equals(childData.SourcePartId, boneData.SourcePartId, StringComparison.Ordinal)) continue;
-                if (childData.IsMirrored != boneData.IsMirrored) continue;
-                if ((childData.Position - boneData.EndPosition).sqrMagnitude > 1e-8f) continue;
-                if (bestChild < 0 || string.CompareOrdinal(childData.Id, snapshot[bestChild].Id) < 0)
-                    bestChild = childIndex;
+                IReadOnlyList<int> children = snapshot.GetChildren(boneIndex);
+                int bestChild = -1;
+                for (int i = 0; i < children.Count; i++)
+                {
+                    int childIndex = children[i];
+                    BoneSnapshot childData = snapshot[childIndex];
+                    if (!string.Equals(childData.SourcePartId, boneData.SourcePartId, StringComparison.Ordinal)) continue;
+                    if (childData.IsMirrored != boneData.IsMirrored) continue;
+                    if ((childData.Position - boneData.EndPosition).sqrMagnitude > 1e-8f) continue;
+                    if (bestChild < 0 || string.CompareOrdinal(childData.Id, snapshot[bestChild].Id) < 0)
+                        bestChild = childIndex;
+                }
+
+                if (bestChild >= 0 && bones[bestChild] != null)
+                    return bones[bestChild].position;
+
+                Transform current = bones[boneIndex];
+                return ResolveCurrentRestOrientedEndpoint(current, boneData);
             }
 
-            if (bestChild >= 0 && bones[bestChild] != null)
-                return bones[bestChild].position;
+            return ResolveCurrentRestOrientedEndpoint(null, boneData);
+        }
 
-            Transform current = bones[boneIndex];
-            Vector3 restOffset = boneData.EndPosition - boneData.Position;
-            return current.position + current.rotation * restOffset;
+        private static Vector3 ResolveCurrentRestOrientedEndpoint(Transform current, BoneSnapshot boneData)
+        {
+            Vector3 restOffsetWorld = boneData.EndPosition - boneData.Position;
+            if (current == null) return boneData.EndPosition;
+
+            // EndPosition is stored in creature/world space. Convert that rest-space
+            // offset into the bone's local frame once, then let the current posed
+            // world rotation carry it. Rotating the raw world delta by current.rotation
+            // directly double-applies the rest orientation and can make leaf segments
+            // such as the final tail bone loop back around the creature.
+            Vector3 restOffsetLocal = Quaternion.Inverse(boneData.Rotation) * restOffsetWorld;
+            return current.position + current.rotation * restOffsetLocal;
         }
 
         private static string GetBoneLabel(BoneSnapshot bone)
