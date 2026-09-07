@@ -2,7 +2,7 @@
   "id": "tsk-0149-build-depth-independent-rig-debug-view",
   "key": "TSK-0149",
   "title": "Build a depth-independent rig debug view for skeleton inspection",
-  "description": "## Summary\nExtend skeleton display into a usable SceneView rig-debug presentation so pose, topology, and weighting changes can be inspected without navigating generated Unity hierarchy.\n\n## Explicit anatomy requirement\nThe debug workflow must remain generic: it must not assume biped, quadruped, legs, or a fixed limb count. Any articulated limb chain must be discoverable, selectable, labeled, and focusable through structural skeleton metadata rather than PartType-specific branches.\n\n## Current implementation\n`RigDebugView` provides x-ray visibility, adjustable bone width, selected-bone emphasis, click selection, semantic labels plus stable IDs, whole-skeleton/selected-chain/body/limb/selected-bone focus, and snapshot-based chain discovery. It uses the live `CreatureRig.RestSkeleton` and indexed transforms rather than re-resolving editor-session DNA. `CreatureRig` also exposes `TryGetBone` and a read-only map boundary.\n\n## Acceptance\n- Bones remain visible through the generated mesh.\n- Skeleton, selected chain, body, all articulated limbs, and selected bone can be framed directly.\n- Selected bones are distinguishable by shape/thickness as well as color.\n- Machine IDs and semantic display names are available.\n- Focus behavior is based on the live generated rig, not stale editor state.\n- A selected terminal child frames its owning articulated parent chain rather than forcing hierarchy traversal.\n- No biped/quadruped/leg-count assumption is encoded in the debug view.\n- Manual Unity SceneView validation is still required before closure.\n\n## Scope limits\nDo not move morphology topology, weighting ownership, or foot-grounding logic into this task. Full mesh suppression and pose-preview controls remain deferred until the basic debug presentation is visually validated.\n\n## Status\nInProgress: generic implementation landed; Unity visual validation remains open.\n\n## Evidence\nSee the skeleton/animation visualization, implementation delta, and next-round audit documents under `docs/audits/` on branch `audit/skeleton-animation-improvements-2026-09-07`.\n\n## Latest implementation note\n`Frame Selected Chain` now walks the live skeleton parent links from the selected bone to the first Body-rooted ancestor and supplements that with the selected articulated part's segment bones. This makes child geometry such as feet/hands practical to inspect without a special-case leg workflow.",
+  "description": "## Summary\nExtend skeleton display into a usable SceneView rig-debug presentation so pose, topology, and weighting changes can be inspected without navigating generated Unity hierarchy.\n\n## Explicit anatomy requirement\nThe debug workflow must remain generic: it must not assume biped, quadruped, legs, or a fixed limb count. Any articulated limb chain must be discoverable, selectable, labeled, and focusable through structural skeleton metadata rather than PartType-specific branches.\n\n## Current implementation\n\u0060RigDebugView\u0060 provides x-ray visibility, adjustable bone width, selected-bone emphasis, click selection, semantic labels plus stable IDs, whole-skeleton/selected-chain/body/limb/selected-bone focus, and snapshot-based chain discovery. It uses the live \u0060CreatureRig.RestSkeleton\u0060 and indexed transforms rather than re-resolving editor-session DNA. \u0060CreatureRig\u0060 also exposes \u0060TryGetBone\u0060 and a read-only map boundary.\n\n## Acceptance\n- Bones remain visible through the generated mesh.\n- Skeleton, selected chain, body, all articulated limbs, and selected bone can be framed directly.\n- Selected bones are distinguishable by shape/thickness as well as color.\n- Machine IDs and semantic display names are available.\n- Focus behavior is based on the live generated rig, not stale editor state.\n- A selected terminal child frames its owning articulated parent chain rather than forcing hierarchy traversal.\n- No biped/quadruped/leg-count assumption is encoded in the debug view.\n- Manual Unity SceneView validation is still required before closure.\n\n## Scope limits\nDo not move morphology topology, weighting ownership, or foot-grounding logic into this task. Full mesh suppression and pose-preview controls remain deferred until the basic debug presentation is visually validated.\n\n## Status\nInProgress: generic implementation landed; Unity visual validation remains open.\n\n## Evidence\nSee the skeleton/animation visualization, implementation delta, and next-round audit documents under \u0060docs/audits/\u0060 on branch \u0060audit/skeleton-animation-improvements-2026-09-07\u0060.\n\n## Latest implementation note\n\u0060Frame Selected Chain\u0060 now walks the live skeleton parent links from the selected bone to the first Body-rooted ancestor and supplements that with the selected articulated part\u0027s segment bones. This makes child geometry such as feet/hands practical to inspect without a special-case leg workflow.",
   "type": "Task",
   "status": "InProgress",
   "priority": "High",
@@ -31,22 +31,29 @@
     {
       "id": "c-20260907-arbitrary-limb-debug",
       "author": "anonymous",
-      "body": "Generalized the debug presentation to the same arbitrary-limb invariant as runtime rigging: removed the hard-coded Focus Legs control and PartType.Leg/Foot label filter. `Focus Limbs` now discovers articulated bones structurally via segment/attachment metadata, so wings, arms, tentacles, antennae, multiple leg sets, and other supported chains do not require new editor modes.",
+      "body": "Generalized the debug presentation to the same arbitrary-limb invariant as runtime rigging: removed the hard-coded Focus Legs control and PartType.Leg/Foot label filter. \u0060Focus Limbs\u0060 now discovers articulated bones structurally via segment/attachment metadata, so wings, arms, tentacles, antennae, multiple leg sets, and other supported chains do not require new editor modes.",
       "createdAtUtc": "2026-09-07T12:55:00Z"
     },
     {
       "id": "c-20260907-chain-focus",
       "author": "anonymous",
-      "body": "Follow-up UX hardening: `Frame Selected Chain` now traverses live parent links so selecting a terminal child such as a foot/hand includes its owning articulated chain. The implementation remains structural and does not depend on PartType or a fixed limb count.",
+      "body": "Follow-up UX hardening: \u0060Frame Selected Chain\u0060 now traverses live parent links so selecting a terminal child such as a foot/hand includes its owning articulated chain. The implementation remains structural and does not depend on PartType or a fixed limb count.",
       "createdAtUtc": "2026-09-07T13:10:00Z"
+    },
+    {
+      "id": "c-a4f8b687882345649e3c4bdcdf73bbaa",
+      "author": "anonymous",
+      "body": "Audit synthesis 2026-09-07: pull the deferred raw generated mesh presentation into this owner. \u0060CreaturePreviewController.BindImplicitSurface\u0060 destroys the preview-root \u0060MeshFilter\u0060 and \u0060MeshRenderer\u0060 before creating the skinned path, and neither preview path exposes a raw/rest-mesh toggle. Add a structural presentation mode that can show the generated mesh without \u0060SkinnedMeshRenderer\u0060, while preserving the current debug view\u0027s generic arbitrary-limb behavior. Acceptance must include a Unity SceneView check that toggles raw versus skinned display and confirms the two paths do not create duplicate owned objects. Provenance: \u0060docs/audits/creaturecreator-rig-liveuse-audit-2026-09-07.md\u0060, Finding 4.",
+      "createdAtUtc": "2026-09-07T19:38:41.4023409Z"
     }
   ],
+  "epicId": null,
   "parentId": "TSK-0073",
   "dueDateUtc": null,
   "createdAtUtc": "2026-09-07T06:27:32.4549774Z",
-  "updatedAtUtc": "2026-09-07T13:10:00Z",
+  "updatedAtUtc": "2026-09-07T19:38:41.4023409Z",
   "completedAtUtc": null,
-  "revision": 6,
+  "revision": 7,
   "isArchived": false,
   "hasLoadError": false,
   "loadError": null,

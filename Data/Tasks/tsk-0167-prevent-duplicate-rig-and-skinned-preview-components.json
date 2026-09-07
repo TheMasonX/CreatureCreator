@@ -1,0 +1,46 @@
+﻿{
+  "id": "tsk-0167-prevent-duplicate-rig-and-skinned-preview-components",
+  "key": "TSK-0167",
+  "title": "Prevent duplicate rig and skinned preview components",
+  "description": "## Summary\n\nMake repeated editor preview binding converge on one owned \u0060CreatureRig\u0060 and one owned \u0060CreatureSkinnedMeshRenderer\u0060 component on the preview root. The current controller uses \u0060GetComponent\u003CT\u003E()\u0060 and \u0060AddComponent\u003CT\u003E()\u0060 without checking for duplicate components already present on the root.\n\n## User Mandate\n\n\u003E I would like to be able to show the non-rigged model at some point. There\u0027s an extra bone at the tail for some reason. Bending the tail still causes weird squishing artifacts. I haven\u0027t moved the leg, but it warped inwards (part of why I want to look at the non-skinnedmeshrenderer as an option). It also tends to generate duplicate bones and skinned mesh as siblings to the old ones under the preview in the scene. Review the repo state and create a detailed audit to create these tasks/fix them, and any other\n\nSTRICT. This task owns the duplicate preview rig and skinned-mesh lifecycle symptom. Do not claim the stale Unity script-reference mechanism without reproduction. Do not merge topology, weighting, or raw-mesh presentation fixes into this task.\n\n## Scope\n\n- Audit both editor and runtime preview binding paths that create \u0060CreatureRig\u0060 and \u0060CreatureSkinnedMeshRenderer\u0060.\n- Define one clear owner for each component and its generated children.\n- Detect and remove or reject duplicate components before binding, with deterministic cleanup semantics for their generated GameObjects and meshes.\n- Add focused EditMode coverage for repeated binding, simulated reload/recovery, and pre-existing duplicate components.\n- Preserve \u0060TSK-0122\u0060 root ownership and do not replace it with name-based discovery.\n\n## Acceptance Criteria\n\n- Repeated editor preview binding leaves exactly one \u0060CreatureRig\u0060 and one \u0060CreatureSkinnedMeshRenderer\u0060 on the owned preview root.\n- Duplicate components created before binding cannot leave duplicate \u0060Bone_*\u0060 or \u0060SkinnedMesh\u0060 sibling hierarchies after cleanup.\n- Cleanup does not destroy unrelated components or foreign children.\n- The test fixture covers the editor controller path and records any Unity domain-reload limitation.\n- The stale-script-reference explanation remains an explicitly unverified hypothesis unless a Unity reproduction proves it.\n\n## Validation\n\nRun the focused editor ownership tests, the relevant editor assembly, and \u0060git diff --check\u0060. Run a Unity EditMode or PlayMode generated-preview check when available. Do not mark this task Done without evidence from the repeated-binding and duplicate-component fixture.\n\n## Findings\n\nThe external live-use audit reported duplicate \u0060Bone_body_pelvis\u0060 and \u0060SkinnedMesh\u0060 sibling hierarchies. Source verification confirms that \u0060CreaturePreviewController.BindImplicitSurface\u0060 and \u0060CreatureRuntimePreview.BindImplicitSurfaceToRig\u0060 use \u0060GetComponent\u003CT\u003E()\u0060 with \u0060AddComponent\u003CT\u003E()\u0060 fallback, while \u0060CreatureRig.Build\u0060 and \u0060CreatureSkinnedMeshRenderer.Bind\u0060 only clean objects owned by the current component instance. The exact trigger is not proven without Unity reproduction.\n\n## Blockers\n\nA real Unity domain-reload or stale-script-reference reproduction is not available in this synthesis. Existing \u0060TSK-0122\u0060 coverage proves preview-root EntityId recovery but does not cover duplicate rig or skin components.\n\n## Next Step\n\nImplement the smallest structural duplicate-component cleanup in the preview binding owner, add the focused fixture, then validate in Unity before changing task status.",
+  "type": "Bug Fix",
+  "status": "Ready",
+  "priority": "High",
+  "assigneeMode": "Custom",
+  "assigneeDirectoryId": null,
+  "assigneeCustomText": "Agent",
+  "reporter": "BeastMaster",
+  "labels": [
+    "editor",
+    "runtime",
+    "animation",
+    "skinning",
+    "preview",
+    "ownership",
+    "cleanup",
+    "audit-synthesis",
+    "user-mandated"
+  ],
+  "attachments": [],
+  "externalLinks": [],
+  "linkedPages": [],
+  "comments": [
+    {
+      "id": "c-df01f888f282482d8c178e38689a7302",
+      "author": "anonymous",
+      "body": "Created from the 2026-09-07 live-use audit synthesis. The duplicate component symptom is accepted as a lifecycle/ownership gap, but the audit\u0027s stale Unity script-reference mechanism remains unverified. Current source evidence is limited to \u0060GetComponent\u003CT\u003E()\u0060 plus \u0060AddComponent\u003CT\u003E()\u0060 fallback in both preview binding paths and per-component private generated-object cleanup. Unity reproduction and focused duplicate-component tests are required before implementation is considered complete.",
+      "createdAtUtc": "2026-09-07T19:38:41.438384Z"
+    }
+  ],
+  "epicId": null,
+  "parentId": "TSK-0098",
+  "dueDateUtc": null,
+  "createdAtUtc": "2026-09-07T19:38:31.933696Z",
+  "updatedAtUtc": "2026-09-07T19:38:41.438384Z",
+  "completedAtUtc": null,
+  "revision": 2,
+  "isArchived": false,
+  "hasLoadError": false,
+  "loadError": null,
+  "sourceFilePath": "tsk-0167-prevent-duplicate-rig-and-skinned-preview-components.json"
+}
