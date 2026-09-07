@@ -63,6 +63,14 @@ namespace ProceduralCreature.Tests.Runtime
             Assert.IsTrue(((IList<IReadOnlyList<VertexInfluence>>)item.VertexInfluences).IsReadOnly);
         }
 
+        [Test]
+        public void GeneratedCreature_GeometryViewIsReadOnly()
+        {
+            var generated = new GeneratedCreature();
+            Mesh mesh = CreateTriangleMesh();
+            generated.AddGeometryForTest(new GeometryItemForTest());
+        }
+
         private static Mesh CreateTriangleMesh()
         {
             var mesh = new Mesh
