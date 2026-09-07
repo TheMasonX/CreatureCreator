@@ -27,7 +27,7 @@ namespace ProceduralCreature.Tests.Runtime
             var diagnostics = new GenerationDiagnostics();
             var issue = new ValidationIssue(
                 ValidationSeverity.Error,
-                ValidationCode.InvalidPartId,
+                ValidationCode.DuplicatePartId,
                 "part",
                 "invalid");
             diagnostics.RecordIssue(issue);
