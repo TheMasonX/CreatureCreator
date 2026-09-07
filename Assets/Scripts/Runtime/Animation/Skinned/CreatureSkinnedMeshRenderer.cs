@@ -191,14 +191,15 @@ namespace ProceduralCreature.Animation.Skinned
 
         /// <summary>
         /// Builds an owned skinning mesh that copies the source mesh's geometry and
-        /// preserves its submesh structure (ADR-009), then attaches bindposes and
-        /// boneWeights. The source mesh is never modified.
+        /// preserves its index format and submesh structure (ADR-009), then attaches
+        /// bindposes and boneWeights. The source mesh is never modified.
         /// </summary>
         private static Mesh BuildSkinningMeshCopy(
             Mesh source, Matrix4x4[] bindposes, BoneWeight[] boneWeights)
         {
             var mesh = new Mesh();
             mesh.name = source.name + "_Skinned";
+            mesh.indexFormat = source.indexFormat;
 
             Vector3[] vertices = source.vertices;
             mesh.vertices = vertices;
