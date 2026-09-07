@@ -135,7 +135,7 @@ namespace ProceduralCreature.Animation.Binding
                 }
 
                 string parentDomain = ResolveDomainForInstance(parent, mirrored);
-                if (!allowedDomains.Contains(parentDomain, StringComparer.Ordinal))
+                if (!allowedDomains.Contains(parentDomain))
                 {
                     allowedDomains.Add(parentDomain);
                 }
@@ -144,11 +144,6 @@ namespace ProceduralCreature.Animation.Binding
             }
 
             return new InfluenceDomain(primaryDomain, allowedDomains.ToArray());
-        }
-
-        private static string ResolvePartDomain(ResolvedPartSnapshot part, Vector3 vertex)
-        {
-            return ResolveDomainForInstance(part, IsMirroredInstance(part, vertex));
         }
 
         private static bool IsMirroredInstance(ResolvedPartSnapshot part, Vector3 vertex)
