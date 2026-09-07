@@ -180,6 +180,40 @@ namespace ProceduralCreature.Animation.Binding
         }
 
         /// <summary>
+        /// Builds all binding influences for a welded implicit surface. Segment bones
+        /// use their authored axis; attachment bones use a point influence at their
+        /// rest position so non-limb SDF parts (for example eyes and feet) can bind
+        /// without changing the segment-only authoring contract.
+        /// </summary>
+        public static List<BoneSegmentInfluence> BuildBindingInfluences(
+            SkeletonSnapshot skeleton, IReadOnlyList<float> radiiByBoneIndex = null)
+        {
+            if (skeleton == null) throw new DomainException("skeleton must not be null.");
+
+            List<BoneSegmentInfluence> result = BuildSegmentInfluences(skeleton, radiiByBoneIndex);
+            var included = new bool[skeleton.Count];
+            for (int i = 0; i < result.Count; i++) included[result[i].BoneIndex] = true;
+
+            for (int i = 0; i < skeleton.Count; i++)
+            {
+                if (included[i]) continue;
+
+                float radius = DefaultInfluenceRadius;
+                if (radiiByBoneIndex != null && i < radiiByBoneIndex.Count)
+                {
+                    float supplied = radiiByBoneIndex[i];
+                    if (supplied > 0f && NumericValidity.IsFinite(supplied)) radius = supplied;
+                }
+
+                Vector3 position = skeleton[i].Position;
+                result.Add(new BoneSegmentInfluence(
+                    i, skeleton[i].IsMirrored, position, position, radius));
+            }
+
+            return result;
+        }
+
+        /// <summary>
         /// Authors per-vertex influences for <paramref name="restVertices"/> over the
         /// given eligible <paramref name="segments"/>. Returns one
         /// <see cref="VertexInfluence"/> array per vertex (same count and order as

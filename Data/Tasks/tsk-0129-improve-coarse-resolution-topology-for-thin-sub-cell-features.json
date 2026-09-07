@@ -45,15 +45,27 @@
       "author": "anonymous",
       "body": "Implementation evidence: added a bounded coarse-loop suppression guard to the extraction path in [Assets/Scripts/Runtime/Morphology/Extraction/MarchingCubesExtractor.cs](Assets/Scripts/Runtime/Morphology/Extraction/MarchingCubesExtractor.cs) so tiny unresolved sub-cell contours are dropped instead of emitted as boundary holes. Updated the regression in [Assets/Scripts/Tests/Runtime/CoarseThinFeatureTopologyTests.cs](Assets/Scripts/Tests/Runtime/CoarseThinFeatureTopologyTests.cs) to assert the watertight coarse-suppression contract plus the high-VPU control.\n\nValidation evidence: \u0060dotnet build ProceduralCreature.Runtime.csproj --no-restore\u0060 and \u0060dotnet build ProceduralCreature.Tests.Runtime.csproj --no-restore\u0060 both succeeded. Unity PlayMode was attempted, but the editor exited with code 1 before emitting test results in this environment, so runtime verification remains blocked by the local Unity test runner state.",
       "createdAtUtc": "2026-09-07T03:10:42.8906561Z"
+    },
+    {
+      "id": "c-6902304a6e9f433abe6f1086c3c93f28",
+      "author": "anonymous",
+      "body": "Bug fix evidence (2026-09-07): normal-resolution creature previews were applying ShouldSuppressCoarseLoop to every grid. This removed valid small contours and produced large boundary-hole counts (dinus_uprightus: 3382 boundary edges; sphere fixture: 432). Restrained suppression to genuinely coarse grids with CellSize \u003E= 0.2 (VPU 5-scale). Focused PlayMode sphere regression now passes 1/1. Runtime build and git diff --check pass. Coarse regression run could not initialize after Unity reload; retain TSK-0129 InProgress pending its VPU 5/VPU 10 checks.",
+      "createdAtUtc": "2026-09-07T05:47:34.8179596Z"
+    },
+    {
+      "id": "c-f5e4c5248c624a1f952c81a6d497fa86",
+      "author": "anonymous",
+      "body": "ROUND 1 final validation review (2026-09-07): no code changes made and no commit/push. Hypothesis that the CellSize \u003E= 0.2 guard was sufficient was falsified by Unity PlayMode on Unity 6000.0.35f1. Focused run of CoarseThinFeatureTopologyTests plus MarchingCubesExtractorTests executed 6/6; failures: ThinBodyFinger_CoarseVpu boundary=32 (expected 0, nonManifold=0), and Extract_TwoOverlappingSpheres_ProducesWatertightMesh boundary=240 (expected watertight, nonManifold=0). This shows the local loop-size suppression is too broad and can remove legitimate coarse contours; a cutoff-only touch would be a new topology policy and was deferred per scope. Existing VPU 6 sphere test covers normal-resolution watertightness, but the full focused slice is not green. Runtime and runtime-tests dotnet builds both passed with --no-restore; git diff --check passed (LF-to-CRLF warnings only). Animation weight-assignment search found no MarchingCubesExtractor/MeshExtractionResult/DensityGrid ownership/API references; CreatureMeshGenerator only consumes extraction output and separately assigns RigidMeshWeightAuthoring weights. Residual risk: TSK-0129 remains InProgress; requires a bounded topology/sampling design and benchmark evidence before implementation.",
+      "createdAtUtc": "2026-09-07T05:53:57.9107462Z"
     }
   ],
   "epicId": null,
   "parentId": "tsk-0008-profile-and-optimize-preview-generation-hotspots",
   "dueDateUtc": null,
   "createdAtUtc": "2026-09-06T18:25:33.7318716Z",
-  "updatedAtUtc": "2026-09-07T03:10:42.8906561Z",
+  "updatedAtUtc": "2026-09-07T05:53:57.9107462Z",
   "completedAtUtc": null,
-  "revision": 6,
+  "revision": 8,
   "isArchived": false,
   "hasLoadError": false,
   "loadError": null,

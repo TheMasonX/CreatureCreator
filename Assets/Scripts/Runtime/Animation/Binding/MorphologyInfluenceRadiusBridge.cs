@@ -92,14 +92,14 @@ namespace ProceduralCreature.Animation.Binding
                 {
                     float radius = ResolveSegmentRadius(limb, segmentIndex);
                     string segmentBoneId = SemanticBoneResolver.ResolveLimbSegmentBoneId(
-                        new CreaturePart { Id = part.Id }, segmentIndex, mirrored: false);
+                        part.Id, segmentIndex, mirrored: false);
                     if (skeleton.TryGetIndex(segmentBoneId, out int localIndex))
                     {
                         result[localIndex] = radius;
                     }
 
                     string mirroredBoneId = SemanticBoneResolver.ResolveLimbSegmentBoneId(
-                        new CreaturePart { Id = part.Id }, segmentIndex, mirrored: true);
+                        part.Id, segmentIndex, mirrored: true);
                     if (skeleton.TryGetIndex(mirroredBoneId, out int mirroredIndex))
                     {
                         result[mirroredIndex] = radius;

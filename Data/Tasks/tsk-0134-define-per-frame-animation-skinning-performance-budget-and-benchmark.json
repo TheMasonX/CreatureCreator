@@ -22,16 +22,23 @@
   "attachments": [],
   "externalLinks": [],
   "linkedPages": [],
-  "comments": [],
+  "comments": [
+    {
+      "id": "c-ec4c6b05ff384a56a1e3aa790cd700be",
+      "author": "anonymous",
+      "body": "## Audit synthesis disposition (2026-09-07)\n\nThe follow-up audits confirm this task is still the correct owner, but its scope must cover two distinct budgets before execution: (A) steady-state pose tick, ApplyPose, Unity SkinnedMeshRenderer/GPU deformation, and per-frame allocations; (B) rebind latency and allocations for implicit-surface weight authoring plus skinning-mesh copying after live geometry replacement. Do not merge these into one number.\n\nNo profiler result is available in this reconciliation. The bind-time concern is source-confirmed algorithmic complexity, not a measured regression: implicit weight authoring scans vertices against eligible segments and CreatureSkinnedMeshRenderer copies source mesh arrays during bind. Keep status Backlog until the benchmark is implemented and Unity PlayMode evidence exists. Evidence: both supplied animation audits and direct source verification.",
+      "createdAtUtc": "2026-09-07T05:19:30.513709Z"
+    }
+  ],
   "epicId": null,
   "parentId": "TSK-0077",
   "dueDateUtc": null,
   "createdAtUtc": "2026-09-06T19:15:13.3211971Z",
-  "updatedAtUtc": "2026-09-06T19:15:13.3211971Z",
+  "updatedAtUtc": "2026-09-07T05:19:30.513709Z",
   "completedAtUtc": null,
-  "revision": 1,
+  "revision": 2,
   "isArchived": false,
   "hasLoadError": false,
   "loadError": null,
-  "sourceFilePath": null
+  "sourceFilePath": "tsk-0134-define-per-frame-animation-skinning-performance-budget-and-benchmark.json"
 }

@@ -36,13 +36,25 @@ namespace ProceduralCreature.Skeleton
         /// <summary>A non-limb part's root bone id: part.Id [+ mirror].</summary>
         public static string ResolvePartRootBoneId(CreaturePart part, bool mirrored)
         {
-            return ResolveMirroredBoneId(part.Id, mirrored);
+            return ResolvePartRootBoneId(part.Id, mirrored);
+        }
+
+        /// <summary>A non-limb part's root bone id from its authoritative id.</summary>
+        public static string ResolvePartRootBoneId(string partId, bool mirrored)
+        {
+            return ResolveMirroredBoneId(partId, mirrored);
         }
 
         /// <summary>A limb's per-segment bone id: part.Id + "_j" + segmentIndex [+ mirror].</summary>
         public static string ResolveLimbSegmentBoneId(CreaturePart part, int segmentIndex, bool mirrored)
         {
-            return ResolveMirroredBoneId(part.Id + LimbJointBoneSeparator + segmentIndex, mirrored);
+            return ResolveLimbSegmentBoneId(part.Id, segmentIndex, mirrored);
+        }
+
+        /// <summary>A limb's per-segment bone id from its authoritative id.</summary>
+        public static string ResolveLimbSegmentBoneId(string partId, int segmentIndex, bool mirrored)
+        {
+            return ResolveMirroredBoneId(partId + LimbJointBoneSeparator + segmentIndex, mirrored);
         }
 
         /// <summary>A limb's explicit terminal joint node id.</summary>
@@ -56,13 +68,27 @@ namespace ProceduralCreature.Skeleton
             CreaturePart limb, ResolvedLimb resolvedLimb, bool mirrored)
         {
             return ResolveLimbJointBoneId(
-                limb, resolvedLimb.JointPositions.Count - 1, mirrored);
+                limb.Id, resolvedLimb.JointPositions.Count - 1, mirrored);
+        }
+
+        /// <summary>Resolves a limb terminal bone id from its id and resolved chain.</summary>
+        public static string ResolveLimbTerminalBoneId(
+            string limbId, ResolvedLimb resolvedLimb, bool mirrored)
+        {
+            return ResolveLimbJointBoneId(
+                limbId, resolvedLimb.JointPositions.Count - 1, mirrored);
         }
 
         /// <summary>Resolves a limb joint node, including the terminal joint.</summary>
         public static string ResolveLimbJointBoneId(CreaturePart limb, int jointIndex, bool mirrored)
         {
-            return ResolveMirroredBoneId(limb.Id + LimbJointBoneSeparator + jointIndex, mirrored);
+            return ResolveLimbJointBoneId(limb.Id, jointIndex, mirrored);
+        }
+
+        /// <summary>Resolves a limb joint node from its authoritative id.</summary>
+        public static string ResolveLimbJointBoneId(string limbId, int jointIndex, bool mirrored)
+        {
+            return ResolveMirroredBoneId(limbId + LimbJointBoneSeparator + jointIndex, mirrored);
         }
 
         /// <summary>The Body bone id for a Body sample: body_j&lt;sampleId&gt;.</summary>
@@ -147,7 +173,7 @@ namespace ProceduralCreature.Skeleton
                 && parent.Limb.JointPositions.Count >= 2;
             string parentLimbTerminalId = parentIsRealLimb
                 ? ResolveLimbTerminalBoneId(
-                    new CreaturePart { Id = parent.Id }, parent.Limb, mirrored: false)
+                    parent.Id, parent.Limb, mirrored: false)
                 : null;
 
             return ResolveParentBoneIdCore(

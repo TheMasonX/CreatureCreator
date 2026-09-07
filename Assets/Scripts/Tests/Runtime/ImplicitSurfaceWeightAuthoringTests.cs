@@ -425,6 +425,30 @@ namespace ProceduralCreature.Tests.Runtime
             }
         }
 
+        [Test]
+        public void BuildBindingInfluences_IncludesAttachmentBonesAsPointInfluences()
+        {
+            Bone attachment = new Bone
+            {
+                Id = "attachment",
+                ParentBoneId = "segment",
+                SourcePartId = "eye",
+                Position = new Vector3(2f, 0f, 0f),
+                Rotation = Quaternion.identity,
+            };
+            SkeletonSnapshot snapshot = Capture(
+                SegmentBone("segment", Vector3.zero, Vector3.right), attachment);
+
+            List<BoneSegmentInfluence> influences =
+                ImplicitSurfaceWeightAuthoring.BuildBindingInfluences(snapshot, new[] { 0.1f, 0.2f });
+            VertexInfluence[][] weights = ImplicitSurfaceWeightAuthoring.Author(
+                influences, new[] { new Vector3(2f, 0f, 0f) });
+
+            Assert.AreEqual(2, influences.Count);
+            Assert.AreEqual(snapshot.GetIndex("attachment"), weights[0][0].BoneIndex);
+            Assert.AreEqual(1f, weights[0][0].Weight, T);
+        }
+
         // ---- Total / defensive behavior -----------------------------------------
 
         [Test]

@@ -41,15 +41,21 @@
       "author": "anonymous",
       "body": "Sprint R4 orchestrator review: independently re-ran focused PlayMode ProceduralCreature.Tests.Runtime.CreatureSkinnedMeshRendererTests -\u003E 7/7 passed (Rest==generated rest; Posed==LBS oracle; TwoBonePose==LBS; MirroredLimb posed==LBS; PerFrame 1000 ApplyPose allocatedBytes=0, ~0.99ms, no mesh/weight/bindpose rebuild; Lifecycle rebind no leak; FailedBind leaves no renderer \u002B source mesh unmodified). Read the adapter: clean separation (separate presenter MonoBehaviour, not in CreatureRig/generation), pure bind-time converter, owns generated GO\u002Bmesh lifecycle (Clear/OnDestroy), never mutates source, preserves submeshes, enforces bind-index contract (snapshot.Count == rig.IndexedBones.Count). Residual risk (flagged by subagent, accepted): strict pointwise \u0022reflected full-SMR mesh == reflection of unmirrored\u0022 is not directly asserted; mirror correctness is locked at the pure LBS/TSK-0131 layer \u002B real mirrored-limb SMR==LBS test. Out of scope deferred: TSK-0130 rigid weighting, TSK-0133 pose driver, TSK-0134 per-frame budget. Parent TSK-0077 stays open (its SMR acceptance now delivered here).",
       "createdAtUtc": "2026-09-06T23:46:41.6194102Z"
+    },
+    {
+      "id": "c-cb46a322e3354b21b88914130048ed06",
+      "author": "anonymous",
+      "body": "Bug fix evidence (2026-09-07): dinus_uprightus preview failed because the implicit welded SDF includes non-limb parts whose inferred bones are attachment points (HasSegment=false), so no segment influence was eligible for some vertices. Added BuildBindingInfluences to preserve segment influences and add deterministic zero-length point influences for attachment bones; CreatureSkinnedMeshRenderer now uses it. Added regression coverage in ImplicitSurfaceWeightAuthoringTests. Validation: ProceduralCreature.Runtime and ProceduralCreature.Tests.Runtime dotnet builds passed; git diff --check passed; focused PlayMode test BuildBindingInfluences_IncludesAttachmentBonesAsPointInfluences passed 1/1. Full runtime suite still has unrelated pre-existing topology/SMR and single-root fixture failures.",
+      "createdAtUtc": "2026-09-07T05:38:33.6736172Z"
     }
   ],
   "epicId": null,
   "parentId": "TSK-0077",
   "dueDateUtc": null,
   "createdAtUtc": "2026-09-06T19:15:06.4054905Z",
-  "updatedAtUtc": "2026-09-06T23:46:44.7586981Z",
+  "updatedAtUtc": "2026-09-07T05:38:33.6736172Z",
   "completedAtUtc": "2026-09-06T23:46:44.7586981Z",
-  "revision": 6,
+  "revision": 7,
   "isArchived": false,
   "hasLoadError": false,
   "loadError": null,

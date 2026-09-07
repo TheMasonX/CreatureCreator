@@ -46,15 +46,39 @@
       "author": "anonymous",
       "body": "Synthesis evidence (2026-09-06 audit batch; see docs/audits/creaturecreator-audit-synthesis-2026-09-06-batch.md). second-order F-207 (P1): SkeletonSnapshot.HasSameBoneOrder only compares count \u002B ordered IDs (SkeletonSnapshot.cs:191-199); it is used as the pose-compatibility gate in PoseRotationResolver (cs:33,62) but does not compare parent indices/IDs, SourcePartId, terminal/segment semantics, mirrored state, or rest pose/bind. Two snapshots with equal ordered IDs but different topology/bind would be accepted. Extend here (indexed pose hot path \u002B skeleton compatibility). Downstream consumer TSK-0077 also relevant. F-208 (SkeletonSnapshot.Capture list-as-priority-queue readability, cs:109-123) is low-value; parent-before-child invariant already Done under TSK-0114 - optional. No duplicate task created.",
       "createdAtUtc": "2026-09-06T22:44:41.4008236Z"
+    },
+    {
+      "id": "c-21b43f0b7d1940b18b21a79c6815a263",
+      "author": "anonymous",
+      "body": "## Audit synthesis disposition (2026-09-07)\n\nFinal animation audit reconciliation confirms the reachable valid path has one inferred skeleton root: DefinitionValidator rejects null/empty Body data, and SkeletonInferrer links Body samples into one parent chain. This resolves the prior N-3 correctness question for valid authored creatures, but does not encode the contract at the generic SkeletonSnapshot boundary.\n\nRetain TSK-0118 as the owner. Extend its closure bar to enforce exactly one root in SkeletonSnapshot.Capture, expose a semantic RootIndex/RootBone accessor for consumers such as CreatureSkinnedMeshRenderer.Bind, and add focused 0-root and multi-root rejection tests. Keep the synthetic locomotion root deferred to a later pose-space/root-motion task. F-207 structural compatibility remains a separate closure blocker. Evidence: docs/audits/creaturecreator-animation-mvp-final-delta-audit-26-09-07-00-18-00.md and direct source verification of DefinitionValidator, SkeletonInferrer, SkeletonSnapshot, and CreatureSkinnedMeshRenderer.",
+      "createdAtUtc": "2026-09-07T05:19:30.4858583Z"
+    },
+    {
+      "id": "c-29c3118d6fc0498491416bc9fc2e8eba",
+      "author": "anonymous",
+      "body": "Sequential Sprint Round 1 bounded skeleton-contract slice implementation evidence (2026-09-07): SkeletonSnapshot.Capture now rejects zero or multiple roots and exposes RootIndex/RootBone; HasSameBoneOrder now requires matching ordered IDs, parent indices, semantic source/part/mirror fields, rest bind fields, segment and child-attachment structure; CreatureSkinnedMeshRenderer.Bind uses snapshot.RootIndex instead of inferring index 0. Focused SkeletonSnapshotTests add empty-root, multi-root, semantic-root, parent-topology, and semantic-identity coverage. Validation: dotnet build ProceduralCreature.Runtime.csproj --no-restore passed; dotnet build ProceduralCreature.Tests.Runtime.csproj --no-restore passed; get_errors reported no errors for all three changed files; git diff --check passed. Unity console was initially clean of errors, but focused PlayMode SkeletonSnapshotTests could not run because the connected Unity instance entered reload and then no Unity Editor instance was available. No commit/push. Residual risk: Unity test execution remains unverified until an editor reconnects; synthetic locomotion/root-motion remains intentionally deferred.",
+      "createdAtUtc": "2026-09-07T05:29:16.696028Z"
+    },
+    {
+      "id": "c-47d2b56efe9e4e78a089cbae949f984d",
+      "author": "anonymous",
+      "body": "Sequential sprint Round 1 implementation evidence (2026-09-07): SkeletonSnapshot now enforces exactly one root, exposes RootIndex/RootBone, CreatureSkinnedMeshRenderer consumes RootIndex, and HasSameBoneOrder compares ordered IDs plus parent indices and immutable structural/semantic fields. Added zero-root, multi-root, semantic-root, topology-mismatch, and semantic-identity tests. Review passed: bounded three-file diff, no unrelated changes, git diff --check passed. Validation: dotnet build ProceduralCreature.Runtime.csproj --no-restore passed; dotnet build ProceduralCreature.Tests.Runtime.csproj --no-restore passed; get_errors found none. Unity focused PlayMode test was not run because the Unity Editor disconnected/no instance was available. Status remains InProgress pending Unity gate and final broader animation confirmation. No commit/push per sprint policy.",
+      "createdAtUtc": "2026-09-07T05:29:52.0307475Z"
+    },
+    {
+      "id": "c-ff8c426375334a17bf3fe58c731b9f6c",
+      "author": "anonymous",
+      "body": "Round 2 sequential review (2026-09-07): reviewed current uncommitted TSK-0118 slice only; no files edited, no commit/push. Changed named source files: Assets/Scripts/Runtime/Skeleton/SkeletonSnapshot.cs, Assets/Scripts/Runtime/Skeleton/SemanticBoneResolver.cs, Assets/Scripts/Runtime/Animation/Skinned/CreatureSkinnedMeshRenderer.cs. Changed focused tests: Assets/Scripts/Tests/Runtime/SkeletonSnapshotTests.cs and Assets/Scripts/Tests/Runtime/SemanticBoneResolverTests.cs; CreatureSkinnedMeshRendererTests.cs was inspected and unchanged.\n\nSource review result: hypothesis supported. SkeletonSnapshot.Capture rejects null/empty IDs, duplicate IDs, missing parents, cycles, zero roots, and multi-root graphs; RootIndex and RootBone expose the semantic root; HasSameBoneOrder compares ordered IDs, parent indices/topology, SourcePartId, PartType, IsMirrored, rest position/rotation, segment/end data, and child-attachment data. CreatureSkinnedMeshRenderer.Bind consumes snapshot.RootIndex for rootBone and retains index-parallel rig transforms. Runtime ownership remains intact: resolver uses authoritative definition only at compatibility entry points and resolved snapshots for generation paths; no pose state or mutable generated state moved into the runtime snapshot boundary.\n\nExact validation: \u0060get_errors\u0060 on all six reviewed files -\u003E no errors; \u0060dotnet build ProceduralCreature.Runtime.csproj --no-restore\u0060 -\u003E exit 0; \u0060dotnet build ProceduralCreature.Tests.Runtime.csproj --no-restore\u0060 -\u003E exit 0; \u0060git diff --check\u0060 -\u003E exit 0. Unity test attempt: \u0060run_tests(mode=PlayMode, test_names=[SkeletonSnapshotTests, SemanticBoneResolverTests, CreatureSkinnedMeshRendererTests], init_timeout=120000)\u0060 started job \u006026d5531809684fd3a9230e76d8913844\u0060; \u0060get_test_job(wait_timeout=60, include_details=true)\u0060 failed with \u0060Could not connect to Unity\u0060. Project validation contract identifies Unity 6000.0.35f1; no connected editor was available to prove the PlayMode result. Static/source review did not identify a remaining TSK-0118 structural gap. Residual risk: Unity execution and the repeated ApplyPose allocation measurement remain unverified in this round; prior Round 1 evidence recorded 28/28 focused PlayMode and 0 allocated bytes, but this review does not re-claim it as a new run. Existing unrelated worktree changes were not touched. Next step: reconnect Unity 6000.0.35f1 and rerun the three focused PlayMode fixtures, then close TSK-0118 only after that gate.",
+      "createdAtUtc": "2026-09-07T05:57:26.2497826Z"
     }
   ],
   "epicId": null,
   "parentId": "TSK-0073",
   "dueDateUtc": null,
   "createdAtUtc": "2026-09-06T03:06:41.5219151Z",
-  "updatedAtUtc": "2026-09-06T22:44:41.4008236Z",
+  "updatedAtUtc": "2026-09-07T05:57:26.2497826Z",
   "completedAtUtc": null,
-  "revision": 6,
+  "revision": 11,
   "isArchived": false,
   "hasLoadError": false,
   "loadError": null,

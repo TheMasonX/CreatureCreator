@@ -44,16 +44,20 @@ namespace ProceduralCreature.Skeleton
         private readonly BoneSnapshot[] _bones;
         private readonly Dictionary<string, int> _indices;
         private readonly IReadOnlyList<int>[] _children;
+        private readonly int _rootIndex;
 
         public int Count => _bones.Length;
         public BoneSnapshot this[int index] => _bones[index];
+        public int RootIndex => _rootIndex;
+        public BoneSnapshot RootBone => _bones[_rootIndex];
 
         private SkeletonSnapshot(BoneSnapshot[] bones, Dictionary<string, int> indices,
-            IReadOnlyList<int>[] children)
+            IReadOnlyList<int>[] children, int rootIndex)
         {
             _bones = bones;
             _indices = indices;
             _children = children;
+            _rootIndex = rootIndex;
         }
 
         public static SkeletonSnapshot Capture(Skeleton skeleton)
@@ -124,6 +128,10 @@ namespace ProceduralCreature.Skeleton
             {
                 throw new DomainException("Skeleton contains a parent cycle.");
             }
+            if (roots.Count != 1)
+            {
+                throw new DomainException("Skeleton snapshot must contain exactly one root bone.");
+            }
 
             var orderedIndices = new Dictionary<string, int>(StringComparer.Ordinal);
             for (int i = 0; i < orderedBones.Count; i++)
@@ -152,7 +160,7 @@ namespace ProceduralCreature.Skeleton
             {
                 readOnlyChildren[i] = new ReadOnlyCollection<int>(children[i]);
             }
-            return new SkeletonSnapshot(bones, orderedIndices, readOnlyChildren);
+            return new SkeletonSnapshot(bones, orderedIndices, readOnlyChildren, orderedIndices[roots[0].Id]);
         }
 
         private static int CompareBonesById(Bone left, Bone right)
@@ -193,7 +201,22 @@ namespace ProceduralCreature.Skeleton
             if (other == null || other.Count != Count) return false;
             for (int i = 0; i < Count; i++)
             {
-                if (!string.Equals(_bones[i].Id, other._bones[i].Id, StringComparison.Ordinal)) return false;
+                BoneSnapshot left = _bones[i];
+                BoneSnapshot right = other._bones[i];
+                if (!string.Equals(left.Id, right.Id, StringComparison.Ordinal) ||
+                    left.ParentIndex != right.ParentIndex ||
+                    !string.Equals(left.SourcePartId, right.SourcePartId, StringComparison.Ordinal) ||
+                    left.PartType != right.PartType ||
+                    left.IsMirrored != right.IsMirrored ||
+                    left.Position != right.Position ||
+                    left.Rotation != right.Rotation ||
+                    left.HasSegment != right.HasSegment ||
+                    left.EndPosition != right.EndPosition ||
+                    left.HasChildAttachmentPosition != right.HasChildAttachmentPosition ||
+                    left.ChildAttachmentPosition != right.ChildAttachmentPosition)
+                {
+                    return false;
+                }
             }
             return true;
         }

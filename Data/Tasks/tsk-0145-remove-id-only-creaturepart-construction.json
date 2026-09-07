@@ -1,0 +1,51 @@
+﻿{
+  "id": "tsk-0145-remove-id-only-creaturepart-construction",
+  "key": "TSK-0145",
+  "title": "Remove ID-only CreaturePart construction from semantic bone helpers",
+  "description": "## Summary\n\nReplace resolved-consumer construction of throwaway \u0060CreaturePart\u0060 objects with ID-based semantic bone helper overloads.\n\n## User Mandate\n\n\u003E \u0022Review this external audit \u002B follow up delta audit and synthesize to durable tasks\u0022\n\nSTRICT. This task is created only as the durable owner for the confirmed audit mechanism. Preserve the supplied audit provenance and do not broaden into a resolver rewrite.\n\n## Scope\n\n- Add string/ID-based overloads for limb segment and joint bone-ID resolution where the implementation reads only \u0060CreaturePart.Id\u0060.\n- Migrate the three current resolved morphology/binding call sites.\n- Retain existing \u0060CreaturePart\u0060 overloads only where they carry meaningful domain data or compatibility is required.\n- Do not add a second semantic derivation path or change DNA semantics.\n\n## Acceptance Criteria\n\n- No resolved-consumer call site creates a \u0060CreaturePart\u0060 only to provide an ID to a helper.\n- ID-based overloads return the same bone IDs as the existing overloads for representative normal and mirrored parts.\n- Existing semantic resolver and morphology binding tests remain green.\n\n## Validation\n\nRun focused runtime tests for \u0060SemanticBoneResolver\u0060 and morphology binding, runtime and runtime-test builds, and \u0060git diff --check\u0060. Unity execution is required before status changes to Done.\n\n## Findings\n\nConfirmed from both supplied animation audits and current source. \u0060SemanticBoneResolver\u0060 and \u0060MorphologyInfluenceRadiusBridge\u0060 contain three ID-only \u0060CreaturePart\u0060 constructions. \u0060TSK-0124\u0060 is Done for shared decision authority and is not the owner of this separate API cleanup.\n\n## Blockers\n\nNone known.\n\n## Next Step\n\nInspect the helper overloads and migrate the three call sites with parity tests.",
+  "type": "Task",
+  "status": "InProgress",
+  "priority": "Medium",
+  "assigneeMode": "Custom",
+  "assigneeDirectoryId": null,
+  "assigneeCustomText": "Agent",
+  "reporter": "BeastMaster",
+  "labels": [
+    "user-mandated",
+    "runtime",
+    "animation",
+    "skeleton",
+    "resolver",
+    "binding",
+    "api-cleanup",
+    "audit-synthesis"
+  ],
+  "attachments": [],
+  "externalLinks": [],
+  "linkedPages": [],
+  "comments": [
+    {
+      "id": "c-fa12e52629c84570bf63a67e6c91b54c",
+      "author": "anonymous",
+      "body": "Round 3 sequential review (2026-09-07). Reviewed Assets/Scripts/README.md, the full TSK-0145 record, and the current uncommitted SemanticBoneResolver.cs / SemanticBoneResolverTests.cs diff. Implementation evidence: resolver adds ID-based overloads for ResolvePartRootBoneId, ResolveLimbSegmentBoneId, and ResolveLimbJointBoneId; existing CreaturePart overloads delegate to them, preserving public APIs. The parity test covers normal and mirrored parts and terminal resolution. Scoped multiline search \u0060rg -n -U --glob \u0027*.cs\u0027 \u0027new CreaturePart\\s*\\{\\s*Id\\s*=\u0027 Assets/Scripts/Runtime Assets/Scripts/Tests/Runtime\u0060 found no production-runtime matches; MorphologyInfluenceRadiusBridge uses \u0060ResolveLimbSegmentBoneId(part.Id, ...)\u0060. Validation: \u0060dotnet build ProceduralCreature.Runtime.csproj --no-restore\u0060 exit 0; \u0060dotnet build ProceduralCreature.Tests.Runtime.csproj --no-restore\u0060 exit 0; \u0060dotnet test ProceduralCreature.Tests.Runtime.csproj --no-restore --no-build --verbosity minimal\u0060 exit 0; \u0060git diff --check\u0060 exit 0. Unity Test Framework focused SemanticBoneResolver/morphology-binding run was not available because Unity.exe was not found in standard install locations. Project/skill target Unity version is 6000.0.35f1; test mode would be PlayMode runtime. No edit was made because no concrete acceptance gap was found. Residual risk: Unity-only test discovery/execution and morphology binding behavior remain unverified; task stays InProgress pending Unity validation.",
+      "createdAtUtc": "2026-09-07T06:01:23.5455677Z"
+    },
+    {
+      "id": "c-629e26ab5029463abccd3e02c32bae16",
+      "author": "anonymous",
+      "body": "Correction to the preceding evidence note: the repository ProjectSettings/ProjectVersion.txt reports Unity 6000.5.9f1 (revision b57deb96f08d). This is the exact project version for the required PlayMode Unity Test Framework run; Unity.exe remains unavailable in the standard install locations checked.",
+      "createdAtUtc": "2026-09-07T06:01:31.2802526Z"
+    }
+  ],
+  "epicId": null,
+  "parentId": "TSK-0077",
+  "dueDateUtc": null,
+  "createdAtUtc": "2026-09-07T05:19:42.0357783Z",
+  "updatedAtUtc": "2026-09-07T06:01:31.2802526Z",
+  "completedAtUtc": null,
+  "revision": 4,
+  "isArchived": false,
+  "hasLoadError": false,
+  "loadError": null,
+  "sourceFilePath": "tsk-0145-remove-id-only-creaturepart-construction.json"
+}

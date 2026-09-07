@@ -35,15 +35,21 @@
       "author": "anonymous",
       "body": "Synthesis evidence (2026-09-06 audit batch; see docs/audits/creaturecreator-audit-synthesis-2026-09-06-batch.md). Follow-up cleanups in the SemanticBoneResolver you collapsed (this Done record is the historical owner):\n- whole-codebase F-18 \u002B second-order F-209: synthetic \u0060new CreaturePart { Id = parent.Id }\u0060 at SemanticBoneResolver.cs:150 to format an ID for the resolved overload; a resolved ResolveLimbTerminalBoneId(CreaturePart, ResolvedLimb, mirrored) overload already exists, so the fix is small.\n- whole-codebase F-47 \u002B second-order F-210: raw overload kept as compatibility entry point \u002B facade still holds multiple identity/path policies; audit advises NO interface hierarchy.\nNo duplicate task created; folded into this task\u0027s residual scope / next edit of the class.",
       "createdAtUtc": "2026-09-06T22:44:41.4515651Z"
+    },
+    {
+      "id": "c-042e8a540a8a4b89b3dd12b1715ae217",
+      "author": "anonymous",
+      "body": "## Audit synthesis disposition (2026-09-07)\n\nN-1 is not reopened onto this Done task. TSK-0124 correctly owns raw-vs-snapshot decision duplication and remains closed for that scope. The remaining ID-only throwaway CreaturePart construction is a separate API contract cleanup with three current call sites and will receive its own bounded owner. This preserves the historical relationship without changing TSK-0124 status.",
+      "createdAtUtc": "2026-09-07T05:19:30.5402508Z"
     }
   ],
   "epicId": null,
   "parentId": "tsk-0095-establish-concrete-generation-pipeline-stage-boundaries",
   "dueDateUtc": null,
   "createdAtUtc": "2026-09-06T04:25:46.4310212Z",
-  "updatedAtUtc": "2026-09-06T22:44:41.4515651Z",
+  "updatedAtUtc": "2026-09-07T05:19:30.5402508Z",
   "completedAtUtc": "2026-09-06T06:09:17.8249322Z",
-  "revision": 4,
+  "revision": 5,
   "isArchived": false,
   "hasLoadError": false,
   "loadError": null,

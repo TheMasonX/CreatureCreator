@@ -32,6 +32,8 @@ namespace ProceduralCreature.Morphology.Extraction
     /// </summary>
     public static partial class MarchingCubesExtractor
     {
+        private const float CoarseLoopSuppressionCellSize = 0.2f;
+
         public static MeshExtractionResult Extract(DensityGrid grid)
         {
             return Extract(grid, collectTimings: false);
@@ -134,6 +136,15 @@ namespace ProceduralCreature.Morphology.Extraction
             if (loop == null || loop.Count < 3)
             {
                 return true;
+            }
+
+            // This heuristic is only for genuinely coarse preview grids. Applying
+            // it at normal resolutions removes valid small surface loops (notably
+            // around rounded poles and small creature parts), which opens holes in
+            // otherwise closed meshes.
+            if (grid.CellSize < CoarseLoopSuppressionCellSize)
+            {
+                return false;
             }
 
             // Coarse preview sampling can resolve a tiny under-sampled feature as a

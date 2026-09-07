@@ -116,7 +116,7 @@ namespace ProceduralCreature.Animation.Skinned
             // Author welded-surface weights once at bind time (TSK-0131 consumes the shared
             // SkeletonSnapshot.Capture bone-index contract; this adapter owns the radius bridge).
             List<BoneSegmentInfluence> segments =
-                ImplicitSurfaceWeightAuthoring.BuildSegmentInfluences(snapshot, radiiByBoneIndex);
+                ImplicitSurfaceWeightAuthoring.BuildBindingInfluences(snapshot, radiiByBoneIndex);
             VertexInfluence[][] weights = ImplicitSurfaceWeightAuthoring.Author(segments, restVertices);
 
             Matrix4x4[] bindposes = SkinnedMeshBindingBuilder.ComputeBindposes(snapshot);
@@ -132,7 +132,7 @@ namespace ProceduralCreature.Animation.Skinned
             skinnedObject.transform.SetParent(transform, worldPositionStays: false);
             SkinnedMeshRenderer renderer = skinnedObject.AddComponent<SkinnedMeshRenderer>();
             renderer.sharedMesh = skinnedMesh;
-            renderer.rootBone = rig.IndexedBones[0];
+            renderer.rootBone = rig.IndexedBones[snapshot.RootIndex];
             var bones = new Transform[rig.IndexedBones.Count];
             for (int i = 0; i < bones.Length; i++) bones[i] = rig.IndexedBones[i];
             renderer.bones = bones;

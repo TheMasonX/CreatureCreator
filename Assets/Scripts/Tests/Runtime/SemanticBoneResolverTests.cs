@@ -3,6 +3,7 @@ using System.Linq;
 using NUnit.Framework;
 using UnityEngine;
 using ProceduralCreature.Definition;
+using ProceduralCreature.Morphology;
 using ProceduralCreature.Skeleton;
 
 namespace ProceduralCreature.Tests.Runtime
@@ -186,6 +187,35 @@ namespace ProceduralCreature.Tests.Runtime
                 Assert.IsNotNull(mirrored, $"Mirrored limb segment bone '{segmentId}' must exist in the inferred skeleton.");
                 Assert.IsTrue(mirrored.IsMirrored);
             }
+        }
+
+        [Test]
+        public void IdBasedLimbHelpers_MatchDomainOverloads_ForNormalAndMirroredParts()
+        {
+            CreatureDefinition definition = BuildDefinition();
+            CreaturePart arm = definition.FindPart("part_arm");
+            CreaturePart mirroredLimb = definition.FindPart("part_leg2");
+            ResolvedLimb resolvedArm = ResolvedLimb.Resolve(arm.Limb);
+
+            foreach (CreaturePart part in new[] { arm, mirroredLimb })
+            {
+                foreach (bool mirrored in new[] { false, true })
+                {
+                    Assert.AreEqual(
+                        SemanticBoneResolver.ResolveLimbSegmentBoneId(part, 1, mirrored),
+                        SemanticBoneResolver.ResolveLimbSegmentBoneId(part.Id, 1, mirrored));
+                    Assert.AreEqual(
+                        SemanticBoneResolver.ResolveLimbJointBoneId(part, 2, mirrored),
+                        SemanticBoneResolver.ResolveLimbJointBoneId(part.Id, 2, mirrored));
+                }
+            }
+
+            Assert.AreEqual(
+                SemanticBoneResolver.ResolveLimbTerminalBoneId(arm, resolvedArm, mirrored: false),
+                SemanticBoneResolver.ResolveLimbTerminalBoneId(arm.Id, resolvedArm, mirrored: false));
+            Assert.AreEqual(
+                SemanticBoneResolver.ResolveLimbTerminalBoneId(arm, resolvedArm, mirrored: true),
+                SemanticBoneResolver.ResolveLimbTerminalBoneId(arm.Id, resolvedArm, mirrored: true));
         }
 
         [Test]
