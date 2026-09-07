@@ -133,8 +133,8 @@ namespace ProceduralCreature.Tests.Runtime
             definitionB.SymmetryMode = definitionA.SymmetryMode;
             definitionB.Forward = definitionA.Forward;
             definitionB.Body = definitionA.Body.Clone();
-            definitionB.AddPart(definitionA.Parts[1].Clone()); // leg first
-            definitionB.AddPart(definitionA.Parts[0].Clone()); // body second
+            definitionB.AddPart(definitionA.Parts[1].Clone());
+            definitionB.AddPart(definitionA.Parts[0].Clone());
 
             string jsonA = _serializer.Serialize(definitionA);
             string jsonB = _serializer.Serialize(definitionB);
@@ -165,7 +165,7 @@ namespace ProceduralCreature.Tests.Runtime
         [Test]
         public void Deserialize_ThrowsOnMissingRequiredField()
         {
-            const string json = "{\"schemaVersion\":2,\"symmetryMode\":\"None\"}"; // missing bounds/generation/body/parts
+            const string json = "{\"schemaVersion\":2,\"symmetryMode\":\"None\"}";
             Assert.Throws<DnaDeserializationException>(() => _serializer.Deserialize(json));
         }
 
@@ -235,6 +235,25 @@ namespace ProceduralCreature.Tests.Runtime
             Assert.AreEqual(1f, shape.CapsuleHeight, 1e-4f);
             Assert.AreEqual(new Vector3(0.5f, 0.5f, 0.5f), shape.EllipsoidRadii);
             Assert.AreEqual(new Vector3(0.5f, 0.5f, 0.5f), shape.BoxHalfExtents);
+        }
+
+        [Test]
+        public void RoundTrip_PreservesAllJsonControlCharactersInStringValues()
+        {
+            CreatureDefinition definition = MakeTwoPartDefinition();
+            definition.FindPart("part_leg").DisplayName =
+                "control" + '\u0000' + '\u0001' + '\u0002' + '\u0003' + '\u0004' + '\u0005' + '\u0006' +
+                '\u0007' + '\u0008' + '\u000b' + '\u000c' + '\u000e' + '\u000f' + '\u0010' + '\u0011' +
+                '\u0012' + '\u0013' + '\u0014' + '\u0015' + '\u0016' + '\u0017' + '\u0018' + '\u0019' +
+                '\u001a' + '\u001b' + '\u001c' + '\u001d' + '\u001e' + '\u001f';
+
+            string json = _serializer.Serialize(definition);
+            CreatureDefinition reconstructed = _serializer.Deserialize(json);
+
+            Assert.AreEqual(definition.FindPart("part_leg").DisplayName,
+                reconstructed.FindPart("part_leg").DisplayName);
+            StringAssert.Contains("\\u0000", json);
+            StringAssert.Contains("\\u001f", json);
         }
     }
 }
