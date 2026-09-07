@@ -27,13 +27,14 @@ namespace ProceduralCreature.Animation
         private SkeletonSnapshot _restSkeleton;
         private SkeletonSnapshot _validatedPoseSkeleton;
         private Transform[] _indexedBones = new Transform[0];
+        private IReadOnlyList<Transform> _indexedBonesView = Array.AsReadOnly(new Transform[0]);
         private Quaternion[] _indexedRotations = new Quaternion[0];
 
         public IReadOnlyDictionary<string, Transform> Bones =>
             _readOnlyBones ?? (_readOnlyBones = new ReadOnlyDictionary<string, Transform>(_bones));
 
         public SkeletonSnapshot RestSkeleton => _restSkeleton;
-        public IReadOnlyList<Transform> IndexedBones => _indexedBones;
+        public IReadOnlyList<Transform> IndexedBones => _indexedBonesView;
 
         public bool TryGetBone(string boneId, out Transform bone)
         {
@@ -87,6 +88,7 @@ namespace ProceduralCreature.Animation
             _restSkeleton = nextSkeleton;
             _validatedPoseSkeleton = null;
             _indexedBones = nextIndexedBones;
+            _indexedBonesView = Array.AsReadOnly(nextIndexedBones);
             _indexedRotations = new Quaternion[nextSkeleton.Count];
         }
 
@@ -125,6 +127,7 @@ namespace ProceduralCreature.Animation
             _restSkeleton = null;
             _validatedPoseSkeleton = null;
             _indexedBones = new Transform[0];
+            _indexedBonesView = Array.AsReadOnly(_indexedBones);
             _indexedRotations = new Quaternion[0];
         }
 
