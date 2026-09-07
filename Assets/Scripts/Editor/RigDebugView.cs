@@ -84,7 +84,15 @@ namespace ProceduralCreature.Editor
                 float width = selected ? _lineWidth * 2f : _lineWidth;
                 Handles.color = selected ? Color.yellow : Color.white;
 
-                if (boneData.ParentIndex >= 0 && boneData.ParentIndex < bones.Count)
+                if (boneData.HasSegment && boneData.EndPosition != boneData.Position)
+                {
+                    // A segment bone owns an explicit semantic [Position, EndPosition]
+                    // interval. Draw that interval directly; deriving it from the
+                    // parent/child Transform links loses leaf segments such as the
+                    // compact tail and can visually shift segment endpoints.
+                    Handles.DrawAAPolyLine(width, boneData.Position, boneData.EndPosition);
+                }
+                else if (boneData.ParentIndex >= 0 && boneData.ParentIndex < bones.Count)
                 {
                     Transform parent = bones[boneData.ParentIndex];
                     if (parent != null)
