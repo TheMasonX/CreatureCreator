@@ -62,17 +62,15 @@ namespace ProceduralCreature.Animation.Binding
                         ? spec.Radius
                         : ImplicitSurfaceWeightAuthoring.DefaultInfluenceRadius;
 
-                    // The compact anatomical rig intentionally reduces a dense Body
-                    // spline to a few long bones. A bone is a skinning proxy for the
-                    // entire spline interval it represents, so its influence tube must
-                    // also cover the curvature between the authored centerline and the
-                    // straight bone chord. Otherwise valid Body surface vertices can
-                    // fall outside every compact-bone influence range.
-                    if (spec.HasSegment && spec.EndT > spec.StartT)
+                    // A compact anatomical bone is a skinning proxy for the full
+                    // morphology interval it represents. The radius therefore has to
+                    // cover any centerline-to-chord deviation plus the local sample
+                    // radius. Use the canonical interval regardless of whether this is
+                    // a headward/spine or tailward bone.
+                    if (spec.HasSegment)
                     {
                         radius = Mathf.Max(radius, ResolveBodyProxyRadius(spec, snapshot.Body, snapshot.Forward));
                     }
-
                     result[boneIndex] = radius;
                 }
             }
@@ -130,8 +128,7 @@ namespace ProceduralCreature.Animation.Binding
                 float canonicalT = storedHeadToTail ? storedT : 1f - storedT;
                 if (canonicalT < minT || canonicalT > maxT) continue;
 
-                float distance = DistanceToSegment(
-                    body.SamplePositions[i], bone.Position, bone.EndPosition);
+                float distance = DistanceToSegment(body.SamplePositions[i], bone.Position, bone.EndPosition);
                 float sampleRadius = body.SampleRadii != null && i < body.SampleRadii.Count
                     ? body.SampleRadii[i]
                     : bone.Radius;
@@ -163,8 +160,10 @@ namespace ProceduralCreature.Animation.Binding
         private static bool IsStoredHeadToTail(IReadOnlyList<Vector3> positions, Vector3 forward)
         {
             if (positions == null || positions.Count < 2) return true;
-            return Vector3.Dot(positions[positions.Count - 1], forward)
-                >= Vector3.Dot(positions[0], forward);
+            // Creature Forward points from tail toward head. Sample 0 is therefore
+            // headward when its forward projection is greater than the last sample's.
+            return Vector3.Dot(positions[0], forward)
+                >= Vector3.Dot(positions[positions.Count - 1], forward);
         }
 
         private static float ResolveSegmentRadius(ResolvedLimb limb, int segmentIndex)
