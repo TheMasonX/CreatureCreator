@@ -52,31 +52,59 @@ namespace ProceduralCreature.Animation.Skinned
             Matrix4x4[] bindposes = SkinnedMeshBindingBuilder.ComputeBindposes(snapshot);
             BoneWeight[] boneWeights = SkinnedMeshBindingBuilder.BuildBoneWeights(weights, snapshot.Count);
 
-            Clear();
-            Mesh skinnedMesh = BuildSkinningMeshCopy(sourceMesh, bindposes, boneWeights);
-            _ownedMeshes.Add(skinnedMesh);
-
-            var skinnedObject = new GameObject(SkinnedObjectName);
-            skinnedObject.transform.SetParent(transform, worldPositionStays: false);
-            SkinnedMeshRenderer renderer = skinnedObject.AddComponent<SkinnedMeshRenderer>();
-            renderer.sharedMesh = skinnedMesh;
-            renderer.rootBone = rig.IndexedBones[snapshot.RootIndex];
-            var bones = new Transform[rig.IndexedBones.Count];
-            for (int i = 0; i < bones.Length; i++) bones[i] = rig.IndexedBones[i];
-            renderer.bones = bones;
-            renderer.enabled = false;
-            if (materials != null)
+            // Build the replacement completely before touching the existing valid bind.
+            // Binding can be expensive on large welded meshes; a later Unity allocation
+            // or mesh-copy failure must not leave the preview unrenderable. Commit the
+            // new presentation only after every step below succeeds.
+            Mesh skinnedMesh = null;
+            GameObject skinnedObject = null;
+            try
             {
-                var resolved = new Material[Mathf.Max(1, sourceMesh.subMeshCount)];
-                for (int i = 0; i < resolved.Length; i++) resolved[i] = i < materials.Count ? materials[i] : null;
-                renderer.sharedMaterials = resolved;
-            }
+                skinnedMesh = BuildSkinningMeshCopy(sourceMesh, bindposes, boneWeights);
 
-            _renderer = renderer;
-            _bones = bones;
-            _bonesView = Array.AsReadOnly(bones);
-            _rig = rig;
-            _generatedObjects.Add(skinnedObject);
+                skinnedObject = new GameObject(SkinnedObjectName);
+                skinnedObject.transform.SetParent(transform, worldPositionStays: false);
+                SkinnedMeshRenderer renderer = skinnedObject.AddComponent<SkinnedMeshRenderer>();
+                renderer.sharedMesh = skinnedMesh;
+                renderer.rootBone = rig.IndexedBones[snapshot.RootIndex];
+                var bones = new Transform[rig.IndexedBones.Count];
+                for (int i = 0; i < bones.Length; i++) bones[i] = rig.IndexedBones[i];
+                renderer.bones = bones;
+                renderer.enabled = false;
+                if (materials != null)
+                {
+                    var resolved = new Material[Mathf.Max(1, sourceMesh.subMeshCount)];
+                    for (int i = 0; i < resolved.Length; i++) resolved[i] = i < materials.Count ? materials[i] : null;
+                    renderer.sharedMaterials = resolved;
+                }
+
+                // Commit: the new Unity presentation is valid. Only now destroy the
+                // previous bind. This keeps rebinding failure-safe without changing the
+                // per-frame animation path.
+                Clear();
+
+                _renderer = renderer;
+                _bones = bones;
+                _bonesView = Array.AsReadOnly(bones);
+                _rig = rig;
+                _ownedMeshes.Add(skinnedMesh);
+                _generatedObjects.Add(skinnedObject);
+                return;
+            }
+            catch
+            {
+                if (skinnedObject != null)
+                {
+                    if (Application.isPlaying) Destroy(skinnedObject);
+                    else DestroyImmediate(skinnedObject);
+                }
+                else if (skinnedMesh != null)
+                {
+                    if (Application.isPlaying) Destroy(skinnedMesh);
+                    else DestroyImmediate(skinnedMesh);
+                }
+                throw;
+            }
         }
 
         public void Clear()
