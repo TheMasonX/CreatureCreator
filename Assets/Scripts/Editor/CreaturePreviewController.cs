@@ -220,7 +220,7 @@ namespace ProceduralCreature.Editor
                 snapshotForBinding, snapshot);
 
             InfluenceDomain[] vertexDomains = ImplicitSurfaceInfluenceDomainResolver.Resolve(
-                snapshot, sourceMesh.vertices);
+                snapshotDefinition: null, snapshot, sourceMesh.vertices);
 
             Material defaultMaterial = _defaultMaterialResolver();
             Material[] materials = defaultMaterial != null ? new[] { defaultMaterial } : null;
