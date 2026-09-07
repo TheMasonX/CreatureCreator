@@ -28,18 +28,7 @@ namespace ProceduralCreature.Editor
     /// </summary>
     internal sealed class CreaturePreviewController : IDisposable
     {
-        /// <summary>
-        /// Display-only name for a freshly created preview root. Identity and
-        /// ownership are structural (an entity handle persisted in
-        /// <see cref="SessionState"/>), never derived from this name.
-        /// </summary>
         private const string PreviewObjectName = "CreatureCreator Preview";
-
-        // Structural ownership handles. These persist across domain reload so a
-        // reloaded controller recovers its preview by the recorded entity
-        // identity instead of by a human-readable scene name. EntityId is Unity
-        // 6000's stable object identity (the instance-ID successor) and round-trips
-        // through ulong for storage in SessionState.
         internal const string RootEntityKey = "ProceduralCreature.Editor.Preview.RootEntityId";
         internal const string GeometryEntityIdsKey = "ProceduralCreature.Editor.Preview.GeometryEntityIds";
 
@@ -79,8 +68,6 @@ namespace ProceduralCreature.Editor
 
             while (_scheduler.TryTakeCompleted(out CreatureGenerationResult result))
             {
-                // A7.2: only a current result whose generated snapshot still
-                // matches the live definition may replace the preview.
                 if (!result.Succeeded)
                 {
                     bool isCurrent = _requestState.IsCurrentRequest(result.Sequence);
@@ -130,9 +117,6 @@ namespace ProceduralCreature.Editor
             for (int i = 1; i < generated.Geometry.Count; i++)
             {
                 GeometryItem item = generated.Geometry[i];
-                // The child name is display-only; ownership is carried by the
-                // registered entity handle, so cleanup never depends on a name
-                // prefix.
                 var child = new GameObject("Preview Mesh " + i);
                 child.transform.SetParent(PreviewGameObject.transform, worldPositionStays: false);
                 child.AddComponent<MeshFilter>().sharedMesh = item.Mesh;
@@ -142,13 +126,6 @@ namespace ProceduralCreature.Editor
             }
         }
 
-        /// <summary>
-        /// Recovers an existing preview root left in the scene by a previous
-        /// controller instance (for example across a domain reload). Discovery is
-        /// by the recorded structural entity handle, never by object name, so an
-        /// unrelated object that merely shares the display name is never adopted.
-        /// Returns null when no recoverable owned root exists.
-        /// </summary>
         public GameObject RecoverExistingPreview()
         {
             if (PreviewGameObject != null) return PreviewGameObject;
@@ -159,8 +136,6 @@ namespace ProceduralCreature.Editor
             GameObject root = EditorUtility.EntityIdToObject(handle) as GameObject;
             if (root == null)
             {
-                // Stale handle: the recorded root no longer exists. Drop it so a
-                // later create registers a fresh identity.
                 SessionState.EraseString(RootEntityKey);
                 return null;
             }
@@ -202,6 +177,7 @@ namespace ProceduralCreature.Editor
                 throw new DomainException("Preview definition did not produce a skeleton for the implicit surface.");
             }
 
+            SkeletonSnapshot snapshotForBinding = SkeletonSnapshot.Capture(skeleton);
             CreatureRig rig = PreviewGameObject.GetComponent<CreatureRig>();
             if (rig == null) rig = PreviewGameObject.AddComponent<CreatureRig>();
             rig.Build(skeleton);
@@ -215,10 +191,21 @@ namespace ProceduralCreature.Editor
             }
 
             float[] radiiByBoneIndex = MorphologyInfluenceRadiusBridge.BuildRadiiByBoneIndex(
-                SkeletonSnapshot.Capture(skeleton), snapshot);
+                snapshotForBinding, snapshot);
+
+            // IMPORTANT: the editor preview must use the same resolved influence-domain
+            // contract as the runtime preview. Without this, the welded implicit surface
+            // is globally weighted against every bone, so a mirrored attachment (for
+            // example the right fox foot) can select the unmirrored/left leg as one of
+            // its top-four influences and move when only the opposite leg is posed.
+            // Domain resolution is build-time only; it adds no work to ApplyPose.
+            InfluenceDomain[] vertexDomains = ImplicitSurfaceInfluenceDomainResolver.Resolve(
+                definition, snapshot, sourceMesh.vertices);
+
             Material defaultMaterial = _defaultMaterialResolver();
             Material[] materials = defaultMaterial != null ? new[] { defaultMaterial } : null;
-            skinnedRenderer.Bind(rig, skeleton, sourceMesh, radiiByBoneIndex, materials);
+            skinnedRenderer.Bind(
+                rig, skeleton, sourceMesh, radiiByBoneIndex, materials, vertexDomains);
             if (skinnedRenderer.Renderer != null) skinnedRenderer.Renderer.enabled = true;
         }
 
@@ -243,10 +230,6 @@ namespace ProceduralCreature.Editor
 
         private void ClearGeometryObjects()
         {
-            // Destroy only children this controller explicitly created and
-            // registered. Ownership is the recorded entity handle, never inferred
-            // from a child's display name, so an unrelated prefixed object
-            // survives (TSK-0122).
             List<ulong> owned = ReadOwnedGeometryEntities();
             for (int i = owned.Count - 1; i >= 0; i--)
             {
