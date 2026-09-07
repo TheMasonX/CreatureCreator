@@ -2,7 +2,7 @@
   "id": "tsk-0149-build-depth-independent-rig-debug-view",
   "key": "TSK-0149",
   "title": "Build a depth-independent rig debug view for skeleton inspection",
-  "description": "## Summary\nExtend skeleton display into a usable SceneView rig-debug presentation so pose, topology, and weighting changes can be inspected without navigating generated Unity hierarchy.\n\n## Current implementation\n`RigDebugView` provides x-ray visibility, adjustable bone width, selected-bone emphasis, click selection, semantic labels plus stable IDs, whole-skeleton/selected-chain/body/legs/selected-bone focus, and snapshot-based chain discovery. It uses the live `CreatureRig.RestSkeleton` and indexed transforms rather than re-resolving editor-session DNA. `CreatureRig` also exposes `TryGetBone` and a read-only map boundary.\n\n## Acceptance\n- Bones remain visible through the generated mesh.\n- Skeleton, selected chain, body, legs, and selected bone can be framed directly.\n- Selected bones are distinguishable by shape/thickness as well as color.\n- Machine IDs and semantic display names are available.\n- Focus behavior is based on the live generated rig, not stale editor state.\n- Manual Unity SceneView validation is still required before closure.\n\n## Scope limits\nDo not move morphology topology, weighting ownership, or foot-grounding logic into this task. Full mesh suppression and pose-preview controls remain deferred until the basic debug presentation is visually validated.\n\n## Status\nInProgress: implementation landed; Unity visual validation remains open.\n\n## Evidence\nSee the skeleton/animation visualization, implementation delta, and next-round audit documents under `docs/audits/` on branch `audit/skeleton-animation-improvements-2026-09-07`.",
+  "description": "## Summary\nExtend skeleton display into a usable SceneView rig-debug presentation so pose, topology, and weighting changes can be inspected without navigating generated Unity hierarchy.\n\n## Explicit anatomy requirement\nThe debug workflow must remain generic: it must not assume biped, quadruped, legs, or a fixed limb count. Any articulated limb chain must be discoverable, selectable, labeled, and focusable through structural skeleton metadata rather than PartType-specific branches.\n\n## Current implementation\n`RigDebugView` provides x-ray visibility, adjustable bone width, selected-bone emphasis, click selection, semantic labels plus stable IDs, whole-skeleton/selected-chain/body/limb/selected-bone focus, and snapshot-based chain discovery. It uses the live `CreatureRig.RestSkeleton` and indexed transforms rather than re-resolving editor-session DNA. `CreatureRig` also exposes `TryGetBone` and a read-only map boundary.\n\n## Acceptance\n- Bones remain visible through the generated mesh.\n- Skeleton, selected chain, body, all articulated limbs, and selected bone can be framed directly.\n- Selected bones are distinguishable by shape/thickness as well as color.\n- Machine IDs and semantic display names are available.\n- Focus behavior is based on the live generated rig, not stale editor state.\n- No biped/quadruped/leg-count assumption is encoded in the debug view.\n- Manual Unity SceneView validation is still required before closure.\n\n## Scope limits\nDo not move morphology topology, weighting ownership, or foot-grounding logic into this task. Full mesh suppression and pose-preview controls remain deferred until the basic debug presentation is visually validated.\n\n## Status\nInProgress: generic implementation landed; Unity visual validation remains open.\n\n## Evidence\nSee the skeleton/animation visualization, implementation delta, and next-round audit documents under `docs/audits/` on branch `audit/skeleton-animation-improvements-2026-09-07`.",
   "type": "Task",
   "status": "InProgress",
   "priority": "High",
@@ -27,15 +27,20 @@
       "author": "anonymous",
       "body": "Sequential implementation rounds completed: standalone x-ray SceneView rig overlay, adjustable thickness, semantic labels plus IDs, direct selection, skeleton/chain/body/leg/selected-bone framing, and live-snapshot ownership. Unity visual validation remains the closure gate.",
       "createdAtUtc": "2026-09-07T11:30:00Z"
+    },
+    {
+      "id": "c-20260907-arbitrary-limb-debug",
+      "author": "anonymous",
+      "body": "Generalized the debug presentation to the same arbitrary-limb invariant as runtime rigging: removed the hard-coded Focus Legs control and PartType.Leg/Foot label filter. `Focus Limbs` now discovers articulated bones structurally via segment/attachment metadata, so wings, arms, tentacles, antennae, multiple leg sets, and other supported chains do not require new editor modes.",
+      "createdAtUtc": "2026-09-07T12:55:00Z"
     }
   ],
-  "epicId": null,
   "parentId": "TSK-0073",
   "dueDateUtc": null,
   "createdAtUtc": "2026-09-07T06:27:32.4549774Z",
-  "updatedAtUtc": "2026-09-07T11:30:00Z",
+  "updatedAtUtc": "2026-09-07T12:55:00Z",
   "completedAtUtc": null,
-  "revision": 4,
+  "revision": 5,
   "isArchived": false,
   "hasLoadError": false,
   "loadError": null,
