@@ -25,6 +25,7 @@ namespace ProceduralCreature.Animation
         private ReadOnlyDictionary<string, Transform> _readOnlyBones;
         private readonly List<GameObject> _generatedObjects = new List<GameObject>();
         private SkeletonSnapshot _restSkeleton;
+        private SkeletonSnapshot _validatedPoseSkeleton;
         private Transform[] _indexedBones = new Transform[0];
         private Quaternion[] _indexedRotations = new Quaternion[0];
 
@@ -84,6 +85,7 @@ namespace ProceduralCreature.Animation
             }
             _generatedObjects.AddRange(nextGeneratedObjects);
             _restSkeleton = nextSkeleton;
+            _validatedPoseSkeleton = null;
             _indexedBones = nextIndexedBones;
             _indexedRotations = new Quaternion[nextSkeleton.Count];
         }
@@ -93,7 +95,20 @@ namespace ProceduralCreature.Animation
             if (_restSkeleton == null) throw new DomainException("Build must be called before ApplyPose.");
             if (pose == null) throw new DomainException("pose must not be null.");
 
-            PoseRotationResolver.ResolveInto(_restSkeleton, pose, _indexedRotations);
+            // Compatibility is a structural contract, but it does not change while
+            // a PosedSkeleton is derived from its immutable snapshot. Validate a new
+            // snapshot once, then keep the steady-state animation loop indexed and
+            // allocation-free.
+            if (!ReferenceEquals(_validatedPoseSkeleton, pose.Skeleton))
+            {
+                if (!_restSkeleton.HasSameBoneOrder(pose.Skeleton))
+                {
+                    throw new DomainException("pose must use the same bone structure as the built rest skeleton.");
+                }
+                _validatedPoseSkeleton = pose.Skeleton;
+            }
+
+            PoseRotationResolver.ResolveIntoCompatible(_restSkeleton, pose, _indexedRotations);
             for (int i = 0; i < _restSkeleton.Count; i++)
             {
                 Transform boneTransform = _indexedBones[i];
@@ -108,6 +123,7 @@ namespace ProceduralCreature.Animation
             _generatedObjects.Clear();
             _bones.Clear();
             _restSkeleton = null;
+            _validatedPoseSkeleton = null;
             _indexedBones = new Transform[0];
             _indexedRotations = new Quaternion[0];
         }
