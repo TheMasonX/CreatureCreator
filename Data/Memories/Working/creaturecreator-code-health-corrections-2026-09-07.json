@@ -1,0 +1,25 @@
+{
+  "Id": "creaturecreator-code-health-corrections-2026-09-07",
+  "Content": "Fresh code-health corrections for the 2026-09-07 animation-MVP branch. Use this record to supersede stale statements in older Working memories when they conflict with current source. [C] GeneratedCreature no longer exposes MainMesh; production callers use TryGetImplicitSurface and the old accessor remains only as a regression assertion. [C] GeneratedCreatureData now defensively copies its Color[] input and exposes IReadOnlyList<Color>; CreatureMeshGenerator materializes a copy only at the Unity Mesh.SetColors boundary. [C] GenerationDiagnostics now exposes genuine read-only views and marks FailedStage for every exception escaping a timed stage, so Succeeded remains consistent with the scheduler's all-exceptions failure model. [C] ValidationResult caches IsValid and exposes a read-only issue view. [C] SkeletonSnapshot enforces exactly one root, parent-before-child ordering, and structural compatibility checks. [C] SkeletonSnapshot pending ordering is now implemented with a SortedSet keyed by the existing ordinal bone-ID comparer, preserving observable ordering while removing RemoveAt(0) and repeated whole-list sorting. [C] explicit terminal limb joint nodes exist for every LimbChain; the terminal node is the authored final joint, so missing ankle/wrist nodes are not invented and child attachment routes through the terminal joint. [C] compact body rig topology is independent of body sampling density, and its body-spine radius uses the midpoint of the spine's own canonical interval. [C] RigDebugView lazily initializes GUIStyle and preserves Unity Selection during framing operations. [I/C] Bone and Skeleton remain mutable builder-side derived-state objects; future migration should introduce an internal builder or immutable constructed representation only with compatibility tests, because SkeletonSnapshot is the current runtime compatibility boundary. [C] TSK-0153 grounding is intentionally not implemented until designated foot contact geometry has one explicit source-of-truth; lowest-vertex or arbitrary-foot-origin heuristics are prohibited by the task contract.\n\nDurable engineering preference: prefer narrow reusable utility methods and bridges, eliminate duplicate policy implementations, consolidate raw/resolved entry points at the resolved snapshot boundary, and harden collection/result handoff boundaries against mutation. Track each concrete finding with a tsk-#### record before closing it. Do not claim Unity-gated completion from source or dotnet build evidence alone. When MemorySmith is unavailable, hand-maintained Data/Memories JSON on the isolated audit branch is the fallback and should include provenance, confidence, source links, and explicit supersession/correction language.",
+  "Title": "CreatureCreator Current Code-Health Corrections",
+  "Status": 1,
+  "Confidence": 0.97,
+  "Tags": ["creaturecreator","code-health","animation","deduplication","immutability","skeleton","generation","kind:working"],
+  "References": ["creaturecreator-animation-mvp-code-health","creaturecreator-architecture-and-invariants","creaturecreator-geometry-sources-output"],
+  "Conflicts": ["creaturecreator-geometry-sources-output/MainMesh-current-shim", "creaturecreator-architecture-and-invariants/GeneratedCreatureData-shallow-array-boundary"],
+  "Relationships": [
+    {"sourceId":"creaturecreator-code-health-corrections-2026-09-07","targetId":"creaturecreator-animation-mvp-code-health","relationType":0,"origin":0,"createdAtUtc":"2026-09-07T12:00:00Z"},
+    {"sourceId":"creaturecreator-code-health-corrections-2026-09-07","targetId":"creaturecreator-architecture-and-invariants","relationType":0,"origin":0,"createdAtUtc":"2026-09-07T12:00:00Z"},
+    {"sourceId":"creaturecreator-code-health-corrections-2026-09-07","targetId":"creaturecreator-geometry-sources-output","relationType":0,"origin":0,"createdAtUtc":"2026-09-07T12:00:00Z"}
+  ],
+  "SourceLinks": [
+    {"Label":"generated data","Uri":"Assets/Scripts/Runtime/Generation/GeneratedCreatureData.cs","StartLine":null,"EndLine":null},
+    {"Label":"generator","Uri":"Assets/Scripts/Runtime/Generation/CreatureMeshGenerator.cs","StartLine":null,"EndLine":null},
+    {"Label":"diagnostics","Uri":"Assets/Scripts/Runtime/Generation/GenerationDiagnostics.cs","StartLine":null,"EndLine":null},
+    {"Label":"validation result","Uri":"Assets/Scripts/Runtime/Definition/ValidationResult.cs","StartLine":null,"EndLine":null},
+    {"Label":"skeleton snapshot","Uri":"Assets/Scripts/Runtime/Skeleton/SkeletonSnapshot.cs","StartLine":null,"EndLine":null},
+    {"Label":"takeover audit","Uri":"docs/audits/creaturecreator-animation-mvp-takeover-audit-26-09-07-06-22-00.md","StartLine":null,"EndLine":null}
+  ],
+  "UsageCount": 0,
+  "LastUpdated": "2026-09-07T12:00:00Z"
+}
