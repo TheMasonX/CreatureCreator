@@ -161,6 +161,22 @@ namespace ProceduralCreature.Tests.Runtime
         }
 
         [Test]
+        public void IndexedBonesView_IsReadOnly()
+        {
+            var host = new GameObject("RigHost");
+            _objects.Add(host);
+            var skeleton = new Skeleton.Skeleton();
+            skeleton.Bones.Add(new Bone { Id = "root", Rotation = Quaternion.identity });
+
+            CreatureRig rig = host.AddComponent<CreatureRig>();
+            rig.Build(skeleton);
+
+            Assert.AreEqual(1, rig.IndexedBones.Count);
+            Assert.IsTrue(rig.IndexedBones is IList<Transform>);
+            Assert.IsTrue(((IList<Transform>)rig.IndexedBones).IsReadOnly);
+        }
+
+        [Test]
         public void RigHostSpace_IdentityRoot_BoneWorldPositionMatchesCreatureCoordinate()
         {
             var host = new GameObject("RigHost");
@@ -176,8 +192,6 @@ namespace ProceduralCreature.Tests.Runtime
             CreatureRig rig = host.AddComponent<CreatureRig>();
             rig.Build(skeleton);
 
-            // At an identity host the bone's world position is the creature-space
-            // coordinate directly (the reference behavior of the space contract).
             Assert.That(Vector3.Distance(rig.Bones["root"].position, new Vector3(1f, 2f, 3f)), Is.LessThan(1e-5f));
         }
 
@@ -198,11 +212,6 @@ namespace ProceduralCreature.Tests.Runtime
             CreatureRig rig = host.AddComponent<CreatureRig>();
             rig.Build(skeleton);
 
-            // CreatureRig is not a world-space adapter: it writes the
-            // creature-space coordinate as the bone's world position without
-            // composing the host transform, so a non-identity host does not
-            // offset the bone. This documents why the host must remain at
-            // identity (the explicit space-contract invariant).
             Assert.That(Vector3.Distance(rig.Bones["root"].position, new Vector3(1f, 0f, 0f)), Is.LessThan(1e-5f));
             Assert.That(Vector3.Distance(rig.Bones["root"].position, new Vector3(11f, 0f, 0f)), Is.GreaterThan(1f));
         }
@@ -231,9 +240,6 @@ namespace ProceduralCreature.Tests.Runtime
             CreatureRig rig = host.AddComponent<CreatureRig>();
             rig.Build(skeleton);
 
-            // Chosen external pose-driver interface: a direct `PosedSkeleton` is pushed
-            // through `CreatureRig.ApplyPose`, without introducing any Animator/Avatar
-            // pipeline or locomotion state machine.
             PosedSkeleton restPose = PosedSkeleton.FromRestPose(skeleton);
             PosedSkeleton drivenPose = restPose.WithUpdatedPositions(
                 new Dictionary<string, Vector3>
@@ -249,8 +255,7 @@ namespace ProceduralCreature.Tests.Runtime
                 "direct indexed pose application must move the real bone at the chosen boundary");
 
             yield return null;
-            Assert.That(rig.Bones["tip"].position.x, Is.EqualTo(2f).Within(1e-5f),
-                "the moved bone remains in-place after a frame advance");
+            Assert.That(rig.Bones["tip"].position.x, Is.EqualTo(2f).Within(1e-5f));
         }
     }
 }
