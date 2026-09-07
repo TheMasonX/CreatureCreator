@@ -22,8 +22,8 @@ namespace ProceduralCreature.Animation.Binding
                 throw new DomainException("definition must not be null.");
             }
 
-            SkeletonModel skeleton = SkeletonInferrer.Infer(definition);
             ResolvedCreatureSnapshot snapshot = ResolvedCreatureSnapshot.Resolve(definition);
+            SkeletonModel skeleton = SkeletonInferrer.Infer(snapshot);
             return BuildRadiiByBoneIndex(SkeletonSnapshot.Capture(skeleton), snapshot);
         }
 
