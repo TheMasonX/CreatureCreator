@@ -1,0 +1,56 @@
+{
+  "Id": "creaturecreator-animation-mvp-code-health",
+  "Content": "Active 2026-09-07 animation-MVP/code-health record. The current side branch audit/skeleton-animation-improvements-2026-09-07 preserves a strict authored-DNA -> resolved snapshot -> derived skeleton/geometry -> Unity presentation boundary. Recent hardening patterns are intentionally reusable: resolve raw CreatureDefinition once at the outer compatibility boundary; use ResolvedCreatureSnapshot for canonical consumers; keep semantic ID mapping centralized in SemanticBoneResolver; keep morphology-to-binding conversions in narrow bridge helpers; expose runtime derived data read-only and defensively copy mutable arrays at handoff boundaries.\n\nCONFIRMED ANIMATION MVP CONTRACTS [C]: SkeletonSnapshot rejects zero/multiple roots and captures deterministic parent-before-child ordering; CreatureRig owns Unity bone Transforms transactionally and applies immutable PosedSkeleton data through indexed arrays; limb skeletons use authored LimbChain joints and include an explicit terminal joint node; body rig topology is compact and independent of Body sampling density; implicit-surface influence domains include the primary geometry owner plus its intended non-Body ancestors and exclude sibling/opposite-side chains; MorphologyInfluenceRadiusBridge derives body radii from compact anatomical BoneSpec data and limb radii from resolved thickness profiles; RigDebugView is presentation-only and must preserve user selection while framing.\n\nRECENT BUGS FIXED [C]: AnatomicalBodyRigLayout previously sampled the body-spine influence radius in the pelvis-to-spine interval instead of the spine-to-head interval. The calculation now samples the midpoint of the spine interval itself, and a non-uniform-radius regression prevents uniform fixtures from hiding the defect. RigDebugView no longer creates GUIStyle during static editor initialization. Debug-view framing restores Selection.objects after temporary FrameSelected use. ImplicitSurfaceInfluenceDomainResolver no longer contains its unused ResolvePartDomain helper.\n\nGENERATED OUTPUT HEALTH [C]: GeneratedCreature itself exposes read-only geometry collections and validates GeometryItem/material-region invariants. GeneratedCreatureData previously exposed constructor-owned Color[] storage directly; this was hardened so construction clones the input colors and consumers receive IReadOnlyList<Color>. CreatureMeshGenerator materializes the color list only at the Unity Mesh.SetColors boundary. This pattern should be applied consistently to future generated-data handoff arrays without introducing repeated defensive-copy churn inside hot runtime loops.\n\nREMAINING HEALTH RISKS [I/C]: Bone and Skeleton are still mutable derived-state classes used as builders before SkeletonSnapshot capture; a future bounded migration may introduce an internal builder plus immutable skeleton record without changing the snapshot contract. SkeletonSnapshot ordering uses a List as a priority queue; this is an asymptotic code smell but must not be changed casually because deterministic ordering is part of pose compatibility. GeneratedCreatureData still retains references to Definition, Snapshot, MeshExtractionResult, and MeshTopologyReport; future work should distinguish true immutable value state from owned resource/lifetime objects before changing those APIs.\n\nGROUNDING [C/I]: TSK-0153 remains intentionally open. Grounding must be one rigid derived rest-space translation based on authoritative designated-foot contact geometry, applied consistently to implicit geometry, mesh-asset geometry, and rest skeleton/bind space. Do not substitute overall minimum-Y, arbitrary foot origin, or skeleton-only heuristics.\n\nTASK DISCIPLINE: Local agents without MemorySmith may maintain task JSON and Working memory JSON directly on isolated audit branches. Such records must preserve exact task IDs, source provenance, implementation evidence, validation limitations, and explicit residual risk. Never mark a Unity-gated task Done from source inspection alone.\n\nSTYLE/REFACTORING PREFERENCE: Prefer small pure utility methods, shared semantic helpers, single-purpose bridges, and consolidation of repeated policy code. Avoid speculative abstractions, parallel authorities, broad rewrites, and domain-model pollution for presentation concerns.",
+  "Title": "CreatureCreator Animation MVP Code Health and Durable Patterns",
+  "Status": 1,
+  "Confidence": 0.96,
+  "Tags": [
+    "creaturecreator",
+    "animation",
+    "code-health",
+    "immutability",
+    "deduplication",
+    "resolved-snapshot",
+    "skeleton",
+    "generation",
+    "kind:working"
+  ],
+  "References": [
+    "creaturecreator-architecture-and-invariants",
+    "creaturecreator-skeleton-ik-pose",
+    "creaturecreator-geometry-sources-output"
+  ],
+  "Conflicts": [],
+  "Relationships": [
+    {
+      "sourceId": "creaturecreator-animation-mvp-code-health",
+      "targetId": "creaturecreator-architecture-and-invariants",
+      "relationType": 0,
+      "origin": 0,
+      "createdAtUtc": "2026-09-07T11:42:00Z"
+    },
+    {
+      "sourceId": "creaturecreator-animation-mvp-code-health",
+      "targetId": "creaturecreator-skeleton-ik-pose",
+      "relationType": 0,
+      "origin": 0,
+      "createdAtUtc": "2026-09-07T11:42:00Z"
+    },
+    {
+      "sourceId": "creaturecreator-animation-mvp-code-health",
+      "targetId": "creaturecreator-geometry-sources-output",
+      "relationType": 0,
+      "origin": 0,
+      "createdAtUtc": "2026-09-07T11:42:00Z"
+    }
+  ],
+  "SourceLinks": [
+    { "Label": "takeover audit", "Uri": "docs/audits/creaturecreator-animation-mvp-takeover-audit-26-09-07-06-22-00.md", "StartLine": null, "EndLine": null },
+    { "Label": "generated data contract", "Uri": "Assets/Scripts/Runtime/Generation/GeneratedCreatureData.cs", "StartLine": null, "EndLine": null },
+    { "Label": "generated output", "Uri": "Assets/Scripts/Runtime/Generation/GeneratedCreature.cs", "StartLine": null, "EndLine": null },
+    { "Label": "animation rig", "Uri": "Assets/Scripts/Runtime/Animation/CreatureRig.cs", "StartLine": null, "EndLine": null },
+    { "Label": "compact anatomy", "Uri": "Assets/Scripts/Runtime/Skeleton/AnatomicalBodyRigLayout.cs", "StartLine": null, "EndLine": null }
+  ],
+  "UsageCount": 0,
+  "LastUpdated": "2026-09-07T11:42:00Z"
+}
