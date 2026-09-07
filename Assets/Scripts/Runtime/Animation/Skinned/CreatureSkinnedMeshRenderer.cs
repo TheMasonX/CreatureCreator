@@ -1,4 +1,5 @@
 using System.Collections.Generic;
+using System.Collections.ObjectModel;
 using ProceduralCreature.Animation.Binding;
 using ProceduralCreature.Common;
 using ProceduralCreature.Skeleton;
@@ -56,6 +57,7 @@ namespace ProceduralCreature.Animation.Skinned
         private readonly List<Mesh> _ownedMeshes = new List<Mesh>();
         private SkinnedMeshRenderer _renderer;
         private Transform[] _bones = new Transform[0];
+        private IReadOnlyList<Transform> _bonesView = Array.AsReadOnly(new Transform[0]);
         private CreatureRig _rig;
 
         /// <summary>The live SkinnedMeshRenderer this adapter owns, or null before/after bind.</summary>
@@ -65,7 +67,7 @@ namespace ProceduralCreature.Animation.Skinned
         public CreatureRig Rig => _rig;
 
         /// <summary>The bone Transforms in bind order currently fed to the renderer.</summary>
-        public IReadOnlyList<Transform> Bones => _bones;
+        public IReadOnlyList<Transform> Bones => _bonesView;
 
         /// <summary>
         /// Binds the implicit welded-surface mesh to the given rig. Builds the owned
@@ -154,6 +156,7 @@ namespace ProceduralCreature.Animation.Skinned
 
             _renderer = renderer;
             _bones = bones;
+            _bonesView = Array.AsReadOnly(bones);
             _rig = rig;
             _generatedObjects.Add(skinnedObject);
         }
@@ -181,6 +184,7 @@ namespace ProceduralCreature.Animation.Skinned
             _ownedMeshes.Clear();
             _renderer = null;
             _bones = new Transform[0];
+            _bonesView = Array.AsReadOnly(_bones);
             _rig = null;
         }
 
