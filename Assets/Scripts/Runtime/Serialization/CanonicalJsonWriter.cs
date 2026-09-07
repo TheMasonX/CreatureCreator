@@ -14,75 +14,6 @@ namespace ProceduralCreature.Serialization
     ///
     /// This guarantees the Sprint 1.3 exit gate: "Save -> load -> canonical-save
     /// produces byte-stable canonical JSON for supported definitions."
-    ///
-    /// Field name/nesting reference (the "exact JSON field names and nesting" this
-    /// class exists to fix in place):
-    /// <code>
-    /// {
-    ///   "schemaVersion": 2,
-    ///   "symmetryMode": "None",
-    ///   "bounds": { "maxX": 4.0000, "maxY": 4.0000, "maxZ": 4.0000 },
-    ///   "generation": { "voxelsPerUnit": 16.0000 },
-    ///   "forward": { "x": 0.0000, "y": 0.0000, "z": 1.0000 },
-    ///   "body": {
-    ///     "samples": [
-    ///       { "id": 1, "position": { "x": 0.0000, "y": 0.0000, "z": -1.0000 }, "radius": 0.7500 },
-    ///       { "id": 2, "position": { "x": 0.0000, "y": 0.0000, "z": 1.0000 }, "radius": 0.9000 }
-    ///     ],
-    ///     "appearance": {
-    ///       "topGradient": {
-    ///         "mode": "Blend",
-    ///         "colorKeys": [
-    ///           { "time": 0.0000, "color": { "r": 0.5000, "g": 0.5000, "b": 0.5000, "a": 1.0000 } },
-    ///           { "time": 1.0000, "color": { "r": 0.5000, "g": 0.5000, "b": 0.5000, "a": 1.0000 } }
-    ///         ],
-    ///         "alphaKeys": [
-    ///           { "time": 0.0000, "alpha": 1.0000 },
-    ///           { "time": 1.0000, "alpha": 1.0000 }
-    ///         ]
-    ///       },
-    ///       "bottomGradient": {
-    ///         "mode": "Blend",
-    ///         "colorKeys": [
-    ///           { "time": 0.0000, "color": { "r": 0.5000, "g": 0.5000, "b": 0.5000, "a": 1.0000 } },
-    ///           { "time": 1.0000, "color": { "r": 0.5000, "g": 0.5000, "b": 0.5000, "a": 1.0000 } }
-    ///         ],
-    ///         "alphaKeys": [
-    ///           { "time": 0.0000, "alpha": 1.0000 },
-    ///           { "time": 1.0000, "alpha": 1.0000 }
-    ///         ]
-    ///       },
-    ///       "verticalCurve": {
-    ///         "keys": [
-    ///           { "time": 0.0000, "value": 0.0000, "inTangent": 1.0000, "outTangent": 1.0000 },
-    ///           { "time": 1.0000, "value": 1.0000, "inTangent": 1.0000, "outTangent": 1.0000 }
-    ///         ]
-    ///       }
-    ///     }
-    ///   },
-    ///   "parts": [
-    ///     {
-    ///       "id": "part_4f9a1c02",
-    ///       "parentId": "body",
-    ///       "partType": "Limb",
-    ///       "transform": {
-    ///         "position": { "x": 0.0000, "y": 0.0000, "z": 0.0000 },
-    ///         "rotation": { "x": 0.0000, "y": 0.0000, "z": 0.0000, "w": 1.0000 },
-    ///         "scale": { "x": 1.0000, "y": 1.0000, "z": 1.0000 }
-    ///       },
-    ///       "shape": { "type": "Sphere", "primarySize": 0.5000, "smoothBlendRadius": 0.1000 },
-    ///       "appearance": {
-    ///         "baseColor": { "r": 0.5000, "g": 0.5000, "b": 0.5000, "a": 1.0000 },
-    ///         "noiseSeed": 0,
-    ///         "noiseScale": 1.0000
-    ///       },
-    ///       "mirrorAcrossSymmetryPlane": false,
-    ///       "parentAttachment": null,
-    ///       "limbChain": null
-    ///     }
-    ///   ]
-    /// }
-    /// </code>
     /// </summary>
     internal static class CanonicalJsonWriter
     {
@@ -163,12 +94,6 @@ namespace ProceduralCreature.Serialization
             return sb.ToString();
         }
 
-        /// <summary>
-        /// Writes the vertical-blend curve (CC-034) as its canonical key list. Only
-        /// time / value / inTangent / outTangent are part of the contract; wrap
-        /// modes are irrelevant (the input is always clamped to [0, 1]) and
-        /// weighted/constant tangents are normalized away by CurveAdapter.
-        /// </summary>
         private static string WriteCurve(UnityEngine.AnimationCurve curve)
         {
             if (curve == null) return "null";
@@ -228,8 +153,6 @@ namespace ProceduralCreature.Serialization
             var sb = new StringBuilder();
             sb.Append('{');
             WriteField(sb, "id", part.Id, first: true);
-            // Preserve the authored DisplayName verbatim (null round-trips as null)
-            // instead of substituting the part Id (CC-084).
             WriteNullableField(sb, "displayName", part.DisplayName);
             WriteNullableField(sb, "parentId", part.ParentId);
             WriteField(sb, "partType", part.PartType.ToString());
@@ -244,13 +167,6 @@ namespace ProceduralCreature.Serialization
             return sb.ToString();
         }
 
-        /// <summary>
-        /// Writes a part's mesh-asset geometry source (CC-031). Always emitted —
-        /// null for parts without one — so save/load/save stays byte-stable.
-        /// MeshAssetKey is a stable name, never a UnityEngine.Object reference;
-        /// the attachment carries the semantic placement intent (pass 1: local
-        /// offset/orientation/scale only, ADR-002 §2).
-        /// </summary>
         private static string WriteNullableMeshGeometry(MeshGeometry mesh)
         {
             if (mesh == null) return "null";
@@ -275,14 +191,6 @@ namespace ProceduralCreature.Serialization
             return sb.ToString();
         }
 
-        /// <summary>
-        /// Writes a limb chain (CC-018). Always emitted — null for non-limb parts —
-        /// so save/load/save stays byte-stable. Joints keep their authored chain
-        /// order (list order IS the chain, like Body samples); the thickness
-        /// profile writes its keys. The v1 key record is <c>{ t, value }</c>;
-        /// tangent fields are planned additive fields that do not break this
-        /// format (ADR-001 §4).
-        /// </summary>
         private static string WriteNullableLimbChain(LimbChain limb)
         {
             if (limb == null) return "null";
@@ -385,8 +293,6 @@ namespace ProceduralCreature.Serialization
             sb.Append("\"baseColor\":").Append(WriteColor(appearance.BaseColor));
             WriteField(sb, "noiseSeed", appearance.NoiseSeed);
             WriteField(sb, "noiseScale", appearance.NoiseScale);
-            // CC-028: optional submaterial override by stable name. Null when blank
-            // so save-load-save stays byte-stable regardless of authored whitespace.
             WriteNullableField(sb, "materialKey",
                 string.IsNullOrWhiteSpace(appearance.MaterialKey) ? null : appearance.MaterialKey);
             sb.Append('}');
@@ -397,8 +303,6 @@ namespace ProceduralCreature.Serialization
         {
             return "{\"r\":" + Num(c.r) + ",\"g\":" + Num(c.g) + ",\"b\":" + Num(c.b) + ",\"a\":" + Num(c.a) + "}";
         }
-
-        // ---- low-level field writers -------------------------------------------------
 
         private static void WriteField(StringBuilder sb, string key, string value, bool first = false)
         {
@@ -439,11 +343,6 @@ namespace ProceduralCreature.Serialization
 
         private static string Num(float value)
         {
-            // Fixed decimal-place formatting is the entire point of "canonical" here —
-            // it must never vary between save operations regardless of platform
-            // locale (hence InvariantCulture) or the specific float value's shortest
-            // round-trip representation (hence a fixed "F<n>" format rather than "R"
-            // or "G").
             return value.ToString("F" + Common.GenerationTolerances.QuantizationDecimalPlaces, CultureInfo.InvariantCulture);
         }
 
@@ -460,7 +359,16 @@ namespace ProceduralCreature.Serialization
                     case '\n': sb.Append("\\n"); break;
                     case '\r': sb.Append("\\r"); break;
                     case '\t': sb.Append("\\t"); break;
-                    default: sb.Append(c); break;
+                    default:
+                        if (c < 0x20)
+                        {
+                            sb.Append("\\u").Append(((int)c).ToString("x4", CultureInfo.InvariantCulture));
+                        }
+                        else
+                        {
+                            sb.Append(c);
+                        }
+                        break;
                 }
             }
             return sb.ToString();
