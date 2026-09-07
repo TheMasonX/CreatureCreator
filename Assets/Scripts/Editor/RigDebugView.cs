@@ -1,3 +1,4 @@
+using System;
 using System.Collections.Generic;
 using UnityEditor;
 using UnityEngine;
@@ -84,13 +85,10 @@ namespace ProceduralCreature.Editor
                 float width = selected ? _lineWidth * 2f : _lineWidth;
                 Handles.color = selected ? Color.yellow : Color.white;
 
-                if (boneData.HasSegment && boneData.EndPosition != boneData.Position)
+                if (boneData.HasSegment && (boneData.EndPosition - boneData.Position).sqrMagnitude > 1e-10f)
                 {
-                    // A segment bone owns an explicit semantic [Position, EndPosition]
-                    // interval. Draw that interval directly; deriving it from the
-                    // parent/child Transform links loses leaf segments such as the
-                    // compact tail and can visually shift segment endpoints.
-                    Handles.DrawAAPolyLine(width, boneData.Position, boneData.EndPosition);
+                    Vector3 end = ResolveCurrentSegmentEnd(rig, i, boneData, bones, snapshot);
+                    Handles.DrawAAPolyLine(width, bone.position, end);
                 }
                 else if (boneData.ParentIndex >= 0 && boneData.ParentIndex < bones.Count)
                 {
@@ -133,10 +131,36 @@ namespace ProceduralCreature.Editor
             Handles.zTest = previousZTest;
         }
 
+        private static Vector3 ResolveCurrentSegmentEnd(
+            CreatureRig rig,
+            int boneIndex,
+            BoneSnapshot boneData,
+            IReadOnlyList<Transform> bones,
+            SkeletonSnapshot snapshot)
+        {
+            IReadOnlyList<int> children = snapshot.GetChildren(boneIndex);
+            int bestChild = -1;
+            for (int i = 0; i < children.Count; i++)
+            {
+                int childIndex = children[i];
+                BoneSnapshot childData = snapshot[childIndex];
+                if (!string.Equals(childData.SourcePartId, boneData.SourcePartId, StringComparison.Ordinal)) continue;
+                if ((childData.Position - boneData.EndPosition).sqrMagnitude > 1e-8f) continue;
+                if (bestChild < 0 || string.CompareOrdinal(childData.Id, snapshot[bestChild].Id) < 0)
+                    bestChild = childIndex;
+            }
+
+            if (bestChild >= 0 && bones[bestChild] != null)
+                return bones[bestChild].position;
+
+            Vector3 restOffset = boneData.EndPosition - boneData.Position;
+            return bone.position + bone.rotation * restOffset;
+        }
+
         private static string GetBoneLabel(BoneSnapshot bone)
         {
             string display = GetDisplayName(bone);
-            if (string.Equals(display, bone.Id, System.StringComparison.Ordinal)) return display;
+            if (string.Equals(display, bone.Id, StringComparison.Ordinal)) return display;
             return display + "\n" + bone.Id;
         }
 
@@ -148,7 +172,7 @@ namespace ProceduralCreature.Editor
             if (bone.Id == AnatomicalBodyRigLayout.TailBoneId) return "Tail";
 
             string id = bone.Id;
-            int separator = id.IndexOf(SemanticBoneResolver.LimbJointBoneSeparator, System.StringComparison.Ordinal);
+            int separator = id.IndexOf(SemanticBoneResolver.LimbJointBoneSeparator, StringComparison.Ordinal);
             if (separator > 0)
             {
                 string part = id.Substring(0, separator);
@@ -168,9 +192,6 @@ namespace ProceduralCreature.Editor
                 return true;
             }
 
-            // Do not encode biped/quadruped assumptions in the visualization.
-            // Every articulated segment gets the same structural treatment,
-            // regardless of PartType or limb count.
             return bone.HasSegment || bone.HasChildAttachmentPosition;
         }
 
@@ -250,9 +271,7 @@ namespace ProceduralCreature.Editor
                 if (rigs[r] == null) continue;
                 IReadOnlyList<Transform> bones = rigs[r].IndexedBones;
                 for (int i = 0; i < bones.Count; i++)
-                {
                     if (bones[i] != null) result.Add(bones[i]);
-                }
             }
             return result;
         }
@@ -279,16 +298,10 @@ namespace ProceduralCreature.Editor
                     {
                         if (++guard > rig.RestSkeleton.Count) break;
                         Transform currentTransform = bones[current];
-                        if (currentTransform != null && !result.Contains(currentTransform))
-                        {
-                            result.Add(currentTransform);
-                        }
+                        if (currentTransform != null && !result.Contains(currentTransform)) result.Add(currentTransform);
 
                         int parent = rig.RestSkeleton[current].ParentIndex;
-                        if (parent < 0 || rig.RestSkeleton[parent].SourcePartId == CreatureDefinition.BodyId)
-                        {
-                            break;
-                        }
+                        if (parent < 0 || rig.RestSkeleton[parent].SourcePartId == CreatureDefinition.BodyId) break;
                         current = parent;
                     }
 
@@ -296,7 +309,7 @@ namespace ProceduralCreature.Editor
                     for (int j = 0; j < bones.Count; j++)
                     {
                         BoneSnapshot candidate = rig.RestSkeleton[j];
-                        if (string.Equals(candidate.SourcePartId, anchor.SourcePartId, System.StringComparison.Ordinal)
+                        if (string.Equals(candidate.SourcePartId, anchor.SourcePartId, StringComparison.Ordinal)
                             && candidate.IsMirrored == anchor.IsMirrored
                             && candidate.HasSegment
                             && bones[j] != null
@@ -324,10 +337,7 @@ namespace ProceduralCreature.Editor
                 for (int i = 0; i < bones.Count; i++)
                 {
                     BoneSnapshot bone = rig.RestSkeleton[i];
-                    if (bone.HasSegment || bone.HasChildAttachmentPosition)
-                    {
-                        result.Add(bones[i]);
-                    }
+                    if (bone.HasSegment || bone.HasChildAttachmentPosition) result.Add(bones[i]);
                 }
             }
             return result;
@@ -343,12 +353,7 @@ namespace ProceduralCreature.Editor
                 if (rig == null) continue;
                 IReadOnlyList<Transform> bones = rig.IndexedBones;
                 for (int i = 0; i < bones.Count; i++)
-                {
-                    if (rig.RestSkeleton[i].SourcePartId == CreatureDefinition.BodyId)
-                    {
-                        result.Add(bones[i]);
-                    }
-                }
+                    if (rig.RestSkeleton[i].SourcePartId == CreatureDefinition.BodyId) result.Add(bones[i]);
             }
             return result;
         }
