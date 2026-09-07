@@ -107,22 +107,12 @@ namespace ProceduralCreature.Generation
     public sealed class GeometryItem
     {
         public string SourcePartId { get; }
-
         public GeometryType GeometryType { get; }
-
         public Mesh Mesh { get; }
-
-        /// <summary>Original mesh-asset source in its authored local space (null for the implicit surface).</summary>
         public Mesh SourceMesh { get; }
-
-        /// <summary>Authored source-to-creature rest placement for mesh assets (identity for the implicit surface).</summary>
         public Matrix4x4 RestPlacement { get; }
-
         public IReadOnlyList<MaterialRegion> MaterialRegions { get; }
-
         public RigBindingMetadata RigBinding { get; }
-
-        /// <summary>Build-time per-vertex influences in SkeletonSnapshot capture order. Returned as nested read-only lists.</summary>
         public IReadOnlyList<IReadOnlyList<VertexInfluence>> VertexInfluences { get; }
 
         internal GeometryItem(
@@ -203,7 +193,9 @@ namespace ProceduralCreature.Generation
                         $"geometry item material region {i} start index {region.StartIndex} is outside the valid range [0, {maxStart}] for submesh {region.SubmeshIndex}.");
                 }
 
-                if (region.IndexCount < 0 || region.StartIndex + region.IndexCount > maxStart)
+                // Avoid StartIndex + IndexCount overflow: validate the remaining
+                // capacity instead of adding two attacker-controlled int values.
+                if (region.IndexCount < 0 || region.IndexCount > maxStart - region.StartIndex)
                 {
                     throw new DomainException(
                         $"geometry item material region {i} range [{region.StartIndex}, {region.StartIndex + region.IndexCount}) exceeds submesh {region.SubmeshIndex} length {maxStart}.");
