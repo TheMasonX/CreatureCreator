@@ -25,6 +25,26 @@ namespace ProceduralCreature.Skeleton
         public static string ResolvePartRootBoneId(string partId, bool mirrored)
             => ResolveMirroredBoneId(partId, mirrored);
 
+        /// <summary>
+        /// Resolves the bone that should carry an authored mesh attachment for a part.
+        /// A normal mesh part owns a semantic part-root bone; a limb mesh is carried by
+        /// its first actual segment bone because limb skeletons do not create a separate
+        /// transform whose id is exactly the part id.
+        /// </summary>
+        public static string ResolveGeometryAttachmentBoneId(
+            ResolvedCreatureSnapshot snapshot, string sourcePartId, bool mirrored)
+        {
+            if (snapshot == null) throw new DomainException("snapshot must not be null.");
+            if (string.IsNullOrEmpty(sourcePartId)) throw new DomainException("sourcePartId must not be empty.");
+            if (!snapshot.TryGetPart(sourcePartId, out ResolvedPartSnapshot part))
+                return ResolvePartRootBoneId(sourcePartId, mirrored);
+
+            if (part.HasLimb && part.Limb.JointPositions != null && part.Limb.JointPositions.Count >= 2)
+                return ResolveLimbSegmentBoneId(part.Id, 0, mirrored);
+
+            return ResolvePartRootBoneId(part.Id, mirrored);
+        }
+
         public static string ResolveLimbSegmentBoneId(CreaturePart part, int segmentIndex, bool mirrored)
             => ResolveLimbSegmentBoneId(part.Id, segmentIndex, mirrored);
 
