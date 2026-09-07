@@ -254,6 +254,45 @@ namespace ProceduralCreature.Tests.Runtime
             }
         }
 
+        private static void AssertMirroredVerticesClose(
+            Vector3[] mirrored,
+            Vector3[] unmirrored,
+            Vector3[] unmirroredRest,
+            Vector3[] mirroredRest,
+            string message)
+        {
+            Assert.AreEqual(unmirrored.Length, mirrored.Length, message + ": vertex count");
+            var usedMirroredIndices = new HashSet<int>();
+
+            for (int v = 0; v < unmirrored.Length; v++)
+            {
+                Vector3 reflectedRest = MirrorUtility.ReflectPointAcrossX(unmirroredRest[v]);
+                int mirroredIndex = -1;
+                float closestSqrDistance = float.PositiveInfinity;
+                for (int candidate = 0; candidate < mirroredRest.Length; candidate++)
+                {
+                    if (usedMirroredIndices.Contains(candidate)) continue;
+                    float sqrDistance = (mirroredRest[candidate] - reflectedRest).sqrMagnitude;
+                    if (sqrDistance < closestSqrDistance)
+                    {
+                        closestSqrDistance = sqrDistance;
+                        mirroredIndex = candidate;
+                    }
+                }
+
+                Assert.That(mirroredIndex, Is.GreaterThanOrEqualTo(0),
+                    message + $" missing reflected rest vertex {v}: {reflectedRest}");
+                Assert.That(closestSqrDistance, Is.LessThan(2.5e-3f),
+                    message + $" reflected rest vertex {v} matched too far: " +
+                    $"got {mirroredRest[mirroredIndex]} expected {reflectedRest}");
+                usedMirroredIndices.Add(mirroredIndex);
+                Vector3 expected = MirrorUtility.ReflectPointAcrossX(unmirrored[v]);
+                Assert.That(Vector3.Distance(mirrored[mirroredIndex], expected), Is.LessThan(SkinningTolerance),
+                    message + $" vertex {v} -> {mirroredIndex}: rest {unmirroredRest[v]} -> {mirroredRest[mirroredIndex]} " +
+                    $"got {mirrored[mirroredIndex]} expected {expected}");
+            }
+        }
+
         private static Vector3[] DeformOracle(BoundRig bound, BonePose[] posed)
         {
             return LinearBlendSkinning.Deform(
@@ -443,7 +482,9 @@ namespace ProceduralCreature.Tests.Runtime
             definition.Forward = Vector3.forward;
             definition.SymmetryMode = SymmetryMode.MirrorAcrossXAxis;
             definition.Generation = new GenerationSettings { VoxelsPerUnit = 10f };
-            definition.Body.Samples.Add(new BodySample { Id = 1, Position = Vector3.zero, Radius = 0.9f });
+            definition.Body.Samples.Add(new BodySample { Id = 1, Position = new Vector3(0f, 0f, -1f), Radius = 0.9f });
+            definition.Body.Samples.Add(new BodySample { Id = 2, Position = Vector3.zero, Radius = 0.85f });
+            definition.Body.Samples.Add(new BodySample { Id = 3, Position = new Vector3(0f, 0f, 1f), Radius = 0.8f });
 
             definition.AddPart(new CreaturePart
             {
@@ -467,6 +508,15 @@ namespace ProceduralCreature.Tests.Runtime
                         new LimbJoint { Id = 2, Position = new Vector3(0.35f, 0f, 0f) },
                         new LimbJoint { Id = 3, Position = new Vector3(0.7f, 0f, 0f) },
                     },
+                    Thickness = new ThicknessProfile
+                    {
+                        Keys =
+                        {
+                            new ThicknessKey { T = 0f, Value = 0.14f },
+                            new ThicknessKey { T = 1f, Value = 0.10f },
+                        }
+                    },
+                    BlendRadius = 0.08f,
                 },
             });
             return definition;
@@ -503,6 +553,36 @@ namespace ProceduralCreature.Tests.Runtime
             Vector3[] oracle = DeformOracle(bound, posedFrames);
             Vector3[] baked = BakeVertices(bound);
             AssertVerticesClose(baked, oracle, "mirrored-limb posed SMR must equal the LBS oracle");
+        }
+
+        [Test]
+        public void MirroredLimb_PosedSmrEqualsReflectedUnmirroredSmr_OnRealGeometry()
+        {
+            CreatureDefinition definition = MirroredLimbDefinition();
+            BoundRig unmirrored = BuildBoundRig(definition);
+            BoundRig mirrored = BuildBoundRig(definition);
+            CreaturePart arm = definition.FindPart("part_arm");
+
+            string authoredSeg = SemanticBoneResolver.ResolveLimbSegmentBoneId(arm, 1, false);
+            string mirroredSeg = SemanticBoneResolver.ResolveLimbSegmentBoneId(arm, 1, true);
+            int authoredIndex = unmirrored.Snapshot.GetIndex(authoredSeg);
+            int mirroredIndex = mirrored.Snapshot.GetIndex(mirroredSeg);
+            Vector3 authoredDelta = new Vector3(0.2f, 0.25f, 0f);
+
+            unmirrored.Rig.ApplyPose(PoseOf(unmirrored,
+                (authoredSeg, unmirrored.Snapshot[authoredIndex].Position + authoredDelta)));
+            mirrored.Rig.ApplyPose(PoseOf(mirrored,
+                (mirroredSeg, mirrored.Snapshot[mirroredIndex].Position
+                    + MirrorUtility.ReflectPointAcrossX(authoredDelta))));
+
+            Vector3[] unmirroredBaked = BakeVertices(unmirrored);
+            Vector3[] mirroredBaked = BakeVertices(mirrored);
+            AssertMirroredVerticesClose(
+                mirroredBaked,
+                unmirroredBaked,
+                unmirrored.RestVertices,
+                mirrored.RestVertices,
+                "mirrored SMR must equal reflection of the unmirrored SMR");
         }
     }
 }

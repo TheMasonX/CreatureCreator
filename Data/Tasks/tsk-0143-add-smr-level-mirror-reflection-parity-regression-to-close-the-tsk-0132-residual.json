@@ -4,7 +4,7 @@
   "title": "Add SMR-level mirror reflection parity regression to close the TSK-0132 residual",
   "description": "## Summary\nTSK-0132 (Done) validated mirror correctness at the pure LBS/TSK-0131 layer and via a real mirrored-limb SMR==LBS test, but the strict pointwise \u0022full rendered SMR mirrored mesh == reflection of the unmirrored SMR mesh (via MirrorUtility)\u0022 parity is not directly asserted through the live SkinnedMeshRenderer. Council review accepted this residual on R4; close it with a dedicated regression.\n\n## Scope\n- Add a PlayMode test that binds a creature with a mirrored limb through CreatureSkinnedMeshRenderer, poses one side, and asserts the full SMR-baked mirrored result equals MirrorUtility reflection of the unmirrored result within tolerance (BakeMesh read-back).\n- Reuse the existing real generated-geometry fixture; no production code change expected unless the test surfaces a real defect.\n\n## Acceptance Criteria\n- Full-SMR reflected parity test passes on real geometry; if it fails, fix the adapter/wiring (not the pure LBS layer) and document.\n\n## Validation\nFocused PlayMode; dotnet Tests.Runtime build; git diff --check.",
   "type": "Task",
-  "status": "Backlog",
+  "status": "Done",
   "priority": "Medium",
   "assigneeMode": "Custom",
   "assigneeDirectoryId": null,
@@ -22,16 +22,29 @@
   "attachments": [],
   "externalLinks": [],
   "linkedPages": [],
-  "comments": [],
+  "comments": [
+    {
+      "id": "c-90c0860fae7b4cd999d02342e88ab807",
+      "author": "anonymous",
+      "body": "Implemented the SMR-level mirror reflection parity regression in Assets/Scripts/Tests/Runtime/CreatureSkinnedMeshRendererTests.cs.\n\nImplementation evidence:\n- Reused the real generated mirrored-limb fixture and CreatureSkinnedMeshRenderer adapter.\n- Extended the fixture to the established three-sample body spine and explicit limb thickness so the real generated surface is fully covered by morphology-derived bind influences.\n- Added MirroredLimb_PosedSmrEqualsReflectedUnmirroredSmr_OnRealGeometry: builds two real bindings, poses the authored limb in one and the reflected limb in the other, reads both with SkinnedMeshRenderer.BakeMesh, and compares every rendered vertex against MirrorUtility reflection using one-to-one reflected rest-space correspondence.\n- No production adapter/wiring change was required. The initial same-index comparison was corrected because Marching Cubes produces reflected vertex ordering/coordinate drift; the final comparison remains full-mesh and pointwise at matched reflected rest vertices.\n\nValidation evidence:\n- Unity 6000.0.35f1 PlayMode focused test: 1/1 passed, 0 failed, duration 0.3974547s. Test: ProceduralCreature.Tests.Runtime.CreatureSkinnedMeshRendererTests.MirroredLimb_PosedSmrEqualsReflectedUnmirroredSmr_OnRealGeometry.\n- Unity console: no errors or warnings.\n- dotnet build ProceduralCreature.Tests.Runtime.csproj --no-restore: exit 0, succeeded, 0 warnings, 0 errors.\n- git diff --check: exit 0.\n\nResidual risk: the parity test uses nearest one-to-one reflected rest-space correspondence with a 0.05-unit source matching bound to account for finite-grid mirror coordinate drift; rendered pointwise tolerance remains the existing 0.02 SMR read-back tolerance. Broader PlayMode suite was not run for this focused sprint slice.",
+      "createdAtUtc": "2026-09-07T04:14:56.0515112Z"
+    },
+    {
+      "id": "c-d79a13f1c6d84cbc9b4aeaa45707f882",
+      "author": "anonymous",
+      "body": "ROUND 5 review: test-only bug-fix regression accepted. CreatureSkinnedMeshRendererTests adds MirroredLimb_PosedSmrEqualsReflectedUnmirroredSmr_OnRealGeometry, using real generated mirrored geometry, independent poses, SkinnedMeshRenderer.BakeMesh readback, MirrorUtility point reflection, one-to-one reflected rest matching, and existing 0.02 rendered tolerance. No production adapter change was required. Independent validation: dotnet Tests.Runtime build passed with 0 warnings/errors; git diff --check passed. Subagent-reported focused PlayMode 1/1 passed on Unity 6000.0.35f1 and console had no errors/warnings. Evidence confidence: test source spot-check plus independently re-run build/diff; Unity focused gate report-trusted. Residual risk: focused test only; broader PlayMode suite not rerun, and source matching uses a 0.05 bound for finite-grid mirror drift.",
+      "createdAtUtc": "2026-09-07T04:15:33.3230828Z"
+    }
+  ],
   "epicId": null,
   "parentId": "TSK-0077",
   "dueDateUtc": null,
   "createdAtUtc": "2026-09-06T23:55:28.9540885Z",
-  "updatedAtUtc": "2026-09-06T23:55:28.9540885Z",
-  "completedAtUtc": null,
-  "revision": 1,
+  "updatedAtUtc": "2026-09-07T04:15:33.3230828Z",
+  "completedAtUtc": "2026-09-07T04:15:00.8230147Z",
+  "revision": 5,
   "isArchived": false,
   "hasLoadError": false,
   "loadError": null,
-  "sourceFilePath": null
+  "sourceFilePath": "tsk-0143-add-smr-level-mirror-reflection-parity-regression-to-close-the-tsk-0132-residual.json"
 }
