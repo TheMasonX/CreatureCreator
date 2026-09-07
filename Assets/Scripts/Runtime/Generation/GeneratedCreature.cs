@@ -1,5 +1,6 @@
 using System;
 using System.Collections.Generic;
+using System.Collections.ObjectModel;
 using ProceduralCreature.Animation.Binding;
 using ProceduralCreature.Common;
 using ProceduralCreature.Definition;
@@ -33,9 +34,15 @@ namespace ProceduralCreature.Generation
         public const string MirrorSuffix = "_mirror";
 
         private readonly List<GeometryItem> _geometry = new List<GeometryItem>();
+        private readonly ReadOnlyCollection<GeometryItem> _geometryView;
+
+        public GeneratedCreature()
+        {
+            _geometryView = _geometry.AsReadOnly();
+        }
 
         /// <summary>Read-only, deterministic, ordered geometry items. New code must not depend on positional item 0.</summary>
-        public IReadOnlyList<GeometryItem> Geometry => _geometry;
+        public IReadOnlyList<GeometryItem> Geometry => _geometryView;
 
         public int Count => _geometry.Count;
 
@@ -219,11 +226,8 @@ namespace ProceduralCreature.Generation
     public sealed class MaterialRegion
     {
         public int SubmeshIndex { get; }
-
         public int StartIndex { get; }
-
         public int IndexCount { get; }
-
         public string MaterialKey { get; }
 
         internal MaterialRegion(int submeshIndex, int startIndex, int indexCount, string materialKey)
@@ -250,9 +254,7 @@ namespace ProceduralCreature.Generation
     public sealed class RigBindingMetadata
     {
         public string SourcePartId { get; }
-
         public string ParentPartId { get; }
-
         public bool IsMirrored { get; }
 
         internal RigBindingMetadata(string sourcePartId, string parentPartId, bool isMirrored)
