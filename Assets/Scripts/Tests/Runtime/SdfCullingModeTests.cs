@@ -107,8 +107,10 @@ namespace ProceduralCreature.Tests.Runtime
             MeshTopologyReport report;
             GeneratedCreature generated = CreatureMeshGenerator.Generate(
                 definition, out report, diagnostics);
+            Assert.IsTrue(generated.TryGetImplicitSurface(out GeometryItem implicitItem),
+                "the generated implicit mesh must be discoverable semantically");
 
-            Vector3[] vertices = generated.MainMesh.vertices;
+            Vector3[] vertices = implicitItem.Mesh.vertices;
             for (int i = 0; i < vertices.Length; i++)
             {
                 Vector3 v = vertices[i];
@@ -116,9 +118,9 @@ namespace ProceduralCreature.Tests.Runtime
                 Assert.IsFalse(float.IsInfinity(v.x) || float.IsInfinity(v.y) || float.IsInfinity(v.z), $"Fast mesh Inf vertex {i}.");
             }
             Assert.IsTrue(report.IsWatertight, "Fast mesh must be watertight.");
-            Assert.Greater(generated.MainMesh.triangles.Length / 3, 0, "Fast mesh must emit triangles.");
-            Assert.AreEqual(generated.MainMesh.vertexCount, diagnostics.VertexCount);
-            Assert.AreEqual(generated.MainMesh.triangles.Length / 3, diagnostics.TriangleCount);
+            Assert.Greater(implicitItem.Mesh.triangles.Length / 3, 0, "Fast mesh must emit triangles.");
+            Assert.AreEqual(implicitItem.Mesh.vertexCount, diagnostics.VertexCount);
+            Assert.AreEqual(implicitItem.Mesh.triangles.Length / 3, diagnostics.TriangleCount);
         }
 
         [Test]
@@ -129,9 +131,11 @@ namespace ProceduralCreature.Tests.Runtime
             MeshTopologyReport report;
             GeneratedCreature generated = CreatureMeshGenerator.Generate(
                 definition, out report, diagnostics);
+            Assert.IsTrue(generated.TryGetImplicitSurface(out GeometryItem implicitItem),
+                "the generated implicit mesh must be discoverable semantically");
 
-            Color[] colors = generated.MainMesh.colors;
-            Assert.AreEqual(generated.MainMesh.vertexCount, colors.Length);
+            Color[] colors = implicitItem.Mesh.colors;
+            Assert.AreEqual(implicitItem.Mesh.vertexCount, colors.Length);
             for (int i = 0; i < colors.Length; i++)
             {
                 Color c = colors[i];
@@ -151,8 +155,10 @@ namespace ProceduralCreature.Tests.Runtime
                 definition, out report, diagnostics);
             GeneratedCreature b = CreatureMeshGenerator.Generate(
                 definition, out report, diagnostics);
-            Assert.AreEqual(a.MainMesh.triangles.Length, b.MainMesh.triangles.Length);
-            Assert.AreEqual(a.MainMesh.vertexCount, b.MainMesh.vertexCount);
+            Assert.IsTrue(a.TryGetImplicitSurface(out GeometryItem aImplicit));
+            Assert.IsTrue(b.TryGetImplicitSurface(out GeometryItem bImplicit));
+            Assert.AreEqual(aImplicit.Mesh.triangles.Length, bImplicit.Mesh.triangles.Length);
+            Assert.AreEqual(aImplicit.Mesh.vertexCount, bImplicit.Mesh.vertexCount);
         }
     }
 }

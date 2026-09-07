@@ -1,4 +1,5 @@
 using System.Collections.Generic;
+using System.Reflection;
 using NUnit.Framework;
 using UnityEngine;
 using UnityEngine.TestTools;
@@ -9,6 +10,7 @@ using ProceduralCreature.Animation.Skinned;
 using ProceduralCreature.Common;
 using ProceduralCreature.Definition;
 using ProceduralCreature.Generation;
+using ProceduralCreature.Serialization;
 using ProceduralCreature.Skeleton;
 using SkeletonModel = ProceduralCreature.Skeleton.Skeleton;
 
@@ -99,6 +101,7 @@ namespace ProceduralCreature.Tests.Runtime
 
             SkeletonModel skeleton = SkeletonInferrer.Infer(definition);
             SkeletonSnapshot snapshot = SkeletonSnapshot.Capture(skeleton);
+            ResolvedCreatureSnapshot resolved = ResolvedCreatureSnapshot.Resolve(definition);
             Assert.Greater(snapshot.Count, 0, "a generated creature must have an inferred skeleton");
 
             Mesh source = implicitItem.Mesh;
@@ -109,9 +112,11 @@ namespace ProceduralCreature.Tests.Runtime
             bound.Snapshot = snapshot;
             bound.SkeletonInput = skeleton;
 
-            // Re-author the identical welded-surface weights the adapter will build.
+            // Re-author the identical welded-surface weights the adapter will build,
+            // using the morphology-derived radius bridge rather than the 0.5 default.
+            float[] radiiByBoneIndex = MorphologyInfluenceRadiusBridge.BuildRadiiByBoneIndex(snapshot, resolved);
             List<BoneSegmentInfluence> segments =
-                ImplicitSurfaceWeightAuthoring.BuildSegmentInfluences(snapshot, null);
+                ImplicitSurfaceWeightAuthoring.BuildSegmentInfluences(snapshot, radiiByBoneIndex);
             bound.Weights = ImplicitSurfaceWeightAuthoring.Author(segments, bound.RestVertices);
 
             var host = new GameObject("SkinnedHost");
@@ -140,6 +145,83 @@ namespace ProceduralCreature.Tests.Runtime
                 frames[i] = new BonePose(snapshot[i].Position, snapshot[i].Rotation);
             }
             return frames;
+        }
+
+        private static CreatureDefinition BodyAndThinLimbDefinition()
+        {
+            var definition = CreatureDefinition.CreateEmpty();
+            definition.Forward = Vector3.forward;
+            definition.Generation = new GenerationSettings { VoxelsPerUnit = 10f };
+            definition.Body.Samples.Add(new BodySample { Id = 1, Position = new Vector3(0f, 0f, -1f), Radius = 0.9f });
+            definition.Body.Samples.Add(new BodySample { Id = 2, Position = new Vector3(0f, 0f, 0f), Radius = 0.85f });
+            definition.Body.Samples.Add(new BodySample { Id = 3, Position = new Vector3(0f, 0f, 1f), Radius = 0.8f });
+
+            var limb = new CreaturePart
+            {
+                Id = "thin_leg",
+                ParentId = CreatureDefinition.BodyId,
+                PartType = PartType.Limb,
+                Transform = new TransformData
+                {
+                    Position = new Vector3(0.65f, 0f, 0f),
+                    Rotation = Quaternion.identity,
+                    Scale = Vector3.one,
+                },
+                Shape = new ShapeDefinition { Type = ShapeType.Capsule, PrimarySize = 0.12f, Radius = 0.12f },
+                Appearance = AppearanceDefinition.Default,
+                Limb = new LimbChain
+                {
+                    Joints =
+                    {
+                        new LimbJoint { Id = 1, Position = Vector3.zero },
+                        new LimbJoint { Id = 2, Position = new Vector3(0.55f, 0f, 0f) },
+                    },
+                    Thickness = new ThicknessProfile
+                    {
+                        Keys =
+                        {
+                            new ThicknessKey { T = 0f, Value = 0.12f },
+                            new ThicknessKey { T = 1f, Value = 0.08f },
+                        }
+                    },
+                    BlendRadius = 0.08f,
+                },
+            };
+            definition.AddPart(limb);
+            return definition;
+        }
+
+        [Test]
+        public void MorphologyInfluenceRadii_BodyAndThinLimb_UseResolvedMorphology_NotDefaultHalf()
+        {
+            CreatureDefinition definition = BodyAndThinLimbDefinition();
+            GeneratedCreature generated = CreatureMeshGenerator.Generate(definition, out _);
+            Assert.IsTrue(generated.TryGetImplicitSurface(out GeometryItem _), "body + limb should generate an implicit welded surface");
+
+            SkeletonModel skeleton = SkeletonInferrer.Infer(definition);
+            SkeletonSnapshot snapshot = SkeletonSnapshot.Capture(skeleton);
+            float[] radii = MorphologyInfluenceRadiusBridge.BuildRadiiByBoneIndex(snapshot, ResolvedCreatureSnapshot.Resolve(definition));
+
+            int bodyBoneIndex = snapshot.GetIndex(SemanticBoneResolver.ResolveBodySocketBoneId(2u));
+            int limbBoneIndex = snapshot.GetIndex(SemanticBoneResolver.ResolveLimbSegmentBoneId(definition.FindPart("thin_leg"), 0, false));
+
+            Assert.That(radii[bodyBoneIndex], Is.EqualTo(0.85f).Within(1e-4f),
+                "body sample radius must drive the body bone influence radius");
+            Assert.That(radii[limbBoneIndex], Is.EqualTo(0.10f).Within(1e-4f),
+                "limb thickness at segment midpoint must drive the bone influence radius");
+            Assert.That(radii[bodyBoneIndex], Is.Not.EqualTo(ImplicitSurfaceWeightAuthoring.DefaultInfluenceRadius).Within(1e-4f));
+            Assert.That(radii[limbBoneIndex], Is.Not.EqualTo(ImplicitSurfaceWeightAuthoring.DefaultInfluenceRadius).Within(1e-4f));
+
+            List<BoneSegmentInfluence> segments = ImplicitSurfaceWeightAuthoring.BuildSegmentInfluences(snapshot, radii);
+            Assert.IsTrue(generated.TryGetImplicitSurface(out GeometryItem implicitItem),
+                "expected an implicit welded-surface item");
+            VertexInfluence[][] weights = ImplicitSurfaceWeightAuthoring.Author(segments, implicitItem.Mesh.vertices);
+            Vector3[] rest = LinearBlendSkinning.Deform(RestFrames(snapshot), RestFrames(snapshot), implicitItem.Mesh.vertices, weights);
+            for (int i = 0; i < implicitItem.Mesh.vertexCount; i++)
+            {
+                Assert.That(Vector3.Distance(rest[i], implicitItem.Mesh.vertices[i]), Is.LessThan(1e-4f),
+                    "weighting with derived morphology must reproduce the rest mesh");
+            }
         }
 
         /// <summary>Reads the rig's actual bone frames (what Unity saw) as LBS frames.</summary>
@@ -263,6 +345,36 @@ namespace ProceduralCreature.Tests.Runtime
                 "bone weights must not be rebuilt per frame");
             Assert.AreEqual(bindposesBefore.Length, sharedBefore.bindposes.Length,
                 "bindposes must not be rebuilt per frame");
+        }
+
+        [UnityTest]
+        public System.Collections.IEnumerator RuntimePreview_ImplicitSurface_IsBoundToSkinnedRenderer_AndAppliedIdlePose()
+        {
+            var host = new GameObject("RuntimePreviewHost");
+            _objects.Add(host);
+            var preview = host.AddComponent<CreatureRuntimePreview>();
+            var definitionJson = new TextAsset(new JsonDnaSerializer().Serialize(BodyOnlyDefinition()));
+            FieldInfo field = typeof(CreatureRuntimePreview).GetField("definitionJson",
+                BindingFlags.Instance | BindingFlags.NonPublic);
+            Assert.NotNull(field, "preview should load a definition asset");
+            field.SetValue(preview, definitionJson);
+
+            preview.Generate();
+            for (int i = 0; i < 10; i++)
+            {
+                yield return null;
+            }
+
+            CreatureRig rig = host.GetComponentInChildren<CreatureRig>();
+            SkinnedMeshRenderer renderer = host.GetComponentInChildren<SkinnedMeshRenderer>();
+            Assert.NotNull(rig, "runtime preview should install a rig on the generated implicit surface");
+            Assert.NotNull(renderer, "runtime preview should install a SkinnedMeshRenderer for the implicit surface");
+            Assert.IsTrue(renderer.sharedMesh != null, "preview skinning mesh must be created");
+            Assert.IsTrue(renderer.rootBone != null, "preview skinned mesh must have a root bone");
+            Assert.Greater(renderer.bones.Length, 0, "preview skinned mesh must bind the rig's bone array");
+            Assert.IsTrue(renderer.enabled, "idle pose should be applied and the skin render enabled");
+
+            preview.enabled = false;
         }
 
         [UnityTest]

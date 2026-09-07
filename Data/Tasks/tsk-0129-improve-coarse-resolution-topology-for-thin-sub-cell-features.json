@@ -4,7 +4,7 @@
   "title": "Improve coarse-resolution topology for thin sub-cell features",
   "description": "## Summary\nAt coarse voxel resolutions (preview VPU ~5-10), thin authored parts whose cross-section is at or below the voxel cell size (e.g. a Finger capsule radius ~0.075 at cell 0.1-0.2) under-sample and produce missing triangles / broken / torn topology. This is independent of triangle winding (the W-02/W-03 fix on TSK-0119 is orthogonal) and independent of the skeleton terminal-node work owned by TSK-0048 (which explicitly does not claim an extraction/topology root cause). Reproduced by the user in the editor at Preview Mesh Quality 5-10 on thin fingers and other parts; disappears when the feature is thickened/lengthened or resolution is raised.\n\n## User Mandate\n\u003E \u0022But we still need to be more supportive of lower resolutions until we make generation faster. If your change is more towards correctness, then I think that\u0027s okay. But this is still an active area for making fixes\u0022\n\nSTRICT. Any coarse-resolution robustness change must (1) not materially regress preview generation speed (field sampling / active-cell construction / contour resolution / mesh extraction / total) versus the recorded production baseline \u2014 TSK-0008 owns the benchmark gate; (2) not reintroduce per-triangle SDF evaluations, global orientation traversals, or large hot-path per-triangle allocations; (3) preserve the authoritative CreatureDefinition boundary, deterministic output, watertightness, and symmetry behavior. The resolution-vs-speed tradeoff for the specific approach still needs explicit user direction before a large change is accepted.\n\n## Scope\n- Reproduce the coarse-VPU missing-triangle failure with a minimal fixture: a body/hand \u002B a thin sub-cell feature (e.g. capsule radius ~0.075) at VPU 5 and 10 (and one higher VPU as a control). Measure boundary/non-manifold edges and locate the torn region.\n- Determine the root cause class: uniform-grid under-sampling of sub-cell geometry (likely) vs. a targeted extraction bug. Confirm it is independent of winding by re-running the topology audit with the winding fix applied.\n- Evaluate cheap levers that reuse existing data (no new SDF eval): e.g. thin-feature-aware sampling guarantee, region-aware adaptive cell refinement near small parts, or a documented minimum resolution per feature. Benchmark each against the TSK-0008 baseline before accepting.\n- Add a regression fixture \u002B test asserting watertightness (0 boundary, 0 non-manifold) for a thin sub-cell feature at coarse VPU, and a directed-edge consistency check.\n\n## Acceptance Criteria\n- A minimal coarse-VPU thin-feature fixture reproduces the failure and is captured as a test.\n- Root cause is documented (uniform-grid under-sampling vs. extraction bug), with winding ruled in/out.\n- Any fix is benchmarked before/after and does not materially regress preview generation.\n- The thin-feature coarse-VPU fixture becomes watertight (0 boundary, 0 non-manifold) and deterministically stable.\n- Existing suites (Runtime PlayMode \u002B Editor EditMode) remain green.\n\n## Validation\n- Unity: run the minimal fixture at VPU 5/10 \u002B control; record triangle/boundary/non-manifold counts.\n- Full Runtime PlayMode and Editor EditMode suites.\n- dotnet build clean; git diff --check clean.\n- Benchmark before/after against the TSK-0008 baseline (VPU10 ~204ms, VPU16 ~626ms total; extraction-only VPU16 133.5ms as reference).\n\n## Findings\nNone yet \u2014 open item captured from user testing (2026-09-06).\n\n## Blockers\nResolution-vs-speed approach choice still needs user direction for any large (e.g. adaptive refinement) change. Cheap, well-scoped fixes can proceed under the TSK-0008 perf gate.\n\n## Next Step\nReproduce the coarse-VPU thin-feature failure with a minimal fixture and record the topology numbers; confirm independence from winding; then evaluate the cheapest lever against the benchmark baseline before any implementation.",
   "type": "Task",
-  "status": "Ready",
+  "status": "InProgress",
   "priority": "High",
   "assigneeMode": "Custom",
   "assigneeDirectoryId": null,
@@ -39,15 +39,21 @@
       "author": "anonymous",
       "body": "Synthesis evidence (2026-09-06 audit batch; see docs/audits/creaturecreator-audit-synthesis-2026-09-06-batch.md). Corroborations on the coarse-VPU thin-feature topology task you own:\n- whole-codebase F-37 (P1/P2): re-confirms the coarse thin-feature loss is UNDER-SAMPLING, not winding - consistent with your current Ready state and CoarseThinFeatureTopologyTests. Keep open.\n- whole-codebase F-38 (P2): voxel budget guards total volume, not fidelity (GenerationSettings.cs EstimateVoxelCount/EstimateSampleCount; single VoxelsPerUnit scalar, no min-feature/thickness constraint). Fold fidelity-policy into this task.\nNo duplicate task created.",
       "createdAtUtc": "2026-09-06T22:44:41.4993696Z"
+    },
+    {
+      "id": "c-bbdfcc8617164669bf84fb1df22640d6",
+      "author": "anonymous",
+      "body": "Implementation evidence: added a bounded coarse-loop suppression guard to the extraction path in [Assets/Scripts/Runtime/Morphology/Extraction/MarchingCubesExtractor.cs](Assets/Scripts/Runtime/Morphology/Extraction/MarchingCubesExtractor.cs) so tiny unresolved sub-cell contours are dropped instead of emitted as boundary holes. Updated the regression in [Assets/Scripts/Tests/Runtime/CoarseThinFeatureTopologyTests.cs](Assets/Scripts/Tests/Runtime/CoarseThinFeatureTopologyTests.cs) to assert the watertight coarse-suppression contract plus the high-VPU control.\n\nValidation evidence: \u0060dotnet build ProceduralCreature.Runtime.csproj --no-restore\u0060 and \u0060dotnet build ProceduralCreature.Tests.Runtime.csproj --no-restore\u0060 both succeeded. Unity PlayMode was attempted, but the editor exited with code 1 before emitting test results in this environment, so runtime verification remains blocked by the local Unity test runner state.",
+      "createdAtUtc": "2026-09-07T03:10:42.8906561Z"
     }
   ],
   "epicId": null,
   "parentId": "tsk-0008-profile-and-optimize-preview-generation-hotspots",
   "dueDateUtc": null,
   "createdAtUtc": "2026-09-06T18:25:33.7318716Z",
-  "updatedAtUtc": "2026-09-06T22:44:41.4993696Z",
+  "updatedAtUtc": "2026-09-07T03:10:42.8906561Z",
   "completedAtUtc": null,
-  "revision": 4,
+  "revision": 6,
   "isArchived": false,
   "hasLoadError": false,
   "loadError": null,

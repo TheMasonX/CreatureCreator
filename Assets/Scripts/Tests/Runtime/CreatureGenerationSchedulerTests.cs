@@ -14,6 +14,8 @@ namespace ProceduralCreature.Tests.Runtime
         {
             CreatureDefinition definition = CreateDefinition();
             GeneratedCreature synchronous = CreatureMeshGenerator.Generate(definition, out _);
+            Assert.IsTrue(synchronous.TryGetImplicitSurface(out GeometryItem syncImplicit),
+                "synchronous output must include the implicit mesh");
 
             using (var scheduler = new CreatureGenerationScheduler())
             {
@@ -22,7 +24,9 @@ namespace ProceduralCreature.Tests.Runtime
                 Assert.IsTrue(result.Succeeded, result.Exception?.ToString());
 
                 GeneratedCreature asynchronous = CreatureMeshGenerator.Assemble(result.Data);
-                AssertMeshEqual(synchronous.MainMesh, asynchronous.MainMesh);
+                Assert.IsTrue(asynchronous.TryGetImplicitSurface(out GeometryItem asyncImplicit),
+                    "asynchronous output must include the implicit mesh");
+                AssertMeshEqual(syncImplicit.Mesh, asyncImplicit.Mesh);
             }
         }
 

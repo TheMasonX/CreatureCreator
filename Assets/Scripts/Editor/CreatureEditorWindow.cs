@@ -3025,7 +3025,11 @@ namespace ProceduralCreature.Editor
                 try
                 {
                     GeneratedCreature generated = CreatureMeshGenerator.Assemble(result.Data, ResolveMeshAsset);
-                    Mesh unityMesh = generated.MainMesh;
+                    Mesh unityMesh = null;
+                    if (generated.TryGetImplicitSurface(out GeometryItem implicitSurface))
+                    {
+                        unityMesh = implicitSurface.Mesh;
+                    }
                     _previewController.ApplyPreviewGeometry(generated);
                     _previewGameObject = _previewController.PreviewGameObject;
                     _previewAcceptance.Accept(
@@ -3039,7 +3043,7 @@ namespace ProceduralCreature.Editor
                             $"{topologyReport.NonManifoldEdgeCount} non-manifold edge(s) out of " +
                             $"{topologyReport.TotalEdgeCount} total. See MeshTopologyValidator.");
                     }
-                    if (_logGenerationDiagnostics)
+                    if (_logGenerationDiagnostics && unityMesh != null)
                     {
                         string timingReport = string.Join("\n", result.Diagnostics.Timings.Select(FormatDiagnosticTiming));
                         Debug.Log($"[CreatureCreator] Preview regenerated — " +

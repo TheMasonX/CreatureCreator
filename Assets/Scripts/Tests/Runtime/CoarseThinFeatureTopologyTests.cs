@@ -7,31 +7,15 @@ using ProceduralCreature.Morphology.Sdf;
 namespace ProceduralCreature.Tests.Runtime
 {
     /// <summary>
-    /// CHARACTERIZATION GATE for TSK-0129 (coarse-resolution topology for thin
-    /// sub-cell features).
+    /// TSK-0129 coarse-resolution topology gate for thin sub-cell features.
     ///
-    /// A thin part whose cross-section is at or below the lattice cell size at
-    /// coarse Preview VoxelsPerUnit under-samples and produces either a dropped
-    /// feature (0 triangles) or an open / torn surface (boundary edges &gt; 0).
-    /// The measurements below were captured on current main (e88ba5d) with the
-    /// W-02/W-03 trilinear-gradient winding fix (e1b078a) already applied. Every
-    /// torn result shows boundary edges (holes) with ZERO non-manifold edges —
-    /// winding cannot create or remove a boundary hole, so this is orthogonal to
-    /// winding and confirms the root cause is uniform-grid under-sampling, not
-    /// winding and not a targeted extraction bug.
-    ///
-    /// These tests lock in the CURRENT (known-limited) behavior so a future
-    /// robust-coarse-resolution fix has a gate: they are green today and a fix
-    /// that makes thin sub-cell features watertight and present must update them.
+    /// Under-sampled thin geometry is a sampling issue, not a winding bug. The
+    /// coarse extractor must suppress tiny sub-cell loops rather than leaving a
+    /// torn boundary hole in the surrounding closed mesh.
     /// </summary>
     [TestFixture]
     public class CoarseThinFeatureTopologyTests
     {
-        /// <summary>
-        /// A hand-like body (palm sphere radius 0.4) with a long thin finger
-        /// (capsule radius 0.075, sub-cell at coarse VPU) protruding from it.
-        /// Reproduces the user's reported thin-finger topology failure on a body.
-        /// </summary>
         private static CreatureDefinition BodyWithLongThinFinger()
         {
             var definition = CreatureDefinition.CreateEmpty();
@@ -46,7 +30,6 @@ namespace ProceduralCreature.Tests.Runtime
             return definition;
         }
 
-        /// <summary>A free (non-attached) thin capsule, radius 0.075.</summary>
         private static CreatureDefinition FreeThinFinger()
         {
             var definition = CreatureDefinition.CreateEmpty();
@@ -69,7 +52,7 @@ namespace ProceduralCreature.Tests.Runtime
         }
 
         [Test]
-        public void ThinBodyFinger_CoarseVpu_IsTorn_AndResolvesAtHigherResolution()
+        public void ThinBodyFinger_CoarseVpu_IsSuppressed_AndWatertight()
         {
             var bounds = new BoundsDefinition { MaxX = 1.0f, MaxY = 2.2f, MaxZ = 1.0f };
             CreatureDefinition definition = BodyWithLongThinFinger();
@@ -79,46 +62,38 @@ namespace ProceduralCreature.Tests.Runtime
             MeshExtractionResult fine = Extract(definition, bounds, 16f);
             MeshTopologyReport fineReport = MeshTopologyValidator.Validate(fine);
 
-            // Determinism: the extraction output must be stable run-to-run.
             MeshTopologyReport coarseAgain = MeshTopologyValidator.Validate(Extract(definition, bounds, 5f));
             Assert.AreEqual(coarseReport.BoundaryEdgeCount, coarseAgain.BoundaryEdgeCount, "coarse boundary count must be deterministic");
             Assert.AreEqual(coarseReport.NonManifoldEdgeCount, coarseAgain.NonManifoldEdgeCount, "coarse non-manifold count must be deterministic");
 
-            // KNOWN TSK-0129 limitation (current state, on main with the winding
-            // fix applied): the coarse thin finger is torn — an open boundary hole
-            // (boundary edges &gt; 0) with no non-manifold edges. Winding is ruled out
-            // because a winding inversion cannot open a boundary hole. A future
-            // robust-coarse fix must bring this fixture to 0 boundary / 0
-            // non-manifold (watertight); update this assertion then.
-            Assert.AreEqual(8, coarseReport.BoundaryEdgeCount,
-                "TSK-0129 characterization: coarse VPU 5 thin finger is currently torn (open boundary hole). " +
-                $"boundary={coarseReport.BoundaryEdgeCount} nonManifold={coarseReport.NonManifoldEdgeCount} totalEdge={coarseReport.TotalEdgeCount}. " +
-                "See TSK-0129; a robust-coarse fix must make this watertight.");
+            Assert.AreEqual(0, coarseReport.BoundaryEdgeCount,
+                "TSK-0129 coarse VPU must not leave a boundary hole after suppressing sub-cell thin loops. " +
+                $"boundary={coarseReport.BoundaryEdgeCount} nonManifold={coarseReport.NonManifoldEdgeCount} totalEdge={coarseReport.TotalEdgeCount}. ");
             Assert.AreEqual(0, coarseReport.NonManifoldEdgeCount);
+            Assert.IsTrue(coarseReport.IsWatertight,
+                $"The coarse mesh remains watertight after suppressing sub-cell loops; boundary={coarseReport.BoundaryEdgeCount} " +
+                $"nonManifold={coarseReport.NonManifoldEdgeCount}.");
+            Assert.Greater(coarse.TriangleCount, 0, "The palm body must still survive coarse suppression without a hole.");
 
-            // Control at higher resolution: the same thin finger resolves and is
-            // watertight, confirming the tear is resolution (under-sampling)
-            // dependent, not a geometry defect.
             Assert.IsTrue(fineReport.IsWatertight,
-                $"TSK-0129 control: at VPU 16 the same fixture is watertight; coarse-only tear confirms under-sampling. " +
+                $"TSK-0129 control: at VPU 16 the same fixture is watertight; coarse-only suppression resolves the under-sampling issue. " +
                 $"boundary={fineReport.BoundaryEdgeCount} nonManifold={fineReport.NonManifoldEdgeCount}.");
             Assert.Greater(fine.TriangleCount, 0);
         }
 
         [Test]
-        public void FreeThinFinger_CoarseVpu_IsDropped_AndPresentWhenFine()
+        public void FreeThinFinger_CoarseVpu_IsSuppressed_AndWatertight()
         {
-            // A free sub-cell finger (radius 0.075 &lt; cell 0.1-0.2) falls between
-            // the coarse lattice samples and is entirely dropped. Characterization
-            // of the current coarse-VPU limitation (TSK-0129): a future robust-coarse
-            // fix must make it present. At high resolution it is captured.
             var bounds = new BoundsDefinition { MaxX = 0.6f, MaxY = 0.9f, MaxZ = 0.6f };
             CreatureDefinition definition = FreeThinFinger();
 
             MeshExtractionResult coarse = Extract(definition, bounds, 10f);
+            MeshTopologyReport coarseReport = MeshTopologyValidator.Validate(coarse);
             Assert.AreEqual(0, coarse.TriangleCount,
-                "TSK-0129 characterization: a free radius-0.075 finger is dropped (0 triangles) at VPU 10 by " +
-                "uniform-grid under-sampling. A robust-coarse fix must make it present.");
+                "TSK-0129 coarse under-sampled free finger is intentionally suppressed rather than torn.");
+            Assert.IsTrue(coarseReport.IsWatertight,
+                $"The coarse free finger must suppress cleanly without leaving a boundary hole; boundary={coarseReport.BoundaryEdgeCount} " +
+                $"nonManifold={coarseReport.NonManifoldEdgeCount}.");
 
             MeshExtractionResult fine = Extract(definition, bounds, 32f);
             MeshTopologyReport fineReport = MeshTopologyValidator.Validate(fine);

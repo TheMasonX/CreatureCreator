@@ -107,7 +107,13 @@ namespace ProceduralCreature.Editor
             if (generated == null) throw new ArgumentNullException(nameof(generated));
             if (_disposed) throw new ObjectDisposedException(nameof(CreaturePreviewController));
 
-            ApplyPreviewMesh(generated.MainMesh);
+            if (!generated.TryGetImplicitSurface(out GeometryItem implicitSurface))
+            {
+                ClearGeometryObjects();
+                return;
+            }
+
+            ApplyPreviewMesh(implicitSurface.Mesh);
             ClearGeometryObjects();
 
             for (int i = 1; i < generated.Geometry.Count; i++)

@@ -111,6 +111,11 @@ namespace ProceduralCreature.Morphology.Extraction
 
                 foreach (List<CubeContourResolver.LoopVertex> loop in loops)
                 {
+                    if (ShouldSuppressCoarseLoop(loop, grid))
+                    {
+                        continue;
+                    }
+
                     EmitLoop(
                         grid, loop, cx, cy, cz, vertexCache, result,
                         collectTimings, ref vertexWeldingTicks, ref triangleEmissionTicks);
@@ -122,6 +127,41 @@ namespace ProceduralCreature.Morphology.Extraction
             result.TriangleEmissionTime = StopwatchTicksToTimeSpan(triangleEmissionTicks);
 
             return result;
+        }
+
+        private static bool ShouldSuppressCoarseLoop(List<CubeContourResolver.LoopVertex> loop, DensityGrid grid)
+        {
+            if (loop == null || loop.Count < 3)
+            {
+                return true;
+            }
+
+            // Coarse preview sampling can resolve a tiny under-sampled feature as a
+            // small sub-cell loop whose world-space extent is far smaller than a
+            // grid cell. Emitting that loop creates a boundary hole in the otherwise
+            // closed outer mesh; suppressing it keeps the coarse surface stable
+            // without introducing per-triangle SDF checks or large allocations.
+            var min = new Vector3(float.PositiveInfinity, float.PositiveInfinity, float.PositiveInfinity);
+            var max = new Vector3(float.NegativeInfinity, float.NegativeInfinity, float.NegativeInfinity);
+            foreach (CubeContourResolver.LoopVertex vertex in loop)
+            {
+                Vector3 p = vertex.Position;
+                min.x = Mathf.Min(min.x, p.x);
+                min.y = Mathf.Min(min.y, p.y);
+                min.z = Mathf.Min(min.z, p.z);
+                max.x = Mathf.Max(max.x, p.x);
+                max.y = Mathf.Max(max.y, p.y);
+                max.z = Mathf.Max(max.z, p.z);
+            }
+
+            Vector3 extent = max - min;
+            float maximumExtent = Mathf.Max(extent.x, Mathf.Max(extent.y, extent.z));
+            if (maximumExtent <= grid.CellSize * 0.75f)
+            {
+                return true;
+            }
+
+            return false;
         }
 
         private static void EmitLoop(

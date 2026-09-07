@@ -1,10 +1,16 @@
 using System.Collections.Generic;
+using ProceduralCreature.Animation;
+using ProceduralCreature.Animation.Binding;
+using ProceduralCreature.Animation.Ik;
+using ProceduralCreature.Animation.Skinned;
 using ProceduralCreature.Appearance;
 using ProceduralCreature.Common;
 using ProceduralCreature.Definition;
 using ProceduralCreature.Morphology.Extraction;
 using ProceduralCreature.Serialization;
+using ProceduralCreature.Skeleton;
 using UnityEngine;
+using SkeletonModel = ProceduralCreature.Skeleton.Skeleton;
 
 namespace ProceduralCreature.Generation
 {
@@ -20,6 +26,8 @@ namespace ProceduralCreature.Generation
         private readonly List<GameObject> _geometryObjects = new List<GameObject>();
         private Material _previewMaterial;
         private CreatureGenerationScheduler _generationScheduler;
+        private CreatureRig _rig;
+        private CreatureSkinnedMeshRenderer _skinnedRenderer;
 
         private void Awake()
         {
@@ -58,13 +66,13 @@ namespace ProceduralCreature.Generation
                 MeshTopologyReport topology = result.Data.TopologyReport;
 
                 DestroyGeneratedGeometry();
+                BindImplicitSurfaceToRig(generated, result.Data.Definition, result.Data.Snapshot);
 
-                for (int i = 0; i < generated.Geometry.Count; i++)
+                int implicitTriangles = 0;
+                if (generated.TryGetImplicitSurface(out GeometryItem implicitSurface) && implicitSurface.Mesh != null)
                 {
-                    CreateGeometryObject(i, generated.Geometry[i]);
+                    implicitTriangles = implicitSurface.Mesh.triangles.Length / 3;
                 }
-
-                int implicitTriangles = generated.MainMesh != null ? generated.MainMesh.triangles.Length / 3 : 0;
                 Debug.Log($"[CreatureCreator] Runtime preview generated: {generated.Count} geometry item(s), " +
                           $"{implicitTriangles} implicit triangles.", this);
                 if (!topology.IsWatertight)
@@ -103,6 +111,11 @@ namespace ProceduralCreature.Generation
 
         private void CreateGeometryObject(int index, GeometryItem item)
         {
+            if (item.GeometryType == GeometryType.Implicit)
+            {
+                return;
+            }
+
             var go = new GameObject($"{GeometryChildPrefix}{index}");
             go.transform.SetParent(transform, worldPositionStays: false);
             go.AddComponent<MeshFilter>().sharedMesh = item.Mesh;
@@ -166,6 +179,50 @@ namespace ProceduralCreature.Generation
             if (material != null) renderer.sharedMaterial = material;
         }
 
+        private void BindImplicitSurfaceToRig(GeneratedCreature generated, CreatureDefinition definition, ResolvedCreatureSnapshot snapshot)
+        {
+            if (generated == null || definition == null)
+            {
+                return;
+            }
+
+            if (!generated.TryGetImplicitSurface(out GeometryItem implicitItem))
+            {
+                Debug.LogWarning("[CreatureCreator] Runtime preview has no implicit surface to bind to a SkinnedMeshRenderer.", this);
+                return;
+            }
+
+            SkeletonModel skeleton = SkeletonInferrer.Infer(definition);
+            if (skeleton == null || skeleton.Bones.Count == 0)
+            {
+                Debug.LogWarning("[CreatureCreator] Runtime preview could not infer a skeleton for the implicit surface.", this);
+                return;
+            }
+
+            if (_rig == null)
+            {
+                _rig = gameObject.GetComponent<CreatureRig>() ?? gameObject.AddComponent<CreatureRig>();
+            }
+            _rig.Build(skeleton);
+            _rig.ApplyPose(PosedSkeleton.FromRestPose(skeleton));
+
+            if (_skinnedRenderer == null)
+            {
+                _skinnedRenderer = gameObject.GetComponent<CreatureSkinnedMeshRenderer>()
+                    ?? gameObject.AddComponent<CreatureSkinnedMeshRenderer>();
+            }
+
+            float[] radiiByBoneIndex = MorphologyInfluenceRadiusBridge.BuildRadiiByBoneIndex(
+                SkeletonSnapshot.Capture(skeleton), snapshot);
+            Material defaultMaterial = MaterialResolver.ResolveDefault(ResolveMaterialPalette());
+            Material[] materials = defaultMaterial != null ? new[] { defaultMaterial } : null;
+            _skinnedRenderer.Bind(_rig, skeleton, implicitItem.Mesh, radiiByBoneIndex, materials);
+            if (_skinnedRenderer.Renderer != null)
+            {
+                _skinnedRenderer.Renderer.enabled = true;
+            }
+        }
+
         private void DestroyGeneratedGeometry()
         {
             for (int i = _geometryObjects.Count - 1; i >= 0; i--)
@@ -175,6 +232,22 @@ namespace ProceduralCreature.Generation
                 else DestroyImmediate(_geometryObjects[i]);
             }
             _geometryObjects.Clear();
+
+            if (_skinnedRenderer != null)
+            {
+                _skinnedRenderer.Clear();
+                if (Application.isPlaying) Destroy(_skinnedRenderer);
+                else DestroyImmediate(_skinnedRenderer);
+                _skinnedRenderer = null;
+            }
+
+            if (_rig != null)
+            {
+                _rig.Clear();
+                if (Application.isPlaying) Destroy(_rig);
+                else DestroyImmediate(_rig);
+                _rig = null;
+            }
         }
 
         private static Material CreatePreviewMaterial()

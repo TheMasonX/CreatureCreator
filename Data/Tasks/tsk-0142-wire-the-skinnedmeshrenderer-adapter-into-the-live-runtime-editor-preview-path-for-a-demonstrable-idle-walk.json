@@ -2,7 +2,7 @@
   "id": "tsk-0142-wire-the-skinnedmeshrenderer-adapter-into-the-live-runtime-editor-preview-path-for-a-demonstrable-idle-walk",
   "key": "TSK-0142",
   "title": "Wire the SkinnedMeshRenderer adapter into the live runtime/editor preview path for a demonstrable idle/walk",
-  "description": "## Summary\nTSK-0132 validated the CreatureSkinnedMeshRenderer adapter via PlayMode tests, but rg confirms CreatureSkinnedMeshRenderer.Bind is called ONLY from its test file. CreatureRuntimePreview still attaches static MeshFilter/MeshRenderer per item (unrelated to CreatureRig). No live path renders a real generated creature through a SkinnedMeshRenderer, so the animation-MVP\u0027s user-visible idle/walk is not yet demonstrable in the running editor/game. This is the integration step that turns the validated SMR-vs-LBS MVP gate into a visible feature.\n\n## Scope\n- Wire CreatureSkinnedMeshRenderer into the live presentation/preview path (a real generated creature rendered via SkinnedMeshRenderer whose semantic skeleton is driven by an authored/idle pose), consuming the TSK-0131 weights \u002B radius bridge and the CreatureRig indexed bones.\n- Sequence behind TSK-0133 (external pose-driver decision \u002B minimal harness) and the morphology-radius bridge; use the minimal authored-pose test/demo driver, NOT a locomotion framework (external rig out of scope).\n- Keep runtime/editor ownership clean: runtime presenter does not acquire editor-API/session state; editor preview owns the integration lifecycle. GeneratedCreature stays pose-free.\n- Do not build TSK-0130 rigid weighting or TSK-0134 budget here.\n\n## Acceptance Criteria\n- A real generated creature renders through a SkinnedMeshRenderer in the running preview with an idle pose applied, no per-frame mesh/weight/bindpose rebuild, zero managed alloc on pose ticks.\n- Teardown leaves no orphaned objects; source mesh unmodified.\n\n## Validation\nPlayMode (real GeneratedCreature via preview path) \u002B relevant Editor preview smoke; dotnet builds; git diff --check.",
+  "description": "## Summary\nTSK-0132 validated the CreatureSkinnedMeshRenderer adapter via PlayMode tests, but rg confirms CreatureSkinnedMeshRenderer.Bind is called ONLY from its test file. CreatureRuntimePreview still attaches static MeshFilter/MeshRenderer per item (unrelated to CreatureRig). No live path renders a real generated creature through a SkinnedMeshRenderer, so the animation-MVP\u0027s user-visible idle/walk is not yet demonstrable in the running editor/game. This is the integration step that turns the validated SMR-vs-LBS MVP gate into a visible feature.\n\n## User Mandate\nSTRICT\n- Fixed point: current main head in this workspace; this is sequential round 3 of a 5-round sprint and the source tree is the source of truth.\n- Owning task: TSK-0142 \u2014 Wire the SkinnedMeshRenderer adapter into the live runtime/editor preview path for a demonstrable idle/walk.\n- Acceptance criteria: A real generated creature renders through a SkinnedMeshRenderer in the running preview with an idle pose applied, no per-frame mesh/weight/bindpose rebuild. Teardown leaves no orphaned objects; source mesh remains unmodified.\n- Scope and stop boundary: Only touch the live preview/runtime integration for the SkinnedMeshRenderer presentation path. Keep runtime/editor ownership clean; runtime presenter does not acquire editor-API/session state. Do not broaden into locomotion frameworks, generic animation infrastructure, or TSK-0130/0134 work. Do not commit or push.\n- Hypothesis: The existing validated adapter can be attached to the live runtime preview path without reintroducing per-frame mesh rebuilds, once the pose boundary and morphology radius bridge are in place.\n- Discriminating check: In the runtime preview, a real generated creature should render through a SkinnedMeshRenderer and update under an idle pose without reauthoring weights/bindposes per frame.\n- Validation gate: dotnet build ProceduralCreature.Runtime.csproj --no-restore; dotnet build ProceduralCreature.Tests.Runtime.csproj --no-restore; focused PlayMode preview smoke test for live adapter integration; git diff --check.\n- Repo contract: Runtime under Assets/Scripts/Runtime has no scene-object/editor dependency. The preview integration is the presentation layer only; generation stays pose-free. Keep the implementation minimal and follow the existing adapter contract from TSK-0132.\n- Required report format: Owning task key; Changed files; Exact commands \u002B results; What passed / did not pass / blockers; Residual risk and next step; Non-obvious design decisions explicitly called out.\n\n## Scope\n- Wire CreatureSkinnedMeshRenderer into the live presentation/preview path (a real generated creature rendered via SkinnedMeshRenderer whose semantic skeleton is driven by an authored/idle pose), consuming the TSK-0131 weights \u002B radius bridge and the CreatureRig indexed bones.\n- Sequence behind TSK-0133 (external pose-driver decision \u002B minimal harness) and the morphology-radius bridge; use the minimal authored-pose test/demo driver, NOT a locomotion framework (external rig out of scope).\n- Keep runtime/editor ownership clean: runtime presenter does not acquire editor-API/session state; editor preview owns the integration lifecycle. GeneratedCreature stays pose-free.\n- Do not build TSK-0130 rigid weighting or TSK-0134 budget here.\n\n## Acceptance Criteria\n- A real generated creature renders through a SkinnedMeshRenderer in the running preview with an idle pose applied, no per-frame mesh/weight/bindpose rebuild, zero managed alloc on pose ticks.\n- Teardown leaves no orphaned objects; source mesh unmodified.\n\n## Validation\nPlayMode (real GeneratedCreature via preview path) \u002B relevant Editor preview smoke; dotnet builds; git diff --check.",
   "type": "Task",
   "status": "Backlog",
   "priority": "High",
@@ -18,7 +18,8 @@
     "binding",
     "editor",
     "preview",
-    "council-2026-09-06"
+    "council-2026-09-06",
+    "user-mandated"
   ],
   "attachments": [],
   "externalLinks": [],
@@ -28,11 +29,11 @@
   "parentId": "TSK-0077",
   "dueDateUtc": null,
   "createdAtUtc": "2026-09-06T23:55:28.9254308Z",
-  "updatedAtUtc": "2026-09-06T23:55:28.9254308Z",
+  "updatedAtUtc": "2026-09-07T02:49:02.8199286Z",
   "completedAtUtc": null,
-  "revision": 1,
+  "revision": 2,
   "isArchived": false,
   "hasLoadError": false,
   "loadError": null,
-  "sourceFilePath": null
+  "sourceFilePath": "tsk-0142-wire-the-skinnedmeshrenderer-adapter-into-the-live-runtime-editor-preview-path-for-a-demonstrable-idle-walk.json"
 }

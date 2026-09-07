@@ -5,6 +5,7 @@ using ProceduralCreature.Animation.Ik;
 using ProceduralCreature.Common;
 using ProceduralCreature.Skeleton;
 using UnityEngine;
+using UnityEngine.TestTools;
 
 namespace ProceduralCreature.Tests.Runtime
 {
@@ -204,6 +205,52 @@ namespace ProceduralCreature.Tests.Runtime
             // identity (the explicit space-contract invariant).
             Assert.That(Vector3.Distance(rig.Bones["root"].position, new Vector3(1f, 0f, 0f)), Is.LessThan(1e-5f));
             Assert.That(Vector3.Distance(rig.Bones["root"].position, new Vector3(11f, 0f, 0f)), Is.GreaterThan(1f));
+        }
+
+        [UnityTest]
+        public System.Collections.IEnumerator ExternalPoseDriverHarness_DirectIndexedPose_MovesBoneWithinOneFrame()
+        {
+            var host = new GameObject("PoseDriverHost");
+            _objects.Add(host);
+
+            var skeleton = new Skeleton.Skeleton();
+            skeleton.Bones.Add(new Bone
+            {
+                Id = "root",
+                Position = Vector3.zero,
+                Rotation = Quaternion.identity,
+            });
+            skeleton.Bones.Add(new Bone
+            {
+                Id = "tip",
+                ParentBoneId = "root",
+                Position = Vector3.right,
+                Rotation = Quaternion.identity,
+            });
+
+            CreatureRig rig = host.AddComponent<CreatureRig>();
+            rig.Build(skeleton);
+
+            // Chosen external pose-driver interface: a direct `PosedSkeleton` is pushed
+            // through `CreatureRig.ApplyPose`, without introducing any Animator/Avatar
+            // pipeline or locomotion state machine.
+            PosedSkeleton restPose = PosedSkeleton.FromRestPose(skeleton);
+            PosedSkeleton drivenPose = restPose.WithUpdatedPositions(
+                new Dictionary<string, Vector3>
+                {
+                    ["tip"] = new Vector3(2f, 0f, 0f),
+                });
+
+            rig.ApplyPose(restPose);
+            yield return null;
+
+            rig.ApplyPose(drivenPose);
+            Assert.That(rig.Bones["tip"].position.x, Is.EqualTo(2f).Within(1e-5f),
+                "direct indexed pose application must move the real bone at the chosen boundary");
+
+            yield return null;
+            Assert.That(rig.Bones["tip"].position.x, Is.EqualTo(2f).Within(1e-5f),
+                "the moved bone remains in-place after a frame advance");
         }
     }
 }

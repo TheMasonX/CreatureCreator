@@ -10,9 +10,8 @@ namespace ProceduralCreature.Generation
     /// Multi-item output of creature generation (CC-031). A creature is no longer a
     /// single Mesh: it is a deterministic, ordered collection of geometry items.
     /// The implicit combined surface (Body + Shape/Limb parts) is identified
-    /// semantically via <see cref="TryGetImplicitSurface"/> (and <see cref="MainMesh"/>,
-    /// retained as compatibility); mesh-asset and procedural items follow in
-    /// ascending SourcePartId order.
+    /// semantically via <see cref="TryGetImplicitSurface"/>; mesh-asset and
+    /// procedural items follow in ascending SourcePartId order.
     ///
     /// The collection is read-only once built: the only construction path is the
     /// internal <see cref="AddGeometry"/> choke point, which only
@@ -21,7 +20,12 @@ namespace ProceduralCreature.Generation
     /// </summary>
     public sealed class GeneratedCreature
     {
-        /// <summary>SourcePartId used by the implicit combined surface item — no single part owns it.</summary>
+        /// <summary>
+        /// Explicit sentinel for the implicit combined-surface item. The empty string
+        /// is reserved to mean "this item is not owned by any single part"; it is not
+        /// a valid authored part id and is the single authoritative policy for the
+        /// implicit-surface slot.
+        /// </summary>
         public const string ImplicitSurfaceSourceId = "";
 
         /// <summary>Suffix on a mirrored item's SourcePartId (matches SkeletonInferrer.MirrorSuffix).</summary>
@@ -33,13 +37,6 @@ namespace ProceduralCreature.Generation
         public IReadOnlyList<GeometryItem> Geometry => _geometry;
 
         public int Count => _geometry.Count;
-
-        /// <summary>
-        /// Compatibility accessor for the implicit combined surface mesh. Retained
-        /// only until callers migrate to <see cref="TryGetImplicitSurface"/>; new
-        /// code should prefer the semantic accessor over positional item 0.
-        /// </summary>
-        public Mesh MainMesh => TryGetImplicitSurface(out GeometryItem item) ? item.Mesh : null;
 
         /// <summary>
         /// Single internal construction path (TSK-0125). Only
@@ -128,25 +125,67 @@ namespace ProceduralCreature.Generation
         {
             if (mesh == null) throw new DomainException("geometry item mesh must not be null.");
             if (sourcePartId == null) throw new DomainException("geometry item source part id must not be null.");
+
+            MaterialRegions = materialRegions ?? Array.Empty<MaterialRegion>();
+            ValidateMaterialRegions(mesh);
+
             SourcePartId = sourcePartId;
             GeometryType = geometryType;
             Mesh = mesh;
             SourceMesh = sourceMesh;
             RestPlacement = restPlacement;
-            MaterialRegions = materialRegions ?? Array.Empty<MaterialRegion>();
             RigBinding = rigBinding;
+        }
+
+        private void ValidateMaterialRegions(Mesh mesh)
+        {
+            if (MaterialRegions.Count == 0)
+            {
+                return;
+            }
+
+            int maxSubmeshIndex = Mathf.Max(0, mesh.subMeshCount - 1);
+            for (int i = 0; i < MaterialRegions.Count; i++)
+            {
+                MaterialRegion region = MaterialRegions[i];
+                if (region == null)
+                {
+                    throw new DomainException($"geometry item material region {i} must not be null.");
+                }
+
+                if (region.SubmeshIndex < 0 || region.SubmeshIndex > maxSubmeshIndex)
+                {
+                    throw new DomainException(
+                        $"geometry item material region {i} submesh index {region.SubmeshIndex} is out of range for mesh submesh count {mesh.subMeshCount}.");
+                }
+
+                int[] submeshTriangles = mesh.GetTriangles(region.SubmeshIndex);
+                int maxStart = submeshTriangles.Length;
+                if (region.StartIndex < 0 || region.StartIndex > maxStart)
+                {
+                    throw new DomainException(
+                        $"geometry item material region {i} start index {region.StartIndex} is outside the valid range [0, {maxStart}] for submesh {region.SubmeshIndex}.");
+                }
+
+                if (region.IndexCount < 0 || region.StartIndex + region.IndexCount > maxStart)
+                {
+                    throw new DomainException(
+                        $"geometry item material region {i} range [{region.StartIndex}, {region.StartIndex + region.IndexCount}) exceeds submesh {region.SubmeshIndex} length {maxStart}.");
+                }
+            }
         }
     }
 
     /// <summary>
-    /// A submaterial assignment on a geometry item (CC-031, TSK-0125). Model 1
-    /// (ADR-009): a region addresses one explicit <see cref="SubmeshIndex"/> and a
-    /// contiguous [<see cref="StartIndex"/>, StartIndex + <see cref="IndexCount"/>)
-    /// range of that submesh's indices, carrying a material key. Implicit items
-    /// keep an empty list (vertex-color bake path); a mesh-asset item with a
-    /// submaterial override emits one region per submesh so the material coverage
-    /// is deterministic and complete, with no ambiguity about which indices it
-    /// refers to.
+    /// A submaterial assignment on a geometry item (CC-031, TSK-0125). Policy: a
+    /// region is a strict, explicit mapping to a single zero-based submesh index
+    /// with a contiguous [StartIndex, StartIndex + IndexCount) range within that
+    /// submesh. The implicit combined item keeps an empty list; mesh-asset items
+    /// with a submaterial override emit one region per submesh so the material
+    /// coverage is deterministic and complete, with no ambiguity about which
+    /// indices it refers to. This is the single authoritative region contract for
+    /// the output model; renderers resolve MaterialKey, but generation never hides
+    /// or infers a wider range.
     /// </summary>
     public sealed class MaterialRegion
     {
@@ -163,7 +202,7 @@ namespace ProceduralCreature.Generation
             if (indexCount < 0) throw new DomainException("material region index count must not be negative.");
             if (startIndex < 0) throw new DomainException("material region start index must not be negative.");
             if (submeshIndex < 0) throw new DomainException("material region submesh index must not be negative.");
-            if (materialKey == null) throw new DomainException("material region material key must not be null.");
+            if (string.IsNullOrWhiteSpace(materialKey)) throw new DomainException("material region material key must not be null or whitespace.");
             SubmeshIndex = submeshIndex;
             StartIndex = startIndex;
             IndexCount = indexCount;

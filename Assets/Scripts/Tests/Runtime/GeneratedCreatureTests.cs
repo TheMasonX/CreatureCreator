@@ -87,7 +87,8 @@ namespace ProceduralCreature.Tests.Runtime
             Assert.AreEqual(GeneratedCreature.ImplicitSurfaceSourceId, generated.Geometry[0].SourcePartId);
             Assert.AreEqual(GeometryType.Implicit, generated.Geometry[0].GeometryType);
             Assert.IsNotNull(generated.Geometry[0].Mesh);
-            Assert.IsNotNull(generated.MainMesh);
+            Assert.IsTrue(generated.TryGetImplicitSurface(out GeometryItem implicitItem));
+            Assert.AreSame(generated.Geometry[0].Mesh, implicitItem.Mesh);
         }
 
         [Test]
@@ -388,6 +389,29 @@ namespace ProceduralCreature.Tests.Runtime
         }
 
         [Test]
+        public void GeneratedCreature_DoesNotExposeLegacyMainMeshShim()
+        {
+            Assert.IsNull(typeof(GeneratedCreature).GetProperty("MainMesh"),
+                "the legacy MainMesh shim is removed; callers must use TryGetImplicitSurface().");
+        }
+
+        [Test]
+        public void GeometryItem_InvalidMaterialRegionRange_ThrowsDomainException()
+        {
+            var mesh = UnitCube();
+            var invalidRegion = new MaterialRegion(0, 0, mesh.triangles.Length + 1, "eye_white");
+
+            Assert.Throws<DomainException>(() => new GeometryItem(
+                sourcePartId: "eye",
+                geometryType: GeometryType.MeshAsset,
+                mesh: mesh,
+                sourceMesh: null,
+                restPlacement: Matrix4x4.identity,
+                materialRegions: new[] { invalidRegion },
+                rigBinding: new RigBindingMetadata("eye", null, false)));
+        }
+
+        [Test]
         public void GeneratedCreature_AddGeometry_NullItem_ThrowsDomainException()
         {
             var generated = new GeneratedCreature();
@@ -421,8 +445,6 @@ namespace ProceduralCreature.Tests.Runtime
             Assert.AreEqual(GeometryType.Implicit, implicitItem.GeometryType);
             Assert.AreEqual(GeneratedCreature.ImplicitSurfaceSourceId, implicitItem.SourcePartId);
             Assert.IsNotNull(implicitItem.Mesh);
-            Assert.IsNotNull(generated.MainMesh);
-            Assert.AreSame(implicitItem.Mesh, generated.MainMesh);
         }
 
         [Test]
