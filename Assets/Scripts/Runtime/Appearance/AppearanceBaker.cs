@@ -48,6 +48,9 @@ namespace ProceduralCreature.Appearance
             CreatureDefinition definition, MeshExtractionResult mesh,
             GenerationDiagnostics diagnostics)
         {
+            if (definition == null) throw new DomainException("definition must not be null.");
+            if (mesh == null) throw new DomainException("mesh must not be null.");
+
             var compiledParts = SdfProgramBuilder.CompileIndividualPartsPortable(definition);
             SdfProgram bodyProgram = SdfProgramBuilder.CompilePortableBodyField(definition);
             ResolvedBody body = definition.Body == null
