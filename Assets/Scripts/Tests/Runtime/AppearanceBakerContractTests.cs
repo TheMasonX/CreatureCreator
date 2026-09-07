@@ -1,6 +1,7 @@
 using NUnit.Framework;
 using ProceduralCreature.Appearance;
 using ProceduralCreature.Common;
+using ProceduralCreature.Definition;
 using UnityEngine;
 
 namespace ProceduralCreature.Tests.Runtime
@@ -9,19 +10,19 @@ namespace ProceduralCreature.Tests.Runtime
     public sealed class AppearanceBakerContractTests
     {
         [Test]
-        public void BakePart_NullAppearance_ThrowsDomainException()
+        public void BakePart_NullPart_ThrowsDomainException()
         {
             var positions = new[] { Vector3.zero };
             var normals = new[] { Vector3.up };
 
             Assert.Throws<DomainException>(() =>
-                AppearanceBaker.BakePart(null, positions, normals));
+                AppearanceBaker.BakePart((CreaturePart)null, positions, normals));
         }
 
         [Test]
         public void BakePart_MismatchedPositionsAndNormals_ThrowsDomainException()
         {
-            var appearance = AppearanceDefinition.Default;
+            AppearanceDefinition appearance = AppearanceDefinition.Default;
             var positions = new[] { Vector3.zero, Vector3.right };
             var normals = new[] { Vector3.up };
 
