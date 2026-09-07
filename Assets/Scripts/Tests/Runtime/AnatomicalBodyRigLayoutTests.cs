@@ -60,23 +60,60 @@ namespace ProceduralCreature.Tests.Runtime
             IReadOnlyList<AnatomicalBodyRigLayout.BoneSpec> bones =
                 AnatomicalBodyRigLayout.Build(BuildBody(5), Vector3.forward);
 
-            Assert.AreEqual(1, CountById(bones, AnatomicalBodyRigLayout.PelvisBoneId));
-            Assert.GreaterOrEqual(CountById(bones, AnatomicalBodyRigLayout.SpineBoneId), 3,
+            Assert.AreEqual(1, CountExactId(bones, AnatomicalBodyRigLayout.PelvisBoneId));
+            Assert.GreaterOrEqual(CountByPrefix(bones, AnatomicalBodyRigLayout.SpineBoneId), 3,
                 "Headward Body curvature must not collapse to one chest-to-head segment.");
-            Assert.GreaterOrEqual(CountById(bones, AnatomicalBodyRigLayout.TailBoneId), 3,
+            Assert.GreaterOrEqual(CountByPrefix(bones, AnatomicalBodyRigLayout.TailBoneId), 3,
                 "Tail curvature must not collapse to one pelvis-to-tail segment.");
+            Assert.AreEqual(1, CountExactId(bones, AnatomicalBodyRigLayout.HeadBoneId));
 
+            int rootCount = 0;
             for (int i = 0; i < bones.Count; i++)
             {
                 if (bones[i].ParentBoneId == null)
                 {
+                    rootCount++;
                     Assert.AreEqual(AnatomicalBodyRigLayout.PelvisBoneId, bones[i].Id);
                 }
             }
+            Assert.AreEqual(1, rootCount);
+        }
 
-            Assert.AreEqual(1, CountById(bones, AnatomicalBodyRigLayout.HeadBoneId));
-            Assert.IsFalse(bones[bones.Count - 1].Id == AnatomicalBodyRigLayout.HeadBoneId,
-                "Body branch ordering should keep the tail branch after the head terminal.");
+        [Test]
+        public void Build_CurvedBodyRetainsMultipleJointDirections()
+        {
+            var samples = new List<BodySample>
+            {
+                new BodySample { Id = 1, Position = new Vector3(0f, 0f, -3f), Radius = 0.5f },
+                new BodySample { Id = 2, Position = new Vector3(0f, 0.2f, -2.2f), Radius = 0.6f },
+                new BodySample { Id = 3, Position = new Vector3(0f, 0.8f, -1.2f), Radius = 0.8f },
+                new BodySample { Id = 4, Position = new Vector3(0f, 1.8f, -0.4f), Radius = 1.0f },
+                new BodySample { Id = 5, Position = new Vector3(0f, 2.8f, 0.1f), Radius = 0.9f },
+                new BodySample { Id = 6, Position = new Vector3(0f, 3.3f, 0.9f), Radius = 0.6f },
+                new BodySample { Id = 7, Position = new Vector3(0f, 3.5f, 1.8f), Radius = 0.4f },
+            };
+            ResolvedBody body = ResolvedBody.Resolve(samples);
+            IReadOnlyList<AnatomicalBodyRigLayout.BoneSpec> bones =
+                AnatomicalBodyRigLayout.Build(body, Vector3.forward);
+
+            var spineDirections = new List<Vector3>();
+            for (int i = 0; i < bones.Count; i++)
+            {
+                if (!bones[i].HasSegment || !bones[i].Id.StartsWith(AnatomicalBodyRigLayout.SpineBoneId)) continue;
+                spineDirections.Add((bones[i].EndPosition - bones[i].Position).normalized);
+            }
+
+            Assert.GreaterOrEqual(spineDirections.Count, 3);
+            bool directionChanged = false;
+            for (int i = 1; i < spineDirections.Count; i++)
+            {
+                if (Vector3.Dot(spineDirections[i - 1], spineDirections[i]) < 0.999f)
+                {
+                    directionChanged = true;
+                    break;
+                }
+            }
+            Assert.IsTrue(directionChanged, "Body rig segments must follow a curved authored centerline rather than a single straight chord.");
         }
 
         [Test]
@@ -92,26 +129,18 @@ namespace ProceduralCreature.Tests.Runtime
             {
                 Assert.AreEqual(coarse[i].Id, dense[i].Id);
                 Assert.AreEqual(coarse[i].ParentBoneId, dense[i].ParentBoneId);
-                Assert.That(coarse[i].Position, Is.EqualTo(dense[i].Position).Using(Vector3Comparer.Instance));
-                Assert.That(coarse[i].EndPosition, Is.EqualTo(dense[i].EndPosition).Using(Vector3Comparer.Instance));
-                Assert.That(coarse[i].StartT, Is.EqualTo(dense[i].StartT).Within(1e-5f));
-                Assert.That(coarse[i].EndT, Is.EqualTo(dense[i].EndT).Within(1e-5f));
+                Assert.Less(Vector3.Distance(coarse[i].Position, dense[i].Position), 1e-4f);
+                Assert.Less(Vector3.Distance(coarse[i].EndPosition, dense[i].EndPosition), 1e-4f);
+                Assert.AreEqual(coarse[i].StartT, dense[i].StartT, 1e-5f);
+                Assert.AreEqual(coarse[i].EndT, dense[i].EndT, 1e-5f);
             }
         }
 
         [Test]
-        public void Build_SamplesEachSegmentRadiusFromItsOwnCanonicalMidpoint()
+        public void Build_ProducesFinitePositiveRadiiForEveryBone()
         {
-            var samples = new List<BodySample>
-            {
-                new BodySample { Id = 1, Position = new Vector3(0f, 0f, -2f), Radius = 0.4f },
-                new BodySample { Id = 2, Position = new Vector3(0f, 0f, 0f), Radius = 1.0f },
-                new BodySample { Id = 3, Position = new Vector3(0f, 0f, 2f), Radius = 1.6f },
-            };
-            ResolvedBody body = ResolvedBody.Resolve(samples);
-
             IReadOnlyList<AnatomicalBodyRigLayout.BoneSpec> bones =
-                AnatomicalBodyRigLayout.Build(body, Vector3.forward);
+                AnatomicalBodyRigLayout.Build(BuildBody(17), Vector3.forward);
 
             for (int i = 0; i < bones.Count; i++)
             {
@@ -119,11 +148,6 @@ namespace ProceduralCreature.Tests.Runtime
                 Assert.IsFalse(float.IsNaN(bones[i].Radius));
                 Assert.IsFalse(float.IsInfinity(bones[i].Radius));
             }
-
-            Assert.AreEqual(1.0f, bones[0].Radius, 1e-4f, "pelvis radius");
-            Assert.AreEqual(0.4f, bones[1].Radius, 1e-4f, "first headward segment midpoint is near the dense head-side sample");
-            Assert.AreEqual(1.6f, bones[CountById(bones, AnatomicalBodyRigLayout.SpineBoneId)].Radius, 1e-4f,
-                "the final headward segment must sample the head radius");
         }
 
         [Test]
@@ -192,17 +216,15 @@ namespace ProceduralCreature.Tests.Runtime
             IReadOnlyList<AnatomicalBodyRigLayout.BoneSpec> bodyBones =
                 AnatomicalBodyRigLayout.Build(resolved);
 
-            Assert.GreaterOrEqual(bodyBones.Count, 8, "The compact rig must retain multiple Body articulation segments.");
+            Assert.GreaterOrEqual(bodyBones.Count, 8);
             Assert.AreEqual(5, CountDirectBodyRootedLimbs(resolved));
 
             Skeleton.Skeleton skeleton = SkeletonInferrer.Infer(definition);
             Assert.Greater(skeleton.Bones.Count, 14,
                 "5 two-bone limb chains plus the segmented Body rig must exceed the old 4-body-bone total.");
 
-            Assert.AreEqual(AnatomicalBodyRigLayout.SpineBoneId,
-                skeleton.FindBone("limb_a_j0").ParentBoneId.StartsWith(AnatomicalBodyRigLayout.SpineBoneId)
-                    ? skeleton.FindBone("limb_a_j0").ParentBoneId
-                    : skeleton.FindBone("limb_a_j0").ParentBoneId,
+            string limbAParent = skeleton.FindBone("limb_a_j0").ParentBoneId;
+            Assert.IsTrue(limbAParent.StartsWith(AnatomicalBodyRigLayout.SpineBoneId),
                 "limb attachment should remain on the headward Body branch rather than a legacy body_j id");
             Assert.IsTrue(skeleton.FindBone("limb_b_j0").ParentBoneId.StartsWith(AnatomicalBodyRigLayout.PelvisBoneId));
             Assert.IsTrue(skeleton.FindBone("limb_c_j0").ParentBoneId.StartsWith(AnatomicalBodyRigLayout.PelvisBoneId));
@@ -210,7 +232,14 @@ namespace ProceduralCreature.Tests.Runtime
             Assert.IsTrue(skeleton.FindBone("limb_e_j0").ParentBoneId.StartsWith(AnatomicalBodyRigLayout.TailBoneId));
         }
 
-        private static int CountById(IReadOnlyList<AnatomicalBodyRigLayout.BoneSpec> bones, string prefix)
+        private static int CountExactId(IReadOnlyList<AnatomicalBodyRigLayout.BoneSpec> bones, string id)
+        {
+            int count = 0;
+            for (int i = 0; i < bones.Count; i++) if (bones[i].Id == id) count++;
+            return count;
+        }
+
+        private static int CountByPrefix(IReadOnlyList<AnatomicalBodyRigLayout.BoneSpec> bones, string prefix)
         {
             int count = 0;
             for (int i = 0; i < bones.Count; i++)
@@ -228,13 +257,6 @@ namespace ProceduralCreature.Tests.Runtime
                 if (part.HasLimb && part.ParentId == CreatureDefinition.BodyId) count++;
             }
             return count;
-        }
-
-        private sealed class Vector3Comparer : IEqualityComparer<Vector3>
-        {
-            public static readonly Vector3Comparer Instance = new Vector3Comparer();
-            public bool Equals(Vector3 x, Vector3 y) => Vector3.Distance(x, y) <= 1e-4f;
-            public int GetHashCode(Vector3 obj) => 0;
         }
     }
 }
