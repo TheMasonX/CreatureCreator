@@ -216,6 +216,7 @@ namespace ProceduralCreature.Appearance
 
         public static Color[] BakePart(AppearanceDefinition appearance, IReadOnlyList<Vector3> positions, IReadOnlyList<Vector3> normals)
         {
+            if (appearance == null) throw new DomainException("appearance must not be null.");
             if (positions == null) throw new DomainException("positions must not be null.");
             if (normals == null) throw new DomainException("normals must not be null.");
             if (positions.Count != normals.Count)
@@ -234,8 +235,6 @@ namespace ProceduralCreature.Appearance
         private static Color BakeVertexColor(Vector3 position, Vector3 normal, Color baseColor, int noiseSeed, float noiseScale)
         {
             float noise = TriplanarNoise.Evaluate(position, normal, noiseSeed, noiseScale);
-
-            // Remap noise from [0,1] to [1-BrightnessVariation, 1+BrightnessVariation].
             float brightness = 1f + (noise * 2f - 1f) * BrightnessVariation;
 
             return new Color(
