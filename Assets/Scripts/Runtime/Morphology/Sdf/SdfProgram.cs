@@ -165,9 +165,14 @@ namespace ProceduralCreature.Morphology.Sdf
             }
 
             var values = new NativeArray<float>(operations.Length, Allocator.Temp);
-            float result = EvaluateInto(operations, rootIndex, point, values, 0, influenceRadius, allowCulling);
-            values.Dispose();
-            return result;
+            try
+            {
+                return EvaluateInto(operations, rootIndex, point, values, 0, influenceRadius, allowCulling);
+            }
+            finally
+            {
+                values.Dispose();
+            }
         }
 
         public static float EvaluateReference(NativeArray<SdfOperation>.ReadOnly operations, int rootIndex,
