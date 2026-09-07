@@ -1,0 +1,37 @@
+{
+  "id": "tsk-0166-export-generated-creatures-as-gltf-glb-with-skeleton-and-skinning",
+  "key": "TSK-0166",
+  "title": "Export generated creatures as standard glTF/GLB with skeleton and skinning",
+  "description": "## Summary\nProvide a standard, shareable export path for a generated creature that preserves the rest mesh, skeleton hierarchy, bone ordering, bind poses, vertex skin weights, submeshes/material assignments, and mirrored identities. Prefer glTF 2.0 / GLB so an exported artifact can be inspected independently of Unity and shared for debugging or review.\n\n## User requirement\nThe exported artifact should be simple enough to share with external reviewers and should contain the information needed to inspect animation binding, not merely a static mesh.\n\n## Scope\n- Export the generated implicit surface through the existing resolved `CreatureSkinnedMeshRenderer`/binding data path.\n- Export the resolved skeleton hierarchy and rest transforms in stable semantic/index order.\n- Export up to the existing four influences per vertex with normalized weights.\n- Export bind poses / equivalent glTF inverse-bind matrices.\n- Preserve submeshes and material slots where glTF supports the source information without introducing a custom runtime format.\n- Preserve mirrored bone identity and deterministic ordering.\n- Provide a deterministic editor command/API that writes a `.glb` or `.gltf` plus required resources.\n- Keep export build-time/editor-time only; never add export work to animation ticks or procedural generation hot paths.\n- Add an optional diagnostic companion JSON containing CreatureCreator semantic IDs and task/audit metadata if this can be done without contaminating the standard glTF payload.\n\n## Non-goals\n- Do not create a proprietary CreatureCreator interchange format as the primary export.\n- Do not add animation locomotion/state-machine logic.\n- Do not regenerate geometry or recalculate weights during export if the generated/binding result already contains them.\n- Do not make glTF a dependency of the runtime animation hot path.\n\n## Acceptance Criteria\n- A real generated creature such as `dinus_uprightus` exports successfully.\n- The exported mesh matches the generated rest geometry within the established tolerance.\n- The exported skeleton contains the same semantic bone count/order/parenting and rest transforms as `SkeletonSnapshot`.\n- The exported skin weights match the binding data and retain the four-influence ceiling.\n- Importing the GLB into a standard glTF viewer shows the creature intact and skinned; a controlled bone pose deforms the mesh in the expected region.\n- Mirrored limb deformation remains isolated and correct in the exported artifact.\n- Export does not mutate the source mesh or creature definition.\n- Export is deterministic for the same generated creature/binding input.\n- No per-frame/runtime dependency on the exporter exists.\n\n## Validation\nUse a real generated creature and compare exported rest mesh/skeleton/weights against `GeneratedCreature`, `SkeletonSnapshot`, and `CreatureSkinnedMeshRenderer` binding data. Validate with at least one external glTF viewer or importer plus automated structural checks. Run dotnet builds and relevant Unity editor tests; measure export time separately from per-frame animation.\n\n## Ownership\nChild of the animation/presentation workstream. The exporter consumes existing binding data; it does not become a second source of skeleton/weight truth.\n\n## Status\nBacklog.\n\n## Notes\nThe first implementation may target GLB only, provided it remains standards-compliant and contains mesh + skin + joints + inverse bind matrices in one shareable file."
+  ,
+  "type": "Task",
+  "status": "Backlog",
+  "priority": "Medium",
+  "assigneeMode": "Custom",
+  "assigneeDirectoryId": null,
+  "assigneeCustomText": "Agent",
+  "reporter": "anonymous",
+  "labels": [
+    "runtime",
+    "animation",
+    "skinning",
+    "binding",
+    "export",
+    "editor",
+    "interchange"
+  ],
+  "attachments": [],
+  "externalLinks": [],
+  "linkedPages": [],
+  "comments": [],
+  "epicId": null,
+  "parentId": "TSK-0077",
+  "dueDateUtc": null,
+  "createdAtUtc": "2026-09-07T19:50:00Z",
+  "updatedAtUtc": "2026-09-07T19:50:00Z",
+  "completedAtUtc": null,
+  "revision": 1,
+  "isArchived": false,
+  "hasLoadError": false,
+  "sourceFilePath": "tsk-0166-export-generated-creatures-as-gltf-glb-with-skeleton-and-skinning.json"
+}
