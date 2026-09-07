@@ -98,7 +98,10 @@ namespace ProceduralCreature.Animation.Skinned
                     if (Application.isPlaying) Destroy(skinnedObject);
                     else DestroyImmediate(skinnedObject);
                 }
-                else if (skinnedMesh != null)
+
+                // The replacement mesh is not registered in _ownedMeshes until commit,
+                // so it must be disposed independently even when a GameObject was created.
+                if (skinnedMesh != null)
                 {
                     if (Application.isPlaying) Destroy(skinnedMesh);
                     else DestroyImmediate(skinnedMesh);
