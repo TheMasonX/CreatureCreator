@@ -43,8 +43,10 @@ namespace ProceduralCreature.Animation.Binding
                 var scratch = new NativeArray<float>(scratchLength, Allocator.Temp);
                 try
                 {
-                    SkeletonModelSnapshot bodyRig = BuildBodyRigSnapshot(snapshot);
+                    IReadOnlyList<AnatomicalBodyRigLayout.BoneSpec> bodyRig =
+                        AnatomicalBodyRigLayout.Build(snapshot);
                     var domains = new InfluenceDomain[vertices.Count];
+
                     for (int vertexIndex = 0; vertexIndex < vertices.Count; vertexIndex++)
                     {
                         Vector3 vertex = vertices[vertexIndex];
@@ -99,73 +101,62 @@ namespace ProceduralCreature.Animation.Binding
             }
         }
 
-        private static InfluenceDomain BuildBodyDomain(SkeletonModelSnapshot bodyRig, Vector3 vertex)
+        private static InfluenceDomain BuildBodyDomain(
+            IReadOnlyList<AnatomicalBodyRigLayout.BoneSpec> bodyRig,
+            Vector3 vertex)
         {
-            var candidates = new List<BodyCandidate>(bodyRig.Count);
+            if (bodyRig == null || bodyRig.Count == 0)
+                throw new DomainException("A Body influence domain requires a non-empty compact Body rig.");
+
+            // Keep only the four nearest Body bones. Insertion is O(bodyBones * 4),
+            // avoiding a per-vertex List/sort allocation. InfluenceDomain clones the
+            // resulting IDs because it is an immutable binding contract.
+            var nearestIds = new string[Math.Min(MaxBodyDomainInfluences, bodyRig.Count)];
+            var nearestDistances = new float[nearestIds.Length];
+            for (int i = 0; i < nearestDistances.Length; i++) nearestDistances[i] = float.PositiveInfinity;
+
             for (int i = 0; i < bodyRig.Count; i++)
             {
-                BodyBone bone = bodyRig[i];
+                AnatomicalBodyRigLayout.BoneSpec bone = bodyRig[i];
                 float distance = bone.HasSegment
-                    ? SqrDistanceToSegment(vertex, bone.Start, bone.End)
+                    ? SqrDistanceToSegment(vertex, bone.Position, bone.EndPosition)
                     : (vertex - bone.Position).sqrMagnitude;
-                candidates.Add(new BodyCandidate(bone.Id, distance));
+
+                int insertAt = -1;
+                for (int slot = 0; slot < nearestDistances.Length; slot++)
+                {
+                    if (distance < nearestDistances[slot]
+                        || (Mathf.Approximately(distance, nearestDistances[slot])
+                            && string.CompareOrdinal(bone.Id, nearestIds[slot]) < 0))
+                    {
+                        insertAt = slot;
+                        break;
+                    }
+                }
+                if (insertAt < 0) continue;
+
+                for (int slot = nearestDistances.Length - 1; slot > insertAt; slot--)
+                {
+                    nearestDistances[slot] = nearestDistances[slot - 1];
+                    nearestIds[slot] = nearestIds[slot - 1];
+                }
+                nearestDistances[insertAt] = distance;
+                nearestIds[insertAt] = bone.Id;
             }
 
-            candidates.Sort((left, right) =>
-            {
-                int byDistance = left.Distance.CompareTo(right.Distance);
-                return byDistance != 0
-                    ? byDistance
-                    : string.CompareOrdinal(left.Id, right.Id);
-            });
+            int validCount = 0;
+            while (validCount < nearestIds.Length && nearestIds[validCount] != null) validCount++;
+            if (validCount == 0)
+                throw new DomainException("Unable to resolve a compact Body influence domain.");
 
-            int take = Math.Min(MaxBodyDomainInfluences, candidates.Count);
-            var allowed = new string[take];
-            for (int i = 0; i < take; i++) allowed[i] = candidates[i].Id;
-            string primary = take > 0 ? allowed[0] : AnatomicalBodyRigLayout.PelvisBoneId;
-            return new InfluenceDomain(primary, allowed);
-        }
-
-        private static SkeletonModelSnapshot BuildBodyRigSnapshot(ResolvedCreatureSnapshot snapshot)
-        {
-            IReadOnlyList<AnatomicalBodyRigLayout.BoneSpec> specs =
-                AnatomicalBodyRigLayout.Build(snapshot);
-            var result = new SkeletonModelSnapshot(specs.Count);
-            for (int i = 0; i < specs.Count; i++)
+            if (validCount != nearestIds.Length)
             {
-                AnatomicalBodyRigLayout.BoneSpec spec = specs[i];
-                result.Add(new BodyBone(spec.Id, spec.Position, spec.EndPosition, spec.HasSegment));
+                var compactIds = new string[validCount];
+                Array.Copy(nearestIds, compactIds, validCount);
+                nearestIds = compactIds;
             }
-            return result;
-        }
 
-        private readonly struct BodyCandidate
-        {
-            public readonly string Id;
-            public readonly float Distance;
-            public BodyCandidate(string id, float distance) { Id = id; Distance = distance; }
-        }
-
-        private readonly struct BodyBone
-        {
-            public readonly string Id;
-            public readonly Vector3 Position;
-            public readonly Vector3 Start;
-            public readonly Vector3 End;
-            public readonly bool HasSegment;
-            public BodyBone(string id, Vector3 position, Vector3 end, bool hasSegment)
-            {
-                Id = id; Position = position; Start = position; End = end; HasSegment = hasSegment;
-            }
-        }
-
-        private sealed class SkeletonModelSnapshot
-        {
-            private readonly List<BodyBone> _bones;
-            public int Count => _bones.Count;
-            public BodyBone this[int index] => _bones[index];
-            public SkeletonModelSnapshot(int capacity) { _bones = new List<BodyBone>(capacity); }
-            public void Add(BodyBone bone) => _bones.Add(bone);
+            return new InfluenceDomain(nearestIds[0], nearestIds);
         }
 
         private static InfluenceDomain BuildHierarchyDomain(
