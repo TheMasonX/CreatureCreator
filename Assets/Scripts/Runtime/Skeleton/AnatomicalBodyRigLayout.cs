@@ -165,20 +165,11 @@ namespace ProceduralCreature.Skeleton
 
             var result = new List<BoneSpec>(16);
 
-            // Keep the pelvis as the single semantic root, but do not collapse the
-            // entire headward body curve into one segment. The first explicit spine
-            // segment starts after the pelvis proxy segment and follows fixed
-            // canonical arc-length intervals independent of dense sample count.
             Vector3 firstSpine = EvaluateCanonical(body, storedHeadToTail, pelvisHeadStepT);
             result.Add(CreateSpec(
-                PelvisBoneId,
-                null,
-                pelvis,
-                firstSpine,
-                pelvisT,
-                pelvisHeadStepT,
-                EvaluateRadiusCanonical(body, storedHeadToTail, (pelvisT + pelvisHeadStepT) * 0.5f),
-                axis));
+                PelvisBoneId, null, pelvis, firstSpine,
+                pelvisT, pelvisHeadStepT,
+                EvaluateRadiusCanonical(body, storedHeadToTail, (pelvisT + pelvisHeadStepT) * 0.5f), axis));
 
             float previousT = pelvisHeadStepT;
             string previousId = PelvisBoneId;
@@ -188,16 +179,13 @@ namespace ProceduralCreature.Skeleton
                 float endT = Mathf.Max(0f, previousT - BodySegmentArcStep);
                 string id = IndexedBoneId(SpineBoneId, spineIndex);
                 Vector3 start = EvaluateCanonical(body, storedHeadToTail, previousT);
-                Vector3 end = endT <= Mathf.Epsilon ? head : EvaluateCanonical(body, storedHeadToTail, endT);
+                Vector3 end = endT <= Mathf.Epsilon
+                    ? head
+                    : EvaluateCanonical(body, storedHeadToTail, endT);
                 result.Add(CreateSpec(
-                    id,
-                    previousId,
-                    start,
-                    end,
-                    previousT,
-                    endT,
-                    EvaluateRadiusCanonical(body, storedHeadToTail, (previousT + endT) * 0.5f),
-                    axis));
+                    id, previousId, start, end,
+                    previousT, endT,
+                    EvaluateRadiusCanonical(body, storedHeadToTail, (previousT + endT) * 0.5f), axis));
 
                 previousId = id;
                 previousT = endT;
@@ -212,9 +200,6 @@ namespace ProceduralCreature.Skeleton
                 EvaluateRadiusCanonical(body, storedHeadToTail, 0f),
                 axis));
 
-            // Tail gets the same density-independent segmentation policy. This is
-            // important for long/curved tails: a single pelvis->tail segment would
-            // reproduce the exact problem this layer is intended to avoid.
             previousT = pelvisT;
             previousId = PelvisBoneId;
             int tailIndex = 0;
@@ -223,16 +208,13 @@ namespace ProceduralCreature.Skeleton
                 float endT = Mathf.Min(1f, previousT + BodySegmentArcStep);
                 string id = IndexedBoneId(TailBoneId, tailIndex);
                 Vector3 start = EvaluateCanonical(body, storedHeadToTail, previousT);
-                Vector3 end = endT >= 1f ? tail : EvaluateCanonical(body, storedHeadToTail, endT);
+                Vector3 end = endT >= 1f
+                    ? tail
+                    : EvaluateCanonical(body, storedHeadToTail, endT);
                 result.Add(CreateSpec(
-                    id,
-                    previousId,
-                    start,
-                    end,
-                    previousT,
-                    endT,
-                    EvaluateRadiusCanonical(body, storedHeadToTail, (previousT + endT) * 0.5f),
-                    axis));
+                    id, previousId, start, end,
+                    previousT, endT,
+                    EvaluateRadiusCanonical(body, storedHeadToTail, (previousT + endT) * 0.5f), axis));
 
                 previousId = id;
                 previousT = endT;
@@ -456,8 +438,12 @@ namespace ProceduralCreature.Skeleton
         private static bool IsStoredHeadToTail(IReadOnlyList<Vector3> positions, Vector3 forward)
         {
             if (positions.Count < 2) return true;
-            return Vector3.Dot(positions[positions.Count - 1], forward)
-                >= Vector3.Dot(positions[0], forward);
+
+            // CreatureDefinition.Forward points toward the head. Therefore when
+            // the final sample has the greater Forward projection, the stored
+            // order is tail -> head, NOT head -> tail.
+            return Vector3.Dot(positions[0], forward)
+                >= Vector3.Dot(positions[positions.Count - 1], forward);
         }
 
         private static Vector3 NormalizeForward(Vector3 forward)
