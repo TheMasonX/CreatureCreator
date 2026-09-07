@@ -109,6 +109,13 @@ namespace ProceduralCreature.Editor
                         jointSize,
                         Handles.SphereHandleCap))
                     {
+                        // The rig overlay represents a bone manipulation target. A
+                        // previous hierarchy selection may still contain several
+                        // objects; assigning only the clicked bone is therefore part
+                        // of the selection contract. This deliberately does not change
+                        // the user's global Center/Pivot preference: with one selected
+                        // object both modes resolve to that Transform's pivot.
+                        Selection.objects = new UnityEngine.Object[] { bone.gameObject };
                         Selection.activeGameObject = bone.gameObject;
                         SceneView.RepaintAll();
                     }
@@ -245,7 +252,7 @@ namespace ProceduralCreature.Editor
 
         private static string GetDisplayName(BoneSnapshot bone)
         {
-            if (bone.Id == AnatomicalBodyRigLayout.PelvisBoneId) return "Pelvis";
+            if (bone.Id == AnatomicalBodyRigLayout.BodyRootBoneId) return "Body Root";
             if (bone.Id == AnatomicalBodyRigLayout.SpineBoneId) return "Spine / Chest";
             if (bone.Id == AnatomicalBodyRigLayout.HeadBoneId) return "Head";
             if (bone.Id == AnatomicalBodyRigLayout.TailBoneId) return "Tail";
@@ -263,7 +270,7 @@ namespace ProceduralCreature.Editor
 
         private static bool ShouldLabelBone(BoneSnapshot bone)
         {
-            if (bone.Id == AnatomicalBodyRigLayout.PelvisBoneId
+            if (bone.Id == AnatomicalBodyRigLayout.BodyRootBoneId
                 || bone.Id == AnatomicalBodyRigLayout.SpineBoneId
                 || bone.Id == AnatomicalBodyRigLayout.HeadBoneId
                 || bone.Id == AnatomicalBodyRigLayout.TailBoneId)
