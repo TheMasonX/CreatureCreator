@@ -28,6 +28,7 @@ namespace ProceduralCreature.Editor
         private const string RawMeshKey = "ProceduralCreature.RigDebug.ShowRawMesh";
         private const float GeometryEpsilonSqr = 1e-10f;
         private const float AttachmentMarkerScale = 0.06f;
+        private const float RestRotationTolerance = 1e-5f;
 
         private static bool _enabled = EditorPrefs.GetBool(EnabledKey, false);
         private static bool _alwaysOnTop = EditorPrefs.GetBool(AlwaysOnTopKey, true);
@@ -218,16 +219,21 @@ namespace ProceduralCreature.Editor
 
         private static Vector3 ResolveCurrentRestOrientedEndpoint(Transform current, BoneSnapshot boneData)
         {
-            Vector3 restOffsetWorld = boneData.EndPosition - boneData.Position;
+            // In the unposed state the snapshot endpoint is authoritative. Returning it
+            // directly avoids manufacturing a second endpoint with quaternion arithmetic,
+            // so a terminal tail segment can never visually loop because of accumulated
+            // rest-frame conversion error.
             if (current == null) return boneData.EndPosition;
 
-            // EndPosition is stored in creature/world space. Convert that rest-space
-            // offset into the bone's local frame once, then let the current posed
-            // world rotation carry it. Rotating the raw world delta by current.rotation
-            // directly double-applies the rest orientation and can make leaf segments
-            // such as the final tail bone loop back around the creature.
-            Vector3 restOffsetLocal = Quaternion.Inverse(boneData.Rotation) * restOffsetWorld;
-            return current.position + current.rotation * restOffsetLocal;
+            Quaternion restRotation = boneData.Rotation;
+            Quaternion currentRotation = current.rotation;
+            float rotationAlignment = Quaternion.Dot(restRotation, currentRotation);
+            if (Mathf.Abs(Mathf.Abs(rotationAlignment) - 1f) <= RestRotationTolerance)
+                return boneData.EndPosition;
+
+            Vector3 restOffsetWorld = boneData.EndPosition - boneData.Position;
+            Vector3 restOffsetLocal = Quaternion.Inverse(restRotation) * restOffsetWorld;
+            return current.position + currentRotation * restOffsetLocal;
         }
 
         private static string GetBoneLabel(BoneSnapshot bone)
