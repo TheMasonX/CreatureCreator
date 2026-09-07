@@ -144,7 +144,7 @@ namespace ProceduralCreature.Tests.Runtime
             Assert.AreEqual(item.Mesh.vertexCount, item.VertexInfluences.Count);
             for (int vertex = 0; vertex < item.VertexInfluences.Count; vertex++)
             {
-                Assert.AreEqual(1, item.VertexInfluences[vertex].Length);
+                Assert.AreEqual(1, item.VertexInfluences[vertex].Count);
                 Assert.AreEqual(expectedBoneIndex, item.VertexInfluences[vertex][0].BoneIndex);
                 Assert.AreEqual(1f, item.VertexInfluences[vertex][0].Weight, 1e-5f);
             }
