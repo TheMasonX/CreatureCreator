@@ -26,13 +26,10 @@ namespace ProceduralCreature.Animation.Ik
         {
             if (restSkeleton == null) throw new DomainException("restSkeleton must not be null.");
             if (pose == null) throw new DomainException("pose must not be null.");
-            if (!restSkeleton.HasSameBoneOrder(pose.Skeleton))
-            {
-                throw new DomainException("pose must use the same bone order as restSkeleton.");
-            }
+            ValidateCompatibility(restSkeleton, pose);
 
             var indexedRotations = new Quaternion[restSkeleton.Count];
-            ResolveInto(restSkeleton, pose, indexedRotations);
+            ResolveIntoCompatible(restSkeleton, pose, indexedRotations);
             var rotations = new Dictionary<string, Quaternion>(restSkeleton.Count);
             for (int i = 0; i < restSkeleton.Count; i++)
             {
@@ -50,9 +47,25 @@ namespace ProceduralCreature.Animation.Ik
             {
                 throw new DomainException("rotations must contain one entry per rest-skeleton bone.");
             }
-            if (!restSkeleton.HasSameBoneOrder(pose.Skeleton))
+            ValidateCompatibility(restSkeleton, pose);
+            ResolveIntoCompatible(restSkeleton, pose, rotations);
+        }
+
+        /// <summary>
+        /// Applies the rotation algorithm after the caller has already established
+        /// structural compatibility between the pose snapshot and the rest snapshot.
+        /// CreatureRig uses this path after caching the compatibility check per pose
+        /// snapshot, keeping the steady-state animation loop free of a repeated
+        /// O(bones) structural comparison.
+        /// </summary>
+        internal static void ResolveIntoCompatible(
+            SkeletonSnapshot restSkeleton, PosedSkeleton pose, Quaternion[] rotations)
+        {
+            if (restSkeleton == null) throw new DomainException("restSkeleton must not be null.");
+            if (pose == null) throw new DomainException("pose must not be null.");
+            if (rotations == null || rotations.Length < restSkeleton.Count)
             {
-                throw new DomainException("pose must use the same bone order as restSkeleton.");
+                throw new DomainException("rotations must contain one entry per rest-skeleton bone.");
             }
 
             for (int i = 0; i < restSkeleton.Count; i++)
@@ -83,6 +96,14 @@ namespace ProceduralCreature.Animation.Ik
 
                 Vector3 direction = targetPosition - position;
                 rotations[i] = ResolveLookRotation(direction, bone.Rotation);
+            }
+        }
+
+        private static void ValidateCompatibility(SkeletonSnapshot restSkeleton, PosedSkeleton pose)
+        {
+            if (!restSkeleton.HasSameBoneOrder(pose.Skeleton))
+            {
+                throw new DomainException("pose must use the same bone structure as restSkeleton.");
             }
         }
 
