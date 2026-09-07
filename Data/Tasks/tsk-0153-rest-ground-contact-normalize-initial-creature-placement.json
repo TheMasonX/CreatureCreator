@@ -28,19 +28,18 @@
     {
       "id": "c-20260907-grounding-review",
       "author": "anonymous",
-      "body": "Created from the 2026-09-07 animation/skeleton review. The current repo intentionally keeps foot grounding separate from rig inference and skinning. The task therefore defines grounding as one deterministic rest-space translation shared by generated geometry and skeleton/bind space, with designated foot contact as the anchor rather than absolute creature minimum-Y. No Unity result is claimed at task creation.",
-      "createdAtUtc": "2026-09-07T00:00:00Z"
+      "body": "Created from the 2026-09-07 animation/skeleton review at 06:07 CDT. Current source keeps foot grounding separate from rig inference and skinning. The task therefore defines grounding as one deterministic rest-space translation shared by generated geometry and skeleton/bind space, with designated foot contact as the anchor rather than absolute creature minimum-Y. No Unity result is claimed at task creation.",
+      "createdAtUtc": "2026-09-07T11:07:02Z"
     }
   ],
   "epicId": null,
   "parentId": "tsk-0077",
-  "dueDateUtc": "2026-09-14T00:00:00Z",
-  "createdAtUtc": "2026-09-07T00:00:00Z",
-  "updatedAtUtc": "2026-09-07T00:00:00Z",
+  "dueDateUtc": null,
+  "createdAtUtc": "2026-09-07T11:07:02Z",
+  "updatedAtUtc": "2026-09-07T11:07:02Z",
   "completedAtUtc": null,
-  "revision": 1,
+  "sourceFilePath": "tsk-0153-rest-ground-contact-normalize-initial-creature-placement.json",
+  "revision": 2,
   "isArchived": false,
-  "hasLoadError": false,
-  "loadError": null,
-  "sourceFilePath": "tsk-0153-rest-ground-contact-normalize-initial-creature-placement.json"
+  "hasLoadError": false
 }
