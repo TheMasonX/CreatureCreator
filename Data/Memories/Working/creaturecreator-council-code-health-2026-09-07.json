@@ -11,7 +11,7 @@
     { "Label": "Generated output contract", "Uri": "Assets/Scripts/Runtime/Generation/GeneratedCreature.cs" },
     { "Label": "TSK-0093 malformed-definition owner", "Uri": "Data/Tasks/tsk-0093-make-malformed-definition-validation-and-cloning-total.json" },
     { "Label": "TSK-0156 skeleton builder migration", "Uri": "Data/Tasks/tsk-0156-separate-skeleton-builder-from-mutable-bone-model.json" },
-    { "Label": "TSK-0125 generated output owner", "Uri": "Data/Tasks/tsk-0125-strengthen-generated-output-contract.json" }
+    { "Label": "TSK-0125 generated output owner", "Uri": "Data/Tasks/tsk-0125-harden-generatedcreature-output-contract-and-materialregion-submesh.json" }
   ],
   "Conflicts": [
     "Older Working memories may describe GeneratedCreature.VertexInfluences as VertexInfluence[] arrays; current truth is nested read-only lists.",
