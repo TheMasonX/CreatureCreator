@@ -110,17 +110,21 @@ namespace ProceduralCreature.Skeleton
             }
 
             var orderedBones = new List<Bone>(skeleton.Bones.Count);
-            var pending = new List<Bone>(roots);
+            var pending = new SortedSet<Bone>(Comparer<Bone>.Create(CompareBonesById));
+            foreach (Bone root in roots) pending.Add(root);
+
             while (pending.Count > 0)
             {
-                Bone bone = pending[0];
-                pending.RemoveAt(0);
+                Bone bone = pending.Min;
+                pending.Remove(bone);
                 orderedBones.Add(bone);
 
                 if (childrenById.TryGetValue(bone.Id, out List<Bone> boneChildren))
                 {
-                    pending.AddRange(boneChildren);
-                    pending.Sort(CompareBonesById);
+                    for (int i = 0; i < boneChildren.Count; i++)
+                    {
+                        pending.Add(boneChildren[i]);
+                    }
                 }
             }
 
