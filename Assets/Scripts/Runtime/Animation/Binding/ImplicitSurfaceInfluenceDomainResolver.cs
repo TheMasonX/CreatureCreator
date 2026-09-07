@@ -15,6 +15,11 @@ namespace ProceduralCreature.Animation.Binding
     /// correspondence used by appearance baking; this resolver reuses that
     /// contract for binding and does not infer ownership from mesh names or
     /// Unity hierarchy order.
+    ///
+    /// A resolved geometry domain includes its own part plus the intended
+    /// non-Body ancestors in the authored hierarchy. This allows a terminal
+    /// child such as a foot/hand to blend with its owning limb chain while
+    /// excluding sibling and opposite-side chains.
     /// </summary>
     public static class ImplicitSurfaceInfluenceDomainResolver
     {
@@ -75,8 +80,10 @@ namespace ProceduralCreature.Animation.Binding
                         }
                         else if (hasPart)
                         {
-                            domains[vertexIndex] = new InfluenceDomain(
-                                ResolvePartDomain(nearestPart, vertex));
+                            domains[vertexIndex] = BuildHierarchyDomain(
+                                snapshot,
+                                nearestPart,
+                                vertex);
                         }
                         else
                         {
@@ -98,15 +105,66 @@ namespace ProceduralCreature.Animation.Binding
             }
         }
 
+        private static InfluenceDomain BuildHierarchyDomain(
+            ResolvedCreatureSnapshot snapshot,
+            ResolvedPartSnapshot primaryPart,
+            Vector3 vertex)
+        {
+            bool mirrored = IsMirroredInstance(primaryPart, vertex);
+            string primaryDomain = ResolveDomainForInstance(primaryPart, mirrored);
+            var allowedDomains = new List<string>(4) { primaryDomain };
+
+            // The welded surface is geometry, not hierarchy. Eligibility is the
+            // explicit bridge: the nearest authored geometry part may blend with
+            // its own non-Body ancestors, but never with sibling chains.
+            string parentId = primaryPart.ParentId;
+            int guard = 0;
+            while (!string.IsNullOrEmpty(parentId) && parentId != CreatureDefinition.BodyId)
+            {
+                if (++guard > snapshot.PartsById.Count)
+                {
+                    throw new DomainException(
+                        $"Resolved parent chain for part '{primaryPart.Id}' exceeds the part count; " +
+                        "the resolved hierarchy is cyclic or inconsistent.");
+                }
+
+                if (!snapshot.PartsById.TryGetValue(parentId, out ResolvedPartSnapshot parent))
+                {
+                    throw new DomainException(
+                        $"Resolved part '{primaryPart.Id}' references missing parent '{parentId}'.");
+                }
+
+                string parentDomain = ResolveDomainForInstance(parent, mirrored);
+                if (!allowedDomains.Contains(parentDomain, StringComparer.Ordinal))
+                {
+                    allowedDomains.Add(parentDomain);
+                }
+
+                parentId = parent.ParentId;
+            }
+
+            return new InfluenceDomain(primaryDomain, allowedDomains.ToArray());
+        }
+
         private static string ResolvePartDomain(ResolvedPartSnapshot part, Vector3 vertex)
         {
-            if (!part.MirrorAcrossSymmetryPlane) return part.Id;
+            return ResolveDomainForInstance(part, IsMirroredInstance(part, vertex));
+        }
+
+        private static bool IsMirroredInstance(ResolvedPartSnapshot part, Vector3 vertex)
+        {
+            if (!part.MirrorAcrossSymmetryPlane) return false;
 
             Vector3 originalOrigin = part.PartFrameToCreatureSpace.GetColumn(3);
             Vector3 mirroredOrigin = MirrorUtility.ReflectPointAcrossX(originalOrigin);
             float originalDistance = (vertex - originalOrigin).sqrMagnitude;
             float mirroredDistance = (vertex - mirroredOrigin).sqrMagnitude;
-            return mirroredDistance < originalDistance
+            return mirroredDistance < originalDistance;
+        }
+
+        private static string ResolveDomainForInstance(ResolvedPartSnapshot part, bool mirrored)
+        {
+            return mirrored && part.MirrorAcrossSymmetryPlane
                 ? part.Id + SemanticBoneResolver.MirrorSuffix
                 : part.Id;
         }
