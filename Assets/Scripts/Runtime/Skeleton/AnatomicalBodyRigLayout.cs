@@ -69,39 +69,20 @@ namespace ProceduralCreature.Skeleton
         }
 
         public static IReadOnlyList<BoneSpec> Build(ResolvedBody body, Vector3 forward)
-        {
-            return Build(body, forward, null);
-        }
+            => Build(body, forward, null);
 
-        public static string ResolveAttachmentBoneId(
-            ResolvedCreatureSnapshot snapshot,
-            Vector3 position,
-            bool mirrored,
-            uint anchorSampleId = 0u)
+        public static string ResolveAttachmentBoneId(ResolvedCreatureSnapshot snapshot, Vector3 position, bool mirrored, uint anchorSampleId = 0u)
         {
             if (snapshot == null) throw new DomainException("snapshot must not be null.");
             if (!snapshot.HasBody) return null;
-            return ResolveAttachmentBoneId(
-                snapshot.Body, snapshot.Forward, position, mirrored, anchorSampleId, snapshot.PartsById.Values);
+            return ResolveAttachmentBoneId(snapshot.Body, snapshot.Forward, position, mirrored, anchorSampleId, snapshot.PartsById.Values);
         }
 
-        public static string ResolveAttachmentBoneId(
-            ResolvedBody body,
-            Vector3 forward,
-            Vector3 position,
-            bool mirrored,
-            uint anchorSampleId = 0u)
-        {
-            return ResolveAttachmentBoneId(body, forward, position, mirrored, anchorSampleId, null);
-        }
+        public static string ResolveAttachmentBoneId(ResolvedBody body, Vector3 forward, Vector3 position, bool mirrored, uint anchorSampleId = 0u)
+            => ResolveAttachmentBoneId(body, forward, position, mirrored, anchorSampleId, null);
 
-        private static string ResolveAttachmentBoneId(
-            ResolvedBody body,
-            Vector3 forward,
-            Vector3 position,
-            bool mirrored,
-            uint anchorSampleId,
-            IEnumerable<ResolvedPartSnapshot> resolvedParts)
+        private static string ResolveAttachmentBoneId(ResolvedBody body, Vector3 forward, Vector3 position, bool mirrored,
+            uint anchorSampleId, IEnumerable<ResolvedPartSnapshot> resolvedParts)
         {
             if (body.SamplePositions == null || body.SamplePositions.Count == 0) return null;
             if (mirrored) position = MirrorUtility.ReflectPointAcrossX(position);
@@ -123,35 +104,23 @@ namespace ProceduralCreature.Skeleton
                 }
             }
 
-            if (canonicalT < 0f)
-            {
-                canonicalT = CanonicalArcTAtPoint(body, storedHeadToTail, position);
-            }
-
+            if (canonicalT < 0f) canonicalT = CanonicalArcTAtPoint(body, storedHeadToTail, position);
             return ResolveBoneAtCanonicalT(bones, canonicalT);
         }
 
-        private static IReadOnlyList<BoneSpec> Build(
-            ResolvedBody body,
-            Vector3 forward,
-            IEnumerable<ResolvedPartSnapshot> resolvedParts)
+        private static IReadOnlyList<BoneSpec> Build(ResolvedBody body, Vector3 forward, IEnumerable<ResolvedPartSnapshot> resolvedParts)
         {
-            if (body.SamplePositions == null || body.SamplePositions.Count == 0)
-                return Array.Empty<BoneSpec>();
+            if (body.SamplePositions == null || body.SamplePositions.Count == 0) return Array.Empty<BoneSpec>();
 
             Vector3 axis = NormalizeForward(forward);
             bool storedHeadToTail = IsStoredHeadToTail(body.SamplePositions, axis);
             var attachmentTs = new List<float>();
-
             if (resolvedParts != null)
             {
                 foreach (ResolvedPartSnapshot part in resolvedParts)
                 {
-                    if (!part.HasLimb || part.ParentId != CreatureDefinition.BodyId)
-                        continue;
-                    if (part.Limb.JointPositions == null || part.Limb.JointPositions.Count == 0)
-                        continue;
-
+                    if (!part.HasLimb || part.ParentId != CreatureDefinition.BodyId) continue;
+                    if (part.Limb.JointPositions == null || part.Limb.JointPositions.Count == 0) continue;
                     Vector3 root = part.PartFrameToCreatureSpace.MultiplyPoint3x4(part.Limb.RootSocket);
                     attachmentTs.Add(CanonicalArcTAtPoint(body, storedHeadToTail, root));
                 }
@@ -162,13 +131,10 @@ namespace ProceduralCreature.Skeleton
             Vector3 pelvis = EvaluateCanonical(body, storedHeadToTail, pelvisT);
             Vector3 head = EvaluateCanonical(body, storedHeadToTail, 0f);
             Vector3 tail = EvaluateCanonical(body, storedHeadToTail, 1f);
-
             var result = new List<BoneSpec>(16);
 
             Vector3 firstSpine = EvaluateCanonical(body, storedHeadToTail, pelvisHeadStepT);
-            result.Add(CreateSpec(
-                PelvisBoneId, null, pelvis, firstSpine,
-                pelvisT, pelvisHeadStepT,
+            result.Add(CreateSpec(PelvisBoneId, null, pelvis, firstSpine, pelvisT, pelvisHeadStepT,
                 EvaluateRadiusCanonical(body, storedHeadToTail, (pelvisT + pelvisHeadStepT) * 0.5f), axis));
 
             float previousT = pelvisHeadStepT;
@@ -179,26 +145,16 @@ namespace ProceduralCreature.Skeleton
                 float endT = Mathf.Max(0f, previousT - BodySegmentArcStep);
                 string id = IndexedBoneId(SpineBoneId, spineIndex);
                 Vector3 start = EvaluateCanonical(body, storedHeadToTail, previousT);
-                Vector3 end = endT <= Mathf.Epsilon
-                    ? head
-                    : EvaluateCanonical(body, storedHeadToTail, endT);
-                result.Add(CreateSpec(
-                    id, previousId, start, end,
-                    previousT, endT,
+                Vector3 end = endT <= Mathf.Epsilon ? head : EvaluateCanonical(body, storedHeadToTail, endT);
+                result.Add(CreateSpec(id, previousId, start, end, previousT, endT,
                     EvaluateRadiusCanonical(body, storedHeadToTail, (previousT + endT) * 0.5f), axis));
-
                 previousId = id;
                 previousT = endT;
                 spineIndex++;
             }
 
-            result.Add(CreateTerminalSpec(
-                HeadBoneId,
-                previousId,
-                head,
-                0f,
-                EvaluateRadiusCanonical(body, storedHeadToTail, 0f),
-                axis));
+            result.Add(CreateTerminalSpec(HeadBoneId, previousId, head, 0f,
+                EvaluateRadiusCanonical(body, storedHeadToTail, 0f), axis));
 
             previousT = pelvisT;
             previousId = PelvisBoneId;
@@ -208,14 +164,9 @@ namespace ProceduralCreature.Skeleton
                 float endT = Mathf.Min(1f, previousT + BodySegmentArcStep);
                 string id = IndexedBoneId(TailBoneId, tailIndex);
                 Vector3 start = EvaluateCanonical(body, storedHeadToTail, previousT);
-                Vector3 end = endT >= 1f
-                    ? tail
-                    : EvaluateCanonical(body, storedHeadToTail, endT);
-                result.Add(CreateSpec(
-                    id, previousId, start, end,
-                    previousT, endT,
+                Vector3 end = endT >= 1f ? tail : EvaluateCanonical(body, storedHeadToTail, endT);
+                result.Add(CreateSpec(id, previousId, start, end, previousT, endT,
                     EvaluateRadiusCanonical(body, storedHeadToTail, (previousT + endT) * 0.5f), axis));
-
                 previousId = id;
                 previousT = endT;
                 tailIndex++;
@@ -225,71 +176,29 @@ namespace ProceduralCreature.Skeleton
         }
 
         private static string IndexedBoneId(string baseId, int index)
-        {
-            return index == 0 ? baseId : baseId + "_" + index;
-        }
+            => index == 0 ? baseId : baseId + "_" + index;
 
-        private static BoneSpec CreateSpec(
-            string id,
-            string parentId,
-            Vector3 start,
-            Vector3 end,
-            float startT,
-            float endT,
-            float radius,
-            Vector3 fallbackAxis)
+        private static BoneSpec CreateSpec(string id, string parentId, Vector3 start, Vector3 end, float startT, float endT, float radius, Vector3 fallbackAxis)
         {
             Vector3 direction = end - start;
             bool hasSegment = direction.sqrMagnitude > EpsilonSqr;
-            return new BoneSpec(
-                id,
-                parentId,
-                start,
-                hasSegment ? end : start,
-                hasSegment,
-                ResolveRotation(direction, fallbackAxis),
-                startT,
-                endT,
-                Mathf.Max(0.001f, radius));
+            return new BoneSpec(id, parentId, start, hasSegment ? end : start, hasSegment,
+                ResolveRotation(direction, fallbackAxis), startT, endT, Mathf.Max(0.001f, radius));
         }
 
-        private static BoneSpec CreateTerminalSpec(
-            string id,
-            string parentId,
-            Vector3 position,
-            float t,
-            float radius,
-            Vector3 fallbackAxis)
-        {
-            return new BoneSpec(
-                id,
-                parentId,
-                position,
-                position,
-                false,
-                ResolveRotation(fallbackAxis, fallbackAxis),
-                t,
-                t,
-                Mathf.Max(0.001f, radius));
-        }
+        private static BoneSpec CreateTerminalSpec(string id, string parentId, Vector3 position, float t, float radius, Vector3 fallbackAxis)
+            => new BoneSpec(id, parentId, position, position, false, ResolveRotation(fallbackAxis, fallbackAxis), t, t, Mathf.Max(0.001f, radius));
 
         private static float DeterminePelvisT(IReadOnlyList<float> attachmentTs)
         {
             if (attachmentTs == null || attachmentTs.Count == 0) return DefaultPelvisT;
-
             var sorted = new List<float>(attachmentTs.Count);
             for (int i = 0; i < attachmentTs.Count; i++)
-            {
-                if (NumericValidity.IsFinite(attachmentTs[i]))
-                    sorted.Add(Mathf.Clamp01(attachmentTs[i]));
-            }
-
+                if (NumericValidity.IsFinite(attachmentTs[i])) sorted.Add(Mathf.Clamp01(attachmentTs[i]));
             if (sorted.Count == 0) return DefaultPelvisT;
             sorted.Sort();
             int middle = sorted.Count / 2;
-            float median = sorted.Count % 2 == 1
-                ? sorted[middle]
-                : (sorted[middle - 1] + sorted[middle]) * 0.5f;
+            float median = sorted.Count % 2 == 1 ? sorted[middle] : (sorted[middle - 1] + sorted[middle]) * 0.5f;
             return ClampInterior(median);
         }
 
@@ -297,32 +206,20 @@ namespace ProceduralCreature.Skeleton
         {
             if (bones == null || bones.Count == 0) return null;
             if (t <= 0f) return HeadBoneId;
-
             string terminalTailId = TailBoneId;
             for (int i = 0; i < bones.Count; i++)
-            {
-                if (bones[i].Id == TailBoneId || bones[i].Id.StartsWith(TailBoneId + "_", StringComparison.Ordinal))
-                    terminalTailId = bones[i].Id;
-            }
+                if (bones[i].Id == TailBoneId || bones[i].Id.StartsWith(TailBoneId + "_", StringComparison.Ordinal)) terminalTailId = bones[i].Id;
             if (t >= 1f) return terminalTailId;
-
             string best = PelvisBoneId;
             float bestDistance = float.PositiveInfinity;
             for (int i = 0; i < bones.Count; i++)
             {
                 BoneSpec bone = bones[i];
                 if (!bone.HasSegment) continue;
-
-                float min = Mathf.Min(bone.StartT, bone.EndT);
-                float max = Mathf.Max(bone.StartT, bone.EndT);
+                float min = Mathf.Min(bone.StartT, bone.EndT), max = Mathf.Max(bone.StartT, bone.EndT);
                 if (t >= min && t <= max) return bone.Id;
-
                 float distance = t < min ? min - t : t - max;
-                if (distance < bestDistance)
-                {
-                    bestDistance = distance;
-                    best = bone.Id;
-                }
+                if (distance < bestDistance) { bestDistance = distance; best = bone.Id; }
             }
             return best;
         }
@@ -331,7 +228,6 @@ namespace ProceduralCreature.Skeleton
         {
             Vector3 forward = direction.sqrMagnitude > EpsilonSqr ? direction.normalized : fallbackAxis;
             if (forward.sqrMagnitude <= EpsilonSqr) forward = Vector3.forward;
-
             Vector3 up = Vector3.up;
             if (Mathf.Abs(Vector3.Dot(forward, up)) > 0.9999f)
             {
@@ -341,35 +237,21 @@ namespace ProceduralCreature.Skeleton
             return Quaternion.LookRotation(forward, up);
         }
 
-        private static float CanonicalArcTAtPoint(
-            ResolvedBody body,
-            bool storedHeadToTail,
-            Vector3 point)
+        private static float CanonicalArcTAtPoint(ResolvedBody body, bool storedHeadToTail, Vector3 point)
         {
             if (body.SamplePositions.Count == 1) return 0f;
-
-            float bestDistance = float.PositiveInfinity;
-            float bestStoredT = 0f;
+            float bestDistance = float.PositiveInfinity, bestStoredT = 0f;
             for (int i = 0; i < body.SamplePositions.Count - 1; i++)
             {
-                Vector3 a = body.SamplePositions[i];
-                Vector3 b = body.SamplePositions[i + 1];
-                Vector3 ab = b - a;
+                Vector3 a = body.SamplePositions[i], b = body.SamplePositions[i + 1], ab = b - a;
                 float lengthSqr = ab.sqrMagnitude;
-                float localT = lengthSqr > EpsilonSqr
-                    ? Mathf.Clamp01(Vector3.Dot(point - a, ab) / lengthSqr)
-                    : 0f;
+                float localT = lengthSqr > EpsilonSqr ? Mathf.Clamp01(Vector3.Dot(point - a, ab) / lengthSqr) : 0f;
                 Vector3 closest = a + localT * ab;
                 float distance = (point - closest).sqrMagnitude;
                 if (distance >= bestDistance) continue;
-
                 bestDistance = distance;
-                bestStoredT = Mathf.Lerp(
-                    body.NormalizedArcLengthAtSample[i],
-                    body.NormalizedArcLengthAtSample[i + 1],
-                    localT);
+                bestStoredT = Mathf.Lerp(body.NormalizedArcLengthAtSample[i], body.NormalizedArcLengthAtSample[i + 1], localT);
             }
-
             return storedHeadToTail ? bestStoredT : 1f - bestStoredT;
         }
 
@@ -380,57 +262,30 @@ namespace ProceduralCreature.Skeleton
         }
 
         private static Vector3 EvaluateCanonical(ResolvedBody body, bool storedHeadToTail, float canonicalT)
-        {
-            return EvaluateStored(body, storedHeadToTail ? canonicalT : 1f - canonicalT);
-        }
+            => EvaluateStored(body, storedHeadToTail ? canonicalT : 1f - canonicalT);
 
         private static Vector3 EvaluateStored(ResolvedBody body, float storedT)
         {
             if (body.SamplePositions.Count == 1) return body.SamplePositions[0];
-
             int segment = body.SamplePositions.Count - 2;
             float clamped = Mathf.Clamp01(storedT);
             for (int i = 0; i < body.NormalizedArcLengthAtSample.Count - 1; i++)
-            {
-                if (clamped <= body.NormalizedArcLengthAtSample[i + 1])
-                {
-                    segment = i;
-                    break;
-                }
-            }
-
-            float startT = body.NormalizedArcLengthAtSample[segment];
-            float endT = body.NormalizedArcLengthAtSample[segment + 1];
+                if (clamped <= body.NormalizedArcLengthAtSample[i + 1]) { segment = i; break; }
+            float startT = body.NormalizedArcLengthAtSample[segment], endT = body.NormalizedArcLengthAtSample[segment + 1];
             float localT = endT > EpsilonSqr ? (clamped - startT) / (endT - startT) : 0f;
-            return Vector3.Lerp(
-                body.SamplePositions[segment],
-                body.SamplePositions[segment + 1],
-                Mathf.Clamp01(localT));
+            return Vector3.Lerp(body.SamplePositions[segment], body.SamplePositions[segment + 1], Mathf.Clamp01(localT));
         }
 
-        private static float EvaluateRadiusCanonical(
-            ResolvedBody body,
-            bool storedHeadToTail,
-            float canonicalT)
+        private static float EvaluateRadiusCanonical(ResolvedBody body, bool storedHeadToTail, float canonicalT)
         {
             if (body.SampleRadii == null || body.SampleRadii.Count == 0) return 0.5f;
-
             float storedT = storedHeadToTail ? canonicalT : 1f - canonicalT;
             if (body.SampleRadii.Count == 1) return body.SampleRadii[0];
-
             float clamped = Mathf.Clamp01(storedT);
             int segment = body.SampleRadii.Count - 2;
             for (int i = 0; i < body.NormalizedArcLengthAtSample.Count - 1; i++)
-            {
-                if (clamped <= body.NormalizedArcLengthAtSample[i + 1])
-                {
-                    segment = i;
-                    break;
-                }
-            }
-
-            float startT = body.NormalizedArcLengthAtSample[segment];
-            float endT = body.NormalizedArcLengthAtSample[segment + 1];
+                if (clamped <= body.NormalizedArcLengthAtSample[i + 1]) { segment = i; break; }
+            float startT = body.NormalizedArcLengthAtSample[segment], endT = body.NormalizedArcLengthAtSample[segment + 1];
             float localT = endT > EpsilonSqr ? (clamped - startT) / (endT - startT) : 0f;
             return Mathf.Lerp(body.SampleRadii[segment], body.SampleRadii[segment + 1], Mathf.Clamp01(localT));
         }
@@ -438,22 +293,15 @@ namespace ProceduralCreature.Skeleton
         private static bool IsStoredHeadToTail(IReadOnlyList<Vector3> positions, Vector3 forward)
         {
             if (positions.Count < 2) return true;
-
-            // CreatureDefinition.Forward points toward the head. Therefore when
-            // the final sample has the greater Forward projection, the stored
-            // order is tail -> head, NOT head -> tail.
-            return Vector3.Dot(positions[0], forward)
-                >= Vector3.Dot(positions[positions.Count - 1], forward);
+            // Creature Forward points from tail toward head. Therefore sample 0 is
+            // headward when it has the GREATER projection, not the last sample.
+            return Vector3.Dot(positions[0], forward) >= Vector3.Dot(positions[positions.Count - 1], forward);
         }
 
         private static Vector3 NormalizeForward(Vector3 forward)
-        {
-            return forward.sqrMagnitude > EpsilonSqr ? forward.normalized : Vector3.forward;
-        }
+            => forward.sqrMagnitude > EpsilonSqr ? forward.normalized : Vector3.forward;
 
         private static float ClampInterior(float value)
-        {
-            return Mathf.Clamp(value, InteriorMinT, InteriorMaxT);
-        }
+            => Mathf.Clamp(value, InteriorMinT, InteriorMaxT);
     }
 }
