@@ -29,21 +29,24 @@ namespace ProceduralCreature.Editor
         private static bool _labels = EditorPrefs.GetBool(LabelsKey, false);
         private static bool _selectable = EditorPrefs.GetBool(SelectableKey, true);
         private static float _lineWidth = Mathf.Clamp(EditorPrefs.GetFloat(WidthKey, 4f), 1f, 8f);
-        private static readonly GUIStyle LabelStyle = CreateLabelStyle();
+        private static GUIStyle _labelStyle;
 
         static RigDebugView()
         {
             SceneView.duringSceneGui += OnSceneGUI;
         }
 
-        private static GUIStyle CreateLabelStyle()
+        private static GUIStyle GetLabelStyle()
         {
+            if (_labelStyle != null) return _labelStyle;
+
             var style = new GUIStyle(EditorStyles.boldLabel)
             {
                 alignment = TextAnchor.MiddleLeft,
             };
             style.normal.textColor = Color.white;
-            return style;
+            _labelStyle = style;
+            return _labelStyle;
         }
 
         private static void OnSceneGUI(SceneView sceneView)
@@ -114,7 +117,7 @@ namespace ProceduralCreature.Editor
                     Handles.Label(
                         bone.position + Vector3.up * handleSize * 0.08f,
                         label,
-                        LabelStyle);
+                        GetLabelStyle());
                 }
             }
 
@@ -345,8 +348,17 @@ namespace ProceduralCreature.Editor
         private static void FrameBones(SceneView sceneView, List<Transform> bones)
         {
             if (sceneView == null || bones == null || bones.Count == 0) return;
-            Selection.objects = bones.ConvertAll(b => b.gameObject).ToArray();
-            sceneView.FrameSelected();
+
+            GameObject[] previousSelection = Selection.objects;
+            try
+            {
+                Selection.objects = bones.ConvertAll(b => b.gameObject).ToArray();
+                sceneView.FrameSelected();
+            }
+            finally
+            {
+                Selection.objects = previousSelection;
+            }
         }
     }
 }
