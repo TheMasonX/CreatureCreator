@@ -127,7 +127,7 @@ namespace ProceduralCreature.Editor
                     throw new DomainException($"Generated mesh asset item {i} has no rig binding metadata.");
                 }
 
-                if (!TryResolveGeometryBone(rig, item.RigBinding, out Transform bone))
+                if (!TryResolveGeometryBone(rig, item.RigBinding, snapshot, out Transform bone))
                 {
                     throw new DomainException(
                         $"Generated mesh asset '{item.RigBinding.SourcePartId}' could not resolve its rig bone " +
@@ -143,11 +143,16 @@ namespace ProceduralCreature.Editor
             }
         }
 
-        private static bool TryResolveGeometryBone(CreatureRig rig, RigBindingMetadata binding, out Transform bone)
+        private static bool TryResolveGeometryBone(
+            CreatureRig rig,
+            RigBindingMetadata binding,
+            ResolvedCreatureSnapshot snapshot,
+            out Transform bone)
         {
             bone = null;
-            if (binding == null || rig == null) return false;
-            string boneId = SemanticBoneResolver.ResolvePartRootBoneId(binding.SourcePartId, binding.IsMirrored);
+            if (binding == null || rig == null || snapshot == null) return false;
+            string boneId = SemanticBoneResolver.ResolveGeometryAttachmentBoneId(
+                snapshot, binding.SourcePartId, binding.IsMirrored);
             return rig.TryGetBone(boneId, out bone);
         }
 
