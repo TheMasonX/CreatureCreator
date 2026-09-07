@@ -1,0 +1,17 @@
+{
+  "Id": "creaturecreator-council-long-campaign-2026-09-07",
+  "Type": "WorkingMemory",
+  "Status": "Active",
+  "Content": "Extended council-style repository audit campaign on audit/skeleton-animation-improvements-2026-09-07. Reviewed the repo council skill and used independent simulated seats because no independently invokable /council subagent was exposed. More than 390 explicitly numbered rounds plus additional distinct micro-rounds were performed across runtime generation, editor workflow, serialization, validation/sequencing, skeleton/IK, API ownership, resource lifetime, concurrency, numeric policy, compatibility/migration, performance, determinism, and adversarial equivalence. The campaign intentionally suppressed stale findings and duplicate task creation. Confirmed/fixed: generated-output collection and nested influence ownership, material-region input ownership, GeneratedCreatureData color ownership, clone-policy consolidation, one-resolution radius bridge, AppearanceBaker null contracts, MaterialRegion integer-overflow validation, SDF temp-buffer exception disposal, non-repairing CapsuleAxis canonicalization, NormalizeOr invalid-fallback contract, and skeleton queue simplification. Confirmed/tracked: TSK-0156 mutable Bone/Skeleton model; TSK-0159 mutable CreaturePart elements retained by hierarchy index; TSK-0154 broader GeneratedCreatureData ownership across async publication; TSK-0160 malformed MeshExtractionResult operations; TSK-0162 source fix awaiting validation; TSK-0163 BodyFrame default handedness mismatch; TSK-0164 JSON writer control-character escaping mismatch; TSK-0165 Unity-native Gradient/AnimationCurve evaluation from background Task.Run; TSK-0056 post-quantization key collisions; TSK-0095 snapshot/stage ownership umbrella. Do not blanket-convert Unity authoring palette Entries to immutable APIs. No Unity execution was performed; no new test is claimed as passing in Unity. Branch remains the working feature branch.",
+  "References": [
+    { "Label": "Council skill", "Uri": ".github/skills/council/SKILL.md" },
+    { "Label": "Long campaign audit", "Uri": "docs/audits/creaturecreator-council-long-campaign-audit-26-09-07.md" },
+    { "Label": "TSK-0156", "Uri": "Data/Tasks/tsk-0156-separate-skeleton-builder-from-mutable-bone-model.json" },
+    { "Label": "TSK-0159", "Uri": "Data/Tasks/tsk-0159-clarify-hierarchy-index-element-ownership.json" },
+    { "Label": "TSK-0165", "Uri": "Data/Tasks/tsk-0165-eliminate-unity-native-objects-from-background-generation-path.json" }
+  ],
+  "Conflicts": [
+    "Older audits may still describe backing-list leaks, duplicate resolution paths, shallow GeneratedCreatureData colors, or the old canonicalizer CapsuleAxis repair; those findings are stale where current source now fixes them.",
+    "The repository task-tracker skill calls for MemorySmith MCP actions; that connector was unavailable here, so repository JSON was used as the existing fallback and remains subject to later MemorySmith reconciliation."
+  ]
+}
