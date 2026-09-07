@@ -202,7 +202,7 @@ namespace ProceduralCreature.Skeleton
             Vector3 tail = EvaluateCanonical(body, storedHeadToTail, 1f);
 
             float pelvisRadius = EvaluateRadiusCanonical(body, storedHeadToTail, pelvisT);
-            float spineRadius = EvaluateRadiusCanonical(body, storedHeadToTail, (pelvisT + spineT) * 0.5f);
+            float spineRadius = EvaluateRadiusCanonical(body, storedHeadToTail, spineT * 0.5f);
             float headRadius = EvaluateRadiusCanonical(body, storedHeadToTail, 0f);
             float tailRadius = EvaluateRadiusCanonical(body, storedHeadToTail, (pelvisT + 1f) * 0.5f);
 
