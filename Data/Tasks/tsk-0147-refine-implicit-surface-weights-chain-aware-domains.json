@@ -2,7 +2,7 @@
   "id": "tsk-0147-refine-implicit-surface-weights-chain-aware-domains",
   "key": "TSK-0147",
   "title": "Refine implicit-surface weights with chain-aware influence domains",
-  "description": "## Summary\nRefine the MVP welded-surface weighting model with explicit anatomical influence domains.\n\n## Current state\nThe domain-aware refinement is implemented. `InfluenceDomain[]` is supplied by the live runtime preview to `CreatureSkinnedMeshRenderer.Bind`; Body radius preparation now uses the compact anatomical Body rig. The compact-rig topology dependency is resolved.\n\n## Acceptance\nPreserve TSK-0131 closest-segment distance, morphology radii, deterministic top-four selection, normalization, mirror behavior, and build-time ownership. Prove hip, shoulder, mirrored, branch, knee, and elbow locality plus generated-geometry deformation.\n\n## Remaining gate\nExecutable Unity generated-geometry validation is still required. The task must not be marked Done based solely on source/build inspection. Foot-grounding remains separate.\n\n## Evidence\nSee the skeleton/animation audit documents under `docs/audits/` on `audit/skeleton-animation-improvements-2026-09-07`.",
+  "description": "## Explicit anatomy requirement\n\nThe weighting system must remain general-purpose: it must not assume biped or quadruped topology. Any number of limbs, in any authored order and at any valid Body position, must be supported without limb-count modes or species-specific branches.\n\n## Summary\nRefine the MVP welded-surface weighting model with explicit anatomical influence domains.\n\n## Current state\nThe domain-aware refinement is implemented. `InfluenceDomain[]` is supplied by the live runtime preview to `CreatureSkinnedMeshRenderer.Bind`; Body radius preparation uses the compact anatomical Body rig; and the topology dependency is resolved. `ImplicitSurfaceInfluenceDomainResolver` now resolves a primary geometry domain plus its intended non-Body authored ancestors. Child geometry therefore may blend with its owning limb chain while sibling and opposite-side chains remain ineligible.\n\n## Acceptance\nPreserve TSK-0131 closest-segment distance, morphology radii, deterministic top-four selection, normalization, mirror behavior, and build-time ownership. Prove hip, shoulder, mirrored, branch, knee, elbow, and child-geometry locality plus generated-geometry deformation. The domain contract must remain independent of limb count, authored order, and attachment position.\n\n## Remaining gate\nExecutable Unity generated-geometry validation is still required. The task must not be marked Done based solely on source/build inspection. Foot-grounding remains separate.\n\n## Evidence\nFocused resolver regression coverage now proves child-domain inclusion, sibling exclusion, and mirrored parent-chain isolation. See the skeleton/animation audit documents under `docs/audits/` on `audit/skeleton-animation-improvements-2026-09-07`.",
   "type": "Task",
   "status": "InProgress",
   "priority": "High",
@@ -28,17 +28,22 @@
       "author": "anonymous",
       "body": "Topology blocker resolved by TSK-0148 implementation. The runtime seam is connected: live preview supplies InfluenceDomain[] into CreatureSkinnedMeshRenderer.Bind. Keep InProgress pending executable generated-geometry validation; do not merge the separate foot-grounding issue into this task.",
       "createdAtUtc": "2026-09-07T11:40:00Z"
+    },
+    {
+      "id": "c-20260907-hierarchy-domain",
+      "author": "anonymous",
+      "body": "Hierarchy-domain hardening: welded-surface geometry now resolves its own part domain plus non-Body authored ancestor domains. This allows foot/hand child geometry to blend with its owning limb chain while excluding sibling and opposite-side chains. Added focused runtime resolver coverage for owned-parent inclusion, sibling exclusion, and mirrored-parent isolation. Unity/generated-creature validation remains the closure gate.",
+      "createdAtUtc": "2026-09-07T12:35:00Z"
     }
   ],
   "epicId": null,
   "parentId": "TSK-0077",
   "dueDateUtc": null,
   "createdAtUtc": "2026-09-07T06:27:32.3039768Z",
-  "updatedAtUtc": "2026-09-07T11:40:00Z",
+  "updatedAtUtc": "2026-09-07T12:35:00Z",
   "completedAtUtc": null,
-  "revision": 9,
+  "revision": 10,
   "isArchived": false,
   "hasLoadError": false,
-  "loadError": null,
   "sourceFilePath": "tsk-0147-refine-implicit-surface-weights-chain-aware-domains.json"
 }
