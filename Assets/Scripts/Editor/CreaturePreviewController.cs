@@ -112,9 +112,15 @@ namespace ProceduralCreature.Editor
                 throw new DomainException("Preview rig must be built before mesh-asset geometry is attached.");
             }
 
-            for (int i = 1; i < generated.Geometry.Count; i++)
+            // GeneratedCreature intentionally does not guarantee implicit geometry at
+            // position zero. Search by semantic geometry type so adding/reordering
+            // geometry items cannot silently skip a renderable mesh asset or treat the
+            // implicit surface as a rigid attachment.
+            for (int i = 0; i < generated.Geometry.Count; i++)
             {
                 GeometryItem item = generated.Geometry[i];
+                if (item.GeometryType == GeometryType.Implicit) continue;
+
                 if (item.Mesh == null) throw new DomainException($"Generated mesh asset item {i} has no mesh.");
                 if (item.RigBinding == null)
                 {
@@ -148,33 +154,19 @@ namespace ProceduralCreature.Editor
         private T GetSingleOwnedComponent<T>() where T : Component
         {
             if (PreviewGameObject == null) return null;
-
             T[] components = PreviewGameObject.GetComponents<T>();
             if (components == null || components.Length == 0) return null;
 
-            // The preview root is exclusively owned by this controller. Clear every
-            // duplicate before removing it so each component has a chance to release
-            // generated child objects it tracks internally. Keep the first component
-            // deterministicly; no per-frame path calls this helper.
             T retained = components[0];
             for (int i = 0; i < components.Length; i++)
             {
                 T component = components[i];
                 if (component == null) continue;
 
-                if (component is CreatureRig rig)
-                {
-                    rig.Clear();
-                }
-                else if (component is CreatureSkinnedMeshRenderer skinned)
-                {
-                    skinned.Clear();
-                }
+                if (component is CreatureRig rig) rig.Clear();
+                else if (component is CreatureSkinnedMeshRenderer skinned) skinned.Clear();
 
-                if (component != retained)
-                {
-                    UnityEngine.Object.DestroyImmediate(component);
-                }
+                if (component != retained) UnityEngine.Object.DestroyImmediate(component);
             }
             return retained;
         }
@@ -182,7 +174,6 @@ namespace ProceduralCreature.Editor
         public GameObject RecoverExistingPreview()
         {
             if (PreviewGameObject != null) return PreviewGameObject;
-
             EntityId handle = ReadRootEntity();
             if (!handle.IsValid()) return null;
 
@@ -208,17 +199,10 @@ namespace ProceduralCreature.Editor
             PersistRootEntity(PreviewGameObject.GetEntityId());
         }
 
-        private void BindImplicitSurface(
-            Mesh sourceMesh,
-            CreatureDefinition definition,
-            ResolvedCreatureSnapshot snapshot)
+        private void BindImplicitSurface(Mesh sourceMesh, CreatureDefinition definition, ResolvedCreatureSnapshot snapshot)
         {
             EnsurePreviewRoot();
 
-            // Keep the raw rest mesh on the preview root as a diagnostic view. It is
-            // disabled during normal rendering but can be toggled by RigDebugView to
-            // distinguish generation artifacts from skinning artifacts without a
-            // second generation pass or another copy of the mesh.
             MeshFilter rawFilter = PreviewGameObject.GetComponent<MeshFilter>();
             if (rawFilter == null) rawFilter = PreviewGameObject.AddComponent<MeshFilter>();
             rawFilter.sharedMesh = sourceMesh;
@@ -233,8 +217,6 @@ namespace ProceduralCreature.Editor
             if (collider == null) collider = PreviewGameObject.AddComponent<MeshCollider>();
             collider.sharedMesh = sourceMesh;
 
-            // Consume the exact resolved snapshot produced by generation. Do not
-            // re-infer from raw DNA at this presentation boundary.
             SkeletonModel skeleton = SkeletonInferrer.Infer(snapshot);
             if (skeleton == null || skeleton.Bones.Count == 0)
             {
@@ -243,29 +225,21 @@ namespace ProceduralCreature.Editor
 
             SkeletonSnapshot snapshotForBinding = SkeletonSnapshot.Capture(skeleton);
             CreatureRig rig = GetSingleOwnedComponent<CreatureRig>();
-            if (rig == null)
-            {
-                rig = PreviewGameObject.AddComponent<CreatureRig>();
-            }
+            if (rig == null) rig = PreviewGameObject.AddComponent<CreatureRig>();
             rig.Build(skeleton);
             rig.ApplyPose(PosedSkeleton.FromRestPose(skeleton));
 
             CreatureSkinnedMeshRenderer skinnedRenderer = GetSingleOwnedComponent<CreatureSkinnedMeshRenderer>();
-            if (skinnedRenderer == null)
-            {
-                skinnedRenderer = PreviewGameObject.AddComponent<CreatureSkinnedMeshRenderer>();
-            }
+            if (skinnedRenderer == null) skinnedRenderer = PreviewGameObject.AddComponent<CreatureSkinnedMeshRenderer>();
 
             float[] radiiByBoneIndex = MorphologyInfluenceRadiusBridge.BuildRadiiByBoneIndex(
                 snapshotForBinding, snapshot);
-
             InfluenceDomain[] vertexDomains = ImplicitSurfaceInfluenceDomainResolver.Resolve(
                 definition, snapshot, sourceMesh.vertices);
 
             Material defaultMaterial = _defaultMaterialResolver();
             Material[] materials = defaultMaterial != null ? new[] { defaultMaterial } : null;
-            skinnedRenderer.Bind(
-                rig, skeleton, sourceMesh, radiiByBoneIndex, materials, vertexDomains);
+            skinnedRenderer.Bind(rig, skeleton, sourceMesh, radiiByBoneIndex, materials, vertexDomains);
             if (skinnedRenderer.Renderer != null) skinnedRenderer.Renderer.enabled = true;
         }
 
@@ -277,10 +251,8 @@ namespace ProceduralCreature.Editor
                 if (fallback != null) renderer.sharedMaterial = fallback;
                 return;
             }
-
             Material resolved = _materialResolver(item.MaterialRegions[0].MaterialKey);
             if (fallback == null && resolved == null) return;
-
             int subMeshCount = Mathf.Max(1, item.Mesh != null ? item.Mesh.subMeshCount : 1);
             var materials = new Material[subMeshCount];
             for (int i = 0; i < materials.Length; i++) materials[i] = fallback;
@@ -322,21 +294,13 @@ namespace ProceduralCreature.Editor
             if (string.IsNullOrEmpty(raw)) return ids;
             string[] parts = raw.Split(',');
             for (int i = 0; i < parts.Length; i++)
-            {
                 if (ulong.TryParse(parts[i], out ulong id) && !ids.Contains(id)) ids.Add(id);
-            }
             return ids;
         }
 
-        private static void PersistOwnedGeometryEntities(List<ulong> ids)
-        {
-            SessionState.SetString(GeometryEntityIdsKey, string.Join(",", ids));
-        }
+        private static void PersistOwnedGeometryEntities(List<ulong> ids) => SessionState.SetString(GeometryEntityIdsKey, string.Join(",", ids));
 
-        private static void PersistRootEntity(EntityId entity)
-        {
-            SessionState.SetString(RootEntityKey, entity.IsValid() ? EntityId.ToULong(entity).ToString() : string.Empty);
-        }
+        private static void PersistRootEntity(EntityId entity) => SessionState.SetString(RootEntityKey, entity.IsValid() ? EntityId.ToULong(entity).ToString() : string.Empty);
 
         private static EntityId ReadRootEntity()
         {
