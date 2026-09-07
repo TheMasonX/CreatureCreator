@@ -89,6 +89,21 @@ namespace ProceduralCreature.Tests.Runtime
             AssertFinite(radii);
         }
 
+        [Test]
+        public void BuildRadii_DefinitionOverloadMatchesSnapshotOverload()
+        {
+            CreatureDefinition definition = CreateDefinition(
+                bodyRadius: 0.75f,
+                limb: CreateLimb(new[] { 0f, 0.4f, 1f }, new[] { 0.16f, 0.12f, 0.09f }));
+            ResolvedCreatureSnapshot resolved = ResolvedCreatureSnapshot.Resolve(definition);
+            SkeletonSnapshot skeleton = SkeletonSnapshot.Capture(SkeletonInferrer.Infer(resolved));
+
+            float[] fromDefinition = MorphologyInfluenceRadiusBridge.BuildRadiiByBoneIndex(definition);
+            float[] fromSnapshot = MorphologyInfluenceRadiusBridge.BuildRadiiByBoneIndex(skeleton, resolved);
+
+            AssertFiniteAndDeterministic(fromDefinition, fromSnapshot);
+        }
+
         private static CreatureDefinition CreateDefinition(float? bodyRadius, LimbChain limb)
         {
             var definition = CreatureDefinition.CreateEmpty();
