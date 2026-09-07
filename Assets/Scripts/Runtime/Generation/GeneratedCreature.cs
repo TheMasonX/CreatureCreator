@@ -21,40 +21,19 @@ namespace ProceduralCreature.Generation
     /// </summary>
     public sealed class GeneratedCreature
     {
-        /// <summary>
-        /// Explicit sentinel for the implicit combined-surface item. The empty string
-        /// is reserved to mean "this item is not owned by any single part"; it is not
-        /// a valid authored part id and is the single authoritative policy for the
-        /// implicit-surface slot.
-        /// </summary>
         public const string ImplicitSurfaceSourceId = "";
-
-        /// <summary>Suffix on a mirrored item's SourcePartId (matches SkeletonInferrer.MirrorSuffix).</summary>
         public const string MirrorSuffix = "_mirror";
 
         private readonly List<GeometryItem> _geometry = new List<GeometryItem>();
-
-        /// <summary>Read-only, deterministic, ordered geometry items. New code must not depend on positional item 0.</summary>
         public IReadOnlyList<GeometryItem> Geometry => _geometry;
-
         public int Count => _geometry.Count;
 
-        /// <summary>
-        /// Single internal construction path (TSK-0125). Only
-        /// <c>CreatureMeshGenerator.Assemble</c> may drive construction of a
-        /// generated creature. Validates that a null item never enters the
-        /// collection.
-        /// </summary>
         internal void AddGeometry(GeometryItem item)
         {
             if (item == null) throw new DomainException("geometry item must not be null.");
             _geometry.Add(item);
         }
 
-        /// <summary>
-        /// Returns the semantic implicit-surface item (the combined Body + Shape/
-        /// Limb field). False when no implicit surface was generated.
-        /// </summary>
         public bool TryGetImplicitSurface(out GeometryItem item)
         {
             for (int i = 0; i < _geometry.Count; i++)
@@ -69,13 +48,6 @@ namespace ProceduralCreature.Generation
             return false;
         }
 
-        /// <summary>
-        /// Finds the geometry item whose SourcePartId matches (exact ordinal). This
-        /// is deliberately an O(n) scan rather than a keyed dictionary: no real
-        /// consumer performs repeated part lookups on a single GeneratedCreature
-        /// today, so a dictionary would add per-creature memory for no measured
-        /// win. Revisit only if a consumer shows repeated lookups (TSK-0125).
-        /// </summary>
         public bool TryFindGeometryForPart(string partId, out GeometryItem item)
         {
             for (int i = 0; i < _geometry.Count; i++)
@@ -91,31 +63,15 @@ namespace ProceduralCreature.Generation
         }
     }
 
-    /// <summary>
-    /// One generated mesh within a GeneratedCreature (CC-031). Immutable after
-    /// construction (TSK-0125): every field is fixed by the constructor, so a
-    /// malformed item (for example a null mesh) cannot be built through the single
-    /// generator factory.
-    /// </summary>
     public sealed class GeometryItem
     {
         public string SourcePartId { get; }
-
         public GeometryType GeometryType { get; }
-
         public Mesh Mesh { get; }
-
-        /// <summary>Original mesh-asset source in its authored local space (null for the implicit surface).</summary>
         public Mesh SourceMesh { get; }
-
-        /// <summary>Authored source-to-creature rest placement for mesh assets (identity for the implicit surface).</summary>
         public Matrix4x4 RestPlacement { get; }
-
         public IReadOnlyList<MaterialRegion> MaterialRegions { get; }
-
         public RigBindingMetadata RigBinding { get; }
-
-        /// <summary>Build-time per-vertex influences in SkeletonSnapshot capture order.</summary>
         public IReadOnlyList<VertexInfluence[]> VertexInfluences { get; }
 
         internal GeometryItem(
@@ -131,7 +87,9 @@ namespace ProceduralCreature.Generation
             if (mesh == null) throw new DomainException("geometry item mesh must not be null.");
             if (sourcePartId == null) throw new DomainException("geometry item source part id must not be null.");
 
-            MaterialRegions = materialRegions ?? Array.Empty<MaterialRegion>();
+            MaterialRegions = materialRegions == null
+                ? (IReadOnlyList<MaterialRegion>)Array.Empty<MaterialRegion>()
+                : new List<MaterialRegion>(materialRegions).AsReadOnly();
             ValidateMaterialRegions(mesh);
 
             SourcePartId = sourcePartId;
@@ -165,10 +123,7 @@ namespace ProceduralCreature.Generation
 
         private void ValidateMaterialRegions(Mesh mesh)
         {
-            if (MaterialRegions.Count == 0)
-            {
-                return;
-            }
+            if (MaterialRegions.Count == 0) return;
 
             int maxSubmeshIndex = Mathf.Max(0, mesh.subMeshCount - 1);
             for (int i = 0; i < MaterialRegions.Count; i++)
@@ -178,7 +133,6 @@ namespace ProceduralCreature.Generation
                 {
                     throw new DomainException($"geometry item material region {i} must not be null.");
                 }
-
                 if (region.SubmeshIndex < 0 || region.SubmeshIndex > maxSubmeshIndex)
                 {
                     throw new DomainException(
@@ -192,7 +146,6 @@ namespace ProceduralCreature.Generation
                     throw new DomainException(
                         $"geometry item material region {i} start index {region.StartIndex} is outside the valid range [0, {maxStart}] for submesh {region.SubmeshIndex}.");
                 }
-
                 if (region.IndexCount < 0 || region.StartIndex + region.IndexCount > maxStart)
                 {
                     throw new DomainException(
@@ -202,25 +155,11 @@ namespace ProceduralCreature.Generation
         }
     }
 
-    /// <summary>
-    /// A submaterial assignment on a geometry item (CC-031, TSK-0125). Policy: a
-    /// region is a strict, explicit mapping to a single zero-based submesh index
-    /// with a contiguous [StartIndex, StartIndex + IndexCount) range within that
-    /// submesh. The implicit combined item keeps an empty list; mesh-asset items
-    /// with a submaterial override emit one region per submesh so the material
-    /// coverage is deterministic and complete, with no ambiguity about which
-    /// indices it refers to. This is the single authoritative region contract for
-    /// the output model; renderers resolve MaterialKey, but generation never hides
-    /// or infers a wider range.
-    /// </summary>
     public sealed class MaterialRegion
     {
         public int SubmeshIndex { get; }
-
         public int StartIndex { get; }
-
         public int IndexCount { get; }
-
         public string MaterialKey { get; }
 
         internal MaterialRegion(int submeshIndex, int startIndex, int indexCount, string materialKey)
@@ -236,20 +175,10 @@ namespace ProceduralCreature.Generation
         }
     }
 
-    /// <summary>
-    /// Semantic rig binding for a geometry item (CC-031). Surface attachment and rig
-    /// attachment stay separate: this records what the item follows during
-    /// animation, derived from the semantic skeleton (CC-018) — never from the
-    /// render mesh. Records the source and parent part ids; resolving the exact
-    /// bone id reuses SkeletonInferrer.ResolveParentBoneId in a later pass.
-    /// Immutable after construction (TSK-0125).
-    /// </summary>
     public sealed class RigBindingMetadata
     {
         public string SourcePartId { get; }
-
         public string ParentPartId { get; }
-
         public bool IsMirrored { get; }
 
         internal RigBindingMetadata(string sourcePartId, string parentPartId, bool isMirrored)
