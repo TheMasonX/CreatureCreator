@@ -24,58 +24,30 @@ namespace ProceduralCreature.Skeleton
                 throw new DomainException("Cannot infer a skeleton from a null CreatureDefinition.");
             }
 
-            var skeleton = new Skeleton();
-            ResolvedCreatureSnapshot snapshot;
             try
             {
-                snapshot = ResolvedCreatureSnapshot.Resolve(definition);
+                return Infer(ResolvedCreatureSnapshot.Resolve(definition));
             }
             catch (DomainException)
             {
-                // Direct callers may supply malformed DNA before validation. Keep the
-                // independently resolvable Body and valid standalone parts available
-                // for diagnostics without leaking the resolution exception here.
-                bool hasBody = definition.Body != null
-                               && definition.Body.Samples != null
-                               && definition.Body.Samples.Count > 0;
-                AppendBodyBones(
-                    skeleton,
-                    hasBody ? ResolvedBody.Resolve(definition.Body) : null,
-                    definition.Forward,
-                    hasBody,
-                    resolvedSnapshot: null);
+                return InferMalformedDefinition(definition);
+            }
+        }
 
-                IReadOnlyList<CreaturePart> parts = definition.CreateHierarchyIndex().Parts;
-                for (int i = 0; i < parts.Count; i++)
-                {
-                    CreaturePart part = parts[i];
-                    if (part == null || part.Limb != null) continue;
-
-                    try
-                    {
-                        Matrix4x4 world = CreaturePartWorldTransformResolver
-                            .ResolvePartFrameToCreatureSpace(definition, part);
-                        skeleton.Bones.Add(new Bone
-                        {
-                            Id = SemanticBoneResolver.ResolvePartRootBoneId(part, mirrored: false),
-                            ParentBoneId = SemanticBoneResolver.ResolveParentBoneId(
-                                definition, part, mirrored: false),
-                            SourcePartId = part.Id,
-                            PartType = part.PartType,
-                            Position = world.GetColumn(3),
-                            Rotation = world.rotation,
-                        });
-                    }
-                    catch (DomainException)
-                    {
-                        // Broken ancestry remains a validation problem; do not invent a
-                        // disconnected bone just to keep inference going.
-                    }
-                }
-
-                return skeleton;
+        /// <summary>
+        /// Infers the skeleton entirely from an already-resolved snapshot. This is the
+        /// canonical generation path; callers that already crossed the resolved-data
+        /// boundary must use this overload so hierarchy and morphology are not resolved
+        /// a second time from raw DNA.
+        /// </summary>
+        public static Skeleton Infer(ResolvedCreatureSnapshot snapshot)
+        {
+            if (snapshot == null)
+            {
+                throw new DomainException("snapshot must not be null.");
             }
 
+            var skeleton = new Skeleton();
             AppendBodyBones(
                 skeleton,
                 snapshot.Body,
@@ -83,32 +55,25 @@ namespace ProceduralCreature.Skeleton
                 snapshot.HasBody,
                 snapshot);
 
-            List<CreaturePart> orderedParts = definition.Parts
-                .OrderBy(p => p.Id, System.StringComparer.Ordinal)
-                .ToList();
-
-            foreach (CreaturePart part in orderedParts)
+            foreach (ResolvedPartSnapshot part in snapshot.PartsById.Values.OrderBy(p => p.Id, System.StringComparer.Ordinal))
             {
-                snapshot.TryGetPart(part.Id, out ResolvedPartSnapshot resolvedPart);
                 bool shouldMirror = part.MirrorAcrossSymmetryPlane
-                                     && definition.SymmetryMode != SymmetryMode.None;
+                    && snapshot.SymmetryMode != SymmetryMode.None;
 
-                if (part.Limb != null)
+                if (part.HasLimb)
                 {
-                    AppendLimbBones(
-                        skeleton, snapshot, part, resolvedPart, mirrored: false);
+                    AppendLimbBones(skeleton, snapshot, part, mirrored: false);
                     if (shouldMirror)
                     {
-                        AppendLimbBones(
-                            skeleton, snapshot, part, resolvedPart, mirrored: true);
+                        AppendLimbBones(skeleton, snapshot, part, mirrored: true);
                     }
                 }
                 else
                 {
-                    skeleton.Bones.Add(BuildBone(part, resolvedPart, mirrored: false, snapshot));
+                    skeleton.Bones.Add(BuildBone(part, mirrored: false, snapshot));
                     if (shouldMirror)
                     {
-                        skeleton.Bones.Add(BuildBone(part, resolvedPart, mirrored: true, snapshot));
+                        skeleton.Bones.Add(BuildBone(part, mirrored: true, snapshot));
                     }
                 }
             }
@@ -116,13 +81,56 @@ namespace ProceduralCreature.Skeleton
             return skeleton;
         }
 
+        private static Skeleton InferMalformedDefinition(CreatureDefinition definition)
+        {
+            var skeleton = new Skeleton();
+            bool hasBody = definition.Body != null
+                && definition.Body.Samples != null
+                && definition.Body.Samples.Count > 0;
+            AppendBodyBones(
+                skeleton,
+                hasBody ? ResolvedBody.Resolve(definition.Body) : null,
+                definition.Forward,
+                hasBody,
+                resolvedSnapshot: null);
+
+            IReadOnlyList<CreaturePart> parts = definition.CreateHierarchyIndex().Parts;
+            for (int i = 0; i < parts.Count; i++)
+            {
+                CreaturePart part = parts[i];
+                if (part == null || part.Limb != null) continue;
+
+                try
+                {
+                    Matrix4x4 world = CreaturePartWorldTransformResolver
+                        .ResolvePartFrameToCreatureSpace(definition, part);
+                    skeleton.Bones.Add(new Bone
+                    {
+                        Id = SemanticBoneResolver.ResolvePartRootBoneId(part, mirrored: false),
+                        ParentBoneId = SemanticBoneResolver.ResolveParentBoneId(
+                            definition, part, mirrored: false),
+                        SourcePartId = part.Id,
+                        PartType = part.PartType,
+                        Position = world.GetColumn(3),
+                        Rotation = world.rotation,
+                    });
+                }
+                catch (DomainException)
+                {
+                    // Broken ancestry remains a validation problem; do not invent a
+                    // disconnected bone just to keep inference going.
+                }
+            }
+
+            return skeleton;
+        }
+
         private static Bone BuildBone(
-            CreaturePart part,
-            ResolvedPartSnapshot resolvedPart,
+            ResolvedPartSnapshot part,
             bool mirrored,
             ResolvedCreatureSnapshot snapshot)
         {
-            Matrix4x4 world = resolvedPart.PartFrameToCreatureSpace;
+            Matrix4x4 world = part.PartFrameToCreatureSpace;
             if (mirrored)
             {
                 world = MirrorUtility.MirrorAcrossXPlane(world);
@@ -130,8 +138,8 @@ namespace ProceduralCreature.Skeleton
 
             return new Bone
             {
-                Id = SemanticBoneResolver.ResolvePartRootBoneId(part, mirrored),
-                ParentBoneId = SemanticBoneResolver.ResolveParentBoneId(snapshot, resolvedPart, mirrored),
+                Id = SemanticBoneResolver.ResolvePartRootBoneId(part.Id, mirrored),
+                ParentBoneId = SemanticBoneResolver.ResolveParentBoneId(snapshot, part, mirrored),
                 SourcePartId = part.Id,
                 PartType = part.PartType,
                 IsMirrored = mirrored,
@@ -143,19 +151,18 @@ namespace ProceduralCreature.Skeleton
         private static void AppendLimbBones(
             Skeleton skeleton,
             ResolvedCreatureSnapshot snapshot,
-            CreaturePart part,
-            ResolvedPartSnapshot resolvedPart,
+            ResolvedPartSnapshot part,
             bool mirrored)
         {
-            if (!resolvedPart.HasLimb) return;
+            if (!part.HasLimb) return;
 
-            ResolvedLimb resolved = resolvedPart.Limb;
+            ResolvedLimb resolved = part.Limb;
             if (resolved.JointPositions == null || resolved.JointPositions.Count < 2)
             {
                 return;
             }
 
-            Matrix4x4 partMatrix = resolvedPart.PartFrameToCreatureSpace;
+            Matrix4x4 partMatrix = part.PartFrameToCreatureSpace;
             Vector3 upHint = partMatrix.rotation * Vector3.up;
             if (mirrored)
             {
@@ -164,7 +171,7 @@ namespace ProceduralCreature.Skeleton
             }
 
             string rootParentBoneId = SemanticBoneResolver.ResolveParentBoneId(
-                snapshot, resolvedPart, mirrored);
+                snapshot, part, mirrored);
             string previousBoneId = null;
             Quaternion previousRotation = Quaternion.identity;
 
@@ -175,7 +182,7 @@ namespace ProceduralCreature.Skeleton
                 Quaternion rotation = ResolveLimbBoneRotation(toWorld - fromWorld, upHint);
                 previousRotation = rotation;
 
-                string boneId = SemanticBoneResolver.ResolveLimbSegmentBoneId(part, i, mirrored);
+                string boneId = SemanticBoneResolver.ResolveLimbSegmentBoneId(part.Id, i, mirrored);
                 skeleton.Bones.Add(new Bone
                 {
                     Id = boneId,
@@ -198,7 +205,7 @@ namespace ProceduralCreature.Skeleton
                 resolved.JointPositions[terminalIndex]);
             skeleton.Bones.Add(new Bone
             {
-                Id = SemanticBoneResolver.ResolveLimbJointBoneId(part, terminalIndex, mirrored),
+                Id = SemanticBoneResolver.ResolveLimbJointBoneId(part.Id, terminalIndex, mirrored),
                 ParentBoneId = previousBoneId,
                 SourcePartId = part.Id,
                 PartType = part.PartType,
