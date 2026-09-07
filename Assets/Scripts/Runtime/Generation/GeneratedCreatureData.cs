@@ -3,6 +3,7 @@ using System.Collections.Generic;
 using System.Collections.ObjectModel;
 using ProceduralCreature.Morphology.Extraction;
 using ProceduralCreature.Definition;
+using ProceduralCreature.Common;
 using UnityEngine;
 
 namespace ProceduralCreature.Generation
