@@ -106,7 +106,7 @@ namespace ProceduralCreature.Editor
             ClearGeometryObjects();
             BindImplicitSurface(implicitSurface.Mesh, definition, snapshot);
 
-            CreatureRig rig = GetSingleOwnedComponent<CreatureRig>();
+            CreatureRig rig = GetSingleOwnedComponent<CreatureRig>(clearGeneratedState: false);
             if (rig == null || rig.RestSkeleton == null)
             {
                 throw new DomainException("Preview rig must be built before mesh-asset geometry is attached.");
@@ -151,7 +151,7 @@ namespace ProceduralCreature.Editor
             return rig.TryGetBone(boneId, out bone);
         }
 
-        private T GetSingleOwnedComponent<T>() where T : Component
+        private T GetSingleOwnedComponent<T>(bool clearGeneratedState = true) where T : Component
         {
             if (PreviewGameObject == null) return null;
             T[] components = PreviewGameObject.GetComponents<T>();
@@ -163,8 +163,11 @@ namespace ProceduralCreature.Editor
                 T component = components[i];
                 if (component == null) continue;
 
-                if (component is CreatureRig rig) rig.Clear();
-                else if (component is CreatureSkinnedMeshRenderer skinned) skinned.Clear();
+                if (clearGeneratedState)
+                {
+                    if (component is CreatureRig rig) rig.Clear();
+                    else if (component is CreatureSkinnedMeshRenderer skinned) skinned.Clear();
+                }
 
                 if (component != retained) UnityEngine.Object.DestroyImmediate(component);
             }

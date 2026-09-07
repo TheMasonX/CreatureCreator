@@ -1,8 +1,8 @@
-{
+﻿{
   "id": "tsk-0168-harden-preview-rig-component-ownership-across-editor-reloads",
   "key": "TSK-0168",
   "title": "Harden editor preview rig/skinner component ownership across reloads",
-  "description": "## Summary\nThe preview root is structurally identified with an EntityId, but `CreatureRig` and `CreatureSkinnedMeshRenderer` previously relied on `GetComponent`/`AddComponent` while each component kept private generated-object state. Rapid editor recompilation/domain reloads could therefore leave stale duplicate components or orphaned generated children.\n\n## Scope\n- Extend the existing structural ownership pattern from the preview root/geometry children to the preview's rig and skinned-renderer components.\n- Before rebinding, discover all owned `CreatureRig` and `CreatureSkinnedMeshRenderer` components on the preview root, clear each one's generated objects, retain exactly one live component of each type, and remove extras.\n- Do not use global name searches.\n- Preserve the preview root's external objects/components and source mesh.\n- Ensure clear/rebuild is idempotent and leaves exactly one rig/skinner pair.\n- Add focused editor tests for duplicate-component recovery where Unity allows.\n\n## Non-goals\n- Do not redesign `CreatureRig` ownership globally.\n- Do not add per-frame checks.\n- Do not add another preview root identity system.\n\n## Acceptance Criteria\n- Rebinding a recovered preview with duplicate rig/skinner components produces exactly one active `CreatureRig` and one `CreatureSkinnedMeshRenderer`.\n- Generated rig bones/renderer objects owned by removed duplicates are cleaned up rather than orphaned.\n- Existing structural ownership and teardown remain intact.\n- No per-frame allocation or lookup is introduced; this is bind/reload-time only.\n\n## Validation\nFocused Editor/PlayMode lifecycle test with forced rebind/recovery; inspect hierarchy for one rig/skinner pair and no orphaned generated bones/renderer objects.\n\n## Status\nInProgress — source hardening landed; focused Unity validation remains the closure gate.\n\n## Implementation evidence\n`CreaturePreviewController.GetSingleOwnedComponent<T>` now scans all owned components of each preview rig/skin type, clears their generated state, retains one deterministic component, and destroys duplicates during bind/clear only. No per-frame path uses this helper.",
+  "description": "## Summary\nThe preview root is structurally identified with an EntityId, but \u0060CreatureRig\u0060 and \u0060CreatureSkinnedMeshRenderer\u0060 previously relied on \u0060GetComponent\u0060/\u0060AddComponent\u0060 while each component kept private generated-object state. Rapid editor recompilation/domain reloads could therefore leave stale duplicate components or orphaned generated children.\n\n## Scope\n- Extend the existing structural ownership pattern from the preview root/geometry children to the preview\u0027s rig and skinned-renderer components.\n- Before rebinding, discover all owned \u0060CreatureRig\u0060 and \u0060CreatureSkinnedMeshRenderer\u0060 components on the preview root, clear each one\u0027s generated objects, retain exactly one live component of each type, and remove extras.\n- Do not use global name searches.\n- Preserve the preview root\u0027s external objects/components and source mesh.\n- Ensure clear/rebuild is idempotent and leaves exactly one rig/skinner pair.\n- Add focused editor tests for duplicate-component recovery where Unity allows.\n\n## Non-goals\n- Do not redesign \u0060CreatureRig\u0060 ownership globally.\n- Do not add per-frame checks.\n- Do not add another preview root identity system.\n\n## Acceptance Criteria\n- Rebinding a recovered preview with duplicate rig/skinner components produces exactly one active \u0060CreatureRig\u0060 and one \u0060CreatureSkinnedMeshRenderer\u0060.\n- Generated rig bones/renderer objects owned by removed duplicates are cleaned up rather than orphaned.\n- Existing structural ownership and teardown remain intact.\n- No per-frame allocation or lookup is introduced; this is bind/reload-time only.\n\n## Validation\nFocused Editor/PlayMode lifecycle test with forced rebind/recovery; inspect hierarchy for one rig/skinner pair and no orphaned generated bones/renderer objects.\n\n## Status\nInProgress \u2014 source hardening landed; focused Unity validation remains the closure gate.\n\n## Implementation evidence\n\u0060CreaturePreviewController.GetSingleOwnedComponent\u003CT\u003E\u0060 now scans all owned components of each preview rig/skin type, clears their generated state, retains one deterministic component, and destroys duplicates during bind/clear only. No per-frame path uses this helper.",
   "type": "Task",
   "status": "InProgress",
   "priority": "High",
@@ -32,18 +32,25 @@
     {
       "id": "c-20260907-preview-component-ownership-implementation",
       "author": "anonymous",
-      "body": "Implementation landed: preview bind/clear now reconciles all rig/skinned-renderer components on the owned preview root, clears each component's generated state before removing duplicates, and retains one deterministic component. This is bind/reload-time only; per-frame animation is unchanged. Unity lifecycle validation remains required.",
+      "body": "Implementation landed: preview bind/clear now reconciles all rig/skinned-renderer components on the owned preview root, clears each component\u0027s generated state before removing duplicates, and retains one deterministic component. This is bind/reload-time only; per-frame animation is unchanged. Unity lifecycle validation remains required.",
       "createdAtUtc": "2026-09-07T20:25:00Z"
+    },
+    {
+      "id": "c-d9affa3a94cb40a1944688ddb79c06ce",
+      "author": "anonymous",
+      "body": "Follow-up bug fix for live regeneration failure. Root cause: ApplyPreviewGeometry called GetSingleOwnedComponent\u003CCreatureRig\u003E() after BindImplicitSurface; that helper cleared generated state on the retained rig before checking RestSkeleton, producing \u0022Preview rig must be built before mesh-asset geometry is attached.\u0022 Fix in Assets/Scripts/Editor/CreaturePreviewController.cs adds a non-destructive lookup mode and uses it only for the post-bind attachment lookup; cleanup/rebind calls retain destructive reconciliation. Validation: dotnet build ProceduralCreature.Editor.csproj --no-restore passed with 0 errors/warnings; get_errors reported no errors. Unity EditMode fixture could not run because the MCP connection could not connect to Unity, so live first-build/rebuild/delete-rebuild evidence remains outstanding.",
+      "createdAtUtc": "2026-09-07T21:32:02.8120679Z"
     }
   ],
   "epicId": null,
   "parentId": "TSK-0142",
   "dueDateUtc": null,
   "createdAtUtc": "2026-09-07T20:20:00Z",
-  "updatedAtUtc": "2026-09-07T20:25:00Z",
+  "updatedAtUtc": "2026-09-07T21:32:02.8120679Z",
   "completedAtUtc": null,
-  "revision": 2,
+  "revision": 3,
   "isArchived": false,
   "hasLoadError": false,
+  "loadError": null,
   "sourceFilePath": "tsk-0168-harden-preview-rig-component-ownership-across-editor-reloads.json"
 }
