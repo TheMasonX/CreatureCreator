@@ -27,12 +27,6 @@ namespace ProceduralCreature.Generation
     /// </summary>
     public static class CreatureMeshGenerator
     {
-        /// <summary>
-        /// The creature-space reflection across the X = 0 plane, matching the
-        /// convention SkeletonInferrer uses for mirrored bones and the SDF
-        /// compiler's mirrored limb chains — so mirrored mesh-asset geometry lands
-        /// on the same side as the mirrored implicit field.
-        /// </summary>
         public static GeneratedCreature Generate(CreatureDefinition definition, out MeshTopologyReport topologyReport, GenerationDiagnostics diagnostics = null)
         {
             return Generate(definition, out topologyReport, diagnostics, meshResolver: null);
@@ -53,26 +47,11 @@ namespace ProceduralCreature.Generation
             CreatureDefinition definition,
             GenerationDiagnostics diagnostics = null)
         {
-            // CC-091: generation is a concrete sequence of separately owned stages.
-            // Each stage consumes the resolved/generated data produced by the previous
-            // one and owns any native buffer it allocates. ValidateAndResolve is the
-            // single authority that turns authored DNA into the one resolved snapshot
-            // used by every downstream stage; no stage re-derives morphology from raw
-            // DNA.
             ResolvedCreatureSnapshot snapshot = ValidateAndResolve(definition, diagnostics);
 
-            // Stage 1 — compile the portable SDF program and sample it over the grid.
-            // The returned DensityGrid owns its native sample buffer; that ownership
-            // transfers to ExtractMesh, which releases it.
             DensityGrid grid = GenerateImplicitField(definition, snapshot, diagnostics);
-
-            // Stage 2 — extract the implicit surface mesh from the sampled grid.
             MeshExtractionResult meshResult = ExtractMesh(grid, diagnostics);
-
-            // Stage 3 — validate the extracted mesh topology (watertight/manifold).
             MeshTopologyReport generatedTopologyReport = ValidateMesh(meshResult, diagnostics);
-
-            // Stage 4 — bake per-vertex appearance colors from resolved part data.
             Color[] colors = BakeAppearance(definition, snapshot, meshResult, diagnostics);
 
             return new GeneratedCreatureData(definition, snapshot, meshResult, colors, generatedTopologyReport);
@@ -95,13 +74,6 @@ namespace ProceduralCreature.Generation
             return ResolvedCreatureSnapshot.Resolve(definition);
         }
 
-        /// <summary>
-        /// Stage: compile the creature's portable SDF program and sample it over the
-        /// resolved density grid. The compiled program is transient — it is disposed
-        /// immediately after sampling. The returned <see cref="DensityGrid"/> owns its
-        /// native sample buffer; ownership transfers to <see cref="ExtractMesh"/>,
-        /// which is responsible for releasing it.
-        /// </summary>
         private static DensityGrid GenerateImplicitField(
             CreatureDefinition definition,
             ResolvedCreatureSnapshot snapshot,
@@ -131,14 +103,6 @@ namespace ProceduralCreature.Generation
             return grid;
         }
 
-        /// <summary>
-        /// Stage: extract the implicit surface mesh from the sampled grid. This stage
-        /// takes ownership of <paramref name="grid"/> and releases its native sample
-        /// buffer after extraction — validation, appearance, and assembly consume the
-        /// plain-data <see cref="MeshExtractionResult"/>, so the grid is no longer
-        /// needed. It is disposed even when extraction throws so the Persistent
-        /// allocation cannot leak.
-        /// </summary>
         private static MeshExtractionResult ExtractMesh(DensityGrid grid, GenerationDiagnostics diagnostics)
         {
             MeshExtractionResult meshResult = null;
@@ -168,10 +132,6 @@ namespace ProceduralCreature.Generation
             return meshResult;
         }
 
-        /// <summary>
-        /// Stage: validate the extracted mesh topology. Consumes only the plain-data
-        /// <see cref="MeshExtractionResult"/>; it owns no native resources.
-        /// </summary>
         private static MeshTopologyReport ValidateMesh(
             MeshExtractionResult meshResult,
             GenerationDiagnostics diagnostics)
@@ -182,13 +142,6 @@ namespace ProceduralCreature.Generation
             return generatedTopologyReport;
         }
 
-        /// <summary>
-        /// Stage: bake per-vertex colors from resolved part appearance. Compiles the
-        /// individual-part and Body appearance programs from the resolved snapshot,
-        /// bakes against the extracted mesh, and disposes those programs. It never
-        /// re-derives morphology from raw DNA; it only builds the appearance programs
-        /// this stage itself needs.
-        /// </summary>
         private static Color[] BakeAppearance(
             CreatureDefinition definition,
             ResolvedCreatureSnapshot snapshot,
@@ -219,9 +172,6 @@ namespace ProceduralCreature.Generation
             Mesh mesh = data.MeshResult.ToUnityMesh();
             mesh.SetColors(data.Colors);
 
-            // The implicit combined surface is added first, then mesh-asset items in
-            // ascending SourcePartId order. AddGeometry is the single construction
-            // path (TSK-0125); a GeneratedCreature is immutable to consumers.
             var generated = new GeneratedCreature();
             generated.AddGeometry(new GeometryItem(
                 sourcePartId: GeneratedCreature.ImplicitSurfaceSourceId,
@@ -233,26 +183,16 @@ namespace ProceduralCreature.Generation
                 rigBinding: new RigBindingMetadata(
                     GeneratedCreature.ImplicitSurfaceSourceId, parentPartId: null, isMirrored: false)));
 
-            // Items 1..n: mesh-asset parts, resolved and placed from the snapshot.
             AppendMeshAssetItems(generated, data, meshResolver);
-
             return generated;
         }
 
-        /// <summary>
-        /// Stage: place mesh-asset parts into the generated creature. Mesh-asset parts
-        /// are ordered by SourcePartId for deterministic output independent of
-        /// authoring order; each source mesh is resolved through the injected resolver
-        /// and placed at its captured creature-space transform, mirroring when the
-        /// part is mirrored. Placement comes from the resolved snapshot, never raw
-        /// DNA.
-        /// </summary>
         private static void AppendMeshAssetItems(
             GeneratedCreature generated,
             GeneratedCreatureData data,
             Func<string, Mesh> meshResolver)
         {
-            SkeletonSnapshot skeleton = SkeletonSnapshot.Capture(SkeletonInferrer.Infer(data.Definition));
+            SkeletonSnapshot skeleton = SkeletonSnapshot.Capture(SkeletonInferrer.Infer(data.Snapshot));
             var meshParts = data.Snapshot.PartsById.Values
                 .Where(p => p.HasMeshGeometry)
                 .OrderBy(p => p.Id, StringComparer.Ordinal);
@@ -292,13 +232,6 @@ namespace ProceduralCreature.Generation
             return resolved;
         }
 
-        /// <summary>
-        /// Bakes a mesh-asset item's final creature-space placement into a new Mesh
-        /// (pass-1 simplification: consumers assign the mesh at identity). Submesh
-        /// structure is preserved and normals are recomputed so the transformed mesh
-        /// shades correctly. The source mesh asset is never mutated. Mirrored items
-        /// reuse the same source mesh with a reflected placement.
-        /// </summary>
         private static GeometryItem BuildMeshAssetItem(
             ResolvedPartSnapshot part,
             CreaturePart sourcePart,
@@ -335,25 +268,8 @@ namespace ProceduralCreature.Generation
 
             mesh.RecalculateNormals();
             mesh.RecalculateBounds();
-
-            // Bake the part's own authored appearance onto the item (CC-031 pass-2
-            // vertex-color parity with the implicit surface). A mesh-asset part is
-            // not part of the implicit SDF field, so AppearanceBaker.BakePart
-            // resolves its color from the part itself rather than nearest-surface
-            // sampling — never from the Body's implicit gradient.
             mesh.SetColors(AppearanceBaker.BakePart(part.Appearance, mesh.vertices, mesh.normals));
 
-            // CC-028 + ADR-009 (submesh-index range model): a part with a submaterial
-            // override carries it as a key on its geometry item. We emit one
-            // MaterialRegion per submesh of the baked mesh, each covering that
-            // submesh's full index range, so multi-submesh material coverage is
-            // deterministic and complete — a region never ambiguously refers to "the
-            // whole item." A single-submesh part yields exactly one region.
-            // Resolution of the key to a UnityEngine.Material is a render-layer
-            // concern (MaterialResolver), so the generator output stays key-only and
-            // the domain stays portable. The implicit combined item deliberately gets
-            // no regions — the single-mesh vertex-color bake remains the default path
-            // (CC-028 scope).
             List<MaterialRegion> regions = null;
             if (!string.IsNullOrWhiteSpace(part.Appearance.MaterialKey))
             {
