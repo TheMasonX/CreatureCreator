@@ -156,7 +156,11 @@ namespace ProceduralCreature.Editor
             {
                 return true;
             }
-            return bone.PartType == PartType.Leg || bone.PartType == PartType.Foot;
+
+            // Do not encode biped/quadruped assumptions in the visualization.
+            // Every articulated segment gets the same structural treatment,
+            // regardless of PartType or limb count.
+            return bone.HasSegment || bone.HasChildAttachmentPosition;
         }
 
         private static void DrawOverlayControls(SceneView sceneView)
@@ -211,7 +215,7 @@ namespace ProceduralCreature.Editor
                 EditorGUILayout.EndHorizontal();
 
                 EditorGUILayout.BeginHorizontal();
-                if (GUILayout.Button("Focus Legs")) FrameBones(sceneView, GetBonesByType(PartType.Leg, PartType.Foot));
+                if (GUILayout.Button("Focus Limbs")) FrameBones(sceneView, GetLimbBones());
                 if (GUILayout.Button("Focus Body")) FrameBones(sceneView, GetBodyBones());
                 EditorGUILayout.EndHorizontal();
 
@@ -273,25 +277,21 @@ namespace ProceduralCreature.Editor
             return new List<Transform> { selected };
         }
 
-        private static List<Transform> GetBonesByType(params PartType[] types)
+        private static List<Transform> GetLimbBones()
         {
             var result = new List<Transform>();
             CreatureRig[] rigs = Object.FindObjectsByType<CreatureRig>(FindObjectsSortMode.None);
             for (int r = 0; r < rigs.Length; r++)
             {
                 CreatureRig rig = rigs[r];
-                if (rig == null) continue;
+                if (rig == null || rig.RestSkeleton == null) continue;
                 IReadOnlyList<Transform> bones = rig.IndexedBones;
                 for (int i = 0; i < bones.Count; i++)
                 {
                     BoneSnapshot bone = rig.RestSkeleton[i];
-                    for (int t = 0; t < types.Length; t++)
+                    if (bone.HasSegment || bone.HasChildAttachmentPosition)
                     {
-                        if (bone.PartType == types[t])
-                        {
-                            result.Add(bones[i]);
-                            break;
-                        }
+                        result.Add(bones[i]);
                     }
                 }
             }
