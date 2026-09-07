@@ -2,6 +2,7 @@ using System.Collections.Generic;
 using NUnit.Framework;
 using ProceduralCreature.Animation.Binding;
 using ProceduralCreature.Generation;
+using ProceduralCreature.Common;
 using UnityEngine;
 
 namespace ProceduralCreature.Tests.Runtime
@@ -80,6 +81,23 @@ namespace ProceduralCreature.Tests.Runtime
             Assert.AreEqual(1, generated.Geometry.Count);
             Assert.IsTrue(generated.Geometry is IList<GeometryItem>);
             Assert.IsTrue(((IList<GeometryItem>)generated.Geometry).IsReadOnly);
+        }
+
+        [Test]
+        public void GeometryItem_MaterialRegionRangeOverflowIsRejected()
+        {
+            Mesh mesh = CreateTriangleMesh();
+            var overflowingRegion = new MaterialRegion(0, 2, int.MaxValue, "body");
+
+            Assert.Throws<DomainException>(() =>
+                new GeometryItem(
+                    "part",
+                    GeometryType.MeshAsset,
+                    mesh,
+                    mesh,
+                    Matrix4x4.identity,
+                    new[] { overflowingRegion },
+                    new RigBindingMetadata("part", "body", false)));
         }
 
         private static Mesh CreateTriangleMesh()
