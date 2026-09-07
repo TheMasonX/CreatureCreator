@@ -1,0 +1,43 @@
+{
+  "id": "tsk-0168-harden-preview-rig-component-ownership-across-editor-reloads",
+  "key": "TSK-0168",
+  "title": "Harden editor preview rig/skinner component ownership across reloads",
+  "description": "## Summary\nThe preview root is structurally identified with an EntityId, but `CreatureRig` and `CreatureSkinnedMeshRenderer` currently rely on `GetComponent`/`AddComponent` and each component keeps private generated-object state. Rapid editor recompilation/domain reloads can therefore leave stale duplicate components or orphaned generated children.\n\n## Scope\n- Extend the existing structural ownership pattern from the preview root/geometry children to the preview's rig and skinned-renderer components.\n- Before rebinding, discover all owned `CreatureRig` and `CreatureSkinnedMeshRenderer` components on the preview root, clear each one's generated objects, retain exactly one live component of each type, and remove extras.\n- Do not use global name searches.\n- Preserve the preview root's external objects/components and source mesh.\n- Ensure clear/rebuild is idempotent and leaves exactly one rig/skinner pair.\n- Add focused editor tests for duplicate-component recovery where Unity allows.\n\n## Non-goals\n- Do not redesign `CreatureRig` ownership globally.\n- Do not add per-frame checks.\n- Do not add another preview root identity system.\n\n## Acceptance Criteria\n- Rebinding a recovered preview with duplicate rig/skinner components produces exactly one active `CreatureRig` and one `CreatureSkinnedMeshRenderer`.\n- Generated rig bones/renderer objects owned by removed duplicates are cleaned up rather than orphaned.\n- Existing structural ownership and teardown remain intact.\n- No per-frame allocation or lookup is introduced; this is bind/reload-time only.\n\n## Validation\nFocused Editor/PlayMode lifecycle test with forced rebind/recovery; inspect hierarchy for one rig/skinner pair and no orphaned generated bones/renderer objects.\n\n## Status\nInProgress.\n",
+  "type": "Task",
+  "status": "InProgress",
+  "priority": "High",
+  "assigneeMode": "Custom",
+  "assigneeDirectoryId": null,
+  "assigneeCustomText": "Agent",
+  "reporter": "anonymous",
+  "labels": [
+    "editor",
+    "runtime",
+    "animation",
+    "skinning",
+    "preview",
+    "ownership",
+    "user-mandated"
+  ],
+  "attachments": [],
+  "externalLinks": [],
+  "linkedPages": [],
+  "comments": [
+    {
+      "id": "c-20260907-preview-component-ownership",
+      "author": "anonymous",
+      "body": "Created from live-use audit: root ownership is EntityId-based, but rig and skinned renderer components still use GetComponent/AddComponent with private generated-object state. The repair is intended to be bind/reload-time only and must not affect the per-frame animation path.",
+      "createdAtUtc": "2026-09-07T20:20:00Z"
+    }
+  ],
+  "epicId": null,
+  "parentId": "TSK-0142",
+  "dueDateUtc": null,
+  "createdAtUtc": "2026-09-07T20:20:00Z",
+  "updatedAtUtc": "2026-09-07T20:20:00Z",
+  "completedAtUtc": null,
+  "revision": 1,
+  "isArchived": false,
+  "hasLoadError": false,
+  "sourceFilePath": "tsk-0168-harden-preview-rig-component-ownership-across-editor-reloads.json"
+}
