@@ -22,16 +22,23 @@
   "attachments": [],
   "externalLinks": [],
   "linkedPages": [],
-  "comments": [],
+  "comments": [
+    {
+      "id": "c-c106a699fb4d4524b4560f48a5ebfc35",
+      "author": "anonymous",
+      "body": "Round 4 sequential review evidence (2026-09-07): Added direct runtime fixture Assets/Scripts/Tests/Runtime/MorphologyInfluenceRadiusBridgeTests.cs. Production bridge logic was not edited by this review; the pre-existing staged bridge diff only replaces partial CreaturePart construction with the authoritative string-id resolver overload. Direct tests cover: valid resolved body radius 0.85 and limb midpoint 0.10; unavailable morphology via empty Body plus generic attachment fallback 0.5; non-positive body radius 0 fallback 0.5; degenerate first limb segment midpoint clamped at lower bound (0.2) plus normal second-segment midpoint interpolation (0.6). Tests assert repeated deterministic arrays and finite values.\n\nValidation: dotnet build ProceduralCreature.Runtime.csproj --no-restore =\u003E exit 0. dotnet build ProceduralCreature.Tests.Runtime.csproj --no-restore =\u003E initially failed only because fixture used nonexistent PartType.Shape; corrected to PartType.Part; rerun exit 0. dotnet test ProceduralCreature.Tests.Runtime.csproj --no-restore --no-build --verbosity minimal =\u003E exit 0, but this project command does not provide Unity Test Framework execution evidence. Unity MCP read_console =\u003E no Unity Editor instances found; focused PlayMode run could not initialize (bridge unavailable). Therefore Unity-required acceptance gate remains blocked and task must not be marked Done.\n\nScope review: no extraction, skeleton contract, benchmark, or GeneratedCreature files changed by this review. Repository git diff --check is affected by pre-existing unrelated Assets/Test.unity trailing whitespace; focused source/test build is clean. Residual risk: Unity PlayMode must still run the new fixture and existing CreatureSkinnedMeshRenderer tests, and exact runtime branch execution cannot be claimed until a Unity 6000.0.35f1 editor is connected. Next step: connect Unity, inspect console/compilation, run focused PlayMode tests, then rerun the existing skinned renderer/influence tests and update task status only with that evidence.",
+      "createdAtUtc": "2026-09-07T06:06:05.2728277Z"
+    }
+  ],
   "epicId": null,
   "parentId": "TSK-0077",
   "dueDateUtc": null,
   "createdAtUtc": "2026-09-07T05:19:42.0640062Z",
-  "updatedAtUtc": "2026-09-07T05:19:42.0640062Z",
+  "updatedAtUtc": "2026-09-07T06:06:05.2728277Z",
   "completedAtUtc": null,
-  "revision": 1,
+  "revision": 2,
   "isArchived": false,
   "hasLoadError": false,
   "loadError": null,
-  "sourceFilePath": null
+  "sourceFilePath": "tsk-0146-test-morphology-influence-radius-bridge.json"
 }

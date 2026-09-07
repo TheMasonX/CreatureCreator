@@ -389,6 +389,18 @@ namespace ProceduralCreature.Tests.Runtime
         }
 
         [Test]
+        public void GeneratedCreature_EmptyOutput_HasNoImplicitSurfaceOrPartGeometry()
+        {
+            var generated = new GeneratedCreature();
+
+            Assert.AreEqual(0, generated.Count);
+            Assert.IsFalse(generated.TryGetImplicitSurface(out GeometryItem implicitItem));
+            Assert.IsNull(implicitItem);
+            Assert.IsFalse(generated.TryFindGeometryForPart("missing", out GeometryItem partItem));
+            Assert.IsNull(partItem);
+        }
+
+        [Test]
         public void GeneratedCreature_DoesNotExposeLegacyMainMeshShim()
         {
             Assert.IsNull(typeof(GeneratedCreature).GetProperty("MainMesh"),
