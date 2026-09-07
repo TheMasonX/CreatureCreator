@@ -1,5 +1,6 @@
 using System;
 using System.Collections.Generic;
+using ProceduralCreature.Animation.Binding;
 using ProceduralCreature.Common;
 using ProceduralCreature.Definition;
 using UnityEngine;
@@ -114,6 +115,9 @@ namespace ProceduralCreature.Generation
 
         public RigBindingMetadata RigBinding { get; }
 
+        /// <summary>Build-time per-vertex influences in SkeletonSnapshot capture order.</summary>
+        public IReadOnlyList<VertexInfluence[]> VertexInfluences { get; }
+
         internal GeometryItem(
             string sourcePartId,
             GeometryType geometryType,
@@ -121,7 +125,8 @@ namespace ProceduralCreature.Generation
             Mesh sourceMesh,
             Matrix4x4 restPlacement,
             IReadOnlyList<MaterialRegion> materialRegions,
-            RigBindingMetadata rigBinding)
+            RigBindingMetadata rigBinding,
+            IReadOnlyList<VertexInfluence[]> vertexInfluences = null)
         {
             if (mesh == null) throw new DomainException("geometry item mesh must not be null.");
             if (sourcePartId == null) throw new DomainException("geometry item source part id must not be null.");
@@ -135,6 +140,27 @@ namespace ProceduralCreature.Generation
             SourceMesh = sourceMesh;
             RestPlacement = restPlacement;
             RigBinding = rigBinding;
+            VertexInfluences = CloneInfluences(vertexInfluences);
+        }
+
+        private static IReadOnlyList<VertexInfluence[]> CloneInfluences(
+            IReadOnlyList<VertexInfluence[]> influences)
+        {
+            if (influences == null || influences.Count == 0)
+            {
+                return Array.Empty<VertexInfluence[]>();
+            }
+
+            var copy = new VertexInfluence[influences.Count][];
+            for (int i = 0; i < influences.Count; i++)
+            {
+                if (influences[i] == null)
+                {
+                    throw new DomainException($"geometry item vertex influences {i} must not be null.");
+                }
+                copy[i] = (VertexInfluence[])influences[i].Clone();
+            }
+            return copy;
         }
 
         private void ValidateMaterialRegions(Mesh mesh)

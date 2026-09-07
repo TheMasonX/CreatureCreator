@@ -1,6 +1,7 @@
 using System;
 using System.Collections.Generic;
 using System.Linq;
+using ProceduralCreature.Animation.Binding;
 using ProceduralCreature.Common;
 using ProceduralCreature.Definition;
 using ProceduralCreature.Appearance;
@@ -251,6 +252,7 @@ namespace ProceduralCreature.Generation
             GeneratedCreatureData data,
             Func<string, Mesh> meshResolver)
         {
+            SkeletonSnapshot skeleton = SkeletonSnapshot.Capture(SkeletonInferrer.Infer(data.Definition));
             var meshParts = data.Snapshot.PartsById.Values
                 .Where(p => p.HasMeshGeometry)
                 .OrderBy(p => p.Id, StringComparer.Ordinal);
@@ -259,13 +261,16 @@ namespace ProceduralCreature.Generation
             {
                 Mesh sourceMesh = ResolveMesh(resolvedPart.Id, resolvedPart.MeshAssetKey, meshResolver);
                 Matrix4x4 placement = resolvedPart.GeometryPlacementToCreatureSpace;
+                CreaturePart sourcePart = data.Definition.FindPart(resolvedPart.Id);
 
-                generated.AddGeometry(BuildMeshAssetItem(resolvedPart, sourceMesh, placement, mirror: false));
+                generated.AddGeometry(BuildMeshAssetItem(
+                    resolvedPart, sourcePart, sourceMesh, placement, skeleton, mirror: false));
 
                 if (resolvedPart.MirrorAcrossSymmetryPlane && data.Snapshot.SymmetryMode != SymmetryMode.None)
                 {
-                    generated.AddGeometry(BuildMeshAssetItem(resolvedPart, sourceMesh,
-                        MirrorUtility.ReflectTransformAcrossX(placement), mirror: true));
+                    generated.AddGeometry(BuildMeshAssetItem(
+                        resolvedPart, sourcePart, sourceMesh,
+                        MirrorUtility.ReflectTransformAcrossX(placement), skeleton, mirror: true));
                 }
             }
         }
@@ -294,7 +299,13 @@ namespace ProceduralCreature.Generation
         /// shades correctly. The source mesh asset is never mutated. Mirrored items
         /// reuse the same source mesh with a reflected placement.
         /// </summary>
-        private static GeometryItem BuildMeshAssetItem(ResolvedPartSnapshot part, Mesh source, Matrix4x4 placement, bool mirror)
+        private static GeometryItem BuildMeshAssetItem(
+            ResolvedPartSnapshot part,
+            CreaturePart sourcePart,
+            Mesh source,
+            Matrix4x4 placement,
+            SkeletonSnapshot skeleton,
+            bool mirror)
         {
             Vector3[] positions = source.vertices;
             Vector3[] transformed = new Vector3[positions.Length];
@@ -365,7 +376,9 @@ namespace ProceduralCreature.Generation
                 sourceMesh: source,
                 restPlacement: placement,
                 materialRegions: regions,
-                rigBinding: new RigBindingMetadata(part.Id, part.ParentId, mirror));
+                rigBinding: new RigBindingMetadata(part.Id, part.ParentId, mirror),
+                vertexInfluences: RigidMeshWeightAuthoring.Author(
+                    skeleton, sourcePart, mirror, mesh.vertices));
         }
 
         private static int[] CopyTriangles(int[] triangles, bool reverseWinding)
