@@ -1,0 +1,21 @@
+{
+  "id": "tsk-0158-seal-derived-output-collection-views",
+  "key": "TSK-0158",
+  "title": "Seal derived-output collection views against backing-store mutation",
+  "description": "Council multi-round audit found two read-only-looking APIs that still expose mutable backing collections through interface covariance/casts: GeneratedCreature.Geometry returns its private List as IReadOnlyList, and CreatureSkinnedMeshRenderer.Bones returns its backing Transform[] as IReadOnlyList. Both can be mutated by downcasting despite documentation describing consumer read-only behavior.\n\nScope: return actual read-only wrappers/snapshots, add regression coverage for cast-based mutation, preserve ordering and object identity, and keep runtime/editor ownership unchanged. Coordinate with TSK-0125 (GeneratedCreature) and TSK-0132 (skinned adapter).\n\nValidation gate: runtime build plus focused ownership tests; Unity execution required before closure.",
+  "type": "Bug Fix",
+  "status": "Backlog",
+  "priority": "Medium",
+  "assigneeMode": "Custom",
+  "assigneeDirectoryId": null,
+  "assigneeCustomText": "Unassigned",
+  "reporter": "council-audit",
+  "labels": ["council", "api-contract", "immutability", "animation", "generation", "TSK-0125", "TSK-0132"],
+  "attachments": [],
+  "externalLinks": [],
+  "linkedPages": [],
+  "comments": [],
+  "parentId": "tsk-0125-harden-generatedcreature-output-contract-and-materialregion-submesh",
+  "dueDateUtc": null,
+  "isArchived": false
+}
