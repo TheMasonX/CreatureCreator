@@ -7,6 +7,7 @@ using ProceduralCreature.Animation;
 using ProceduralCreature.Common;
 using ProceduralCreature.Definition;
 using ProceduralCreature.Skeleton;
+using ProceduralCreature.Animation.Skinned;
 
 namespace ProceduralCreature.Editor
 {
@@ -24,11 +25,13 @@ namespace ProceduralCreature.Editor
         private const string LabelsKey = "ProceduralCreature.RigDebug.Labels";
         private const string SelectableKey = "ProceduralCreature.RigDebug.Selectable";
         private const string WidthKey = "ProceduralCreature.RigDebug.LineWidth";
+        private const string RawMeshKey = "ProceduralCreature.RigDebug.ShowRawMesh";
 
         private static bool _enabled = EditorPrefs.GetBool(EnabledKey, false);
         private static bool _alwaysOnTop = EditorPrefs.GetBool(AlwaysOnTopKey, true);
         private static bool _labels = EditorPrefs.GetBool(LabelsKey, false);
         private static bool _selectable = EditorPrefs.GetBool(SelectableKey, true);
+        private static bool _showRawMesh = EditorPrefs.GetBool(RawMeshKey, false);
         private static float _lineWidth = Mathf.Clamp(EditorPrefs.GetFloat(WidthKey, 4f), 1f, 8f);
         private static GUIStyle _labelStyle;
 
@@ -199,7 +202,7 @@ namespace ProceduralCreature.Editor
         private static void DrawOverlayControls(SceneView sceneView)
         {
             Handles.BeginGUI();
-            GUILayout.BeginArea(new Rect(10f, 10f, 290f, 250f), "Rig Debug", GUI.skin.window);
+            GUILayout.BeginArea(new Rect(10f, 10f, 290f, 280f), "Rig Debug", GUI.skin.window);
 
             bool enabled = GUILayout.Toggle(_enabled, "Enable rig overlay");
             if (enabled != _enabled)
@@ -235,6 +238,15 @@ namespace ProceduralCreature.Editor
                     SceneView.RepaintAll();
                 }
 
+                bool showRawMesh = GUILayout.Toggle(_showRawMesh, "Show raw generated mesh");
+                if (showRawMesh != _showRawMesh)
+                {
+                    _showRawMesh = showRawMesh;
+                    EditorPrefs.SetBool(RawMeshKey, _showRawMesh);
+                    SetRawMeshVisibility(_showRawMesh);
+                    SceneView.RepaintAll();
+                }
+
                 _lineWidth = GUILayout.HorizontalSlider(_lineWidth, 1f, 8f);
                 EditorPrefs.SetFloat(WidthKey, _lineWidth);
                 EditorGUILayout.LabelField($"Bone width: {_lineWidth:0.0}");
@@ -261,6 +273,29 @@ namespace ProceduralCreature.Editor
 
             GUILayout.EndArea();
             Handles.EndGUI();
+        }
+
+        private static void SetRawMeshVisibility(bool visible)
+        {
+            CreatureRig[] rigs = UnityEngine.Object.FindObjectsByType<CreatureRig>();
+            for (int i = 0; i < rigs.Length; i++)
+            {
+                CreatureRig rig = rigs[i];
+                if (rig == null) continue;
+
+                MeshFilter rawFilter = rig.GetComponent<MeshFilter>();
+                MeshRenderer rawRenderer = rig.GetComponent<MeshRenderer>();
+                if (rawRenderer != null)
+                {
+                    rawRenderer.enabled = visible && rawFilter != null && rawFilter.sharedMesh != null;
+                }
+
+                CreatureSkinnedMeshRenderer skinned = rig.GetComponent<CreatureSkinnedMeshRenderer>();
+                if (skinned != null && skinned.Renderer != null)
+                {
+                    skinned.Renderer.enabled = !visible;
+                }
+            }
         }
 
         private static List<Transform> GetAllBones()
