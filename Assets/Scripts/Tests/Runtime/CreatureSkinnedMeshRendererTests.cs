@@ -117,7 +117,10 @@ namespace ProceduralCreature.Tests.Runtime
             float[] radiiByBoneIndex = MorphologyInfluenceRadiusBridge.BuildRadiiByBoneIndex(snapshot, resolved);
             List<BoneSegmentInfluence> segments =
                 ImplicitSurfaceWeightAuthoring.BuildSegmentInfluences(snapshot, radiiByBoneIndex);
-            bound.Weights = ImplicitSurfaceWeightAuthoring.Author(segments, bound.RestVertices);
+            InfluenceDomain[] vertexDomains = ImplicitSurfaceInfluenceDomainResolver.Resolve(
+                definition, resolved, bound.RestVertices);
+            bound.Weights = ImplicitSurfaceWeightAuthoring.Author(
+                segments, bound.RestVertices, vertexDomains);
 
             var host = new GameObject("SkinnedHost");
             host.transform.position = Vector3.zero;
@@ -126,7 +129,7 @@ namespace ProceduralCreature.Tests.Runtime
             CreatureRig rig = host.AddComponent<CreatureRig>();
             rig.Build(skeleton);
             CreatureSkinnedMeshRenderer adapter = host.AddComponent<CreatureSkinnedMeshRenderer>();
-            adapter.Bind(rig, skeleton, source, null);
+            adapter.Bind(rig, skeleton, source, radiiByBoneIndex, null, vertexDomains);
 
             bound.Host = host;
             bound.Rig = rig;

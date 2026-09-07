@@ -213,25 +213,6 @@ namespace ProceduralCreature.Morphology.Extraction
             return new Vector3(gx, gy, gz);
         }
 
-        /// <summary>
-        /// Estimates the field gradient at an arbitrary point as the analytic
-        /// derivative of the trilinear interpolant over the cell containing that
-        /// point, using the 8 corner samples already present in this cached grid.
-        ///
-        /// Unlike <see cref="EstimateGradient"/>, this does NOT round the point to
-        /// the nearest integer grid corner first, so the reference direction varies
-        /// smoothly as a surface triangle's centroid moves instead of jumping
-        /// discontinuously when the centroid crosses a corner-rounding boundary —
-        /// that discontinuity can flip a marginal triangle's winding where the
-        /// surface is nearly tangent to the (quantized) reference.
-        ///
-        /// Returns false when the containing cell has any non-finite (+inf/NaN)
-        /// corner: there the local field is not trustworthy (a culled/absent
-        /// boundary per the CC-064 non-finite contract), so no valid local
-        /// direction can be derived and the caller must not treat the loop order as
-        /// confirmed. Uses only already-loaded cell data — never a fresh SDF
-        /// evaluation.
-        /// </summary>
         public bool TryEstimateGradient(Vector3 point, out Vector3 gradient)
         {
             gradient = Vector3.zero;
@@ -242,9 +223,12 @@ namespace ProceduralCreature.Morphology.Extraction
             int x = Mathf.Clamp(Mathf.FloorToInt(fx), 0, CellsX - 1);
             int y = Mathf.Clamp(Mathf.FloorToInt(fy), 0, CellsY - 1);
             int z = Mathf.Clamp(Mathf.FloorToInt(fz), 0, CellsZ - 1);
-
-            int x1 = x + 1, y1 = y + 1, z1 = z + 1;
-            float u = fx - x, v = fy - y, w = fz - z;
+            int x1 = x + 1;
+            int y1 = y + 1;
+            int z1 = z + 1;
+            float u = fx - x;
+            float v = fy - y;
+            float w = fz - z;
 
             float c000 = _samples[Index(x, y, z)];
             float c100 = _samples[Index(x1, y, z)];
@@ -255,18 +239,26 @@ namespace ProceduralCreature.Morphology.Extraction
             float c011 = _samples[Index(x, y1, z1)];
             float c111 = _samples[Index(x1, y1, z1)];
 
-            if (!NumericValidity.IsFinite(c000) || !NumericValidity.IsFinite(c100) || !NumericValidity.IsFinite(c010) || !NumericValidity.IsFinite(c110) ||
-                !NumericValidity.IsFinite(c001) || !NumericValidity.IsFinite(c101) || !NumericValidity.IsFinite(c011) || !NumericValidity.IsFinite(c111))
+            if (!NumericValidity.IsFinite(c000) || !NumericValidity.IsFinite(c100)
+                || !NumericValidity.IsFinite(c010) || !NumericValidity.IsFinite(c110)
+                || !NumericValidity.IsFinite(c001) || !NumericValidity.IsFinite(c101)
+                || !NumericValidity.IsFinite(c011) || !NumericValidity.IsFinite(c111))
             {
                 return false;
             }
 
-            float du = (c100 - c000) * (1f - v) * (1f - w) + (c110 - c010) * v * (1f - w)
-                     + (c101 - c001) * (1f - v) * w + (c111 - c011) * v * w;
-            float dv = (c010 - c000) * (1f - u) * (1f - w) + (c110 - c100) * u * (1f - w)
-                     + (c011 - c001) * (1f - u) * w + (c111 - c101) * u * w;
-            float dw = (c001 - c000) * (1f - u) * (1f - v) + (c101 - c100) * u * (1f - v)
-                     + (c011 - c010) * (1f - u) * v + (c111 - c110) * u * v;
+            float du = (c100 - c000) * (1f - v) * (1f - w)
+                + (c110 - c010) * v * (1f - w)
+                + (c101 - c001) * (1f - v) * w
+                + (c111 - c011) * v * w;
+            float dv = (c010 - c000) * (1f - u) * (1f - w)
+                + (c110 - c100) * u * (1f - w)
+                + (c011 - c001) * (1f - u) * w
+                + (c111 - c101) * u * w;
+            float dw = (c001 - c000) * (1f - u) * (1f - v)
+                + (c101 - c100) * u * (1f - v)
+                + (c011 - c010) * (1f - u) * v
+                + (c111 - c110) * u * v;
 
             gradient = new Vector3(du / CellSize, dv / CellSize, dw / CellSize);
             return true;

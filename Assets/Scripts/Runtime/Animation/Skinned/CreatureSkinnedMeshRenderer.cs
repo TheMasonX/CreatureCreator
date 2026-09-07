@@ -84,12 +84,16 @@ namespace ProceduralCreature.Animation.Skinned
         /// submeshes (submesh/material preservation, ADR-009). When null, a single default
         /// material slot is left for the caller to assign (rendering material wiring is not
         /// this adapter's concern).</param>
+        /// <param name="vertexDomains">Optional resolved geometry domains, index-parallel to
+        /// source vertices. When supplied, authoring admits only bones from each vertex's
+        /// domain; null preserves the legacy unrestricted welded-surface contract.</param>
         public void Bind(
             CreatureRig rig,
             SkeletonModel restSkeleton,
             Mesh sourceMesh,
             IReadOnlyList<float> radiiByBoneIndex = null,
-            IReadOnlyList<Material> materials = null)
+            IReadOnlyList<Material> materials = null,
+            IReadOnlyList<InfluenceDomain> vertexDomains = null)
         {
             if (rig == null) throw new DomainException("rig must not be null.");
             if (restSkeleton == null) throw new DomainException("restSkeleton must not be null.");
@@ -117,7 +121,8 @@ namespace ProceduralCreature.Animation.Skinned
             // SkeletonSnapshot.Capture bone-index contract; this adapter owns the radius bridge).
             List<BoneSegmentInfluence> segments =
                 ImplicitSurfaceWeightAuthoring.BuildBindingInfluences(snapshot, radiiByBoneIndex);
-            VertexInfluence[][] weights = ImplicitSurfaceWeightAuthoring.Author(segments, restVertices);
+            VertexInfluence[][] weights = ImplicitSurfaceWeightAuthoring.Author(
+                segments, restVertices, vertexDomains);
 
             Matrix4x4[] bindposes = SkinnedMeshBindingBuilder.ComputeBindposes(snapshot);
             BoneWeight[] boneWeights = SkinnedMeshBindingBuilder.BuildBoneWeights(weights, snapshot.Count);

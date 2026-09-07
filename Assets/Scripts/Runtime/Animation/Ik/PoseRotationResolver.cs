@@ -69,7 +69,11 @@ namespace ProceduralCreature.Animation.Ik
                 Vector3 targetPosition;
                 if (bone.HasSegment)
                 {
-                    targetPosition = position + (bone.EndPosition - bone.Position);
+                    int continuationChild = FindSegmentContinuationChild(
+                        restSkeleton, bone, children);
+                    targetPosition = continuationChild >= 0
+                        ? pose.GetPosition(continuationChild)
+                        : position + (bone.EndPosition - bone.Position);
                 }
                 else
                 {
@@ -80,6 +84,38 @@ namespace ProceduralCreature.Animation.Ik
                 Vector3 direction = targetPosition - position;
                 rotations[i] = ResolveLookRotation(direction, bone.Rotation);
             }
+        }
+
+        private static int FindSegmentContinuationChild(
+            SkeletonSnapshot skeleton, BoneSnapshot bone, IReadOnlyList<int> children)
+        {
+            int samePartChild = -1;
+            int endpointChild = -1;
+            for (int i = 0; i < children.Count; i++)
+            {
+                int candidate = children[i];
+                BoneSnapshot child = skeleton[candidate];
+                if ((child.Position - bone.EndPosition).sqrMagnitude > DirectionEpsilonSqr)
+                {
+                    continue;
+                }
+
+                endpointChild = SelectDeterministicChild(skeleton, endpointChild, candidate);
+                if (string.Equals(child.SourcePartId, bone.SourcePartId, System.StringComparison.Ordinal))
+                {
+                    samePartChild = SelectDeterministicChild(skeleton, samePartChild, candidate);
+                }
+            }
+
+            return samePartChild >= 0 ? samePartChild : endpointChild;
+        }
+
+        private static int SelectDeterministicChild(
+            SkeletonSnapshot skeleton, int current, int candidate)
+        {
+            return current < 0 || string.CompareOrdinal(skeleton[candidate].Id, skeleton[current].Id) < 0
+                ? candidate
+                : current;
         }
 
         private static int FindPrimaryChild(SkeletonSnapshot skeleton, IReadOnlyList<int> children)

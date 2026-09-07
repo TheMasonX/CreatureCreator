@@ -7,6 +7,44 @@ using UnityEngine;
 namespace ProceduralCreature.Animation.Binding
 {
     /// <summary>
+    /// Explicit domain eligibility for one rest-space vertex. This is a binding
+    /// contract, not a mesh-part attribution: callers may configure a transition
+    /// vertex to admit its own chain domain and named adjacent domains.
+    /// </summary>
+    public readonly struct InfluenceDomain
+    {
+        private readonly string[] allowedDomainIds;
+
+        public string DomainId { get; }
+
+        public InfluenceDomain(string domainId, params string[] allowedDomainIds)
+        {
+            if (string.IsNullOrEmpty(domainId))
+            {
+                throw new DomainException("Influence domain id must not be empty.");
+            }
+
+            DomainId = domainId;
+            this.allowedDomainIds = allowedDomainIds == null || allowedDomainIds.Length == 0
+                ? new[] { domainId }
+                : (string[])allowedDomainIds.Clone();
+        }
+
+        public bool Allows(string candidateDomainId)
+        {
+            if (string.IsNullOrEmpty(candidateDomainId)) return false;
+            for (int i = 0; i < allowedDomainIds.Length; i++)
+            {
+                if (string.Equals(allowedDomainIds[i], candidateDomainId, StringComparison.Ordinal))
+                {
+                    return true;
+                }
+            }
+            return false;
+        }
+    }
+
+    /// <summary>
     /// One eligible influence primitive for the implicit welded surface: the axis
     /// segment of a bone that carries geometry, plus the influence radius that
     /// converts a rest-space distance into a blend weight.
@@ -58,14 +96,28 @@ namespace ProceduralCreature.Animation.Binding
         /// distance to a normalized, smooth blend weight. Must be positive.</summary>
         public readonly float Radius;
 
+        /// <summary>
+        /// Stable anatomical domain key. Build helpers source this from the bone's
+        /// resolved SourcePartId, so all segments in one authored chain share a
+        /// domain without re-deriving DNA or reading mesh vertices.
+        /// </summary>
+        public readonly string DomainId;
+
         public BoneSegmentInfluence(int boneIndex, bool isMirrored,
             Vector3 start, Vector3 end, float radius)
+            : this(boneIndex, isMirrored, start, end, radius, string.Empty)
+        {
+        }
+
+        public BoneSegmentInfluence(int boneIndex, bool isMirrored,
+            Vector3 start, Vector3 end, float radius, string domainId)
         {
             BoneIndex = boneIndex;
             IsMirrored = isMirrored;
             Start = start;
             End = end;
             Radius = radius;
+            DomainId = domainId ?? string.Empty;
         }
     }
 
@@ -174,7 +226,8 @@ namespace ProceduralCreature.Animation.Binding
                 }
 
                 result.Add(new BoneSegmentInfluence(
-                    i, bone.IsMirrored, bone.Position, bone.EndPosition, radius));
+                    i, bone.IsMirrored, bone.Position, bone.EndPosition, radius,
+                    ResolveDomainId(bone)));
             }
             return result;
         }
@@ -207,10 +260,17 @@ namespace ProceduralCreature.Animation.Binding
 
                 Vector3 position = skeleton[i].Position;
                 result.Add(new BoneSegmentInfluence(
-                    i, skeleton[i].IsMirrored, position, position, radius));
+                    i, skeleton[i].IsMirrored, position, position, radius,
+                    ResolveDomainId(skeleton[i])));
             }
 
             return result;
+        }
+
+        private static string ResolveDomainId(BoneSnapshot bone)
+        {
+            string sourceId = string.IsNullOrEmpty(bone.SourcePartId) ? bone.Id : bone.SourcePartId;
+            return bone.IsMirrored ? sourceId + SemanticBoneResolver.MirrorSuffix : sourceId;
         }
 
         /// <summary>
@@ -222,10 +282,15 @@ namespace ProceduralCreature.Animation.Binding
         /// </summary>
         public static VertexInfluence[][] Author(
             IReadOnlyList<BoneSegmentInfluence> segments,
-            IReadOnlyList<Vector3> restVertices)
+            IReadOnlyList<Vector3> restVertices,
+            IReadOnlyList<InfluenceDomain> vertexDomains = null)
         {
             if (segments == null) throw new DomainException("segments must not be null.");
             if (restVertices == null) throw new DomainException("restVertices must not be null.");
+            if (vertexDomains != null && vertexDomains.Count != restVertices.Count)
+            {
+                throw new DomainException("vertexDomains must match restVertices count.");
+            }
             if (segments.Count == 0)
             {
                 throw new DomainException("At least one eligible bone segment is required to author weights.");
@@ -264,6 +329,11 @@ namespace ProceduralCreature.Animation.Binding
                 for (int s = 0; s < segments.Count; s++)
                 {
                     BoneSegmentInfluence seg = segments[s];
+                    if (vertexDomains != null && !vertexDomains[v].Allows(seg.DomainId))
+                    {
+                        weightBySegment[s] = 0f;
+                        continue;
+                    }
                     float distance = DistanceToSegment(vertex, seg.Start, seg.End);
                     float effectiveRadius = seg.Radius * RadiusScale;
                     float falloff = 1f - distance / effectiveRadius;

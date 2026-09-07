@@ -214,9 +214,12 @@ namespace ProceduralCreature.Generation
 
             float[] radiiByBoneIndex = MorphologyInfluenceRadiusBridge.BuildRadiiByBoneIndex(
                 SkeletonSnapshot.Capture(skeleton), snapshot);
+            InfluenceDomain[] vertexDomains = ImplicitSurfaceInfluenceDomainResolver.Resolve(
+                definition, snapshot, implicitItem.Mesh.vertices);
             Material defaultMaterial = MaterialResolver.ResolveDefault(ResolveMaterialPalette());
             Material[] materials = defaultMaterial != null ? new[] { defaultMaterial } : null;
-            _skinnedRenderer.Bind(_rig, skeleton, implicitItem.Mesh, radiiByBoneIndex, materials);
+            _skinnedRenderer.Bind(
+                _rig, skeleton, implicitItem.Mesh, radiiByBoneIndex, materials, vertexDomains);
             if (_skinnedRenderer.Renderer != null)
             {
                 _skinnedRenderer.Renderer.enabled = true;
