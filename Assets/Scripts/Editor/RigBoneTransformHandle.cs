@@ -1,3 +1,4 @@
+using System.Collections.Generic;
 using UnityEditor;
 using UnityEngine;
 using ProceduralCreature.Animation;
@@ -5,15 +6,15 @@ using ProceduralCreature.Animation;
 namespace ProceduralCreature.Editor
 {
     /// <summary>
-    /// Keeps Unity's built-in transform handle anchored to the actual selected
-    /// generated rig bone when the editor is in Center handle-position mode.
+    /// Keeps Unity's built-in transform handle on the actual selected generated
+    /// rig-bone transform even when the editor is in Center handle-position mode.
     ///
     /// Unity's Center mode intentionally uses a graphical selection center. A
-    /// generated rig bone has no useful renderer of its own, and its hierarchy can
-    /// therefore produce a handle location that is unrelated to the bone pivot.
-    /// The rig overlay already defines an explicit single-bone manipulation target;
-    /// when that target is selected, its transform position is the authoritative
-    /// handle position. This does not change the user's global PivotMode setting.
+    /// generated rig bone is an invisible Transform-only object, so that graphical
+    /// center is not a reliable bone pivot. The rig overlay defines one explicit
+    /// manipulation target; when that target is selected, its world position is the
+    /// authoritative handle position. This does not change the user's global
+    /// PivotMode setting and does not affect ordinary Unity selections.
     /// </summary>
     [InitializeOnLoad]
     internal static class RigBoneTransformHandle
@@ -21,17 +22,31 @@ namespace ProceduralCreature.Editor
         static RigBoneTransformHandle()
         {
             Selection.selectionChanged += RepaintSceneViews;
-            SceneView.duringSceneGui += OnSceneGUI;
+            // beforeSceneGui runs before Unity's built-in SceneView tools calculate
+            // their handle position; duringSceneGui is retained as a defensive
+            // refresh for tool/selection state changes that occur during the GUI pass.
+            SceneView.beforeSceneGui += OnBeforeSceneGUI;
+            SceneView.duringSceneGui += OnDuringSceneGUI;
         }
 
-        private static void OnSceneGUI(SceneView sceneView)
+        private static void OnBeforeSceneGUI(SceneView sceneView)
+        {
+            ApplyHandlePosition();
+        }
+
+        private static void OnDuringSceneGUI(SceneView sceneView)
+        {
+            ApplyHandlePosition();
+        }
+
+        private static void ApplyHandlePosition()
         {
             if (Tools.pivotMode != PivotMode.Center) return;
             if (!TryGetSelectedRigBone(out Transform bone)) return;
 
-            // Unity documents handlePosition as the world-space position of the
-            // transform-tool handle. Override only for a single generated rig bone;
-            // all ordinary Unity selections retain their normal Center behavior.
+            // Unity documents handlePosition as the world-space transform-tool handle
+            // position. Set it before the built-in tool reads it, while retaining the
+            // user's Center/Pivot setting for every non-rig selection.
             Tools.handlePosition = bone.position;
         }
 
@@ -46,7 +61,7 @@ namespace ProceduralCreature.Editor
             CreatureRig rig = selected.GetComponentInParent<CreatureRig>();
             if (rig == null) return false;
 
-            System.Collections.Generic.IReadOnlyList<Transform> bones = rig.IndexedBones;
+            IReadOnlyList<Transform> bones = rig.IndexedBones;
             for (int i = 0; i < bones.Count; i++)
             {
                 if (bones[i] != selected) continue;
