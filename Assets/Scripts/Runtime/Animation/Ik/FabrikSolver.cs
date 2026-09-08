@@ -58,7 +58,12 @@ namespace ProceduralCreature.Animation.Ik
 
             for (int iteration = 0; iteration < maxIterations; iteration++)
             {
-                if (Vector3.Distance(positions[last], target) <= tolerance) break;
+                float endEffectorDistance = Vector3.Distance(positions[last], target);
+                if (!NumericValidity.IsFinite(endEffectorDistance))
+                {
+                    throw new DomainException($"IK iteration {iteration} produced a non-finite end-effector distance.");
+                }
+                if (endEffectorDistance <= tolerance) break;
                 BackwardPass(positions, linkLengths, target);
                 ForwardPass(positions, linkLengths, root);
             }
@@ -74,6 +79,7 @@ namespace ProceduralCreature.Animation.Ik
             {
                 Vector3 direction = SafeDirection(positions[i + 1], positions[i]);
                 positions[i] = positions[i + 1] + direction * linkLengths[i];
+                ValidateFiniteResult(positions[i], i);
             }
         }
 
@@ -84,6 +90,7 @@ namespace ProceduralCreature.Animation.Ik
             {
                 Vector3 direction = SafeDirection(positions[i - 1], positions[i]);
                 positions[i] = positions[i - 1] + direction * linkLengths[i - 1];
+                ValidateFiniteResult(positions[i], i);
             }
         }
 
@@ -94,10 +101,7 @@ namespace ProceduralCreature.Animation.Ik
             for (int i = 1; i < positions.Length; i++)
             {
                 positions[i] = positions[i - 1] + direction * linkLengths[i - 1];
-                if (!NumericValidity.IsFinite(positions[i]))
-                {
-                    throw new DomainException($"IK solution joint {i} became non-finite.");
-                }
+                ValidateFiniteResult(positions[i], i);
             }
         }
 
@@ -105,12 +109,26 @@ namespace ProceduralCreature.Animation.Ik
         /// Direction from 'from' to 'to', or Vector3.up if the two points
         /// coincide (a genuine but rare degenerate case — e.g. a chain whose
         /// current pose has two joints at the same position). Vector3.up is an
-        /// arbitrary but fixed, deterministic fallback; it never produces NaN.
+        /// arbitrary but fixed, deterministic fallback. Subtraction can overflow
+        /// even when both input points are individually finite, so the delta is
+        /// checked before normalization.
         /// </summary>
         private static Vector3 SafeDirection(Vector3 from, Vector3 to)
         {
             Vector3 delta = to - from;
+            if (!NumericValidity.IsFinite(delta))
+            {
+                throw new DomainException("IK joint delta became non-finite while computing a direction.");
+            }
             return delta.sqrMagnitude < DegenerateDirectionEpsilonSqr ? Vector3.up : delta.normalized;
+        }
+
+        private static void ValidateFiniteResult(Vector3 position, int index)
+        {
+            if (!NumericValidity.IsFinite(position))
+            {
+                throw new DomainException($"IK solution joint {index} became non-finite.");
+            }
         }
 
         private static void ValidateInputs(
