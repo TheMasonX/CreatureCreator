@@ -95,7 +95,7 @@ namespace ProceduralCreature.Generation
                     }
                     finally
                     {
-                        portableProgram.Dispose();
+                        portableProgram?.Dispose();
                         portableProgram = null;
                     }
                 });
@@ -149,20 +149,29 @@ namespace ProceduralCreature.Generation
             GenerationDiagnostics diagnostics)
         {
             Color[] colors = null;
-            var compiledParts = SdfProgramBuilder.CompileIndividualPartsPortable(definition, snapshot);
-            SdfProgram bodyProgram = SdfProgramBuilder.CompilePortableBodyField(definition, snapshot);
+            List<ResolvedPartProgram> compiledParts = null;
+            SdfProgram bodyProgram = null;
             try
             {
+                compiledParts = SdfProgramBuilder.CompileIndividualPartsPortable(definition, snapshot);
+                bodyProgram = SdfProgramBuilder.CompilePortableBodyField(definition, snapshot);
+
                 Time(diagnostics, GenerationStage.AppearanceBake,
                     () => colors = AppearanceBaker.Bake(
                         definition, meshResult, null, compiledParts, bodyProgram, snapshot.Body, snapshot));
+                return colors;
             }
             finally
             {
-                foreach (ResolvedPartProgram partProgram in compiledParts) partProgram.Program.Dispose();
-                bodyProgram.Dispose();
+                if (compiledParts != null)
+                {
+                    foreach (ResolvedPartProgram partProgram in compiledParts)
+                    {
+                        partProgram.Program?.Dispose();
+                    }
+                }
+                bodyProgram?.Dispose();
             }
-            return colors;
         }
 
         public static GeneratedCreature Assemble(GeneratedCreatureData data, Func<string, Mesh> meshResolver = null)
