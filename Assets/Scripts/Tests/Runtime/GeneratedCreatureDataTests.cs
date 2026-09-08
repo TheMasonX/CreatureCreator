@@ -46,10 +46,10 @@ namespace ProceduralCreature.Tests.Runtime
                 topologyReport: null);
 
             source.Forward = Vector3.up;
-            source.Generation.VoxelPerUnit = 99;
+            source.Generation.VoxelsPerUnit = 99;
 
             Assert.AreEqual(Vector3.right, data.Definition.Forward);
-            Assert.AreNotEqual(99, data.Definition.Generation.VoxelPerUnit);
+            Assert.AreNotEqual(99, data.Definition.Generation.VoxelsPerUnit);
             Assert.AreNotSame(source, data.Definition);
         }
 
