@@ -39,6 +39,16 @@ namespace ProceduralCreature.Tests.Runtime
         }
 
         [Test]
+        public void ExtractRestPositions_NonFiniteBonePosition_ThrowsDomainException()
+        {
+            Skeleton.Skeleton skeleton = ThreeBoneChain();
+            skeleton.Bones[1].Position = new Vector3(float.NaN, 0f, 0f);
+            List<string> chain = BoneChain.ExtractChain(skeleton, "leaf");
+
+            Assert.Throws<DomainException>(() => BoneChain.ExtractRestPositions(skeleton, chain));
+        }
+
+        [Test]
         public void ComputeLinkLengths_MatchesDistancesBetweenConsecutivePositions()
         {
             Vector3[] positions = { Vector3.zero, new Vector3(3, 0, 0), new Vector3(3, 4, 0) };
@@ -47,6 +57,23 @@ namespace ProceduralCreature.Tests.Runtime
             Assert.AreEqual(2, lengths.Length);
             Assert.AreEqual(3f, lengths[0], 1e-5f);
             Assert.AreEqual(4f, lengths[1], 1e-5f);
+        }
+
+        [Test]
+        public void ComputeLinkLengths_CoincidentPoints_ThrowsDomainException()
+        {
+            Assert.Throws<DomainException>(() =>
+                BoneChain.ComputeLinkLengths(new[] { Vector3.zero, Vector3.zero }));
+        }
+
+        [Test]
+        public void ComputeLinkLengths_NonFinitePoint_ThrowsDomainException()
+        {
+            Assert.Throws<DomainException>(() =>
+                BoneChain.ComputeLinkLengths(new[] {
+                    Vector3.zero,
+                    new Vector3(float.PositiveInfinity, 0f, 0f)
+                }));
         }
 
         [Test]
@@ -100,8 +127,7 @@ namespace ProceduralCreature.Tests.Runtime
             Skeleton.Skeleton skeleton = SkeletonInferrer.Infer(definition);
             PosedSkeleton restPose = PosedSkeleton.FromRestPose(skeleton);
 
-            Vector3 target = new Vector3(1.4f, 1f, 0f); // within reach (total chain length = 2)
-
+            Vector3 target = new Vector3(1.4f, 1f, 0f);
             PosedSkeleton posed = IkChainSolver.SolveChainTarget(skeleton, restPose, "part_foot", target);
 
             Assert.LessOrEqual(Vector3.Distance(posed.GetPosition("part_foot"), target), IkChainSolver.DefaultTolerance);
