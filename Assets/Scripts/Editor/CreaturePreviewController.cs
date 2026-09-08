@@ -253,19 +253,37 @@ namespace ProceduralCreature.Editor
 
         private void AssignMaterials(MeshRenderer renderer, GeometryItem item)
         {
-            Material fallback = _defaultMaterialResolver();
-            if (item.MaterialRegions.Count == 0)
-            {
-                if (fallback != null) renderer.sharedMaterial = fallback;
-                return;
-            }
-            Material resolved = _materialResolver(item.MaterialRegions[0].MaterialKey);
-            if (fallback == null && resolved == null) return;
             int subMeshCount = Mathf.Max(1, item.Mesh != null ? item.Mesh.subMeshCount : 1);
+            Material fallback = _defaultMaterialResolver();
             var materials = new Material[subMeshCount];
             for (int i = 0; i < materials.Length; i++) materials[i] = fallback;
-            materials[0] = resolved != null ? resolved : fallback;
-            renderer.sharedMaterials = materials;
+
+            for (int i = 0; i < item.MaterialRegions.Count; i++)
+            {
+                MaterialRegion region = item.MaterialRegions[i];
+                if (region.SubmeshIndex < 0 || region.SubmeshIndex >= materials.Length)
+                {
+                    throw new DomainException(
+                        $"Generated geometry item '{item.SourcePartId}' material region {i} targets submesh {region.SubmeshIndex}, " +
+                        $"but the mesh has {materials.Length} submesh slots.");
+                }
+
+                Material resolved = null;
+                try
+                {
+                    resolved = _materialResolver(region.MaterialKey);
+                }
+                catch (DomainException ex)
+                {
+                    Debug.LogWarning(
+                        $"[CreatureCreator] {ex.Message} Using the default preview material for item '{item.SourcePartId}' submesh {region.SubmeshIndex}.",
+                        PreviewGameObject);
+                }
+
+                materials[region.SubmeshIndex] = resolved != null ? resolved : fallback;
+            }
+
+            if (materials.Length > 0) renderer.sharedMaterials = materials;
         }
 
         private void ClearGeometryObjects()
