@@ -2,9 +2,9 @@
   "id": "tsk-0188-make-debug-rig-attachment-bones-follow-posed-bones-and-pre-skinned-mesh-space",
   "key": "TSK-0188",
   "title": "Make debug rig attachment bones follow posed bones and pre-skinned mesh space",
-  "description": "## Summary\nCorrect the debug rig attachment-bone visualization so attachment points transform with their owning bones and are drawn at the corresponding pre-skinned mesh position.\n\n## User Mandate\n\u003E Without implementing, capture as a task that the debug rig attachment bones don\u0027t transform with the bones themselves, and draw to the pre-skinned mesh position (e.g. rotating the head moves the eyes, but not their attachement point)\n\nSTRICT. Preserve the reported behavior and the requested pre-skinned mesh-space target. Do not silently narrow this to a visual offset or re-scope it to runtime skinning.\n\n## Scope\nInvestigate and correct the SceneView debug rig attachment-bone/attachment-point transform path. Attachment points must inherit the owning bone pose and resolve into the same pre-skinned/rest mesh coordinate space used by the debug presentation. Keep the solution generic for body, limb, and accessory attachments; do not add a part-type-specific eye or head special case.\n\n## Acceptance Criteria\n- Debug rig attachment bones transform with the bones themselves under rotation and translation.\n- Attachment points are drawn at the matching pre-skinned mesh position, not only at the unposed or stale attachment position.\n- A controlled head rotation moves the eyes and their attachment point together, with no visible separation.\n- Unrelated attachment points remain stable when a different bone is posed.\n- The fix works for generic attachment metadata and does not encode an eye/head-only branch.\n- Unity SceneView validation confirms the posed attachment overlay against the pre-skinned mesh presentation.\n\n## Validation\nRun the narrowest relevant editor tests, then perform manual Unity SceneView validation with a controlled head pose and an attachment-bearing generated creature. Capture the result in this task before closure.\n\n## Findings\nUser-provided visual evidence shows the debug rig overlay following the visible eyes under head rotation while the attachment point remains at its prior position. The current issue is recorded for investigation; no source-level diagnosis has been claimed.\n\n## Blockers\nNo implementation or validation has been performed in this task.\n\n## Next Step\nTrace the debug attachment drawing path and identify where bone pose transforms stop before the pre-skinned mesh-space position is computed, then add a focused regression check before implementation.",
+  "description": "## Summary\nCorrect the debug rig attachment-bone visualization so attachment points transform with their owning bones and are drawn at the corresponding pre-skinned mesh position.\n\n## User Mandate\n> Without implementing, capture as a task that the debug rig attachment bones don\u0027t transform with the bones themselves, and draw to the pre-skinned mesh position (e.g. rotating the head moves the eyes, but not their attachement point)\n\nSTRICT. Preserve the reported behavior and the requested pre-skinned mesh-space target. Do not silently narrow this to a visual offset or re-scope it to runtime skinning.\n\n## Scope\nInvestigate and correct the SceneView debug rig attachment-bone/attachment-point transform path. Attachment points must inherit the owning bone pose and resolve into the same pre-skinned/rest mesh coordinate space used by the debug presentation. Keep the solution generic for body, limb, and accessory attachments; do not add a part-type-specific eye or head special case.\n\n## Acceptance Criteria\n- Debug rig attachment bones transform with the bones themselves under rotation and translation.\n- Attachment points are drawn at the matching pre-skinned mesh position, not only at the unposed or stale attachment position.\n- A controlled head rotation moves the eyes and their attachment point together, with no visible separation.\n- Unrelated attachment points remain stable when a different bone is posed.\n- The fix works for generic attachment metadata and does not encode an eye/head-only branch.\n- Unity SceneView validation confirms the posed attachment overlay against the pre-skinned mesh presentation.\n\n## Validation\nRun the narrowest relevant editor tests, then perform manual Unity SceneView validation with a controlled head pose and an attachment-bearing generated creature. Capture the result in this task before closure.\n\n## Findings\nThe source path is now confirmed: `DrawParentAttachment` previously projected the immutable rest-space `BoneSnapshot.Position` onto a current parent segment. That mixed coordinate/pose domains, so a posed child could move while its attachment marker remained anchored to the rest-space location. The implementation now uses the child Transform\u0027s current world position for the projection and keeps parent segment endpoints pose-aware. The fallback endpoint path was also hardened so parent translation is preserved instead of returning the immutable rest-space endpoint verbatim.\n\n## Blockers\nNo Unity SceneView validation has been performed yet. The source-level defect is fixed, but the manual visual acceptance gate remains open.\n\n## Latest Implementation Note (2026-09-08)\n`RigDebugView.DrawParentAttachment` now passes `bone.position` into the generic attachment projection helper. `ResolveCurrentRestOrientedEndpoint` now derives the current endpoint from the current bone transform and the rest-frame offset, including translation even when current and rest rotations are aligned. No eye/head special-case was added.\n\n## Next Step\nRun the focused editor/build validation and a Unity SceneView controlled head-rotation check.\n",
   "type": "Bug",
-  "status": "Backlog",
+  "status": "InProgress",
   "priority": "High",
   "assigneeMode": "Custom",
   "assigneeDirectoryId": null,
@@ -22,16 +22,23 @@
   "attachments": [],
   "externalLinks": [],
   "linkedPages": [],
-  "comments": [],
+  "comments": [
+    {
+      "id": "c-20260908-source-fix",
+      "author": "anonymous",
+      "body": "Source diagnosis confirmed and implementation landed on 2026-09-08. `DrawParentAttachment` had been projecting the rest-space `BoneSnapshot.Position` against a current parent segment. It now projects the current child Transform position; the fallback endpoint also preserves current translation. Unity SceneView validation remains the closure gate.",
+      "createdAtUtc": "2026-09-08T14:25:00Z"
+    }
+  ],
   "epicId": null,
   "parentId": "TSK-0149",
   "dueDateUtc": null,
   "createdAtUtc": "2026-09-08T14:03:04.112886Z",
-  "updatedAtUtc": "2026-09-08T14:03:04.112886Z",
+  "updatedAtUtc": "2026-09-08T14:25:00Z",
   "completedAtUtc": null,
-  "revision": 1,
+  "revision": 2,
   "isArchived": false,
   "hasLoadError": false,
   "loadError": null,
-  "sourceFilePath": null
+  "sourceFilePath": "tsk-0188-make-debug-rig-attachment-bones-follow-posed-bones-and-pre-skinned-mesh-space.json"
 }
