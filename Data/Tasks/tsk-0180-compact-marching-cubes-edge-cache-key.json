@@ -1,0 +1,34 @@
+{
+  "id": "tsk-0180-compact-marching-cubes-edge-cache-key",
+  "key": "TSK-0180",
+  "title": "Compact Marching Cubes welded-edge cache key",
+  "description": "Implement the next safe slice of TSK-0008: replace the four-field tuple dictionary key used by MarchingCubesExtractor's welded vertex cache with one dimension-aware Int64 edge identity. The canonical identity remains the lower grid corner plus edge axis; zero-axis point keys are encoded in a separate class so exact corner intersections cannot collide with incident edges. Use actual corner dimensions rather than arbitrary bit packing so rectangular grids remain collision-free. Keep the existing dictionary ownership model for now; a later benchmark must decide whether a direct indexed edge table is worth its memory cost. Also reuse a single 12-slot loop-index buffer per extraction rather than allocating an int array for every contour loop.",
+  "type": "Performance",
+  "status": "InProgress",
+  "priority": "Medium",
+  "assigneeMode": "Custom",
+  "assigneeDirectoryId": null,
+  "assigneeCustomText": "Agent",
+  "reporter": "anonymous",
+  "labels": ["performance", "mesh", "marching-cubes", "allocation", "deduplication", "TSK-0008"],
+  "attachments": [],
+  "externalLinks": [],
+  "linkedPages": [],
+  "comments": [
+    {
+      "id": "c-0180-implementation",
+      "author": "anonymous",
+      "body": "Implemented on the audit branch. MarchingCubesExtractor now uses a single extraction-local 12-slot loop buffer and a dimension-aware long edge/corner cache key. A council self-review caught and corrected two intermediate key designs: arbitrary 12/4-bit packing and an incorrect cornersX-for-Y linearization. Rectangular-grid parity coverage was added to lock the final identity model. Benchmark and Unity parity validation remain required before declaring the optimization complete.",
+      "createdAtUtc": "2026-09-08T08:50:00Z"
+    }
+  ],
+  "parentId": "TSK-0008",
+  "dueDateUtc": null,
+  "completedAtUtc": null,
+  "createdAtUtc": "2026-09-08T08:50:00Z",
+  "updatedAtUtc": "2026-09-08T08:50:00Z",
+  "revision": 1,
+  "isArchived": false,
+  "hasLoadError": false,
+  "sourceFilePath": "tsk-0180-compact-marching-cubes-edge-cache-key.json"
+}
