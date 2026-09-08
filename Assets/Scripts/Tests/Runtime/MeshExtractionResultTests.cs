@@ -63,6 +63,35 @@ namespace ProceduralCreature.Tests.Runtime
         }
 
         [Test]
+        public void ComputeAngleWeightedNormals_OverflowingEdgeDifference_ThrowsDomainException()
+        {
+            var result = new MeshExtractionResult();
+            result.Positions.Add(new Vector3(float.MaxValue, 0f, 0f));
+            result.Positions.Add(new Vector3(-float.MaxValue, 0f, 0f));
+            result.Positions.Add(new Vector3(float.MaxValue, 1f, 0f));
+            result.Triangles.Add(0);
+            result.Triangles.Add(1);
+            result.Triangles.Add(2);
+
+            Assert.Throws<DomainException>(() => result.ComputeAngleWeightedNormals());
+        }
+
+        [Test]
+        public void ComputeAngleWeightedNormals_OverflowingCrossProduct_ThrowsDomainException()
+        {
+            const float large = 2e19f;
+            var result = new MeshExtractionResult();
+            result.Positions.Add(Vector3.zero);
+            result.Positions.Add(new Vector3(large, large, 0f));
+            result.Positions.Add(new Vector3(-large, large, 0f));
+            result.Triangles.Add(0);
+            result.Triangles.Add(1);
+            result.Triangles.Add(2);
+
+            Assert.Throws<DomainException>(() => result.ComputeAngleWeightedNormals());
+        }
+
+        [Test]
         public void ComputeAngleWeightedNormals_ValidTriangle_ProducesOneNormalPerVertex()
         {
             var result = new MeshExtractionResult();
