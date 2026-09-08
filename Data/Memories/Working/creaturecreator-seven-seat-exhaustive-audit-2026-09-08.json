@@ -1,0 +1,23 @@
+{
+  "Id": "creaturecreator-seven-seat-exhaustive-audit-2026-09-08",
+  "Type": "WorkingMemory",
+  "Status": "Active",
+  "Content": "Seven-seat adversarial whole-codebase audit on audit/skeleton-animation-improvements-2026-09-07. Seats: runtime correctness; editor/runtime boundary; skeleton/IK; ownership/aliasing; performance/Burst; Unity lifecycle/diagnostics; task/document integrity. Concrete fixes landed: runtime geometry attachment resolution now uses SemanticBoneResolver.ResolveGeometryAttachmentBoneId; editor/runtime material regions now honor each MaterialRegion.SubmeshIndex; runtime accessory iteration no longer assumes implicit geometry is index 0; ResolvedPolyline rejects non-finite positions/segment lengths and total-length overflow; GenerationSettings.EstimateSampleCount uses saturating axis increments; MeshExtractionResult rejects duplicate indices within a triangle; CreatureMeshGenerator disposes part SDF programs when body compilation fails and transactionally destroys untransferred Unity meshes on assembly failure; CurveAdapter rejects non-finite legacy verticalOffset; RigSkinningSweepDiagnostic uses invariant numeric formatting and complete JSON control-character escaping; runtime preview no longer double-clones a freshly loaded definition before scheduler capture. New tasks: TSK-0182, TSK-0183, TSK-0184, TSK-0185, TSK-0186, all source-level Done. Existing ownership retained: TSK-0104 owns bounded scheduler/coalescing/cancellation and generated Unity preview ownership; TSK-0095 owns resolved-stage authority and immutable generation handoff; TSK-0160 owns malformed extraction topology; TSK-0137 owns legacy migration policy; TSK-0169 owns live skinning diagnostic execution. Historical findings were explicitly rejected when stale (indexed pose resolution, documented non-uniform SDF approximation) or duplicate (winding direction, output ownership, parser grammar). Self-review caught and corrected several implementation hazards: allocation-producing HashSet duplicate-influence guard replaced with bounded comparisons; compact Marching Cubes edge key corrected for rectangular dimensions; reconstructed files were compared/restored to preserve existing documentation and tests. Branch integrity was checked at commit 21ca1b286e89bb236046c49ce96fd486d78ca7 before the audit report; subsequent writes advanced the branch. No automated tests or Unity execution were performed during this campaign, so runtime/editor/deformation validation remains a separate evidence tier. Report: docs/audits/creaturecreator-seven-seat-exhaustive-audit-26-09-08-05-00-00.md, report ID CC-AUDIT-20260908-7F2D019C.",
+  "References": [
+    { "Label": "Council skill", "Uri": ".github/skills/council/SKILL.md" },
+    { "Label": "Seven-seat audit report", "Uri": "docs/audits/creaturecreator-seven-seat-exhaustive-audit-26-09-08-05-00-00.md" },
+    { "Label": "TSK-0182", "Uri": "Data/Tasks/tsk-0182-harden-shared-resolved-polyline-finite-length-contract.json" },
+    { "Label": "TSK-0183", "Uri": "Data/Tasks/tsk-0183-fix-runtime-preview-semantic-geometry-order-and-material-region-parity.json" },
+    { "Label": "TSK-0184", "Uri": "Data/Tasks/tsk-0184-prevent-generation-sample-budget-estimator-overflow.json" },
+    { "Label": "TSK-0185", "Uri": "Data/Tasks/tsk-0185-harden-rig-skinning-diagnostic-json-output.json" },
+    { "Label": "TSK-0186", "Uri": "Data/Tasks/tsk-0186-harden-generated-mesh-assembly-resource-ownership.json" },
+    { "Label": "TSK-0104", "Uri": "Data/Tasks/tsk-0104-bound-async-preview-work-and-define-generated-unity-object-ownership.json" },
+    { "Label": "TSK-0095", "Uri": "Data/Tasks/tsk-0095-establish-concrete-generation-pipeline-stage-boundaries.json" }
+  ],
+  "Conflicts": [
+    "Scheduler coalescing/cancellation is intentionally not partially implemented beyond redundant clone removal because the dedicated TSK-0104 contract needs focused concurrency tests and Unity lifecycle evidence.",
+    "GeneratedCreatureData shallow ownership remains open under TSK-0095/TSK-0154; do not create parallel immutability tasks.",
+    "Unity PlayMode/EditMode and SkinnedMeshRenderer evidence remains unexecuted in this environment; source confidence must not be reported as runtime validation.",
+    "Task IDs and ids are hard-unique invariants; search ownership before creating any subsequent task."
+  ]
+}
