@@ -2,7 +2,7 @@
   "id": "tsk-0136-fix-rig-bone-selection-pivot-and-body-root-naming",
   "key": "TSK-0136",
   "title": "Fix rig bone selection pivots and rename body pelvis root",
-  "description": "Fix SceneView rig-bone manipulation so the selected generated bone is the sole manipulation target, and keep the compact body root semantic name as body_root. Unity 6.5 does not permit assignment to Tools.handlePosition, so the previous attempted handle-position override is removed. The remaining acceptance gate is live Unity verification of the built-in transform tool or, if that still fails, a dedicated EditorTool/Handle implementation.",
+  "description": "Fix SceneView rig-bone manipulation so a selected generated bone has an explicit, correct manipulation pivot, and keep the compact body root semantic name as body_root. Unity 6.5 does not permit assignment to Tools.handlePosition. The branch now includes a dedicated editor rotation tool using Handles.RotationHandle at the selected bone's actual Transform.position. It is intentionally editor-only and does not mutate global PivotMode. The normal Unity Rotate tool remains a separate fallback until live Unity verification confirms the custom tool is the intended interaction path.\n\nImplementation requirements: trace BoneSnapshot.Position through SkeletonInferrer/SkeletonSnapshot/CreatureRig and do not mask a runtime placement bug with editor code; generated body/neck/limb transforms must retain their authoritative world-space positions; explicit rig-bone selection must be single-object; the custom rotation handle must be positioned from the selected bone transform, respect Tools.pivotRotation Local/Global orientation, support Undo, and leave ordinary Unity objects unaffected; retain body_root naming consistently.\n\nAdversarial review must challenge: Unity 6 EditorTool API availability, editor-tool activation semantics, Selection.objects versus active object, Center/Pivot behavior, world versus local rotation, parent-child Transform semantics, multiple open SceneViews/rigs, interaction with the existing RigDebugView handles, undo/redo, and whether the custom handle is accidentally editing world rotation when the user expects local rotation.\n\nAcceptance: selected rig bone has a dedicated rotation handle exactly at its Transform.position; local/global axis orientation matches Tools.pivotRotation; rotating one bone changes only the intended Transform and its hierarchy descendants; Undo restores the prior transform; normal Unity selections remain unaffected; no Tools.handlePosition assignment remains; body_root naming is complete; focused editor tests/build pass; live Unity SceneView verification confirms no eye/head pivot aliasing.",
   "type": "Task",
   "status": "InProgress",
   "priority": "High",
@@ -24,19 +24,37 @@
     {
       "id": "c-0136-round4-repair",
       "author": "anonymous",
-      "body": "ROUND 4 REPAIR. Removed the unsupported RigBoneTransformHandle.cs implementation rather than retaining a dead/non-compiling abstraction. The earlier single-selection correction in RigDebugView remains. The task stays InProgress because live verification is still required; if Unity's standard transform handle remains incorrectly positioned after the compile fix, the correct next implementation is a dedicated SceneView EditorTool/custom RotationHandle rather than another Tools.handlePosition hack.",
+      "body": "ROUND 4 REPAIR. Removed the unsupported Tools.handlePosition implementation. The earlier single-selection correction remains valid. The task stayed InProgress pending a real EditorTool-based solution if the built-in transform handle remained wrong.",
       "createdAtUtc": "2026-09-08T00:21:00Z"
+    },
+    {
+      "id": "c-0136-round5-user-repro",
+      "author": "anonymous",
+      "body": "ROUND 5 USER REPRO. User supplied Inspector/SceneView captures showing distinct bone local transforms and correct custom overlay bone positions, while the built-in Rotate handle remained visually anchored at the wrong point. Euler Inspector edits deform more plausibly, but generated Body skinning still shows stretching/smearing. This separates the editor handle issue from the skin-weight/deformation issue.",
+      "createdAtUtc": "2026-09-08T00:29:00Z"
+    },
+    {
+      "id": "c-0136-round5-tool",
+      "author": "anonymous",
+      "body": "ROUND 5 IMPLEMENTATION. Added `RigBoneRotateTool`, a Unity 6 EditorTool that uses `Handles.RotationHandle` at the selected rig bone's world Transform.position, respects local/global handle orientation, records Undo, and is only available for a single generated CreatureRig bone. This avoids the unsupported Tools.handlePosition setter entirely.",
+      "createdAtUtc": "2026-09-08T00:31:00Z"
+    },
+    {
+      "id": "c-0136-round5-peer",
+      "author": "anonymous",
+      "body": "ROUND 5 ADVERSARIAL PEER REVIEW. Verified against current Unity 6 API: EditorTool/OnToolGUI and Handles.RotationHandle are supported; Tools.handlePosition is read-only. The tool is global but gated by IsAvailable to a selected generated rig bone and does not modify PivotMode. Remaining validation is interaction-level Unity verification. Separately created TSK-0167 for the observed implicit-body skinning smear so the editor-pivot bug is not conflated with deformation weighting.",
+      "createdAtUtc": "2026-09-08T00:32:00Z"
     }
   ],
   "epicId": null,
   "parentId": null,
   "dueDateUtc": null,
   "createdAtUtc": "2026-09-07T23:45:00Z",
-  "updatedAtUtc": "2026-09-08T00:21:00Z",
+  "updatedAtUtc": "2026-09-08T00:32:00Z",
   "completedAtUtc": null,
-  "revision": 9,
   "isArchived": false,
   "hasLoadError": false,
   "loadError": null,
+  "revision": 12,
   "sourceFilePath": "tsk-0136-fix-rig-bone-selection-pivot-and-body-root-naming.json"
 }
