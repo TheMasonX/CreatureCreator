@@ -1,0 +1,36 @@
+{
+  "id": "tsk-0182-harden-shared-resolved-polyline-finite-length-contract",
+  "key": "TSK-0182",
+  "title": "Harden the shared ResolvedPolyline finite-length contract",
+  "description": "Council seven-seat audit found the shared ResolvedPolyline primitive accepted non-finite source positions and could overflow its float TotalLength even though downstream skeleton/IK consumers require finite resolved geometry. Because both ResolvedBody and ResolvedLimb delegate to this utility, the fix belongs in one shared boundary rather than duplicated in each resolver. Reject non-finite positions/segment lengths and total-length overflow and cover the shared behavior with focused runtime regressions.",
+  "type": "Bug Fix",
+  "status": "Done",
+  "priority": "Medium",
+  "assigneeMode": "Custom",
+  "assigneeDirectoryId": null,
+  "assigneeCustomText": "Agent",
+  "reporter": "council-seven-seat-audit",
+  "labels": ["council", "morphology", "polyline", "numeric", "resolved-model"],
+  "attachments": [],
+  "externalLinks": [],
+  "linkedPages": [],
+  "comments": [
+    {
+      "id": "c-20260908-polyline-hardening",
+      "author": "council-seven-seat-audit",
+      "body": "Implemented in ResolvedPolyline: finite position validation, finite segment-length validation, and explicit total-length overflow rejection. Added ResolvedBodyTests regressions covering non-finite polyline position and total-length overflow. No Unity/runtime execution was performed in this campaign.",
+      "createdAtUtc": "2026-09-08T04:28:00Z"
+    }
+  ],
+  "epicId": null,
+  "parentId": null,
+  "dueDateUtc": null,
+  "createdAtUtc": "2026-09-08T04:28:00Z",
+  "updatedAtUtc": "2026-09-08T04:28:00Z",
+  "completedAtUtc": "2026-09-08T04:28:00Z",
+  "revision": 1,
+  "isArchived": false,
+  "hasLoadError": false,
+  "loadError": null,
+  "sourceFilePath": "tsk-0182-harden-shared-resolved-polyline-finite-length-contract.json"
+}
