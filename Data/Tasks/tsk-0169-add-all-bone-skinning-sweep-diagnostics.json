@@ -4,7 +4,7 @@
   "title": "Add all-bone skinning sweep diagnostics",
   "description": "Add an editor-only diagnostic that sweeps every generated CreatureRig bone through deterministic isolated +/-15 degree rotations on X/Y/Z, captures the actual SkinnedMeshRenderer BakeMesh result, compares it with LinearBlendSkinning using the renderer's actual BoneWeight data and the same bone frames, and writes per-experiment summary JSON plus per-vertex CSV data. The diagnostic must restore the complete rig pose before and after every experiment, never mutate DNA, never enter the runtime animation path, and expose enough weight/delta information to investigate TSK-0172's Body/neck-to-arm tearing and distinguish weighting defects from renderer/bindpose/transform-space defects.",
   "type": "Task",
-  "status": "Backlog",
+  "status": "InProgress",
   "priority": "High",
   "assigneeMode": "Custom",
   "assigneeDirectoryId": null,
@@ -20,14 +20,20 @@
       "author": "anonymous",
       "body": "Supporting implementation for TSK-0172. The first target is evidence collection, not a weighting algorithm change. The sweep must expose the actual BoneWeight assignments and actual-vs-oracle deformation so neck/arm tearing can be classified before changing the authoring model.",
       "createdAtUtc": "2026-09-08T02:20:00Z"
+    },
+    {
+      "id": "c-0169-implementation",
+      "author": "anonymous",
+      "body": "Implementation landed on the audit branch as Assets/Scripts/Editor/RigSkinningSweepDiagnostic.cs. The tool sweeps every indexed rig bone across +/-15 degrees on X/Y/Z, compares baked renderer output to the LinearBlendSkinning oracle using actual BoneWeight data, writes summary JSON and vertex CSV diagnostics, and restores the rest pose in finally cleanup. Unity execution remains the validation gate; no weighting algorithm change has been made.",
+      "createdAtUtc": "2026-09-08T02:29:58Z"
     }
   ],
   "parentId": null,
   "dueDateUtc": null,
   "completedAtUtc": null,
   "createdAtUtc": "2026-09-08T02:20:00Z",
-  "updatedAtUtc": "2026-09-08T02:20:00Z",
-  "revision": 2,
+  "updatedAtUtc": "2026-09-08T02:29:58Z",
+  "revision": 3,
   "isArchived": false,
   "hasLoadError": false,
   "sourceFilePath": "tsk-0169-add-all-bone-skinning-sweep-diagnostics.json"
