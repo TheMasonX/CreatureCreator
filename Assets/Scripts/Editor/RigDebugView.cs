@@ -29,7 +29,6 @@ namespace ProceduralCreature.Editor
         private const string RawMeshKey = "ProceduralCreature.RigDebug.ShowRawMesh";
         private const float GeometryEpsilonSqr = 1e-10f;
         private const float AttachmentMarkerScale = 0.06f;
-        private const float RestRotationTolerance = 1e-5f;
 
         private static bool _enabled = EditorPrefs.GetBool(EnabledKey, false);
         private static bool _alwaysOnTop = EditorPrefs.GetBool(AlwaysOnTopKey, true);
@@ -222,15 +221,9 @@ namespace ProceduralCreature.Editor
         {
             if (current == null) return boneData.EndPosition;
 
-            Quaternion restRotation = boneData.Rotation;
-            Quaternion currentRotation = current.rotation;
-            float rotationAlignment = Quaternion.Dot(restRotation, currentRotation);
-            if (Mathf.Abs(Mathf.Abs(rotationAlignment) - 1f) <= RestRotationTolerance)
-                return boneData.EndPosition;
-
             Vector3 restOffsetWorld = boneData.EndPosition - boneData.Position;
-            Vector3 restOffsetLocal = Quaternion.Inverse(restRotation) * restOffsetWorld;
-            return current.position + currentRotation * restOffsetLocal;
+            Vector3 restOffsetLocal = Quaternion.Inverse(boneData.Rotation) * restOffsetWorld;
+            return current.position + current.rotation * restOffsetLocal;
         }
 
         private static string GetBoneLabel(BoneSnapshot bone)
