@@ -272,7 +272,8 @@ namespace ProceduralCreature.Skeleton
             for (int i = 0; i < body.NormalizedArcLengthAtSample.Count - 1; i++)
                 if (clamped <= body.NormalizedArcLengthAtSample[i + 1]) { segment = i; break; }
             float startT = body.NormalizedArcLengthAtSample[segment], endT = body.NormalizedArcLengthAtSample[segment + 1];
-            float localT = endT > EpsilonSqr ? (clamped - startT) / (endT - startT) : 0f;
+            float span = endT - startT;
+            float localT = span > EpsilonSqr ? (clamped - startT) / span : 0f;
             return Vector3.Lerp(body.SamplePositions[segment], body.SamplePositions[segment + 1], Mathf.Clamp01(localT));
         }
 
@@ -286,15 +287,14 @@ namespace ProceduralCreature.Skeleton
             for (int i = 0; i < body.NormalizedArcLengthAtSample.Count - 1; i++)
                 if (clamped <= body.NormalizedArcLengthAtSample[i + 1]) { segment = i; break; }
             float startT = body.NormalizedArcLengthAtSample[segment], endT = body.NormalizedArcLengthAtSample[segment + 1];
-            float localT = endT > EpsilonSqr ? (clamped - startT) / (endT - startT) : 0f;
+            float span = endT - startT;
+            float localT = span > EpsilonSqr ? (clamped - startT) / span : 0f;
             return Mathf.Lerp(body.SampleRadii[segment], body.SampleRadii[segment + 1], Mathf.Clamp01(localT));
         }
 
         private static bool IsStoredHeadToTail(IReadOnlyList<Vector3> positions, Vector3 forward)
         {
             if (positions.Count < 2) return true;
-            // Creature Forward points from tail toward head. Therefore sample 0 is
-            // headward when it has the GREATER projection, not the last sample.
             return Vector3.Dot(positions[0], forward) >= Vector3.Dot(positions[positions.Count - 1], forward);
         }
 
