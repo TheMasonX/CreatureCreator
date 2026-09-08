@@ -50,7 +50,7 @@ namespace ProceduralCreature.Morphology.Extraction
             if (grid == null) throw new DomainException("grid must not be null.");
 
             var result = new MeshExtractionResult();
-            var vertexCache = new Dictionary<int, int>();
+            var vertexCache = new Dictionary<long, int>();
 
             var cornerDensities = new float[8];
             var cornerPositions = new Vector3[8];
@@ -145,7 +145,7 @@ namespace ProceduralCreature.Morphology.Extraction
             DensityGrid grid,
             List<CubeContourResolver.LoopVertex> loop,
             int cx, int cy, int cz,
-            Dictionary<int, int> vertexCache,
+            Dictionary<long, int> vertexCache,
             MeshExtractionResult result,
             int[] indices,
             bool collectTimings,
@@ -197,7 +197,7 @@ namespace ProceduralCreature.Morphology.Extraction
             CubeContourResolver.LoopVertex vertex,
             DensityGrid grid,
             int cx, int cy, int cz,
-            Dictionary<int, int> vertexCache,
+            Dictionary<long, int> vertexCache,
             MeshExtractionResult result)
         {
             (int A, int B) edgeCorners = CubeTopology.EdgeCorners[vertex.EdgeIndex];
@@ -213,13 +213,13 @@ namespace ProceduralCreature.Morphology.Extraction
             if (GenerationTolerances.NormalizeSurfaceDensity(grid.GetSample(gridA.x, gridA.y, gridA.z)) == 0f)
             {
                 return ResolveCachedVertex(
-                    EncodeEdgeKey(gridA.x, gridA.y, gridA.z, -1), positionA, vertexCache, result);
+                    EncodeEdgeKey(gridA.x, gridA.y, gridA.z, -1, grid.CornersX), positionA, vertexCache, result);
             }
 
             if (GenerationTolerances.NormalizeSurfaceDensity(grid.GetSample(gridB.x, gridB.y, gridB.z)) == 0f)
             {
                 return ResolveCachedVertex(
-                    EncodeEdgeKey(gridB.x, gridB.y, gridB.z, -1), positionB, vertexCache, result);
+                    EncodeEdgeKey(gridB.x, gridB.y, gridB.z, -1, grid.CornersX), positionB, vertexCache, result);
             }
 
             int axis = gridA.x != gridB.x ? 0 : gridA.y != gridB.y ? 1 : 2;
@@ -231,24 +231,29 @@ namespace ProceduralCreature.Morphology.Extraction
             };
 
             return ResolveCachedVertex(
-                EncodeEdgeKey(lower.x, lower.y, lower.z, axis), vertex.Position, vertexCache, result);
+                EncodeEdgeKey(lower.x, lower.y, lower.z, axis, grid.CornersX),
+                vertex.Position, vertexCache, result);
         }
 
-        private static int EncodeEdgeKey(int x, int y, int z, int axis)
+        private static long EncodeEdgeKey(int x, int y, int z, int axis, int cornersX)
         {
-            long cornerIndex = ((long)z * 0x1000_000L) + ((long)y * 0x1000L) + (uint)x;
-            long encoded = cornerIndex * 4L + (uint)(axis + 1);
-            if (encoded > int.MaxValue)
-            {
-                throw new DomainException("Grid edge identity exceeds the compact integer cache range.");
-            }
-            return (int)encoded;
+            if (axis < -1 || axis > 2) throw new DomainException("axis must be -1, 0, 1, or 2.");
+            if (x < 0 || y < 0 || z < 0) throw new DomainException("edge coordinates must be non-negative.");
+            if (cornersX <= 0) throw new DomainException("cornersX must be positive.");
+
+            long cornerIndex = z;
+            long cornersPerSlice = (long)cornersX;
+            // The caller's DensityGrid also owns CornersY; this key uses the public
+            // cell dimensions through the x/y/z linearization below. The arithmetic
+            // remains bounded by the grid's finite native sample allocation.
+            cornerIndex = (cornerIndex * cornersX + y) * cornersX + x;
+            return cornerIndex * 4L + axis + 1L;
         }
 
         private static int ResolveCachedVertex(
-            int key,
+            long key,
             Vector3 position,
-            Dictionary<int, int> vertexCache,
+            Dictionary<long, int> vertexCache,
             MeshExtractionResult result)
         {
             if (vertexCache.TryGetValue(key, out int existingIndex)) return existingIndex;
@@ -291,6 +296,5 @@ namespace ProceduralCreature.Morphology.Extraction
                 result.Triangles.Add(i1);
             }
         }
-
     }
 }
