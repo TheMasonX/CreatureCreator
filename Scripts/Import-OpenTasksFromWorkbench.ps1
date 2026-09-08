@@ -59,6 +59,7 @@ Get-ChildItem -Path $tasksRoot -Filter '*.json' -File -ErrorAction SilentlyConti
         $existing += (Get-Content $_.FullName -Raw | ConvertFrom-Json)
     }
     catch {
+        throw "Task record '$($_.FullName)' is not valid JSON: $($_.Exception.Message)"
     }
 }
 
