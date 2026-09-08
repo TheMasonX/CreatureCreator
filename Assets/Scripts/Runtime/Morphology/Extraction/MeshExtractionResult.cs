@@ -1,5 +1,6 @@
 using System;
 using System.Collections.Generic;
+using ProceduralCreature.Common;
 using UnityEngine;
 
 namespace ProceduralCreature.Morphology.Extraction
@@ -16,20 +17,7 @@ namespace ProceduralCreature.Morphology.Extraction
         public List<int> Triangles { get; } = new List<int>();
         public int MixedCellCount { get; internal set; }
         public int GradientEvaluationCount { get; internal set; }
-
-        /// <summary>
-        /// Number of times the extractor called <see cref="CubeContourResolver"/>.
-        /// One call per active (mixed-sign) cell, so equality with
-        /// <see cref="MixedCellCount"/> proves homogeneous cells never reach the
-        /// contour resolver.
-        /// </summary>
         public int ContourResolutionCallCount { get; internal set; }
-
-        /// <summary>
-        /// Time spent building the active-cell metadata: the single dense scan
-        /// that classifies every cell and retains only mixed-sign cells. This
-        /// replaced the extractor's old full-volume classification pass.
-        /// </summary>
         public TimeSpan ActiveCellConstructionTime { get; internal set; }
         public TimeSpan ContourResolutionTime { get; internal set; }
         public TimeSpan VertexWeldingTime { get; internal set; }
@@ -48,14 +36,15 @@ namespace ProceduralCreature.Morphology.Extraction
 
         /// <summary>
         /// Computes per-vertex normals via angle-weighted accumulation of adjacent
-        /// triangle face normals (each triangle's contribution to a vertex is
-        /// weighted by the angle it subtends at that vertex, which handles
-        /// irregular triangle sizes/shapes better than a plain area- or
-        /// count-weighted average). Idempotent — safe to call more than once;
-        /// recomputes from scratch each time rather than accumulating on stale data.
+        /// triangle face normals. The topology and vertex-domain contract is checked
+        /// before indexing so manually-constructed malformed results fail with a
+        /// domain error instead of surfacing as arbitrary IndexOutOfRange behavior.
+        /// Idempotent — safe to call more than once; recomputes from scratch each time
+        /// rather than accumulating on stale data.
         /// </summary>
         public void ComputeAngleWeightedNormals()
         {
+            ValidateTopology();
             var accumulated = new Vector3[Positions.Count];
 
             for (int i = 0; i < Triangles.Count; i += 3)
@@ -69,7 +58,7 @@ namespace ProceduralCreature.Morphology.Extraction
                 Vector3 p2 = Positions[i2];
 
                 Vector3 faceNormal = Vector3.Cross(p1 - p0, p2 - p0);
-                if (faceNormal.sqrMagnitude < 1e-12f) continue; // degenerate triangle, no contribution
+                if (faceNormal.sqrMagnitude < 1e-12f) continue;
                 faceNormal.Normalize();
 
                 accumulated[i0] += faceNormal * AngleAt(p0, p1, p2);
@@ -85,6 +74,35 @@ namespace ProceduralCreature.Morphology.Extraction
             Normals = normals;
         }
 
+        private void ValidateTopology()
+        {
+            if (Positions == null) throw new DomainException("Positions must not be null.");
+            if (Triangles == null) throw new DomainException("Triangles must not be null.");
+            if (Triangles.Count % 3 != 0)
+            {
+                throw new DomainException(
+                    $"Triangles must contain complete triangles; got {Triangles.Count} indices.");
+            }
+
+            for (int i = 0; i < Positions.Count; i++)
+            {
+                if (!NumericValidity.IsFinite(Positions[i]))
+                {
+                    throw new DomainException($"Positions[{i}] must be finite.");
+                }
+            }
+
+            for (int i = 0; i < Triangles.Count; i++)
+            {
+                int index = Triangles[i];
+                if (index < 0 || index >= Positions.Count)
+                {
+                    throw new DomainException(
+                        $"Triangles[{i}] references vertex {index}, outside Positions (count {Positions.Count}).");
+                }
+            }
+        }
+
         private static float AngleAt(Vector3 vertex, Vector3 a, Vector3 b)
         {
             Vector3 toA = (a - vertex).normalized;
@@ -94,6 +112,7 @@ namespace ProceduralCreature.Morphology.Extraction
 
         public Mesh ToUnityMesh()
         {
+            ValidateTopology();
             var mesh = new Mesh();
             if (Positions.Count > 65535)
             {
