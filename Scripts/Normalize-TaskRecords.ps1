@@ -30,14 +30,14 @@ Get-ChildItem "$taskDir\*.json" | Sort-Object Name | ForEach-Object {
     try {
         $task = Get-Content $path -Raw | ConvertFrom-Json
     } catch {
-        try { Write-Host "SKIP: $($_.Name) - not valid JSON: $($_.Exception.Message)" -ForegroundColor Yellow } catch {}
+        Write-Warning "SKIP: $($_.Name) - not valid JSON: $($_.Exception.Message)"
         $skipped++
         return
     }
 
     $id = [string]$task.id
     $key = [string]$task.key
-    $expectedId = $_.BaseName  # The full slug from filename
+    $expectedId = $_.BaseName
 
     # Fix 1: If id = "TSK-XXXX" but filename = "tsk-XXXX-slug.json", set id = filename
     if ($id -match '^TSK-\d{4,}$' -and $expectedId -match '^tsk-\d{4,}-') {
