@@ -2,7 +2,7 @@
   "id": "tsk-0169-add-all-bone-skinning-sweep-diagnostics",
   "key": "TSK-0169",
   "title": "Add all-bone skinning sweep diagnostics",
-  "description": "Add an editor-only diagnostic that sweeps every generated CreatureRig bone through deterministic isolated +/-15 degree rotations on X/Y/Z, captures the actual SkinnedMeshRenderer BakeMesh result, compares it with LinearBlendSkinning using the renderer's actual BoneWeight data and the same bone frames, and writes per-experiment summary JSON plus per-vertex CSV data. The diagnostic must restore the complete rig pose before and after every experiment, never mutate DNA, never enter the runtime animation path, and expose enough weight/delta information to investigate TSK-0167's Body/neck-to-arm tearing and distinguish weighting defects from renderer/bindpose/transform-space defects.",
+  "description": "Add an editor-only diagnostic that sweeps every generated CreatureRig bone through deterministic isolated +/-15 degree rotations on X/Y/Z, captures the actual SkinnedMeshRenderer BakeMesh result, compares it with LinearBlendSkinning using the renderer's actual BoneWeight data and the same bone frames, and writes per-experiment summary JSON plus per-vertex CSV data. The diagnostic must restore the complete rig pose before and after every experiment, never mutate DNA, never enter the runtime animation path, and expose enough weight/delta information to investigate TSK-0172's Body/neck-to-arm tearing and distinguish weighting defects from renderer/bindpose/transform-space defects.",
   "type": "Task",
   "status": "Backlog",
   "priority": "High",
@@ -18,19 +18,17 @@
     {
       "id": "c-0169-initial",
       "author": "anonymous",
-      "body": "Supporting implementation for TSK-0167. The first target is evidence collection, not a weighting algorithm change. The sweep must expose the actual BoneWeight assignments and actual-vs-oracle deformation so neck/arm tearing can be classified before changing the authoring model.",
+      "body": "Supporting implementation for TSK-0172. The first target is evidence collection, not a weighting algorithm change. The sweep must expose the actual BoneWeight assignments and actual-vs-oracle deformation so neck/arm tearing can be classified before changing the authoring model.",
       "createdAtUtc": "2026-09-08T02:20:00Z"
     }
   ],
-  "epicId": null,
   "parentId": null,
   "dueDateUtc": null,
+  "completedAtUtc": null,
   "createdAtUtc": "2026-09-08T02:20:00Z",
   "updatedAtUtc": "2026-09-08T02:20:00Z",
-  "completedAtUtc": null,
+  "revision": 2,
   "isArchived": false,
   "hasLoadError": false,
-  "loadError": null,
-  "revision": 1,
   "sourceFilePath": "tsk-0169-add-all-bone-skinning-sweep-diagnostics.json"
 }
