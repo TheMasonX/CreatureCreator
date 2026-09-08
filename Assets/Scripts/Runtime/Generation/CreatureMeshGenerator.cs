@@ -193,7 +193,7 @@ namespace ProceduralCreature.Generation
                     restPlacement: Matrix4x4.identity,
                     materialRegions: null,
                     rigBinding: new RigBindingMetadata(
-                        GeneratedCreature.ImplicitSurfaceSourceId, parentPartId: null, isMirrored: false));
+                        GeneratedCreature.ImplicitSurfaceSourceId, parentPartId: null, isMirrored: false)));
                 implicitMeshOwnershipTransferred = true;
 
                 AppendMeshAssetItems(generated, data, meshResolver);
