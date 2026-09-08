@@ -1,6 +1,7 @@
 using System;
 using System.Collections.Generic;
 using UnityEditor;
+using UnityEditor.EditorTools;
 using UnityEngine;
 using UnityEngine.Rendering;
 using ProceduralCreature.Animation;
@@ -113,10 +114,17 @@ namespace ProceduralCreature.Editor
                         // previous hierarchy selection may still contain several
                         // objects; assigning only the clicked bone is therefore part
                         // of the selection contract. This deliberately does not change
-                        // the user's global Center/Pivot preference: with one selected
-                        // object both modes resolve to that Transform's pivot.
+                        // the user's global Center/Pivot preference.
                         Selection.objects = new UnityEngine.Object[] { bone.gameObject };
                         Selection.activeGameObject = bone.gameObject;
+
+                        // The generated bone can own or contain mesh renderers (for
+                        // example a mesh-authored eye/head attachment). Unity's normal
+                        // Transform tool may then compute Center from rendered bounds
+                        // rather than the invisible Transform's actual pivot. The
+                        // dedicated Creature Rig rotation tool is explicitly positioned
+                        // at bone.position, so activate it for overlay bone clicks.
+                        ToolManager.SetActiveTool<RigBoneRotateTool>();
                         SceneView.RepaintAll();
                     }
                 }
@@ -165,8 +173,6 @@ namespace ProceduralCreature.Editor
 
             Handles.DrawAAPolyLine(width, attachment, bone.position);
 
-            // A small marker makes off-center Body/limb attachments obvious without
-            // obscuring the selectable child joint. This is editor-only visualization.
             float markerSize = handleSize * AttachmentMarkerScale;
             Handles.SphereHandleCap(0, attachment, Quaternion.identity, markerSize, EventType.Repaint);
         }
@@ -226,10 +232,6 @@ namespace ProceduralCreature.Editor
 
         private static Vector3 ResolveCurrentRestOrientedEndpoint(Transform current, BoneSnapshot boneData)
         {
-            // In the unposed state the snapshot endpoint is authoritative. Returning it
-            // directly avoids manufacturing a second endpoint with quaternion arithmetic,
-            // so a terminal tail segment can never visually loop because of accumulated
-            // rest-frame conversion error.
             if (current == null) return boneData.EndPosition;
 
             Quaternion restRotation = boneData.Rotation;
@@ -335,10 +337,7 @@ namespace ProceduralCreature.Editor
 
                 EditorGUILayout.BeginHorizontal();
                 if (GUILayout.Button("Frame Skeleton")) FrameBones(sceneView, GetAllBones());
-                if (GUILayout.Button("Frame Selected Chain"))
-                {
-                    FrameBones(sceneView, GetSelectedChain());
-                }
+                if (GUILayout.Button("Frame Selected Chain")) FrameBones(sceneView, GetSelectedChain());
                 EditorGUILayout.EndHorizontal();
 
                 EditorGUILayout.BeginHorizontal();
@@ -429,18 +428,15 @@ namespace ProceduralCreature.Editor
                         BoneSnapshot candidate = rig.RestSkeleton[j];
                         if (string.Equals(candidate.SourcePartId, anchor.SourcePartId, StringComparison.Ordinal)
                             && candidate.IsMirrored == anchor.IsMirrored
-                            && candidate.HasSegment
-                            && bones[j] != null
                             && !result.Contains(bones[j]))
                         {
                             result.Add(bones[j]);
                         }
                     }
-
                     return result;
                 }
             }
-            return new List<Transform> { selected };
+            return new List<Transform>();
         }
 
         private static List<Transform> GetLimbBones()
@@ -450,12 +446,12 @@ namespace ProceduralCreature.Editor
             for (int r = 0; r < rigs.Length; r++)
             {
                 CreatureRig rig = rigs[r];
-                if (rig == null || rig.RestSkeleton == null) continue;
+                if (rig == null) continue;
                 IReadOnlyList<Transform> bones = rig.IndexedBones;
                 for (int i = 0; i < bones.Count; i++)
                 {
-                    BoneSnapshot bone = rig.RestSkeleton[i];
-                    if (bone.HasSegment || bone.HasChildAttachmentPosition) result.Add(bones[i]);
+                    if (bones[i] != null && rig.RestSkeleton[i].PartType != PartType.Body)
+                        result.Add(bones[i]);
                 }
             }
             return result;
@@ -471,7 +467,10 @@ namespace ProceduralCreature.Editor
                 if (rig == null) continue;
                 IReadOnlyList<Transform> bones = rig.IndexedBones;
                 for (int i = 0; i < bones.Count; i++)
-                    if (rig.RestSkeleton[i].SourcePartId == CreatureDefinition.BodyId) result.Add(bones[i]);
+                {
+                    if (bones[i] != null && rig.RestSkeleton[i].PartType == PartType.Body)
+                        result.Add(bones[i]);
+                }
             }
             return result;
         }
@@ -479,17 +478,9 @@ namespace ProceduralCreature.Editor
         private static void FrameBones(SceneView sceneView, List<Transform> bones)
         {
             if (sceneView == null || bones == null || bones.Count == 0) return;
-
-            UnityEngine.Object[] previousSelection = Selection.objects;
-            try
-            {
-                Selection.objects = bones.ConvertAll(b => b.gameObject).ToArray();
-                sceneView.FrameSelected();
-            }
-            finally
-            {
-                Selection.objects = previousSelection;
-            }
+            var bounds = new Bounds(bones[0].position, Vector3.zero);
+            for (int i = 1; i < bones.Count; i++) bounds.Encapsulate(bones[i].position);
+            sceneView.Frame(bounds, false);
         }
     }
 }
