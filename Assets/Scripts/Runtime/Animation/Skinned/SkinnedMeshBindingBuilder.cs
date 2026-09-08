@@ -39,6 +39,8 @@ namespace ProceduralCreature.Animation.Skinned
         /// <see cref="SkeletonSnapshot.Capture"/> order (the shared bind-index
         /// contract). <c>bindPose[i]</c> is the exact inverse of the bone's rest
         /// frame <c>TRS(Position, Rotation, one)</c> in mesh space (bind == rest).
+        /// Every position and rotation component must be finite because a non-finite
+        /// rest frame cannot produce a meaningful Unity bind pose.
         /// </summary>
         public static Matrix4x4[] ComputeBindposes(SkeletonSnapshot rest)
         {
@@ -49,8 +51,22 @@ namespace ProceduralCreature.Animation.Skinned
             for (int bone = 0; bone < rest.Count; bone++)
             {
                 BoneSnapshot snapshot = rest[bone];
+                if (!NumericValidity.IsFinite(snapshot.Position))
+                {
+                    throw new DomainException($"Bone {bone} bind position must be finite.");
+                }
+                if (!NumericValidity.IsFinite(snapshot.Rotation))
+                {
+                    throw new DomainException($"Bone {bone} bind rotation must be finite.");
+                }
+
                 Matrix4x4 restFrame = Matrix4x4.TRS(snapshot.Position, snapshot.Rotation, Vector3.one);
-                bindposes[bone] = restFrame.inverse;
+                Matrix4x4 bindPose = restFrame.inverse;
+                if (!NumericValidity.IsFinite(bindPose))
+                {
+                    throw new DomainException($"Bone {bone} bind pose must be finite.");
+                }
+                bindposes[bone] = bindPose;
             }
             return bindposes;
         }
@@ -58,9 +74,11 @@ namespace ProceduralCreature.Animation.Skinned
         /// <summary>
         /// Converts authored per-vertex influences into Unity <see cref="BoneWeight"/>,
         /// one per vertex in the same order. Each influence list is capped at
-        /// <see cref="LinearBlendSkinning.MaxBoneInfluencesPerVertex"/> (the authored
-        /// contract is already enforced upstream); unused <c>BoneWeight</c> slots carry
-        /// weight zero and the first influence's bone index (a valid in-range index).
+        /// <see cref="LinearBlendSkinning.MaxBoneInfluencesPerVertex"/>. Indices must
+        /// be unique, weights finite and non-negative, and every vertex must have
+        /// positive finite total weight; these are the same safety invariants enforced
+        /// by <see cref="LinearBlendSkinning.Deform"/> so the Unity adapter cannot widen
+        /// the accepted domain of its deformation oracle.
         /// </summary>
         public static BoneWeight[] BuildBoneWeights(IReadOnlyList<VertexInfluence[]> influences, int boneCount)
         {
@@ -86,8 +104,6 @@ namespace ProceduralCreature.Animation.Skinned
                         $"MaxBoneInfluencesPerVertex ({LinearBlendSkinning.MaxBoneInfluencesPerVertex}).");
                 }
 
-                // The first influence provides the index for any empty slots (a valid
-                // in-range index with weight zero, so Unity never sees an invalid slot).
                 int fallbackBone = vertexInfluences[0].BoneIndex;
                 if (fallbackBone < 0 || fallbackBone >= boneCount)
                 {
@@ -106,6 +122,7 @@ namespace ProceduralCreature.Animation.Skinned
                     weight3 = 0f,
                 };
 
+                float totalWeight = 0f;
                 for (int i = 0; i < vertexInfluences.Length; i++)
                 {
                     VertexInfluence influence = vertexInfluences[i];
@@ -114,10 +131,28 @@ namespace ProceduralCreature.Animation.Skinned
                         throw new DomainException(
                             $"Vertex {vertex} references bone {influence.BoneIndex} outside the bone set.");
                     }
+                    if (!NumericValidity.IsFinite(influence.Weight))
+                    {
+                        throw new DomainException($"Vertex {vertex} has a non-finite weight.");
+                    }
                     if (influence.Weight < 0f)
                     {
                         throw new DomainException($"Vertex {vertex} has a negative weight.");
                     }
+                    for (int prior = 0; prior < i; prior++)
+                    {
+                        if (vertexInfluences[prior].BoneIndex == influence.BoneIndex)
+                        {
+                            throw new DomainException(
+                                $"Vertex {vertex} contains duplicate bone index {influence.BoneIndex}.");
+                        }
+                    }
+                    totalWeight += influence.Weight;
+                    if (!NumericValidity.IsFinite(totalWeight))
+                    {
+                        throw new DomainException($"Vertex {vertex} has a non-finite total weight.");
+                    }
+
                     switch (i)
                     {
                         case 0:
@@ -137,6 +172,11 @@ namespace ProceduralCreature.Animation.Skinned
                             weight.weight3 = influence.Weight;
                             break;
                     }
+                }
+
+                if (!(totalWeight > 0f))
+                {
+                    throw new DomainException($"Vertex {vertex} has no net bone weight.");
                 }
 
                 boneWeights[vertex] = weight;
