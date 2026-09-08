@@ -33,6 +33,7 @@ namespace ProceduralCreature.Morphology.Extraction
     public static partial class MarchingCubesExtractor
     {
         private const float CoarseLoopSuppressionCellSize = 0.2f;
+        private const int MaxCubeEdges = 12;
 
         public static MeshExtractionResult Extract(DensityGrid grid)
         {
@@ -53,15 +54,11 @@ namespace ProceduralCreature.Morphology.Extraction
 
             var cornerDensities = new float[8];
             var cornerPositions = new Vector3[8];
+            var loopIndices = new int[MaxCubeEdges];
             long contourResolutionTicks = 0;
             long vertexWeldingTicks = 0;
             long triangleEmissionTicks = 0;
 
-            // One dense scan classifies every cell and retains only the mixed-sign
-            // cells as an ordered active-cell list. The extractor then iterates
-            // that list instead of re-classifying the whole volume, so empty
-            // volume is never re-traversed during contour resolution. Dense
-            // sampling itself is unchanged; this is purely the classification pass.
             Stopwatch activeCellStopwatch = collectTimings ? Stopwatch.StartNew() : null;
             ActiveCellEntry[] activeCells = ActiveCellBuilder.Build(grid);
             if (collectTimings)
@@ -77,19 +74,12 @@ namespace ProceduralCreature.Morphology.Extraction
                 ActiveCellBuilder.DecodeCellIndex(
                     cell.CellIndex, grid.CellsX, grid.CellsY, out int cx, out int cy, out int cz);
 
-                // Active cells are mixed-sign by construction, so a sign
-                // classification here is redundant; only the surface-epsilon
-                // normalization that feeds contour resolution is reapplied.
                 grid.CopyCellCornerSamples(cx, cy, cz, cornerDensities);
                 for (int c = 0; c < 8; c++)
                 {
                     cornerDensities[c] = GenerationTolerances.NormalizeSurfaceDensity(cornerDensities[c]);
                 }
 
-                // Positions are consumed only by mixed cells. Avoiding eight
-                // Vector3 constructions per cell is what kept the old dense loop
-                // cheap for empty volume; active cells are few, but the rule still
-                // keeps this tight.
                 for (int c = 0; c < 8; c++)
                 {
                     Vector3Int offset = CubeTopology.CornerGridOffsets[c];
@@ -113,13 +103,10 @@ namespace ProceduralCreature.Morphology.Extraction
 
                 foreach (List<CubeContourResolver.LoopVertex> loop in loops)
                 {
-                    if (ShouldSuppressCoarseLoop(loop, grid))
-                    {
-                        continue;
-                    }
+                    if (ShouldSuppressCoarseLoop(loop, grid)) continue;
 
                     EmitLoop(
-                        grid, loop, cx, cy, cz, vertexCache, result,
+                        grid, loop, cx, cy, cz, vertexCache, result, loopIndices,
                         collectTimings, ref vertexWeldingTicks, ref triangleEmissionTicks);
                 }
             }
@@ -133,25 +120,9 @@ namespace ProceduralCreature.Morphology.Extraction
 
         private static bool ShouldSuppressCoarseLoop(List<CubeContourResolver.LoopVertex> loop, DensityGrid grid)
         {
-            if (loop == null || loop.Count < 3)
-            {
-                return true;
-            }
+            if (loop == null || loop.Count < 3) return true;
+            if (grid.CellSize < CoarseLoopSuppressionCellSize) return false;
 
-            // This heuristic is only for genuinely coarse preview grids. Applying
-            // it at normal resolutions removes valid small surface loops (notably
-            // around rounded poles and small creature parts), which opens holes in
-            // otherwise closed meshes.
-            if (grid.CellSize < CoarseLoopSuppressionCellSize)
-            {
-                return false;
-            }
-
-            // Coarse preview sampling can resolve a tiny under-sampled feature as a
-            // small sub-cell loop whose world-space extent is far smaller than a
-            // grid cell. Emitting that loop creates a boundary hole in the otherwise
-            // closed outer mesh; suppressing it keeps the coarse surface stable
-            // without introducing per-triangle SDF checks or large allocations.
             var min = new Vector3(float.PositiveInfinity, float.PositiveInfinity, float.PositiveInfinity);
             var max = new Vector3(float.NegativeInfinity, float.NegativeInfinity, float.NegativeInfinity);
             foreach (CubeContourResolver.LoopVertex vertex in loop)
@@ -167,12 +138,7 @@ namespace ProceduralCreature.Morphology.Extraction
 
             Vector3 extent = max - min;
             float maximumExtent = Mathf.Max(extent.x, Mathf.Max(extent.y, extent.z));
-            if (maximumExtent <= grid.CellSize * 0.75f)
-            {
-                return true;
-            }
-
-            return false;
+            return maximumExtent <= grid.CellSize * 0.75f;
         }
 
         private static void EmitLoop(
@@ -181,13 +147,18 @@ namespace ProceduralCreature.Morphology.Extraction
             int cx, int cy, int cz,
             Dictionary<(int, int, int, int), int> vertexCache,
             MeshExtractionResult result,
+            int[] indices,
             bool collectTimings,
             ref long vertexWeldingTicks,
             ref long triangleEmissionTicks)
         {
-            if (loop.Count < 3) return; // degenerate — shouldn't occur for valid input, but cheap to guard
+            if (loop.Count < 3) return;
+            if (loop.Count > indices.Length)
+            {
+                throw new DomainException(
+                    $"Cube contour loop contains {loop.Count} edges; maximum supported is {indices.Length}.");
+            }
 
-            var indices = new int[loop.Count];
             for (int i = 0; i < loop.Count; i++)
             {
                 if (collectTimings)
@@ -202,12 +173,6 @@ namespace ProceduralCreature.Morphology.Extraction
                 }
             }
 
-            // Fan triangulation from the first vertex. Safe and non-self-intersecting
-            // for the star-shaped loops that arise from a single cube's surface
-            // crossing at the grid resolutions this system targets; documented as a
-            // known simplification rather than a proven-general polygon
-            // triangulation (ear clipping) — revisit if golden-fixture testing at
-            // very coarse resolution surfaces a self-intersecting fan.
             for (int i = 1; i < loop.Count - 1; i++)
             {
                 if (collectTimings)
@@ -245,11 +210,6 @@ namespace ProceduralCreature.Morphology.Extraction
             Vector3 positionA = grid.CornerPosition(gridA.x, gridA.y, gridA.z);
             Vector3 positionB = grid.CornerPosition(gridB.x, gridB.y, gridB.z);
 
-            // An exact zero-valued grid corner is represented as an intersection
-            // on every incident crossed edge. Use the normalized endpoint value
-            // rather than comparing interpolated positions, because near-zero
-            // values can produce slightly different floating-point positions on
-            // edges incident to the same grid corner.
             if (GenerationTolerances.NormalizeSurfaceDensity(grid.GetSample(gridA.x, gridA.y, gridA.z)) == 0f)
             {
                 return ResolveCachedVertex(
@@ -280,10 +240,7 @@ namespace ProceduralCreature.Morphology.Extraction
             Dictionary<(int X, int Y, int Z, int Axis), int> vertexCache,
             MeshExtractionResult result)
         {
-            if (vertexCache.TryGetValue(key, out int existingIndex))
-            {
-                return existingIndex;
-            }
+            if (vertexCache.TryGetValue(key, out int existingIndex)) return existingIndex;
 
             int newIndex = result.Positions.Count;
             result.Positions.Add(position);
@@ -298,24 +255,11 @@ namespace ProceduralCreature.Morphology.Extraction
             Vector3 p2 = result.Positions[i2];
 
             Vector3 faceNormal = Vector3.Cross(p1 - p0, p2 - p0);
-            if (faceNormal.sqrMagnitude < 1e-12f)
-            {
-                return; // degenerate triangle (zero area) — skip rather than emit garbage
-            }
+            if (faceNormal.sqrMagnitude < 1e-12f) return;
 
             Vector3 centroid = (p0 + p1 + p2) / 3f;
             result.GradientEvaluationCount++;
 
-            // Winding reference: prefer the analytic trilinear derivative at the
-            // centroid, derived from this cached grid's own cell corners. Unlike
-            // the nearest-corner EstimateGradient, it varies smoothly as the
-            // centroid moves and so does not flip a marginal triangle when the
-            // centroid crosses a corner-rounding boundary. It uses only
-            // already-loaded cell data (never a fresh SDF evaluation). Only when
-            // the containing cell has a non-finite (culled/absent) corner do we
-            // fall back to the finite-aware centered/one-sided estimate — a
-            // deterministic reference from existing grid data, never arbitrary
-            // loop order.
             Vector3 gradient;
             if (!grid.TryEstimateGradient(centroid, out gradient))
             {
@@ -323,7 +267,6 @@ namespace ProceduralCreature.Morphology.Extraction
             }
 
             bool correctlyWound = Vector3.Dot(faceNormal, gradient) >= 0f;
-
             if (correctlyWound)
             {
                 result.Triangles.Add(i0);
