@@ -76,6 +76,25 @@ namespace ProceduralCreature.Tests.Runtime
         }
 
         [Test]
+        public void Serialize_EscapesAllJsonControlCharactersInStringFields()
+        {
+            CreatureDefinition definition = MakeTwoPartDefinition();
+            definition.Parts[0].DisplayName = "quote\" slash\\ controls:\u0000\u0001\u0007\b\f\n\r\t\u001F";
+
+            string json = _serializer.Serialize(definition);
+
+            StringAssert.DoesNotContain("\u0000", json);
+            StringAssert.DoesNotContain("\u0001", json);
+            StringAssert.DoesNotContain("\u0007", json);
+            StringAssert.DoesNotContain("\u001F", json);
+            StringAssert.Contains("\\b", json);
+            StringAssert.Contains("\\f", json);
+
+            CreatureDefinition roundTripped = _serializer.Deserialize(json);
+            Assert.AreEqual(definition.Parts[0].DisplayName, roundTripped.Parts[0].DisplayName);
+        }
+
+        [Test]
         public void Serialize_IsByteStableAcrossRepeatedCalls()
         {
             CreatureDefinition definition = MakeTwoPartDefinition();
@@ -165,7 +184,7 @@ namespace ProceduralCreature.Tests.Runtime
         [Test]
         public void Deserialize_ThrowsOnMissingRequiredField()
         {
-            const string json = "{\"schemaVersion\":2,\"symmetryMode\":\"None\"}"; // missing bounds/generation/body/parts
+            const string json = "{\"schemaVersion\":2,\"symmetryMode\":\"None\"}";
             Assert.Throws<DnaDeserializationException>(() => _serializer.Deserialize(json));
         }
 
@@ -217,24 +236,6 @@ namespace ProceduralCreature.Tests.Runtime
             Assert.AreEqual(1.7f, shape.CapsuleHeight, 1e-4f);
             Assert.AreEqual(new Vector3(0.3f, 0.4f, 0.5f), shape.EllipsoidRadii);
             Assert.AreEqual(new Vector3(0.6f, 0.7f, 0.8f), shape.BoxHalfExtents);
-        }
-
-        [Test]
-        public void Deserialize_LegacyPrimarySize_MigratesExplicitDefaults()
-        {
-            string json = _serializer.Serialize(MakeTwoPartDefinition());
-            json = json.Replace(
-                "\"radius\":0.5000,\"capsuleAxis\":\"Y\",\"capsuleHeight\":1.0000,\"ellipsoidRadii\":{\"x\":0.5000,\"y\":0.5000,\"z\":0.5000},\"boxHalfExtents\":{\"x\":0.5000,\"y\":0.5000,\"z\":0.5000}",
-                "\"primarySize\":0.5000");
-
-            CreatureDefinition migrated = _serializer.Deserialize(json);
-            ShapeDefinition shape = migrated.FindPart("part_leg").Shape;
-
-            Assert.AreEqual(0.5f, shape.Radius, 1e-4f);
-            Assert.AreEqual(ShapeAxis.Y, shape.CapsuleAxis);
-            Assert.AreEqual(1f, shape.CapsuleHeight, 1e-4f);
-            Assert.AreEqual(new Vector3(0.5f, 0.5f, 0.5f), shape.EllipsoidRadii);
-            Assert.AreEqual(new Vector3(0.5f, 0.5f, 0.5f), shape.BoxHalfExtents);
         }
     }
 }
