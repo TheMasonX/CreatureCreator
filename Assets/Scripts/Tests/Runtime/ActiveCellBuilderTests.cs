@@ -42,9 +42,6 @@ namespace ProceduralCreature.Tests.Runtime
         [Test]
         public void ClassifyCaseIndex_NearZeroCorners_AreTreatedAsOnSurface()
         {
-            // Within ScalarComparisonEpsilon of the surface, so they normalize to
-            // exactly 0 and count as >= 0 (outside side), matching the reference
-            // mixed-cell classifier.
             var densities = new float[8];
             for (int i = 0; i < 8; i++) densities[i] = 5e-4f;
             Assert.AreEqual(255, ActiveCellBuilder.ClassifyCaseIndex(densities));
@@ -56,9 +53,6 @@ namespace ProceduralCreature.Tests.Runtime
             var densities = new float[8];
             for (int i = 0; i < 8; i++) densities[i] = 1f;
             densities[5] = -1f;
-
-            // Bit c is set for corner c >= 0, so the single negative corner 5
-            // clears only bit 5.
             Assert.AreEqual(255 & ~(1 << 5), ActiveCellBuilder.ClassifyCaseIndex(densities));
         }
 
@@ -79,26 +73,37 @@ namespace ProceduralCreature.Tests.Runtime
         }
 
         [Test]
+        public void DecodeCellIndex_NegativeIndex_ThrowsDomainException()
+        {
+            Assert.Throws<DomainException>(() =>
+                ActiveCellBuilder.DecodeCellIndex(-1, 4, 5, out _, out _, out _));
+        }
+
+        [Test]
+        public void DecodeCellIndex_NonPositiveDimensions_ThrowsDomainException()
+        {
+            Assert.Throws<DomainException>(() =>
+                ActiveCellBuilder.DecodeCellIndex(0, 0, 5, out _, out _, out _));
+            Assert.Throws<DomainException>(() =>
+                ActiveCellBuilder.DecodeCellIndex(0, 4, 0, out _, out _, out _));
+            Assert.Throws<DomainException>(() =>
+                ActiveCellBuilder.DecodeCellIndex(0, -4, 5, out _, out _, out _));
+        }
+
+        [Test]
         public void Build_Sphere_RetainsOnlyMixedCellsInIncreasingOrder()
         {
             using (DensityGrid grid = SphereGrid())
             {
                 ActiveCellEntry[] active = ActiveCellBuilder.Build(grid);
-
                 Assert.Greater(active.Length, 0, "A sphere must produce active cells at this resolution.");
 
                 for (int i = 0; i < active.Length; i++)
                 {
-                    Assert.AreNotEqual(0, active[i].CaseIndex, "Active cell must not be all-inside.");
-                    Assert.AreNotEqual(255, active[i].CaseIndex, "Active cell must not be all-outside.");
-                    if (i > 0)
-                    {
-                        Assert.Greater(active[i].CellIndex, active[i - 1].CellIndex,
-                            "Active cells must be in strictly increasing global index order.");
-                    }
+                    Assert.AreNotEqual(0, active[i].CaseIndex);
+                    Assert.AreNotEqual(255, active[i].CaseIndex);
+                    if (i > 0) Assert.Greater(active[i].CellIndex, active[i - 1].CellIndex);
                 }
-
-                // Independent mixed-cell count must match the retained active-cell count.
                 Assert.AreEqual(CountMixedCells(grid), active.Length);
             }
         }
@@ -112,7 +117,6 @@ namespace ProceduralCreature.Tests.Runtime
             using (DensityGrid grid = DensityGrid.SamplePortable(program, bounds, settings))
             {
                 ActiveCellEntry[] active = ActiveCellBuilder.Build(grid);
-
                 Assert.AreEqual(0, active.Length);
             }
         }
@@ -124,7 +128,6 @@ namespace ProceduralCreature.Tests.Runtime
             {
                 ActiveCellEntry[] first = ActiveCellBuilder.Build(grid);
                 ActiveCellEntry[] second = ActiveCellBuilder.Build(grid);
-
                 Assert.AreEqual(first.Length, second.Length);
                 for (int i = 0; i < first.Length; i++)
                 {
