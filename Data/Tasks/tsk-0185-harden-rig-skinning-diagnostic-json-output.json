@@ -1,0 +1,36 @@
+{
+  "id": "tsk-0185-harden-rig-skinning-diagnostic-json-output",
+  "key": "TSK-0185",
+  "title": "Harden RigSkinningSweepDiagnostic machine-readable output",
+  "description": "Seven-seat editor/lifecycle review found RigSkinningSweepDiagnostic produced locale-sensitive numeric JSON/CSV via ToString(\"R\") without CultureInfo.InvariantCulture and escaped only quotes/backslashes in JSON strings. A locale using comma decimal separators can make summary JSON invalid, while control characters in rig/mesh names can also corrupt the file. Fix the editor-only diagnostic with invariant numeric formatting and complete JSON string escaping while preserving its existing evidence workflow.",
+  "type": "Bug Fix",
+  "status": "Done",
+  "priority": "Medium",
+  "assigneeMode": "Custom",
+  "assigneeDirectoryId": null,
+  "assigneeCustomText": "Agent",
+  "reporter": "council-seven-seat-audit",
+  "labels": ["council", "editor", "diagnostic", "json", "culture", "TSK-0169"],
+  "attachments": [],
+  "externalLinks": [],
+  "linkedPages": [],
+  "comments": [
+    {
+      "id": "c-20260908-skinning-diagnostic-json",
+      "author": "council-seven-seat-audit",
+      "body": "Implemented invariant numeric formatting for JSON/CSV output and full JSON escaping for control characters. Existing diagnostic semantics and cleanup flow remain unchanged. Unity execution of the diagnostic remains required under TSK-0169.",
+      "createdAtUtc": "2026-09-08T04:44:00Z"
+    }
+  ],
+  "epicId": null,
+  "parentId": "tsk-0169-build-editor-skinning-sweep-diagnostic-to-localize-weighting-and-bind-pose-regressions",
+  "dueDateUtc": null,
+  "createdAtUtc": "2026-09-08T04:44:00Z",
+  "updatedAtUtc": "2026-09-08T04:44:00Z",
+  "completedAtUtc": "2026-09-08T04:44:00Z",
+  "revision": 1,
+  "isArchived": false,
+  "hasLoadError": false,
+  "loadError": null,
+  "sourceFilePath": "tsk-0185-harden-rig-skinning-diagnostic-json-output.json"
+}
