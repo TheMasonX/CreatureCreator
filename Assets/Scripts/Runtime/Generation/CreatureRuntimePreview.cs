@@ -111,7 +111,10 @@ namespace ProceduralCreature.Generation
         {
             if (generated == null || _rig == null || snapshot == null) return;
 
-            for (int index = 1; index < generated.Geometry.Count; index++)
+            // Geometry order is semantic, not positional: the implicit surface may
+            // appear anywhere in the collection, so inspect every item and skip it
+            // by type rather than assuming it occupies slot zero.
+            for (int index = 0; index < generated.Geometry.Count; index++)
             {
                 GeometryItem item = generated.Geometry[index];
                 if (item.GeometryType == GeometryType.Implicit) continue;
@@ -154,45 +157,41 @@ namespace ProceduralCreature.Generation
 
         private void AssignItemMaterials(MeshRenderer renderer, GeometryItem item)
         {
-            if (item.MaterialRegions.Count == 0)
-            {
-                AssignFallbackMaterial(renderer);
-                return;
-            }
-
-            Material resolved = null;
-            try
-            {
-                resolved = MaterialResolver.Resolve(ResolveMaterialPalette(), item.MaterialRegions[0].MaterialKey);
-            }
-            catch (DomainException ex)
-            {
-                Debug.LogWarning(
-                    $"[CreatureCreator] {ex.Message} Using the default preview material for item '{item.SourcePartId}'.",
-                    this);
-            }
-
-            if (resolved == null)
-            {
-                AssignFallbackMaterial(renderer);
-                return;
-            }
-
             int subMeshCount = Mathf.Max(1, item.Mesh != null ? item.Mesh.subMeshCount : 1);
-            var materials = new Material[subMeshCount];
-            for (int i = 0; i < materials.Length; i++) materials[i] = resolved;
-            renderer.sharedMaterials = materials;
-        }
-
-        private void AssignFallbackMaterial(MeshRenderer renderer)
-        {
-            Material material = MaterialResolver.ResolveDefault(ResolveMaterialPalette());
-            if (material == null)
+            Material fallback = MaterialResolver.ResolveDefault(ResolveMaterialPalette());
+            if (fallback == null)
             {
                 if (_previewMaterial == null) _previewMaterial = CreatePreviewMaterial();
-                material = _previewMaterial;
+                fallback = _previewMaterial;
             }
-            if (material != null) renderer.sharedMaterial = material;
+
+            var materials = new Material[subMeshCount];
+            for (int i = 0; i < materials.Length; i++) materials[i] = fallback;
+
+            for (int i = 0; i < item.MaterialRegions.Count; i++)
+            {
+                MaterialRegion region = item.MaterialRegions[i];
+                if (region.SubmeshIndex < 0 || region.SubmeshIndex >= materials.Length)
+                {
+                    throw new DomainException(
+                        $"Generated geometry item '{item.SourcePartId}' material region {i} targets submesh {region.SubmeshIndex}, " +
+                        $"but the mesh has {materials.Length} submesh slots.");
+                }
+
+                try
+                {
+                    Material resolved = MaterialResolver.Resolve(ResolveMaterialPalette(), region.MaterialKey);
+                    materials[region.SubmeshIndex] = resolved ?? fallback;
+                }
+                catch (DomainException ex)
+                {
+                    Debug.LogWarning(
+                        $"[CreatureCreator] {ex.Message} Using the default preview material for item '{item.SourcePartId}' submesh {region.SubmeshIndex}.",
+                        this);
+                }
+            }
+
+            renderer.sharedMaterials = materials;
         }
 
         private void BindImplicitSurfaceToRig(
