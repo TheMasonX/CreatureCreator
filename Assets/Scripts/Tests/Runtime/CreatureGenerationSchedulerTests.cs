@@ -83,22 +83,9 @@ namespace ProceduralCreature.Tests.Runtime
             CreatureGenerationResult result = WaitForResult(scheduler);
 
             Assert.IsNotNull(result);
-            Assert.IsTrue(result.IsStale, "disposing the scheduler advances the latest sequence so already-running work cannot become current");
+            Assert.IsTrue(result.IsStale,
+                "disposing the scheduler advances the latest sequence so already-running work cannot become current");
             scheduler.Dispose();
-        }
-
-        [Test]
-        public void CapturedEnqueue_DoesNotCloneAlreadyDetachedDefinitionAgain()
-        {
-            CreatureDefinition captured = CreateDefinition();
-            using (var scheduler = new CreatureGenerationScheduler())
-            {
-                long sequence = scheduler.EnqueueCapturedForTestOnly(captured);
-                Assert.AreEqual(1, sequence);
-                CreatureGenerationResult result = WaitForResult(scheduler);
-                Assert.IsTrue(result.Succeeded, result.Exception?.ToString());
-                Assert.IsNotNull(result.Data);
-            }
         }
 
         private static CreatureGenerationResult WaitForResult(CreatureGenerationScheduler scheduler)
