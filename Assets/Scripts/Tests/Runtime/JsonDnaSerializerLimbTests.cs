@@ -101,7 +101,6 @@ namespace ProceduralCreature.Tests.Runtime
         [Test]
         public void Deserialize_PreCC018FileWithoutLimbChainField_LoadsNull()
         {
-            // Simulate a v2 file saved before CC-018: no limbChain key at all.
             string withNull = _serializer.Serialize(DefinitionWithoutLimb());
             string legacy = withNull.Replace(",\"limbChain\":null", string.Empty);
             Assert.IsFalse(legacy.Contains("limbChain"), "Sanity: the legacy file must not mention limbChain.");
@@ -168,15 +167,14 @@ namespace ProceduralCreature.Tests.Runtime
             var definition = DefinitionWithLimb();
             definition.FindPart("part_leg").Limb.Joints[1].Position = new Vector3(float.NaN, 0f, 0f);
 
-            Assert.Throws<DomainException>(() => DefinitionCanonicalizer.Canonicalize(definition),
-                "Canonicalization is not a repair pass; a non-finite joint is a programmer error.");
+            Assert.Throws<DomainException>(() => DefinitionCanonicalizer.Canonicalize(definition));
         }
 
         [Test]
         public void Canonicalize_ThrowsOnInvalidThicknessProfile()
         {
             var definition = DefinitionWithLimb();
-            definition.FindPart("part_leg").Limb.Thickness.Keys.RemoveAt(1); // only one key
+            definition.FindPart("part_leg").Limb.Thickness.Keys.RemoveAt(1);
 
             Assert.Throws<DomainException>(() => DefinitionCanonicalizer.Canonicalize(definition));
         }
@@ -187,8 +185,7 @@ namespace ProceduralCreature.Tests.Runtime
             var definition = DefinitionWithLimb();
             definition.FindPart("part_leg").Limb.BlendRadius = -0.1f;
 
-            Assert.Throws<DomainException>(() => DefinitionCanonicalizer.Canonicalize(definition),
-                "Canonicalization is not a repair pass; a negative limb blend radius is a programmer error.");
+            Assert.Throws<DomainException>(() => DefinitionCanonicalizer.Canonicalize(definition));
         }
 
         [Test]
@@ -197,8 +194,7 @@ namespace ProceduralCreature.Tests.Runtime
             var definition = DefinitionWithLimb();
             definition.FindPart("part_leg").Limb.BlendRadius = float.NaN;
 
-            Assert.Throws<DomainException>(() => DefinitionCanonicalizer.Canonicalize(definition),
-                "Canonicalization is not a repair pass; a non-finite limb blend radius is a programmer error.");
+            Assert.Throws<DomainException>(() => DefinitionCanonicalizer.Canonicalize(definition));
         }
 
         [Test]
@@ -209,8 +205,7 @@ namespace ProceduralCreature.Tests.Runtime
 
             CreatureDefinition canonical = DefinitionCanonicalizer.Canonicalize(definition);
 
-            Assert.AreEqual(0.1235f, canonical.FindPart("part_leg").Limb.BlendRadius, 1e-6f,
-                "The limb blend radius must be quantized to 4 decimal places.");
+            Assert.AreEqual(0.1235f, canonical.FindPart("part_leg").Limb.BlendRadius, 1e-6f);
         }
 
         [Test]
@@ -219,9 +214,8 @@ namespace ProceduralCreature.Tests.Runtime
             string json = _serializer.Serialize(DefinitionWithLimb());
 
             int idIndex = json.IndexOf("\"limbChain\":{\"joints\"", System.StringComparison.Ordinal);
-            Assert.GreaterOrEqual(idIndex, 0, "limbChain must be emitted as an object with joints.");
-            Assert.IsTrue(json.Contains("\"thicknessProfile\":{\"keys\":"),
-                "The thickness profile must be emitted as keys.");
+            Assert.GreaterOrEqual(idIndex, 0);
+            Assert.IsTrue(json.Contains("\"thicknessProfile\":{\"keys\":"));
         }
 
         [Test]
@@ -233,25 +227,82 @@ namespace ProceduralCreature.Tests.Runtime
             string json = _serializer.Serialize(definition);
             CreatureDefinition loaded = _serializer.Deserialize(json);
 
-            Assert.AreEqual(0.35f, loaded.FindPart("part_leg").Limb.BlendRadius, 1e-4f,
-                "The authored limb blend radius must round-trip.");
+            Assert.AreEqual(0.35f, loaded.FindPart("part_leg").Limb.BlendRadius, 1e-4f);
         }
 
         [Test]
         public void Deserialize_LimbChainWithoutBlendRadius_DefaultsToStandard()
         {
-            // A file saved between CC-018 and CC-049 has a limbChain but no
-            // blendRadius field. It must load with the standard default so
-            // existing creatures generate identically (additive, no version bump).
             string json = _serializer.Serialize(DefinitionWithLimb());
             string legacy = json.Replace(",\"blendRadius\":0.1000", string.Empty);
-            Assert.IsFalse(legacy.Contains("blendRadius"), "Sanity: the legacy file must not mention blendRadius.");
+            Assert.IsFalse(legacy.Contains("blendRadius"));
 
             CreatureDefinition loaded = _serializer.Deserialize(legacy);
             Assert.AreEqual(
                 ProceduralCreature.Definition.LimbChain.DefaultBlendRadius,
-                loaded.FindPart("part_leg").Limb.BlendRadius, 1e-6f,
-                "A pre-CC-049 limbChain must load with the default blend radius.");
+                loaded.FindPart("part_leg").Limb.BlendRadius, 1e-6f);
+        }
+
+        [Test]
+        public void Canonicalize_ThrowsOnThicknessKeyQuantizationCollision()
+        {
+            var definition = DefinitionWithLimb();
+            var profile = new ThicknessProfile();
+            profile.Keys.Add(new ThicknessKey { T = 0f, Value = 0.4f });
+            profile.Keys.Add(new ThicknessKey { T = 0.123441f, Value = 0.25f });
+            profile.Keys.Add(new ThicknessKey { T = 0.123449f, Value = 0.20f });
+            profile.Keys.Add(new ThicknessKey { T = 1f, Value = 0.1f });
+            definition.FindPart("part_leg").Limb.Thickness = profile;
+
+            Assert.Throws<DomainException>(() => DefinitionCanonicalizer.Canonicalize(definition));
+        }
+
+        [Test]
+        public void Canonicalize_ThrowsOnNullThicknessKey()
+        {
+            var definition = DefinitionWithLimb();
+            definition.FindPart("part_leg").Limb.Thickness.Keys.Insert(1, null);
+
+            Assert.Throws<DomainException>(() => DefinitionCanonicalizer.Canonicalize(definition));
+        }
+
+        [Test]
+        public void ThicknessProfile_QuantizeCollision_DoesNotMutateOnFailure()
+        {
+            var profile = new ThicknessProfile();
+            profile.Keys.Add(new ThicknessKey { T = 0f, Value = 0.4f });
+            profile.Keys.Add(new ThicknessKey { T = 0.123441f, Value = 0.25f });
+            profile.Keys.Add(new ThicknessKey { T = 0.123449f, Value = 0.20f });
+            profile.Keys.Add(new ThicknessKey { T = 1f, Value = 0.1f });
+
+            ThicknessKey first = profile.Keys[0];
+            ThicknessKey second = profile.Keys[1];
+            ThicknessKey third = profile.Keys[2];
+            ThicknessKey fourth = profile.Keys[3];
+
+            Assert.Throws<DomainException>(() => profile.Quantize());
+
+            Assert.AreEqual(4, profile.Keys.Count);
+            Assert.AreSame(first, profile.Keys[0]);
+            Assert.AreSame(second, profile.Keys[1]);
+            Assert.AreSame(third, profile.Keys[2]);
+            Assert.AreSame(fourth, profile.Keys[3]);
+            Assert.AreEqual(0.123441f, profile.Keys[1].T, 1e-7f);
+            Assert.AreEqual(0.123449f, profile.Keys[2].T, 1e-7f);
+        }
+
+        [Test]
+        public void ThicknessProfile_ContentEquals_ContinuesPastMatchingNullEntries()
+        {
+            var first = new ThicknessProfile();
+            first.Keys.Add(null);
+            first.Keys.Add(new ThicknessKey { T = 0.5f, Value = 0.2f });
+
+            var second = new ThicknessProfile();
+            second.Keys.Add(null);
+            second.Keys.Add(new ThicknessKey { T = 0.5f, Value = 0.3f });
+
+            Assert.IsFalse(first.ContentEquals(second));
         }
     }
 }
