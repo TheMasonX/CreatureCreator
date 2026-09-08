@@ -40,7 +40,9 @@ namespace ProceduralCreature.Morphology.Extraction
         /// before indexing so manually-constructed malformed results fail with a
         /// domain error instead of surfacing as arbitrary IndexOutOfRange behavior.
         /// Idempotent — safe to call more than once; recomputes from scratch each time
-        /// rather than accumulating on stale data.
+        /// rather than accumulating on stale data. Arithmetic overflow is rejected at
+        /// the geometry boundary too: finite coordinates alone do not guarantee that
+        /// edge vectors or cross products remain representable as finite floats.
         /// </summary>
         public void ComputeAngleWeightedNormals()
         {
@@ -56,10 +58,24 @@ namespace ProceduralCreature.Morphology.Extraction
                 Vector3 p0 = Positions[i0];
                 Vector3 p1 = Positions[i1];
                 Vector3 p2 = Positions[i2];
+                Vector3 edgeA = p1 - p0;
+                Vector3 edgeB = p2 - p0;
+                if (!NumericValidity.IsFinite(edgeA) || !NumericValidity.IsFinite(edgeB))
+                {
+                    throw new DomainException($"Triangle starting at index {i} has a non-finite edge vector.");
+                }
 
-                Vector3 faceNormal = Vector3.Cross(p1 - p0, p2 - p0);
+                Vector3 faceNormal = Vector3.Cross(edgeA, edgeB);
+                if (!NumericValidity.IsFinite(faceNormal))
+                {
+                    throw new DomainException($"Triangle starting at index {i} produced a non-finite face normal.");
+                }
                 if (faceNormal.sqrMagnitude < 1e-12f) continue;
                 faceNormal.Normalize();
+                if (!NumericValidity.IsFinite(faceNormal))
+                {
+                    throw new DomainException($"Triangle starting at index {i} produced an invalid normalized face normal.");
+                }
 
                 accumulated[i0] += faceNormal * AngleAt(p0, p1, p2);
                 accumulated[i1] += faceNormal * AngleAt(p1, p2, p0);
@@ -69,7 +85,12 @@ namespace ProceduralCreature.Morphology.Extraction
             var normals = new List<Vector3>(Positions.Count);
             foreach (Vector3 n in accumulated)
             {
-                normals.Add(n.sqrMagnitude > 1e-12f ? n.normalized : Vector3.up);
+                Vector3 normal = n.sqrMagnitude > 1e-12f ? n.normalized : Vector3.up;
+                if (!NumericValidity.IsFinite(normal))
+                {
+                    throw new DomainException("Accumulated mesh normal became non-finite.");
+                }
+                normals.Add(normal);
             }
             Normals = normals;
         }
