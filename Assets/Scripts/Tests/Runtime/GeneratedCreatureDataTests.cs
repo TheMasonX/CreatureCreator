@@ -32,6 +32,28 @@ namespace ProceduralCreature.Tests.Runtime
         }
 
         [Test]
+        public void Constructor_DefensivelyCopiesDefinitionOwnership()
+        {
+            CreatureDefinition source = CreatureDefinition.CreateEmpty();
+            source.Forward = Vector3.right;
+            source.Generation = GenerationSettings.Default;
+
+            var data = new GeneratedCreatureData(
+                source,
+                snapshot: null,
+                meshResult: null,
+                colors: new[] { Color.white },
+                topologyReport: null);
+
+            source.Forward = Vector3.up;
+            source.Generation.VoxelPerUnit = 99;
+
+            Assert.AreEqual(Vector3.right, data.Definition.Forward);
+            Assert.AreNotEqual(99, data.Definition.Generation.VoxelPerUnit);
+            Assert.AreNotSame(source, data.Definition);
+        }
+
+        [Test]
         public void Constructor_NullColors_ThrowsDomainException()
         {
             Assert.Throws<ProceduralCreature.Common.DomainException>(() => new GeneratedCreatureData(
