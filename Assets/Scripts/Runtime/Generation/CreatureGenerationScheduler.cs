@@ -31,9 +31,12 @@ namespace ProceduralCreature.Generation
 
         /// <summary>
         /// Queues an already-detached definition without cloning it again. The caller
-        /// transfers ownership of this private request snapshot to the scheduler;
-        /// this is intentionally internal so the double-capture optimization cannot
-        /// weaken the public Enqueue safety contract (TSK-0104).
+        /// transfers ownership of this private request snapshot to the scheduler.
+        /// This entry point is public because the editor preview lives in a separate
+        /// assembly; callers must pass an already-detached definition and therefore
+        /// take responsibility for establishing that ownership boundary. The public
+        /// <see cref="Enqueue"/> method remains the safe cloning boundary for ordinary
+        /// callers (TSK-0104).
         /// </summary>
         public long EnqueueCaptured(CreatureDefinition capturedDefinition, GenerationDiagnostics diagnostics = null)
         {
