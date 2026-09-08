@@ -24,7 +24,14 @@ namespace ProceduralCreature.Animation.Ik
             int last = positions.Length - 1;
 
             float totalLength = 0f;
-            foreach (float length in linkLengths) totalLength += length;
+            foreach (float length in linkLengths)
+            {
+                totalLength += length;
+                if (float.IsInfinity(totalLength))
+                {
+                    throw new DomainException("Total IK chain length exceeds the finite float range.");
+                }
+            }
 
             float rootToTargetDistance = Vector3.Distance(root, target);
             if (rootToTargetDistance >= totalLength)
