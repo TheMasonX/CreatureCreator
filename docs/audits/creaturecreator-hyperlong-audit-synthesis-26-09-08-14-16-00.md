@@ -2,7 +2,7 @@
 
 **Report ID:** `CC-AUDIT-20260908-6E4C2A91`  
 **Branch:** `audit/skeleton-animation-improvements-2026-09-07`  
-**Review fixed point:** `8cddb6ecba9d48a7a6f58d737fe8e6a2dd26d2a0`  
+**Review fixed point:** `97a64a7af52af207efa1c5016a2a9af647dbfb59`  
 **Scope:** newest audit commits plus continued branch-wide source/task review.  
 **Validation truth:** no Unity execution or local PowerShell execution was available in this harness; all source findings are static evidence unless explicitly marked otherwise.
 
@@ -35,6 +35,7 @@ The previously reported `TSK-0136` collision is resolved on this branch: the par
 - Spine/tail influence radii are evaluated from each segment's own `previousT/endT` interval midpoint. The older peer-review claim that `body_spine` sampled the pelvis interval is stale.
 - `CreatureMeshGenerator.Assemble` is now transactional for transient generated meshes. A late mesh-asset failure destroys already-inserted generated meshes as well as an untransferred local mesh. This closes the confirmed partial-failure leak owned by `TSK-0186`.
 - `GeneratedCreatureData` rejects null required inputs and defensively copies colors. This is a useful boundary hardening slice under `TSK-0095`, but it is not the final immutable-handoff architecture.
+- The constructor contract now has a dedicated `GeneratedCreatureDataContractTests` fixture; the mature `GeneratedCreatureTests` fixture was preserved after adversarial self-review caught an accidental coverage deletion during an earlier edit.
 - `MiniJsonReader` has strict duplicate-name, control-character, and JSON-number grammar behavior. `TSK-0136` remains the correct canonical parser owner.
 - `SkeletonSnapshot` and `PosedSkeleton` continue to use an immutable snapshot reference for pose compatibility; no evidence justified weakening `HasSameBoneOrder` into an ID-only check.
 
@@ -46,7 +47,11 @@ The normalizer repaired a stale key to the filename-derived key without first ch
 **Resolution:** added a preflight pass that computes post-normalization IDs/keys for all records and aborts before any write if normalized identities collide.  
 **Owner:** `TSK-0189` — Done.
 
-No CI workflow was added; the change is intentionally a local fail-closed safety improvement.
+No CI workflow was added; the change is intentionally a local fail-closed safety improvement. PowerShell execution was not available in this harness, so `TSK-0189` is source-reviewed but not runtime-validated here.
+
+## Additional bookkeeping hardening
+
+During review of the synthesized task update, a duplicate `dueDateUtc` JSON property was caught in `TSK-0095` before finalization and removed. This is recorded because duplicate JSON member names can create parser-dependent behavior even when a permissive parser accepts them. The task remains `InProgress`; the duplicate-field mistake is corrected in the current branch.
 
 ## Confirmed high-value open work
 
@@ -90,9 +95,7 @@ Background generation still requires architectural treatment of Unity-owned `Gra
 
 ## Self-review notes
 
-The campaign itself produced a test-fixture rewrite error while adding generated-data constructor tests. That edit was immediately identified by adversarial self-review, the original `GeneratedCreatureTests.cs` blob was restored exactly, and the new constructor coverage was isolated into `GeneratedCreatureDataContractTests.cs`. This is deliberately recorded so the branch history does not hide a transient source-integrity mistake.
-
-No Unity compile/test result is claimed from this campaign. No local PowerShell execution is claimed for `TSK-0189`; the container does not expose a PowerShell executable.
+The campaign itself produced a test-fixture rewrite error while adding generated-data constructor tests. That edit was immediately identified by adversarial self-review, the original `GeneratedCreatureTests.cs` coverage was restored exactly, and the new constructor coverage was isolated into `GeneratedCreatureDataContractTests.cs`. The branch therefore retains the original behavioral fixture rather than the accidental compressed rewrite.
 
 ## Task ledger disposition
 
