@@ -1,3 +1,4 @@
+using System;
 using System.Threading;
 using NUnit.Framework;
 using UnityEngine;
@@ -43,6 +44,60 @@ namespace ProceduralCreature.Tests.Runtime
                 Assert.AreNotEqual(first.Sequence, second.Sequence);
                 Assert.IsTrue(first.IsStale || second.IsStale);
                 Assert.IsFalse(first.IsStale && second.IsStale);
+            }
+        }
+
+        [Test]
+        public void GenerationFailure_IsReturnedAsFailedResultInsteadOfEscapingWorker()
+        {
+            CreatureDefinition invalid = CreateDefinition();
+            invalid.Forward = Vector3.zero;
+
+            using (var scheduler = new CreatureGenerationScheduler())
+            {
+                scheduler.Enqueue(invalid);
+                CreatureGenerationResult result = WaitForResult(scheduler);
+
+                Assert.IsFalse(result.Succeeded);
+                Assert.IsNotNull(result.Exception);
+                Assert.IsNull(result.Data);
+            }
+        }
+
+        [Test]
+        public void Enqueue_AfterDispose_ThrowsObjectDisposedException()
+        {
+            var scheduler = new CreatureGenerationScheduler();
+            scheduler.Dispose();
+
+            Assert.Throws<ObjectDisposedException>(() => scheduler.Enqueue(CreateDefinition()));
+        }
+
+        [Test]
+        public void ResultCompletedAfterDispose_IsMarkedStale()
+        {
+            var scheduler = new CreatureGenerationScheduler();
+            scheduler.Enqueue(CreateDefinition());
+            scheduler.Dispose();
+
+            CreatureGenerationResult result = WaitForResult(scheduler);
+
+            Assert.IsNotNull(result);
+            Assert.IsTrue(result.IsStale, "disposing the scheduler advances the latest sequence so already-running work cannot become current");
+            scheduler.Dispose();
+        }
+
+        [Test]
+        public void CapturedEnqueue_DoesNotCloneAlreadyDetachedDefinitionAgain()
+        {
+            CreatureDefinition captured = CreateDefinition();
+            using (var scheduler = new CreatureGenerationScheduler())
+            {
+                long sequence = scheduler.EnqueueCapturedForTestOnly(captured);
+                Assert.AreEqual(1, sequence);
+                CreatureGenerationResult result = WaitForResult(scheduler);
+                Assert.IsTrue(result.Succeeded, result.Exception?.ToString());
+                Assert.IsNotNull(result.Data);
             }
         }
 
