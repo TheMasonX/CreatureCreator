@@ -18,7 +18,7 @@
     {
       "id": "c-0174-implementation",
       "author": "anonymous",
-      "body": "Implemented in LinearBlendSkinning.Deform with a per-vertex HashSet<int> duplicate check. Added LinearBlendSkinningDuplicateInfluenceTests.Deform_DuplicateBoneIndexWithinVertex_Throws. No Unity validation was run in this harness.",
+      "body": "Implemented in LinearBlendSkinning.Deform with a bounded nested comparison across the preceding influence slots. This was deliberately chosen over a per-vertex HashSet after adversarial hot-path review caught the extra heap allocation that HashSet would introduce. Added LinearBlendSkinningDuplicateInfluenceTests.Deform_DuplicateBoneIndexWithinVertex_Throws. No Unity validation was run in this harness.",
       "createdAtUtc": "2026-09-08T03:15:00Z"
     }
   ],
@@ -26,8 +26,8 @@
   "dueDateUtc": null,
   "completedAtUtc": "2026-09-08T03:15:00Z",
   "createdAtUtc": "2026-09-08T03:15:00Z",
-  "updatedAtUtc": "2026-09-08T03:15:00Z",
-  "revision": 1,
+  "updatedAtUtc": "2026-09-08T05:05:00Z",
+  "revision": 2,
   "isArchived": false,
   "hasLoadError": false,
   "sourceFilePath": "tsk-0174-reject-duplicate-bone-influences.json"
