@@ -155,17 +155,21 @@ namespace ProceduralCreature.Animation.Ik
 
         private static Quaternion ResolveLookRotation(Vector3 direction, Quaternion restRotation)
         {
-            Vector3 forward = direction.sqrMagnitude > DirectionEpsilonSqr
-                ? direction.normalized
-                : restRotation * Vector3.forward;
-            if (forward.sqrMagnitude <= DirectionEpsilonSqr) forward = Vector3.forward;
+            // Finite endpoints do not guarantee a finite subtraction: two large but
+            // individually valid coordinates can overflow their delta to Infinity.
+            // NormalizeOr centralizes the finite/degenerate fallback contract so an
+            // overflowed direction cannot poison Quaternion.LookRotation.
+            Vector3 restForward = restRotation * Vector3.forward;
+            Vector3 forward = NumericValidity.NormalizeOr(
+                direction, restForward, DirectionEpsilonSqr);
 
-            Vector3 up = restRotation * Vector3.up;
-            if (Mathf.Abs(Vector3.Dot(forward, up.normalized)) > 0.9999f)
+            Vector3 restUp = restRotation * Vector3.up;
+            Vector3 up = NumericValidity.NormalizeOr(restUp, Vector3.up, DirectionEpsilonSqr);
+            if (Mathf.Abs(Vector3.Dot(forward, up)) > 0.9999f)
             {
-                up = restRotation * Vector3.right;
+                up = NumericValidity.NormalizeOr(
+                    restRotation * Vector3.right, Vector3.right, DirectionEpsilonSqr);
             }
-            if (up.sqrMagnitude <= DirectionEpsilonSqr) up = Vector3.up;
 
             return Quaternion.LookRotation(forward, up);
         }
