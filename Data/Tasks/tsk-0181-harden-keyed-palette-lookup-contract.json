@@ -1,0 +1,34 @@
+{
+  "id": "tsk-0181-harden-keyed-palette-lookup-contract",
+  "key": "TSK-0181",
+  "title": "Harden shared keyed palette lookup contract",
+  "description": "Tighten the common KeyedPaletteLookup utility under TSK-0105. Its implementation explicitly skips null entries, so constrain TEntry to reference types rather than relying on an unconstrained generic null comparison. Treat a null entries collection as an empty collection so partially-deserialized Unity palette assets do not leak NullReferenceException from otherwise benign lookup APIs. GetUsableKeys also filters blank selected keys before distinct/sort, making its public result contract consistent with the usability predicate used by the concrete palettes. Existing concrete Entry types are reference types and valid behavior for populated palettes is unchanged.",
+  "type": "Bug Fix",
+  "status": "Done",
+  "priority": "Low",
+  "assigneeMode": "Custom",
+  "assigneeDirectoryId": null,
+  "assigneeCustomText": "Agent",
+  "reporter": "anonymous",
+  "labels": ["common-utility", "palette", "validation", "code-health", "TSK-0105"],
+  "attachments": [],
+  "externalLinks": [],
+  "linkedPages": [],
+  "comments": [
+    {
+      "id": "c-0181-implementation",
+      "author": "anonymous",
+      "body": "KeyedPaletteLookup methods now use `where TEntry : class`; null collections are benign, and GetUsableKeys excludes blank keys. Added six direct runtime tests covering null collections, null entries, ordinal/distinct key policy, and duplicate detection. No Unity execution was performed in this harness.",
+      "createdAtUtc": "2026-09-08T10:20:00Z"
+    }
+  ],
+  "parentId": "TSK-0105",
+  "dueDateUtc": null,
+  "completedAtUtc": "2026-09-08T10:20:00Z",
+  "createdAtUtc": "2026-09-08T10:20:00Z",
+  "updatedAtUtc": "2026-09-08T10:20:00Z",
+  "revision": 1,
+  "isArchived": false,
+  "hasLoadError": false,
+  "sourceFilePath": "tsk-0181-harden-keyed-palette-lookup-contract.json"
+}
