@@ -61,7 +61,7 @@ namespace ProceduralCreature.Generation
 
                 DestroyGeneratedGeometry();
                 BindImplicitSurfaceToRig(generated, result.Data.Definition, result.Data.Snapshot);
-                CreateRigAttachedGeometry(generated);
+                CreateRigAttachedGeometry(generated, result.Data.Snapshot);
 
                 int implicitTriangles = 0;
                 if (generated.TryGetImplicitSurface(out GeometryItem implicitSurface) && implicitSurface.Mesh != null)
@@ -107,9 +107,9 @@ namespace ProceduralCreature.Generation
         private CreatureMaterialPalette ResolveMaterialPalette()
             => generationConfig != null ? generationConfig.MaterialPalette : null;
 
-        private void CreateRigAttachedGeometry(GeneratedCreature generated)
+        private void CreateRigAttachedGeometry(GeneratedCreature generated, ResolvedCreatureSnapshot snapshot)
         {
-            if (generated == null || _rig == null) return;
+            if (generated == null || _rig == null || snapshot == null) return;
 
             for (int index = 1; index < generated.Geometry.Count; index++)
             {
@@ -120,7 +120,7 @@ namespace ProceduralCreature.Generation
                 if (item.RigBinding == null)
                     throw new DomainException($"Generated geometry item {index} has no RigBinding metadata.");
 
-                if (!TryResolveGeometryBone(item.RigBinding, out Transform bone))
+                if (!TryResolveGeometryBone(item.RigBinding, snapshot, out Transform bone))
                 {
                     throw new DomainException(
                         $"Generated mesh asset '{item.RigBinding.SourcePartId}' could not resolve its rig bone " +
@@ -140,11 +140,15 @@ namespace ProceduralCreature.Generation
             }
         }
 
-        private bool TryResolveGeometryBone(RigBindingMetadata binding, out Transform bone)
+        private bool TryResolveGeometryBone(
+            RigBindingMetadata binding,
+            ResolvedCreatureSnapshot snapshot,
+            out Transform bone)
         {
             bone = null;
-            if (_rig == null || binding == null) return false;
-            string boneId = SemanticBoneResolver.ResolvePartRootBoneId(binding.SourcePartId, binding.IsMirrored);
+            if (_rig == null || binding == null || snapshot == null) return false;
+            string boneId = SemanticBoneResolver.ResolveGeometryAttachmentBoneId(
+                snapshot, binding.SourcePartId, binding.IsMirrored);
             return _rig.TryGetBone(boneId, out bone);
         }
 
