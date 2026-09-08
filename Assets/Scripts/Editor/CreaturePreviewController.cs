@@ -45,9 +45,13 @@ namespace ProceduralCreature.Editor
             if (definition == null) throw new ArgumentNullException(nameof(definition));
             if (_disposed) throw new ObjectDisposedException(nameof(CreaturePreviewController));
 
+            // The preview controller owns the detached request capture because it
+            // must configure generation settings before handing work to the scheduler.
+            // EnqueueCaptured transfers that already-detached snapshot without a
+            // redundant second deep clone (TSK-0104).
             CreatureDefinition captured = definition.Clone();
             captured.Generation.VoxelsPerUnit = voxelsPerUnit;
-            long requestId = _scheduler.Enqueue(captured, new GenerationDiagnostics(logDiagnostics));
+            long requestId = _scheduler.EnqueueCaptured(captured, new GenerationDiagnostics(logDiagnostics));
             _requestState.BeginRequest(requestId);
             return requestId;
         }
