@@ -28,6 +28,12 @@
       "author": "anonymous",
       "body": "Created from live `dinus_uprightus` validation: the earlier compact four-bone Body topology collapsed curved chest/neck/tail geometry into long chords. Current branch retains multiple density-independent segments; this task owns validation/tuning of the final adaptive density policy rather than reverting to one-bone-per-sample.",
       "createdAtUtc": "2026-09-07T20:15:00Z"
+    },
+    {
+      "id": "c-20260908-canonical-span-guard",
+      "author": "anonymous",
+      "body": "Adversarial review found `EvaluateStored` and `EvaluateRadiusCanonical` guarded division using absolute `endT > EpsilonSqr` rather than the actual span `endT - startT`. The implementation now checks the segment span explicitly, preventing a near-zero arc interval from being divided by despite having a large absolute endpoint. This is a hardening change only; normal valid intervals produce identical results.",
+      "createdAtUtc": "2026-09-08T04:15:00Z"
     }
   ],
   "epicId": null,
@@ -35,8 +41,8 @@
   "dueDateUtc": null,
   "completedAtUtc": null,
   "createdAtUtc": "2026-09-07T20:15:00Z",
-  "updatedAtUtc": "2026-09-07T20:15:00Z",
-  "revision": 1,
+  "updatedAtUtc": "2026-09-08T04:15:00Z",
+  "revision": 2,
   "isArchived": false,
   "hasLoadError": false,
   "sourceFilePath": "tsk-0171-adaptive-body-rig-segmentation-for-curved-creatures.json"
