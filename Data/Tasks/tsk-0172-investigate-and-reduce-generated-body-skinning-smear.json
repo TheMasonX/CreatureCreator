@@ -1,0 +1,34 @@
+{
+  "id": "tsk-0172-investigate-and-reduce-generated-body-skinning-smear",
+  "key": "TSK-0172",
+  "title": "Investigate and reduce generated Body skinning smear",
+  "description": "The generated implicit Body mesh shows undesirable stretching/smearing when individual Body/neck bones are rotated in the editor. The current build-time authoring uses closest-point-to-segment weighting, domain eligibility, up to four influences, and a broad RadiusScale=3 falloff. Determine whether the visible deformation is caused by influence radius/overlap, segment placement, pose transform semantics, bindposes, or another skinning contract before changing the weighting algorithm. Do not solve this by disabling useful joint blending or reverting to per-frame mesh regeneration. Required investigation: capture actual BoneWeight data for dinus_uprightus; perform isolated one-bone rotation tests across Body root, spine, neck, limb attachment and terminal bones; compare observed vertex motion against the pure LinearBlendSkinning oracle; identify vertices with excessive distant/competing influences; verify bindposes/rest-pose equivalence; characterize the minimum overlap required for smooth joints; benchmark any candidate weighting change. Prefer deterministic build-time fixes and preserve the indexed zero-allocation animation path. Adversarial review must challenge world-vs-local transform semantics, parented bone rotations, bindpose space, root bone choice, four-influence truncation, tie ordering, domain eligibility, influence radius scaling, mirrored chains, body segment topology, and whether apparent smear is expected linear-blend behavior or an authoring defect.",
+  "type": "Task",
+  "status": "Backlog",
+  "priority": "High",
+  "assigneeMode": "Custom",
+  "assigneeDirectoryId": null,
+  "assigneeCustomText": "Agent",
+  "reporter": "anonymous",
+  "labels": ["animation", "skinning", "bug", "performance"],
+  "attachments": [],
+  "externalLinks": [],
+  "linkedPages": [],
+  "comments": [
+    {
+      "id": "c-0167-observation",
+      "author": "anonymous",
+      "body": "User-provided Unity screenshots show that Euler-angle bone edits deform the generated creature more plausibly than the built-in SceneView Rotate tool, but the implicit Body surface still exhibits visible stretching/smearing. This is a separate correctness concern from the editor gizmo pivot issue tracked by TSK-0136.",
+      "createdAtUtc": "2026-09-08T00:30:00Z"
+    }
+  ],
+  "epicId": null,
+  "parentId": null,
+  "dueDateUtc": null,
+  "completedAtUtc": null,
+  "isArchived": false,
+  "hasLoadError": false,
+  "loadError": null,
+  "revision": 1,
+  "sourceFilePath": "tsk-0172-investigate-and-reduce-generated-body-skinning-smear.json"
+}
