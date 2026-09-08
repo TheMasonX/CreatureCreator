@@ -72,6 +72,22 @@ namespace ProceduralCreature.Skeleton
                 {
                     throw new DomainException("A skeleton snapshot cannot contain a null bone or empty bone id.");
                 }
+                if (!NumericValidity.IsFinite(bone.Position))
+                {
+                    throw new DomainException($"Bone '{bone.Id}' position must be finite.");
+                }
+                if (!NumericValidity.IsFinite(bone.Rotation))
+                {
+                    throw new DomainException($"Bone '{bone.Id}' rotation must be finite.");
+                }
+                if (bone.HasSegment && !NumericValidity.IsFinite(bone.EndPosition))
+                {
+                    throw new DomainException($"Bone '{bone.Id}' segment endpoint must be finite.");
+                }
+                if (bone.HasChildAttachmentPosition && !NumericValidity.IsFinite(bone.ChildAttachmentPosition))
+                {
+                    throw new DomainException($"Bone '{bone.Id}' child attachment position must be finite.");
+                }
                 if (!indices.TryAdd(bone.Id, i))
                 {
                     throw new DomainException($"Skeleton contains duplicate bone id '{bone.Id}'.");
