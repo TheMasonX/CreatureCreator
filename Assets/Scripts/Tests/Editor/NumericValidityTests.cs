@@ -7,17 +7,7 @@ namespace ProceduralCreature.Tests.Editor
     /// <summary>
     /// EditMode tests for the shared numeric helpers in
     /// <see cref="NumericValidity"/>, the single cross-assembly home for finite
-    /// checks and normalize-with-fallback (TSK-0139). These live in the Editor
-    /// test assembly because that assembly is the one discovered by the MCP
-    /// test runner and it references the Runtime assembly where
-    /// <see cref="NumericValidity"/> lives.
-    ///
-    /// The normalize-with-fallback helpers were previously duplicated in
-    /// BodyFrameResolver (Runtime), BodyEditSolver (Editor), and BodySplineAuthoring
-    /// (Editor) with ONE divergent contract: BodySplineAuthoring returned the
-    /// fallback AS-IS while the other two returned <c>fallback.normalized</c>.
-    /// All three now reference this one helper on the majority contract, so the
-    /// divergent case (a non-unit fallback) is locked here as a regression test.
+    /// checks and normalize-with-fallback (TSK-0139).
     /// </summary>
     [TestFixture]
     public class NumericValidityTests
@@ -88,6 +78,22 @@ namespace ProceduralCreature.Tests.Editor
 
             Vector3 underCoarse = NumericValidity.NormalizeOr(value, Vector3.up, 1e-6f);
             Assert.AreEqual(Vector3.up, underCoarse);
+        }
+
+        [Test]
+        public void NormalizeOr_NegativeEpsilon_ThrowsDomainException()
+        {
+            Assert.Throws<DomainException>(() =>
+                NumericValidity.NormalizeOr(Vector3.zero, Vector3.up, -1f));
+        }
+
+        [Test]
+        public void NormalizeOr_NonFiniteEpsilon_ThrowsDomainException()
+        {
+            Assert.Throws<DomainException>(() =>
+                NumericValidity.NormalizeOr(Vector3.zero, Vector3.up, float.NaN));
+            Assert.Throws<DomainException>(() =>
+                NumericValidity.NormalizeOr(Vector3.zero, Vector3.up, float.PositiveInfinity));
         }
     }
 }
