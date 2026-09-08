@@ -110,20 +110,8 @@ namespace ProceduralCreature.Editor
                         jointSize,
                         Handles.SphereHandleCap))
                     {
-                        // The rig overlay represents a bone manipulation target. A
-                        // previous hierarchy selection may still contain several
-                        // objects; assigning only the clicked bone is therefore part
-                        // of the selection contract. This deliberately does not change
-                        // the user's global Center/Pivot preference.
                         Selection.objects = new UnityEngine.Object[] { bone.gameObject };
                         Selection.activeGameObject = bone.gameObject;
-
-                        // The generated bone can own or contain mesh renderers (for
-                        // example a mesh-authored eye/head attachment). Unity's normal
-                        // Transform tool may then compute Center from rendered bounds
-                        // rather than the invisible Transform's actual pivot. The
-                        // dedicated Creature Rig rotation tool is explicitly positioned
-                        // at bone.position, so activate it for overlay bone clicks.
                         ToolManager.SetActiveTool<RigBoneRotateTool>();
                         SceneView.RepaintAll();
                     }
@@ -164,8 +152,8 @@ namespace ProceduralCreature.Editor
 
             Vector3 attachment = ResolveParentAttachmentPoint(
                 parentIndex,
-                boneData.Position,
-                bones[parentIndex],
+                bone.position,
+                parent,
                 snapshot[parentIndex],
                 bones,
                 snapshot);
@@ -179,7 +167,7 @@ namespace ProceduralCreature.Editor
 
         private static Vector3 ResolveParentAttachmentPoint(
             int parentIndex,
-            Vector3 childPosition,
+            Vector3 childCurrentPosition,
             Transform parentTransform,
             BoneSnapshot parentData,
             IReadOnlyList<Transform> bones,
@@ -195,7 +183,7 @@ namespace ProceduralCreature.Editor
             if (segmentLengthSqr <= GeometryEpsilonSqr)
                 return start;
 
-            float t = Mathf.Clamp01(Vector3.Dot(childPosition - start, segment) / segmentLengthSqr);
+            float t = Mathf.Clamp01(Vector3.Dot(childCurrentPosition - start, segment) / segmentLengthSqr);
             return start + segment * t;
         }
 
