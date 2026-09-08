@@ -93,9 +93,20 @@ namespace ProceduralCreature.Morphology.Extraction
         /// </summary>
         public static void DecodeCellIndex(int cellIndex, int cellsX, int cellsY, out int x, out int y, out int z)
         {
+            if (cellsX <= 0) throw new DomainException("cellsX must be positive.");
+            if (cellsY <= 0) throw new DomainException("cellsY must be positive.");
+            if (cellIndex < 0) throw new DomainException("cellIndex must be non-negative.");
+
+            long cellsPerSlice = (long)cellsX * cellsY;
+            long maxCells = cellsPerSlice * int.MaxValue;
+            if (cellIndex >= maxCells)
+            {
+                throw new DomainException("cellIndex exceeds the supplied grid dimensions.");
+            }
+
             x = cellIndex % cellsX;
             y = (cellIndex / cellsX) % cellsY;
-            z = cellIndex / (cellsX * cellsY);
+            z = (int)(cellIndex / cellsPerSlice);
         }
     }
 
