@@ -1,6 +1,6 @@
 {
-  "id": "tsk-0136-fix-rig-bone-selection-pivot-and-body-root-naming",
-  "key": "TSK-0136",
+  "id": "tsk-0187-fix-rig-bone-selection-pivot-and-body-root-naming",
+  "key": "TSK-0187",
   "title": "Fix rig bone selection pivots and rename body pelvis root",
   "description": "Fix SceneView rig-bone manipulation so a selected generated bone has an explicit, correct manipulation pivot, and keep the compact body root semantic name as body_root. Unity 6.5 does not permit assignment to Tools.handlePosition. The branch now includes a dedicated editor rotation tool using Handles.RotationHandle at the selected bone's actual Transform.position. Overlay bone clicks must activate that tool because a bone GameObject may own/contain mesh-rendered descendants whose bounds can make Unity's normal Center-mode handle appear at an unrelated visual center. The normal Unity Rotate tool remains a fallback for ordinary objects.\n\nImplementation requirements: trace BoneSnapshot.Position through SkeletonInferrer/SkeletonSnapshot/CreatureRig; generated body/neck/limb transforms retain authoritative world-space positions; explicit rig-bone selection is single-object; overlay selection activates RigBoneRotateTool; the custom rotation handle is positioned from the selected bone Transform.position, respects Tools.pivotRotation Local/Global orientation, supports Undo, and leaves ordinary Unity objects unaffected; retain body_root naming consistently.\n\nAdversarial review must challenge: Unity 6 EditorTool API availability; editor-tool activation semantics; Selection.objects versus active object; Center/Pivot behavior; child-renderer bounds affecting Unity's built-in handle; world/local rotation; parent-child Transform semantics; multiple open SceneViews/rigs; interaction between RigDebugView handles and RigBoneRotateTool; undo/redo; and whether the custom tool can accidentally edit the wrong selected renderer instead of the generated bone.\n\nAcceptance: selected rig bone has a dedicated rotation handle exactly at its Transform.position; local/global axis orientation matches Tools.pivotRotation; rotating one bone changes only the intended Transform and its hierarchy descendants; Undo restores the prior transform; normal Unity selections remain unaffected; no Tools.handlePosition assignment remains; body_root naming is complete; focused tests/build pass; live Unity SceneView verification confirms no eye/head pivot aliasing.",
   "type": "Task",
@@ -80,17 +80,22 @@
       "author": "anonymous",
       "body": "ROUND 6 ADVERSARIAL REVIEW. Challenged whether the change would alter ordinary Unity selections, global pivot preferences, multiple rigs, or the runtime pose path. The activation is limited to overlay bone clicks; RigBoneRotateTool is itself restricted to exactly one selected generated rig bone. The change is editor-only and does not add per-frame runtime work. Remaining gate is live Unity verification that the R tool appears/activates and the handle coincides with the white joint instead of the eye/head renderer bounds.",
       "createdAtUtc": "2026-09-08T00:53:00Z"
+    },
+    {
+      "id": "c-0187-key-reconcile-20260908",
+      "author": "anonymous",
+      "body": "Task-integrity reconciliation 2026-09-08: this distinct editor task previously collided with the parser grammar task under TSK-0136. The parser task remains canonical TSK-0136; this editor task is now TSK-0187. Full description, acceptance criteria, issue link, and historical comments were preserved.",
+      "createdAtUtc": "2026-09-08T08:27:00-05:00"
     }
   ],
   "epicId": null,
   "parentId": null,
   "dueDateUtc": null,
   "createdAtUtc": "2026-09-07T23:45:00Z",
-  "updatedAtUtc": "2026-09-08T00:53:00Z",
-  "completedAtUtc": null,
+  "updatedAtUtc": "2026-09-08T08:27:00-05:00",
+  "revision": 15,
   "isArchived": false,
   "hasLoadError": false,
   "loadError": null,
-  "revision": 14,
-  "sourceFilePath": "tsk-0136-fix-rig-bone-selection-pivot-and-body-root-naming.json"
+  "sourceFilePath": "tsk-0187-fix-rig-bone-selection-pivot-and-body-root-naming.json"
 }
