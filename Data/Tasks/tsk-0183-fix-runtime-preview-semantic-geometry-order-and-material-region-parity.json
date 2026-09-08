@@ -1,0 +1,36 @@
+{
+  "id": "tsk-0183-fix-runtime-preview-semantic-geometry-order-and-material-region-parity",
+  "key": "TSK-0183",
+  "title": "Fix runtime preview semantic geometry ordering and material-region parity",
+  "description": "Seven-seat Unity/editor review found two concrete preview inconsistencies. CreatureRuntimePreview.CreateRigAttachedGeometry started at geometry index 1 even though GeneratedCreature explicitly says implicit geometry may appear anywhere, so a valid mesh-asset item at index 0 could be skipped. In addition, editor and runtime MeshRenderer material assignment did not honor the generated MaterialRegion-per-submesh contract consistently. Runtime assumed the first region applied to every submesh; editor resolved only region 0 and left remaining submeshes on fallback. Fix both preview frontends to iterate all geometry semantically and assign each MaterialRegion to its declared submesh, retaining fallback behavior for unresolved keys.",
+  "type": "Bug Fix",
+  "status": "Done",
+  "priority": "High",
+  "assigneeMode": "Custom",
+  "assigneeDirectoryId": null,
+  "assigneeCustomText": "Agent",
+  "reporter": "council-seven-seat-audit",
+  "labels": ["council", "preview", "unity", "geometry", "materials", "TSK-0142"],
+  "attachments": [],
+  "externalLinks": [],
+  "linkedPages": [],
+  "comments": [
+    {
+      "id": "c-20260908-preview-parity",
+      "author": "council-seven-seat-audit",
+      "body": "Implemented in CreatureRuntimePreview and CreaturePreviewController. Runtime accessory iteration now starts at zero and skips the implicit item by GeometryType. Both preview paths initialize fallback materials for all submeshes and override the specific SubmeshIndex declared by each MaterialRegion. Unity execution is still required for final live-preview closure under TSK-0142.",
+      "createdAtUtc": "2026-09-08T04:32:00Z"
+    }
+  ],
+  "epicId": null,
+  "parentId": "tsk-0142-wire-the-skinnedmeshrenderer-adapter-into-the-live-runtime-editor-preview-path-for-a-demonstrable-idle-walk",
+  "dueDateUtc": null,
+  "createdAtUtc": "2026-09-08T04:32:00Z",
+  "updatedAtUtc": "2026-09-08T04:32:00Z",
+  "completedAtUtc": "2026-09-08T04:32:00Z",
+  "revision": 1,
+  "isArchived": false,
+  "hasLoadError": false,
+  "loadError": null,
+  "sourceFilePath": "tsk-0183-fix-runtime-preview-semantic-geometry-order-and-material-region-parity.json"
+}
