@@ -119,25 +119,11 @@ namespace ProceduralCreature.Morphology
     /// </summary>
     public readonly struct ResolvedBody
     {
-        /// <summary>Sample positions in creature space.</summary>
         public readonly IReadOnlyList<Vector3> SamplePositions;
-
-        /// <summary>Stable authored IDs for the corresponding samples.</summary>
         public readonly IReadOnlyList<uint> SampleIds;
-
-        /// <summary>Local body thickness at each sample.</summary>
         public readonly IReadOnlyList<float> SampleRadii;
-
-        /// <summary>Length of each segment Samples[i] → Samples[i+1].</summary>
         public readonly IReadOnlyList<float> SegmentLengths;
-
-        /// <summary>Total polyline length (sum of <see cref="SegmentLengths"/>).</summary>
         public readonly float TotalLength;
-
-        /// <summary>
-        /// Normalized cumulative arc length at each sample (0 = root, 1 = tip).
-        /// A degenerate (zero-length) spline resolves every entry to 0.
-        /// </summary>
         public readonly IReadOnlyList<float> NormalizedArcLengthAtSample;
 
         private ResolvedBody(IReadOnlyList<Vector3> samplePositions, IReadOnlyList<uint> sampleIds,
@@ -154,23 +140,9 @@ namespace ProceduralCreature.Morphology
 
         /// <summary>The sample polyline (v1 centerline). Same values as <see cref="SamplePositions"/>.</summary>
         public IReadOnlyList<Vector3> Centerline => SamplePositions;
-
-        /// <summary>The spline root socket: the first sample's creature-space position.</summary>
         public Vector3 RootSocket => SamplePositions[0];
-
-        /// <summary>The spline terminal socket: the last sample's creature-space position.</summary>
         public Vector3 TerminalSocket => SamplePositions[SamplePositions.Count - 1];
 
-        /// <summary>
-        /// Resolves the authoritative <see cref="BodySpline"/> into a stable
-        /// derived snapshot. Reads only <see cref="BodySpline.Samples"/> (the
-        /// geometry); the spline's appearance is a separate concern and is never
-        /// touched here. Throws <see cref="DomainException"/> on a null spline, a
-        /// null or empty sample list, or a null sample entry (the validator
-        /// rejects these before generation; the guards keep direct calls total).
-        /// The returned arrays are copies, so later mutation of the spline is
-        /// invisible here.
-        /// </summary>
         public static ResolvedBody Resolve(BodySpline spline)
         {
             if (spline == null)
@@ -180,13 +152,6 @@ namespace ProceduralCreature.Morphology
             return Resolve(spline.Samples);
         }
 
-        /// <summary>
-        /// Resolves a sample list into a stable derived snapshot. Same contract
-        /// as <see cref="Resolve(BodySpline)"/>; that overload delegates here.
-        /// Exposed so consumers that hold the sample list — the historical input
-        /// type of <see cref="BodyFrameResolver"/> — resolve once without
-        /// materializing a <see cref="BodySpline"/>.
-        /// </summary>
         public static ResolvedBody Resolve(IReadOnlyList<BodySample> samples)
         {
             if (samples == null)
@@ -210,6 +175,14 @@ namespace ProceduralCreature.Morphology
                     throw new DomainException(
                         "Body spline contains a null sample; validation should have rejected it.");
                 }
+                if (!NumericValidity.IsFinite(sample.Position))
+                {
+                    throw new DomainException($"Body sample {i} position must be finite.");
+                }
+                if (!NumericValidity.IsFinite(sample.Radius) || sample.Radius <= 0f)
+                {
+                    throw new DomainException($"Body sample {i} radius must be finite and positive.");
+                }
                 ids[i] = sample.Id;
                 positions[i] = sample.Position;
                 radii[i] = sample.Radius;
@@ -226,15 +199,6 @@ namespace ProceduralCreature.Morphology
                 polyline.NormalizedArcLengthAtPosition);
         }
 
-        /// <summary>
-        /// Non-throwing resolve for validator-only envelope checks (CC-089).
-        /// Returns false instead of throwing when the spline is null, its sample
-        /// list is null or empty, or it contains a null sample — the routine
-        /// incomplete-authoring states <c>DefinitionValidator.ValidateBody</c>
-        /// already reports separately, so they must not use exceptions for
-        /// control flow. When it returns true the value is exactly what
-        /// <see cref="Resolve(BodySpline)"/> would produce.
-        /// </summary>
         public static bool TryResolve(BodySpline spline, out ResolvedBody resolved)
         {
             if (spline == null || !CanResolve(spline.Samples))
@@ -246,12 +210,6 @@ namespace ProceduralCreature.Morphology
             return true;
         }
 
-        /// <summary>
-        /// Non-throwing resolve from a sample list. Same contract as
-        /// <see cref="TryResolve(BodySpline, out ResolvedBody)"/>; delegates to
-        /// <see cref="Resolve(IReadOnlyList{BodySample})"/> when the list can
-        /// resolve.
-        /// </summary>
         public static bool TryResolve(IReadOnlyList<BodySample> samples, out ResolvedBody resolved)
         {
             if (!CanResolve(samples))
@@ -263,18 +221,17 @@ namespace ProceduralCreature.Morphology
             return true;
         }
 
-        /// <summary>
-        /// True when <paramref name="samples"/> can resolve without throwing:
-        /// non-null, non-empty, and free of null entries. Mirrors exactly the
-        /// structural guards <see cref="Resolve(IReadOnlyList{BodySample})"/>
-        /// checks before it throws.
-        /// </summary>
         private static bool CanResolve(IReadOnlyList<BodySample> samples)
         {
             if (samples == null || samples.Count == 0) return false;
             for (int i = 0; i < samples.Count; i++)
             {
-                if (samples[i] == null) return false;
+                BodySample sample = samples[i];
+                if (sample == null || !NumericValidity.IsFinite(sample.Position) ||
+                    !NumericValidity.IsFinite(sample.Radius) || sample.Radius <= 0f)
+                {
+                    return false;
+                }
             }
             return true;
         }
