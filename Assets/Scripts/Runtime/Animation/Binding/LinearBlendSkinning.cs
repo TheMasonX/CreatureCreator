@@ -91,12 +91,16 @@ namespace ProceduralCreature.Animation.Binding
     ///   <c>inv(rest.Rotation) * (vertex - rest.Position)</c>. Because bones carry no
     ///   scale, bind and posed frames are pure rotation + translation, so the inverse
     ///   is the quaternion inverse — exact, no matrix inversion error.
-    /// * WEIGHT CONVENTION: per-vertex influences are non-negative and authored to sum
-    ///   to 1; <see cref="MaxBoneInfluencesPerVertex"/> caps authored influence count
-    ///   and is ENFORCED inside <see cref="Deform"/> (a vertex with more influences
-    ///   throws <c>DomainException</c>). <see cref="Deform"/> normalizes by the total
-    ///   weight so a partially-authored sum still yields a unit blend rather than a
-    ///   second, unnormalized convention. A vertex with no net weight is an error.
+    /// * WEIGHT CONVENTION: per-vertex influences are non-negative, use distinct bone
+    ///   indices, and are authored to sum to 1; <see cref="MaxBoneInfluencesPerVertex"/>
+    ///   caps authored influence count and is ENFORCED inside <see cref="Deform"/>
+    ///   (a vertex with more influences throws <c>DomainException</c>). Duplicate bone
+    ///   indices are rejected because they represent redundant influence slots rather
+    ///   than independent influences and otherwise consume the four-slot budget while
+    ///   silently changing the effective authoring representation. <see cref="Deform"/>
+    ///   normalizes by the total weight so a partially-authored sum still yields a unit
+    ///   blend rather than a second, unnormalized convention. A vertex with no net
+    ///   weight is an error.
     /// * FINITE CONTRACT (F2/F3): rest vertices and every rest and posed
     ///   <c>BonePose</c> frame must be finite. <see cref="Deform"/> rejects a NaN or
     ///   Infinity in a rest vertex or in any bone frame's <c>Position</c>/<c>Rotation</c>
@@ -206,10 +210,16 @@ namespace ProceduralCreature.Animation.Binding
                 }
                 Vector3 blended = Vector3.zero;
                 float totalWeight = 0f;
+                var seenBones = new HashSet<int>();
                 for (int influenceIndex = 0; influenceIndex < influences.Count; influenceIndex++)
                 {
                     VertexInfluence influence = influences[influenceIndex];
                     ValidateInfluence(influence, vertex, rest.Count);
+                    if (!seenBones.Add(influence.BoneIndex))
+                    {
+                        throw new DomainException(
+                            $"bindings[{vertex}] contains duplicate bone index {influence.BoneIndex}.");
+                    }
 
                     // Bind offset from the bone's REST frame (quaternion inverse is exact for
                     // scale-free frames), then carry it into the bone's POSED frame.
