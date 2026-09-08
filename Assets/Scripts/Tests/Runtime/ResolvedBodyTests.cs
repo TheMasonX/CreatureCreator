@@ -99,8 +99,6 @@ namespace ProceduralCreature.Tests.Runtime
             BodySpline spline = StraightSpline();
             ResolvedBody resolved = ResolvedBody.Resolve(spline);
 
-            // Mutate the source after resolution; the snapshot must retain the
-            // original values (Resolve copies its input arrays).
             spline.Samples[0].Position = new Vector3(99f, 0f, 0f);
             spline.Samples[1].Radius = 99f;
 
@@ -159,11 +157,28 @@ namespace ProceduralCreature.Tests.Runtime
         }
 
         [Test]
+        public void Resolve_RejectsNonFinitePolylinePosition()
+        {
+            Assert.Throws<DomainException>(() =>
+                ResolvedPolyline.Resolve(new[] { Vector3.zero, new Vector3(float.NaN, 0f, 0f) }));
+        }
+
+        [Test]
+        public void Resolve_RejectsPolylineTotalLengthOverflow()
+        {
+            Vector3[] positions =
+            {
+                Vector3.zero,
+                new Vector3(float.MaxValue, 0f, 0f),
+                new Vector3(-float.MaxValue, 0f, 0f),
+            };
+
+            Assert.Throws<DomainException>(() => ResolvedPolyline.Resolve(positions));
+        }
+
+        [Test]
         public void TryResolve_NullOrEmptyOrNullSample_ReturnsFalseWithoutThrowing()
         {
-            // CC-089: the validator-only resolved-envelope check must not use
-            // exceptions for routine incomplete authoring data. TryResolve reports
-            // the same structural states Resolve throws on, as a false result.
             Assert.IsFalse(ResolvedBody.TryResolve((BodySpline)null, out ResolvedBody result));
             Assert.IsFalse(ResolvedBody.TryResolve((System.Collections.Generic.IReadOnlyList<BodySample>)null, out _));
 
@@ -188,8 +203,6 @@ namespace ProceduralCreature.Tests.Runtime
         [Test]
         public void TryResolve_ValidInput_MatchesResolveAndReturnsTrue()
         {
-            // CC-089: when TryResolve returns true the value must be exactly what
-            // Resolve produces, for both the spline and sample-list overloads.
             BodySpline spline = StraightSpline();
 
             Assert.IsTrue(ResolvedBody.TryResolve(spline, out ResolvedBody viaSpline));
