@@ -10,8 +10,8 @@ namespace ProceduralCreature.Generation
 {
     /// <summary>
     /// Immutable handoff between pure generation and Unity assembly.
-    /// Mutable arrays supplied by a producer are defensively copied so consumers
-    /// cannot mutate the generated result through this object.
+    /// Mutable definition/array inputs supplied by a producer are defensively copied
+    /// so consumers cannot mutate the generated result through this object.
     /// </summary>
     public sealed class GeneratedCreatureData
     {
@@ -26,7 +26,7 @@ namespace ProceduralCreature.Generation
         {
             if (colors == null) throw new DomainException("colors must not be null.");
 
-            Definition = definition;
+            Definition = definition?.Clone();
             Snapshot = snapshot;
             MeshResult = meshResult;
             _colors = new ReadOnlyCollection<Color>((Color[])colors.Clone());
