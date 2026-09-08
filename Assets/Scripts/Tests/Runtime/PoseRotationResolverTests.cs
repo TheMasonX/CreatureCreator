@@ -88,6 +88,56 @@ namespace ProceduralCreature.Tests.Runtime
         }
 
         [Test]
+        public void Resolve_FiniteCoordinatesWithOverflowedDelta_FallsBackToRestForward()
+        {
+            var skeleton = new Skeleton.Skeleton();
+            skeleton.Bones.Add(new Bone
+            {
+                Id = "root",
+                Position = new Vector3(float.MaxValue, 0f, 0f),
+                Rotation = Quaternion.identity,
+            });
+            skeleton.Bones.Add(new Bone
+            {
+                Id = "child",
+                ParentBoneId = "root",
+                Position = new Vector3(-float.MaxValue, 0f, 0f),
+                Rotation = Quaternion.identity,
+            });
+
+            Dictionary<string, Quaternion> rotations = PoseRotationResolver.Resolve(
+                skeleton, PosedSkeleton.FromRestPose(skeleton));
+            Vector3 forward = rotations["root"] * Vector3.forward;
+
+            Assert.IsTrue(NumericValidity.IsFinite(rotations["root"]));
+            Assert.Greater(Vector3.Dot(forward, Vector3.forward), 0.999f,
+                "overflowed finite-coordinate subtraction must use the stable rest-forward fallback");
+        }
+
+        [Test]
+        public void Resolve_NonUnitRestRotation_RemainsFinite()
+        {
+            var skeleton = new Skeleton.Skeleton();
+            skeleton.Bones.Add(new Bone
+            {
+                Id = "root",
+                Position = Vector3.zero,
+                Rotation = new Quaternion(0f, 0f, 0f, 0f),
+            });
+            skeleton.Bones.Add(new Bone
+            {
+                Id = "child",
+                ParentBoneId = "root",
+                Position = Vector3.up,
+                Rotation = Quaternion.identity,
+            });
+
+            Dictionary<string, Quaternion> rotations = PoseRotationResolver.Resolve(
+                skeleton, PosedSkeleton.FromRestPose(skeleton));
+            Assert.IsTrue(NumericValidity.IsFinite(rotations["root"]));
+        }
+
+        [Test]
         public void Resolve_DoesNotMutateSkeletonOrPose()
         {
             Skeleton.Skeleton skeleton = BuildChain();
