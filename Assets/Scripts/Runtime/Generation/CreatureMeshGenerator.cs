@@ -179,21 +179,33 @@ namespace ProceduralCreature.Generation
             if (data == null) throw new DomainException("generation data must not be null.");
 
             Mesh mesh = data.MeshResult.ToUnityMesh();
-            mesh.SetColors(data.Colors.ToArray());
+            bool implicitMeshOwnershipTransferred = false;
+            try
+            {
+                mesh.SetColors(data.Colors.ToArray());
 
-            var generated = new GeneratedCreature();
-            generated.AddGeometry(new GeometryItem(
-                sourcePartId: GeneratedCreature.ImplicitSurfaceSourceId,
-                geometryType: GeometryType.Implicit,
-                mesh: mesh,
-                sourceMesh: null,
-                restPlacement: Matrix4x4.identity,
-                materialRegions: null,
-                rigBinding: new RigBindingMetadata(
-                    GeneratedCreature.ImplicitSurfaceSourceId, parentPartId: null, isMirrored: false)));
+                var generated = new GeneratedCreature();
+                generated.AddGeometry(new GeometryItem(
+                    sourcePartId: GeneratedCreature.ImplicitSurfaceSourceId,
+                    geometryType: GeometryType.Implicit,
+                    mesh: mesh,
+                    sourceMesh: null,
+                    restPlacement: Matrix4x4.identity,
+                    materialRegions: null,
+                    rigBinding: new RigBindingMetadata(
+                        GeneratedCreature.ImplicitSurfaceSourceId, parentPartId: null, isMirrored: false));
+                implicitMeshOwnershipTransferred = true;
 
-            AppendMeshAssetItems(generated, data, meshResolver);
-            return generated;
+                AppendMeshAssetItems(generated, data, meshResolver);
+                return generated;
+            }
+            finally
+            {
+                if (!implicitMeshOwnershipTransferred)
+                {
+                    DestroyGeneratedMesh(mesh);
+                }
+            }
         }
 
         private static void AppendMeshAssetItems(
@@ -249,61 +261,74 @@ namespace ProceduralCreature.Generation
             SkeletonSnapshot skeleton,
             bool mirror)
         {
-            Vector3[] positions = source.vertices;
-            Vector3[] transformed = new Vector3[positions.Length];
-            for (int i = 0; i < positions.Length; i++)
+            Mesh mesh = null;
+            try
             {
-                transformed[i] = placement.MultiplyPoint3x4(positions[i]);
-            }
-
-            var mesh = new Mesh
-            {
-                name = $"Generated_{part.Id}{(mirror ? GeneratedCreature.MirrorSuffix : string.Empty)}",
-            };
-            mesh.SetVertices(transformed);
-
-            if (source.subMeshCount > 1)
-            {
-                mesh.subMeshCount = source.subMeshCount;
-                for (int s = 0; s < source.subMeshCount; s++)
+                Vector3[] positions = source.vertices;
+                Vector3[] transformed = new Vector3[positions.Length];
+                for (int i = 0; i < positions.Length; i++)
                 {
-                    mesh.SetTriangles(CopyTriangles(source.GetTriangles(s), mirror), s);
+                    transformed[i] = placement.MultiplyPoint3x4(positions[i]);
+                }
+
+                mesh = new Mesh
+                {
+                    name = $"Generated_{part.Id}{(mirror ? GeneratedCreature.MirrorSuffix : string.Empty)}",
+                };
+                mesh.SetVertices(transformed);
+
+                if (source.subMeshCount > 1)
+                {
+                    mesh.subMeshCount = source.subMeshCount;
+                    for (int s = 0; s < source.subMeshCount; s++)
+                    {
+                        mesh.SetTriangles(CopyTriangles(source.GetTriangles(s), mirror), s);
+                    }
+                }
+                else
+                {
+                    mesh.SetTriangles(CopyTriangles(source.triangles, mirror), 0);
+                }
+
+                mesh.RecalculateNormals();
+                mesh.RecalculateBounds();
+                mesh.SetColors(AppearanceBaker.BakePart(part.Appearance, mesh.vertices, mesh.normals));
+
+                List<MaterialRegion> regions = null;
+                if (!string.IsNullOrWhiteSpace(part.Appearance.MaterialKey))
+                {
+                    int subMeshCount = Mathf.Max(1, mesh.subMeshCount);
+                    regions = new List<MaterialRegion>(subMeshCount);
+                    for (int s = 0; s < subMeshCount; s++)
+                    {
+                        regions.Add(new MaterialRegion(
+                            submeshIndex: s,
+                            startIndex: 0,
+                            indexCount: mesh.GetTriangles(s).Length,
+                            materialKey: part.Appearance.MaterialKey));
+                    }
+                }
+
+                GeometryItem item = new GeometryItem(
+                    sourcePartId: mirror ? part.Id + GeneratedCreature.MirrorSuffix : part.Id,
+                    geometryType: GeometryType.MeshAsset,
+                    mesh: mesh,
+                    sourceMesh: source,
+                    restPlacement: placement,
+                    materialRegions: regions,
+                    rigBinding: new RigBindingMetadata(part.Id, part.ParentId, mirror),
+                    vertexInfluences: RigidMeshWeightAuthoring.Author(
+                        skeleton, sourcePart, mirror, mesh.vertices));
+                mesh = null;
+                return item;
+            }
+            finally
+            {
+                if (mesh != null)
+                {
+                    DestroyGeneratedMesh(mesh);
                 }
             }
-            else
-            {
-                mesh.SetTriangles(CopyTriangles(source.triangles, mirror), 0);
-            }
-
-            mesh.RecalculateNormals();
-            mesh.RecalculateBounds();
-            mesh.SetColors(AppearanceBaker.BakePart(part.Appearance, mesh.vertices, mesh.normals));
-
-            List<MaterialRegion> regions = null;
-            if (!string.IsNullOrWhiteSpace(part.Appearance.MaterialKey))
-            {
-                int subMeshCount = Mathf.Max(1, mesh.subMeshCount);
-                regions = new List<MaterialRegion>(subMeshCount);
-                for (int s = 0; s < subMeshCount; s++)
-                {
-                    regions.Add(new MaterialRegion(
-                        submeshIndex: s,
-                        startIndex: 0,
-                        indexCount: mesh.GetTriangles(s).Length,
-                        materialKey: part.Appearance.MaterialKey));
-                }
-            }
-
-            return new GeometryItem(
-                sourcePartId: mirror ? part.Id + GeneratedCreature.MirrorSuffix : part.Id,
-                geometryType: GeometryType.MeshAsset,
-                mesh: mesh,
-                sourceMesh: source,
-                restPlacement: placement,
-                materialRegions: regions,
-                rigBinding: new RigBindingMetadata(part.Id, part.ParentId, mirror),
-                vertexInfluences: RigidMeshWeightAuthoring.Author(
-                    skeleton, sourcePart, mirror, mesh.vertices));
         }
 
         private static int[] CopyTriangles(int[] triangles, bool reverseWinding)
@@ -318,6 +343,13 @@ namespace ProceduralCreature.Generation
                 copy[i + 2] = first;
             }
             return copy;
+        }
+
+        private static void DestroyGeneratedMesh(Mesh mesh)
+        {
+            if (mesh == null) return;
+            if (Application.isPlaying) UnityEngine.Object.Destroy(mesh);
+            else UnityEngine.Object.DestroyImmediate(mesh);
         }
 
         private static void Time(GenerationDiagnostics diagnostics, GenerationStage stage, System.Action action)
