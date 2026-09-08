@@ -14,15 +14,13 @@ namespace ProceduralCreature.Animation.Ik
     {
         private const float DirectionEpsilonSqr = 1e-8f;
 
-        public static Dictionary<string, Quaternion> Resolve(
-            Skeleton.Skeleton restSkeleton, PosedSkeleton pose)
+        public static Dictionary<string, Quaternion> Resolve(Skeleton.Skeleton restSkeleton, PosedSkeleton pose)
         {
             if (restSkeleton == null) throw new DomainException("restSkeleton must not be null.");
             return Resolve(SkeletonSnapshot.Capture(restSkeleton), pose);
         }
 
-        public static Dictionary<string, Quaternion> Resolve(
-            SkeletonSnapshot restSkeleton, PosedSkeleton pose)
+        public static Dictionary<string, Quaternion> Resolve(SkeletonSnapshot restSkeleton, PosedSkeleton pose)
         {
             if (restSkeleton == null) throw new DomainException("restSkeleton must not be null.");
             if (pose == null) throw new DomainException("pose must not be null.");
@@ -31,42 +29,26 @@ namespace ProceduralCreature.Animation.Ik
             var indexedRotations = new Quaternion[restSkeleton.Count];
             ResolveIntoCompatible(restSkeleton, pose, indexedRotations);
             var rotations = new Dictionary<string, Quaternion>(restSkeleton.Count);
-            for (int i = 0; i < restSkeleton.Count; i++)
-            {
-                rotations.Add(restSkeleton[i].Id, indexedRotations[i]);
-            }
+            for (int i = 0; i < restSkeleton.Count; i++) rotations.Add(restSkeleton[i].Id, indexedRotations[i]);
             return rotations;
         }
 
-        public static void ResolveInto(
-            SkeletonSnapshot restSkeleton, PosedSkeleton pose, Quaternion[] rotations)
+        public static void ResolveInto(SkeletonSnapshot restSkeleton, PosedSkeleton pose, Quaternion[] rotations)
         {
             if (restSkeleton == null) throw new DomainException("restSkeleton must not be null.");
             if (pose == null) throw new DomainException("pose must not be null.");
             if (rotations == null || rotations.Length < restSkeleton.Count)
-            {
                 throw new DomainException("rotations must contain one entry per rest-skeleton bone.");
-            }
             ValidateCompatibility(restSkeleton, pose);
             ResolveIntoCompatible(restSkeleton, pose, rotations);
         }
 
-        /// <summary>
-        /// Applies the rotation algorithm after the caller has already established
-        /// structural compatibility between the pose snapshot and the rest snapshot.
-        /// CreatureRig uses this path after caching the compatibility check per pose
-        /// snapshot, keeping the steady-state animation loop free of a repeated
-        /// O(bones) structural comparison.
-        /// </summary>
-        internal static void ResolveIntoCompatible(
-            SkeletonSnapshot restSkeleton, PosedSkeleton pose, Quaternion[] rotations)
+        internal static void ResolveIntoCompatible(SkeletonSnapshot restSkeleton, PosedSkeleton pose, Quaternion[] rotations)
         {
             if (restSkeleton == null) throw new DomainException("restSkeleton must not be null.");
             if (pose == null) throw new DomainException("pose must not be null.");
             if (rotations == null || rotations.Length < restSkeleton.Count)
-            {
                 throw new DomainException("rotations must contain one entry per rest-skeleton bone.");
-            }
 
             for (int i = 0; i < restSkeleton.Count; i++)
             {
@@ -82,33 +64,27 @@ namespace ProceduralCreature.Animation.Ik
                 Vector3 targetPosition;
                 if (bone.HasSegment)
                 {
-                    int continuationChild = FindSegmentContinuationChild(
-                        restSkeleton, bone, children);
+                    int continuationChild = FindSegmentContinuationChild(restSkeleton, bone, children);
                     targetPosition = continuationChild >= 0
                         ? pose.GetPosition(continuationChild)
                         : position + (bone.EndPosition - bone.Position);
                 }
                 else
                 {
-                    int primaryChild = FindPrimaryChild(restSkeleton, children);
-                    targetPosition = pose.GetPosition(primaryChild);
+                    targetPosition = pose.GetPosition(FindPrimaryChild(restSkeleton, children));
                 }
 
-                Vector3 direction = targetPosition - position;
-                rotations[i] = ResolveLookRotation(direction, bone.Rotation);
+                rotations[i] = ResolveLookRotation(targetPosition - position, bone.Rotation);
             }
         }
 
         private static void ValidateCompatibility(SkeletonSnapshot restSkeleton, PosedSkeleton pose)
         {
             if (!restSkeleton.HasSameBoneOrder(pose.Skeleton))
-            {
                 throw new DomainException("pose must use the same bone structure as restSkeleton.");
-            }
         }
 
-        private static int FindSegmentContinuationChild(
-            SkeletonSnapshot skeleton, BoneSnapshot bone, IReadOnlyList<int> children)
+        private static int FindSegmentContinuationChild(SkeletonSnapshot skeleton, BoneSnapshot bone, IReadOnlyList<int> children)
         {
             int samePartChild = -1;
             int endpointChild = -1;
@@ -116,27 +92,19 @@ namespace ProceduralCreature.Animation.Ik
             {
                 int candidate = children[i];
                 BoneSnapshot child = skeleton[candidate];
-                if ((child.Position - bone.EndPosition).sqrMagnitude > DirectionEpsilonSqr)
-                {
-                    continue;
-                }
+                Vector3 endpointDelta = child.Position - bone.EndPosition;
+                if (!NumericValidity.IsFinite(endpointDelta) || endpointDelta.sqrMagnitude > DirectionEpsilonSqr) continue;
 
                 endpointChild = SelectDeterministicChild(skeleton, endpointChild, candidate);
                 if (string.Equals(child.SourcePartId, bone.SourcePartId, System.StringComparison.Ordinal))
-                {
                     samePartChild = SelectDeterministicChild(skeleton, samePartChild, candidate);
-                }
             }
-
             return samePartChild >= 0 ? samePartChild : endpointChild;
         }
 
-        private static int SelectDeterministicChild(
-            SkeletonSnapshot skeleton, int current, int candidate)
+        private static int SelectDeterministicChild(SkeletonSnapshot skeleton, int current, int candidate)
         {
-            return current < 0 || string.CompareOrdinal(skeleton[candidate].Id, skeleton[current].Id) < 0
-                ? candidate
-                : current;
+            return current < 0 || string.CompareOrdinal(skeleton[candidate].Id, skeleton[current].Id) < 0 ? candidate : current;
         }
 
         private static int FindPrimaryChild(SkeletonSnapshot skeleton, IReadOnlyList<int> children)
@@ -145,10 +113,7 @@ namespace ProceduralCreature.Animation.Ik
             for (int i = 1; i < children.Count; i++)
             {
                 int candidate = children[i];
-                if (string.CompareOrdinal(skeleton[candidate].Id, skeleton[primaryChild].Id) < 0)
-                {
-                    primaryChild = candidate;
-                }
+                if (string.CompareOrdinal(skeleton[candidate].Id, skeleton[primaryChild].Id) < 0) primaryChild = candidate;
             }
             return primaryChild;
         }
@@ -157,19 +122,20 @@ namespace ProceduralCreature.Animation.Ik
         {
             // Finite endpoints do not guarantee a finite subtraction: two large but
             // individually valid coordinates can overflow their delta to Infinity.
-            // NormalizeOr centralizes the finite/degenerate fallback contract so an
-            // overflowed direction cannot poison Quaternion.LookRotation.
-            Vector3 restForward = restRotation * Vector3.forward;
-            Vector3 forward = NumericValidity.NormalizeOr(
-                direction, restForward, DirectionEpsilonSqr);
+            // First normalize the rest-frame axes against a canonical fallback; then
+            // the direction fallback is guaranteed valid even when restRotation is a
+            // malformed-but-finite zero quaternion.
+            Vector3 restForward = NumericValidity.NormalizeOr(restRotation * Vector3.forward, Vector3.forward, DirectionEpsilonSqr);
+            Vector3 forward = NumericValidity.NormalizeOr(direction, restForward, DirectionEpsilonSqr);
 
-            Vector3 restUp = restRotation * Vector3.up;
-            Vector3 up = NumericValidity.NormalizeOr(restUp, Vector3.up, DirectionEpsilonSqr);
+            Vector3 up = NumericValidity.NormalizeOr(restRotation * Vector3.up, Vector3.up, DirectionEpsilonSqr);
             if (Mathf.Abs(Vector3.Dot(forward, up)) > 0.9999f)
             {
-                up = NumericValidity.NormalizeOr(
-                    restRotation * Vector3.right, Vector3.right, DirectionEpsilonSqr);
+                up = NumericValidity.NormalizeOr(restRotation * Vector3.right, Vector3.right, DirectionEpsilonSqr);
             }
+
+            if (Mathf.Abs(Vector3.Dot(forward, up)) > 0.9999f)
+                up = NumericValidity.NormalizeOr(Vector3.Cross(forward, Vector3.right), Vector3.up, DirectionEpsilonSqr);
 
             return Quaternion.LookRotation(forward, up);
         }
