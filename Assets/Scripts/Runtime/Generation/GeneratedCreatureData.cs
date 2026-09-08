@@ -24,9 +24,13 @@ namespace ProceduralCreature.Generation
             Color[] colors,
             MeshTopologyReport topologyReport)
         {
-            if (colors == null) throw new DomainException("colors must not be null.");
+            if (definition == null) throw new ArgumentNullException(nameof(definition));
+            if (snapshot == null) throw new ArgumentNullException(nameof(snapshot));
+            if (meshResult == null) throw new ArgumentNullException(nameof(meshResult));
+            if (colors == null) throw new ArgumentNullException(nameof(colors));
+            if (topologyReport == null) throw new ArgumentNullException(nameof(topologyReport));
 
-            Definition = definition?.Clone();
+            Definition = definition.Clone();
             Snapshot = snapshot;
             MeshResult = meshResult;
             _colors = new ReadOnlyCollection<Color>((Color[])colors.Clone());
