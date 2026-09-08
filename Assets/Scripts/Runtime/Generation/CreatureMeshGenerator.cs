@@ -179,12 +179,12 @@ namespace ProceduralCreature.Generation
             if (data == null) throw new DomainException("generation data must not be null.");
 
             Mesh mesh = data.MeshResult.ToUnityMesh();
-            bool implicitMeshOwnershipTransferred = false;
+            GeneratedCreature generated = null;
             try
             {
                 mesh.SetColors(data.Colors.ToArray());
 
-                var generated = new GeneratedCreature();
+                generated = new GeneratedCreature();
                 generated.AddGeometry(new GeometryItem(
                     sourcePartId: GeneratedCreature.ImplicitSurfaceSourceId,
                     geometryType: GeometryType.Implicit,
@@ -194,17 +194,23 @@ namespace ProceduralCreature.Generation
                     materialRegions: null,
                     rigBinding: new RigBindingMetadata(
                         GeneratedCreature.ImplicitSurfaceSourceId, parentPartId: null, isMirrored: false)));
-                implicitMeshOwnershipTransferred = true;
+                mesh = null;
 
                 AppendMeshAssetItems(generated, data, meshResolver);
                 return generated;
             }
-            finally
+            catch
             {
-                if (!implicitMeshOwnershipTransferred)
+                DestroyGeneratedMesh(mesh);
+                if (generated != null)
                 {
-                    DestroyGeneratedMesh(mesh);
+                    for (int i = 0; i < generated.Geometry.Count; i++)
+                    {
+                        GeometryItem item = generated.Geometry[i];
+                        if (item != null) DestroyGeneratedMesh(item.Mesh);
+                    }
                 }
+                throw;
             }
         }
 
