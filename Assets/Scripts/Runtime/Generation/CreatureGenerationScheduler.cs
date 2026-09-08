@@ -35,7 +35,7 @@ namespace ProceduralCreature.Generation
         /// this is intentionally internal so the double-capture optimization cannot
         /// weaken the public Enqueue safety contract (TSK-0104).
         /// </summary>
-        internal long EnqueueCaptured(CreatureDefinition capturedDefinition, GenerationDiagnostics diagnostics = null)
+        public long EnqueueCaptured(CreatureDefinition capturedDefinition, GenerationDiagnostics diagnostics = null)
         {
             if (capturedDefinition == null) throw new ArgumentNullException(nameof(capturedDefinition));
             lock (_gate)
