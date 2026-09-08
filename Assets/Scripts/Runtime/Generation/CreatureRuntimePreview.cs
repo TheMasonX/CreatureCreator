@@ -38,7 +38,7 @@ namespace ProceduralCreature.Generation
         [ContextMenu("Generate Creature")]
         public void Generate()
         {
-            CreatureDefinition definition = LoadDefinition().Clone();
+            CreatureDefinition definition = LoadDefinition();
             if (generationConfig != null)
                 definition.Generation.VoxelsPerUnit = generationConfig.DefaultVoxelsPerUnit;
             _generationScheduler.Enqueue(definition, new GenerationDiagnostics(collectTimings: false));
@@ -192,6 +192,17 @@ namespace ProceduralCreature.Generation
             }
 
             renderer.sharedMaterials = materials;
+        }
+
+        private void AssignFallbackMaterial(MeshRenderer renderer)
+        {
+            Material material = MaterialResolver.ResolveDefault(ResolveMaterialPalette());
+            if (material == null)
+            {
+                if (_previewMaterial == null) _previewMaterial = CreatePreviewMaterial();
+                material = _previewMaterial;
+            }
+            if (material != null) renderer.sharedMaterial = material;
         }
 
         private void BindImplicitSurfaceToRig(
