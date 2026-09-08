@@ -1,0 +1,34 @@
+﻿{
+  "id": "tsk-0160-harden-mesh-extraction-result-against-malformed-topology",
+  "key": "TSK-0160",
+  "title": "Harden MeshExtractionResult against malformed topology",
+  "description": "Make MeshExtractionResult's public operations total over malformed manually-created data. Triangle storage must contain complete triangles, every index must address an existing vertex, and vertex positions must be finite before topology-dependent operations execute. ComputeAngleWeightedNormals and ToUnityMesh should share one validation boundary so malformed input consistently produces DomainException rather than leaking IndexOutOfRangeException, Unity mesh errors, or NaN normals. Keep extraction-path behavior unchanged for valid results.",
+  "type": "Task",
+  "status": "Done",
+  "priority": "Medium",
+  "assigneeMode": "Custom",
+  "assigneeDirectoryId": null,
+  "assigneeCustomText": "Agent",
+  "reporter": "anonymous",
+  "labels": ["runtime", "mesh", "validation", "code-health", "animation"],
+  "attachments": [],
+  "externalLinks": [],
+  "linkedPages": [],
+  "comments": [
+    {
+      "id": "c-0160-implementation",
+      "author": "anonymous",
+      "body": "Implemented a single MeshExtractionResult.ValidateTopology() boundary and call it from both ComputeAngleWeightedNormals() and ToUnityMesh(). It rejects null storage, incomplete triangle lists, out-of-range/negative indices, and non-finite vertices. Added MeshExtractionResultTests covering each malformed case and a valid normal result. No Unity execution was performed in this harness.",
+      "createdAtUtc": "2026-09-08T05:35:00Z"
+    }
+  ],
+  "parentId": null,
+  "dueDateUtc": null,
+  "completedAtUtc": "2026-09-08T05:35:00Z",
+  "createdAtUtc": "2026-09-08T05:35:00Z",
+  "updatedAtUtc": "2026-09-08T05:35:00Z",
+  "revision": 2,
+  "isArchived": false,
+  "hasLoadError": false,
+  "sourceFilePath": "tsk-0160-harden-mesh-extraction-result-against-malformed-topology.json"
+}
