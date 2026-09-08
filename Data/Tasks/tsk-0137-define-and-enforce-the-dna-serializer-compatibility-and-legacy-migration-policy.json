@@ -2,7 +2,7 @@
   "id": "tsk-0137-define-and-enforce-the-dna-serializer-compatibility-and-legacy-migration-policy",
   "key": "TSK-0137",
   "title": "Define and enforce the DNA serializer compatibility and legacy-migration policy",
-  "description": "The serializer boundary needs an explicit compatibility policy for legacy verticalOffset migration and unknown JSON members. The earlier verticalOffset concern remains open for policy selection: FromLegacyOffset still clamps out-of-range legacy values before normal validation, which may silently repair malformed legacy data. This task should decide strict rejection versus explicit repair/reporting, then lock the decision with tests for valid endpoints, out-of-range values, NaN, and Infinity. Unknown JSON members likewise need an explicit open/closed/open-with-diagnostics compatibility decision. The raw-control-character writer defect has been separately completed under TSK-0164 and is no longer part of this task.",
+  "description": "The serializer boundary needs an explicit compatibility policy for legacy verticalOffset migration and unknown JSON members. The earlier verticalOffset concern remains open for policy selection: FromLegacyOffset still clamps finite out-of-range legacy values before normal validation, which may silently repair malformed legacy data. This task should decide strict rejection versus explicit repair/reporting, then lock the decision with tests for valid endpoints and finite out-of-range values. Non-finite legacy offsets are no longer admitted: FromLegacyOffset now rejects NaN and Infinity at the migration boundary. Unknown JSON members likewise need an explicit open/closed/open-with-diagnostics compatibility decision. The raw-control-character writer defect is separately completed under TSK-0164 and is no longer part of this task.",
   "type": "Task",
   "status": "Backlog",
   "priority": "Medium",
@@ -18,15 +18,21 @@
     {
       "id": "c-0137-control-char-split",
       "author": "anonymous",
-      "body": "TSK-0164 now owns the CanonicalJsonWriter control-character implementation. This record retains only the still-unresolved legacy verticalOffset policy and unknown-field policy so task ownership is not duplicated.",
+      "body": "TSK-0164 now owns the CanonicalJsonWriter control-character implementation. This record retains only the still-unresolved legacy verticalOffset finite-range policy and unknown-field policy so task ownership is not duplicated.",
       "createdAtUtc": "2026-09-08T10:40:00Z"
+    },
+    {
+      "id": "c-0137-nonfinite-guard",
+      "author": "anonymous",
+      "body": "Safe partial hardening landed: CurveAdapter.FromLegacyOffset rejects NaN and +/-Infinity rather than producing a non-finite AnimationCurve. Finite values outside [-1,1] remain historically clamped until the compatibility policy is explicitly decided. Added CurveAdapterMigrationTests covering NaN, Infinity, and preservation of the finite clamp behavior.",
+      "createdAtUtc": "2026-09-08T11:05:00Z"
     }
   ],
   "parentId": null,
   "createdAtUtc": "2026-09-06T22:44:12.7367527Z",
-  "updatedAtUtc": "2026-09-08T10:40:00Z",
+  "updatedAtUtc": "2026-09-08T11:05:00Z",
   "completedAtUtc": null,
-  "revision": 2,
+  "revision": 3,
   "isArchived": false,
   "hasLoadError": false,
   "sourceFilePath": "tsk-0137-define-and-enforce-the-dna-serializer-compatibility-and-legacy-migration-policy.json"
