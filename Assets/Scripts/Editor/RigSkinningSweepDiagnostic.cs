@@ -1,5 +1,6 @@
 using System;
 using System.Collections.Generic;
+using System.Globalization;
 using System.IO;
 using System.Text;
 using UnityEditor;
@@ -95,7 +96,7 @@ namespace ProceduralCreature.Editor
                 Vector3[] generatedRest = sourceMesh.vertices;
 
                 Directory.CreateDirectory(OutputDirectory);
-                string stamp = DateTime.UtcNow.ToString("yyyyMMdd-HHmmss");
+                string stamp = DateTime.UtcNow.ToString("yyyyMMdd-HHmmss", CultureInfo.InvariantCulture);
                 string baseName = "skinning-sweep-" + SanitizeName(rig.gameObject.name) + "-" + stamp;
                 string summaryPath = Path.Combine(OutputDirectory, baseName + "-summary.json");
                 string detailsPath = Path.Combine(OutputDirectory, baseName + "-vertices.csv");
@@ -118,7 +119,7 @@ namespace ProceduralCreature.Editor
                         "weight2Bone,weight2,weight3Bone,weight3");
 
                     var summaryRows = new List<string>();
-                    summaryRows.Add("  {\"boneIndex\":" + -1 +
+                    summaryRows.Add("  {\"boneIndex\":-1" +
                         ",\"boneId\":\"__rest_baseline__\",\"sourcePartId\":\"\",\"parentIndex\":-1" +
                         ",\"axis\":\"\",\"angleDegrees\":0" +
                         ",\"maxMovement\":" + FloatJson(MaxDistance(baseline, generatedRest)) +
@@ -176,14 +177,14 @@ namespace ProceduralCreature.Editor
                                         BoneWeight weight = sourceMesh.boneWeights[vertex];
                                         details.WriteLine(
                                             boneIndex + "," + Csv(restBone.Id) + "," + Csv(restBone.SourcePartId) + "," +
-                                            restBone.ParentIndex + "," + AxisNames[axisIndex] + "," + angle.ToString("R") + "," +
+                                            restBone.ParentIndex + "," + AxisNames[axisIndex] + "," + NumberCsv(angle) + "," +
                                             vertex + "," + VecCsv(baselineVertex) + "," + VecCsv(actualVertex) + "," +
-                                            VecCsv(delta) + "," + movement.ToString("R") + "," + VecCsv(expectedVertex) + "," +
-                                            oracleError.ToString("R") + "," +
-                                            weight.boneIndex0 + "," + weight.weight0.ToString("R") + "," +
-                                            weight.boneIndex1 + "," + weight.weight1.ToString("R") + "," +
-                                            weight.boneIndex2 + "," + weight.weight2.ToString("R") + "," +
-                                            weight.boneIndex3 + "," + weight.weight3.ToString("R"));
+                                            VecCsv(delta) + "," + NumberCsv(movement) + "," + VecCsv(expectedVertex) + "," +
+                                            NumberCsv(oracleError) + "," +
+                                            weight.boneIndex0 + "," + NumberCsv(weight.weight0) + "," +
+                                            weight.boneIndex1 + "," + NumberCsv(weight.weight1) + "," +
+                                            weight.boneIndex2 + "," + NumberCsv(weight.weight2) + "," +
+                                            weight.boneIndex3 + "," + NumberCsv(weight.weight3));
                                     }
 
                                     stats.Record(movement, oracleError);
@@ -199,14 +200,14 @@ namespace ProceduralCreature.Editor
                     var summary = new StringBuilder();
                     summary.AppendLine("{");
                     summary.AppendLine("  \"schemaVersion\": 1,");
-                    summary.AppendLine("  \"generatedUtc\": \"" + DateTime.UtcNow.ToString("O") + "\",");
+                    summary.AppendLine("  \"generatedUtc\": \"" + DateTime.UtcNow.ToString("O", CultureInfo.InvariantCulture) + "\",");
                     summary.AppendLine("  \"rigObject\": \"" + Json(rig.gameObject.name) + "\",");
                     summary.AppendLine("  \"mesh\": \"" + Json(sourceMesh.name) + "\",");
                     summary.AppendLine("  \"vertexCount\": " + sourceMesh.vertexCount + ",");
                     summary.AppendLine("  \"boneCount\": " + rest.Length + ",");
-                    summary.AppendLine("  \"testAngleDegrees\": " + TestAngleDegrees.ToString("R") + ",");
-                    summary.AppendLine("  \"movementEpsilon\": " + MovementEpsilon.ToString("R") + ",");
-                    summary.AppendLine("  \"oracleDiscrepancyEpsilon\": " + OracleDiscrepancyEpsilon.ToString("R") + ",");
+                    summary.AppendLine("  \"testAngleDegrees\": " + FloatJson(TestAngleDegrees) + ",");
+                    summary.AppendLine("  \"movementEpsilon\": " + FloatJson(MovementEpsilon) + ",");
+                    summary.AppendLine("  \"oracleDiscrepancyEpsilon\": " + FloatJson(OracleDiscrepancyEpsilon) + ",");
                     summary.AppendLine("  \"detailsCsv\": \"" + Json(detailsPath.Replace('\\', '/')) + "\",");
                     summary.AppendLine("  \"experiments\": [");
                     for (int i = 0; i < summaryRows.Count; i++)
@@ -341,7 +342,7 @@ namespace ProceduralCreature.Editor
 
         private static string VecCsv(Vector3 value)
         {
-            return value.x.ToString("R") + "," + value.y.ToString("R") + "," + value.z.ToString("R");
+            return NumberCsv(value.x) + "," + NumberCsv(value.y) + "," + NumberCsv(value.z);
         }
 
         private static string Csv(string value)
@@ -353,13 +354,36 @@ namespace ProceduralCreature.Editor
         private static string Json(string value)
         {
             if (value == null) return "null";
-            return value.Replace("\\", "\\\\").Replace("\"", "\\\"");
+            var sb = new StringBuilder(value.Length + 8);
+            foreach (char c in value)
+            {
+                switch (c)
+                {
+                    case '"': sb.Append("\\\""); break;
+                    case '\\': sb.Append("\\\\"); break;
+                    case '\b': sb.Append("\\b"); break;
+                    case '\f': sb.Append("\\f"); break;
+                    case '\n': sb.Append("\\n"); break;
+                    case '\r': sb.Append("\\r"); break;
+                    case '\t': sb.Append("\\t"); break;
+                    default:
+                        if (c < 0x20)
+                        {
+                            sb.Append("\\u").Append(((int)c).ToString("X4", CultureInfo.InvariantCulture));
+                        }
+                        else
+                        {
+                            sb.Append(c);
+                        }
+                        break;
+                }
+            }
+            return sb.ToString();
         }
 
-        private static string FloatJson(float value)
-        {
-            return value.ToString("R");
-        }
+        private static string FloatJson(float value) => value.ToString("R", CultureInfo.InvariantCulture);
+
+        private static string NumberCsv(float value) => value.ToString("R", CultureInfo.InvariantCulture);
 
         private static string SanitizeName(string name)
         {
@@ -409,14 +433,14 @@ namespace ProceduralCreature.Editor
                     ",\"boneId\":\"" + Json(BoneId) + "\"" +
                     ",\"sourcePartId\":\"" + Json(SourcePartId) + "\"" +
                     ",\"parentIndex\":" + ParentIndex +
-                    ",\"axis\":\"" + Axis + "\"" +
-                    ",\"angleDegrees\":" + AngleDegrees.ToString("R") +
+                    ",\"axis\":\"" + Json(Axis) + "\"" +
+                    ",\"angleDegrees\":" + FloatJson(AngleDegrees) +
                     ",\"movedVertexCount\":" + MovedVertexCount +
                     ",\"unexpectedVertexCount\":" + UnexpectedVertexCount +
-                    ",\"maxMovement\":" + MaxMovement.ToString("R") +
-                    ",\"meanMovement\":" + meanMovement.ToString("R") +
-                    ",\"oracleMaxError\":" + MaxOracleError.ToString("R") +
-                    ",\"oracleMeanError\":" + meanOracleError.ToString("R") +
+                    ",\"maxMovement\":" + FloatJson(MaxMovement) +
+                    ",\"meanMovement\":" + FloatJson(meanMovement) +
+                    ",\"oracleMaxError\":" + FloatJson(MaxOracleError) +
+                    ",\"oracleMeanError\":" + FloatJson(meanOracleError) +
                     "}";
             }
         }
