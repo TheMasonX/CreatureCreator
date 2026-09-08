@@ -33,10 +33,15 @@ namespace ProceduralCreature.Common
         ///
         /// The <paramref name="sqrMagnitudeEpsilon"/> threshold is supplied by the
         /// caller because each call site's degenerate-zero semantics may differ;
-        /// do not force one epsilon across sites with different meaning.
+        /// do not force one epsilon across sites with different meaning. The
+        /// threshold itself must be finite and non-negative.
         /// </summary>
         public static Vector3 NormalizeOr(Vector3 value, Vector3 fallback, float sqrMagnitudeEpsilon)
         {
+            if (!IsFinite(sqrMagnitudeEpsilon) || sqrMagnitudeEpsilon < 0f)
+            {
+                throw new DomainException("sqrMagnitudeEpsilon must be finite and non-negative.");
+            }
             if (!IsFinite(fallback) || fallback.sqrMagnitude <= sqrMagnitudeEpsilon)
             {
                 throw new DomainException("fallback must be a finite, non-degenerate vector.");
