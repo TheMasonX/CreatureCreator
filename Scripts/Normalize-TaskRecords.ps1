@@ -1,7 +1,7 @@
 #!/usr/bin/env pwsh
 # Normalize-TaskRecords.ps1 - Bulk normalize CreatureCreator task records.
 # Adapted from MemorySmith.Agent's bulk-normalize script. Fixes id/format
-# drift, derives missing keys, and strips priority labels.
+# drift, derives missing keys, repairs filename/key drift, and strips priority labels.
 
 param(
     [string]$TasksRoot = $null
@@ -38,6 +38,8 @@ Get-ChildItem "$taskDir\*.json" | Sort-Object Name | ForEach-Object {
     $id = [string]$task.id
     $key = [string]$task.key
     $expectedId = $_.BaseName
+    $expectedKeyMatch = [regex]::Match($expectedId, '^tsk-(\d{4,})(?:-|$)')
+    $expectedKey = if ($expectedKeyMatch.Success) { "TSK-$($expectedKeyMatch.Groups[1].Value)" } else { $null }
 
     # Fix 1: If id = "TSK-XXXX" but filename = "tsk-XXXX-slug.json", set id = filename
     if ($id -match '^TSK-\d{4,}$' -and $expectedId -match '^tsk-\d{4,}-') {
@@ -46,14 +48,21 @@ Get-ChildItem "$taskDir\*.json" | Sort-Object Name | ForEach-Object {
         $needSave = $true
     }
 
-    # Fix 2: If key is missing, derive from filename
+    # Fix 2: Derive a missing key from the filename.
     if ([string]::IsNullOrWhiteSpace($key)) {
-        $idMatch = [regex]::Match($expectedId, '^tsk-(\d{4,})')
-        if ($idMatch.Success) {
-            $task | Add-Member -NotePropertyName 'key' -NotePropertyValue "TSK-$($idMatch.Groups[1].Value)" -Force
-            Write-Host "$($_.Name): added key 'TSK-$($idMatch.Groups[1].Value)'"
+        if ($expectedKey) {
+            $task.key = $expectedKey
+            Write-Host "$($_.Name): added key '$expectedKey'"
             $needSave = $true
         }
+    }
+    # Fix 2b: A present key must remain consistent with the filename-derived key.
+    # This is intentionally deterministic: task identity is keyed by the canonical
+    # filename, so stale keys are worse than a loud, reproducible normalization.
+    elseif ($expectedKey -and $key -ne $expectedKey) {
+        $task.key = $expectedKey
+        Write-Host "$($_.Name): fixed key '$key' -> '$expectedKey'"
+        $needSave = $true
     }
 
     # Fix 3: Remove priority labels (P0, P1, etc.) from labels array
