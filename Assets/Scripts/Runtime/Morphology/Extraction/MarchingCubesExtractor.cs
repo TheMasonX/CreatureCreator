@@ -50,7 +50,7 @@ namespace ProceduralCreature.Morphology.Extraction
             if (grid == null) throw new DomainException("grid must not be null.");
 
             var result = new MeshExtractionResult();
-            var vertexCache = new Dictionary<(int X, int Y, int Z, int Axis), int>();
+            var vertexCache = new Dictionary<int, int>();
 
             var cornerDensities = new float[8];
             var cornerPositions = new Vector3[8];
@@ -145,7 +145,7 @@ namespace ProceduralCreature.Morphology.Extraction
             DensityGrid grid,
             List<CubeContourResolver.LoopVertex> loop,
             int cx, int cy, int cz,
-            Dictionary<(int, int, int, int), int> vertexCache,
+            Dictionary<int, int> vertexCache,
             MeshExtractionResult result,
             int[] indices,
             bool collectTimings,
@@ -197,7 +197,7 @@ namespace ProceduralCreature.Morphology.Extraction
             CubeContourResolver.LoopVertex vertex,
             DensityGrid grid,
             int cx, int cy, int cz,
-            Dictionary<(int, int, int, int), int> vertexCache,
+            Dictionary<int, int> vertexCache,
             MeshExtractionResult result)
         {
             (int A, int B) edgeCorners = CubeTopology.EdgeCorners[vertex.EdgeIndex];
@@ -213,13 +213,13 @@ namespace ProceduralCreature.Morphology.Extraction
             if (GenerationTolerances.NormalizeSurfaceDensity(grid.GetSample(gridA.x, gridA.y, gridA.z)) == 0f)
             {
                 return ResolveCachedVertex(
-                    (gridA.x, gridA.y, gridA.z, -1), positionA, vertexCache, result);
+                    EncodeEdgeKey(gridA.x, gridA.y, gridA.z, -1), positionA, vertexCache, result);
             }
 
             if (GenerationTolerances.NormalizeSurfaceDensity(grid.GetSample(gridB.x, gridB.y, gridB.z)) == 0f)
             {
                 return ResolveCachedVertex(
-                    (gridB.x, gridB.y, gridB.z, -1), positionB, vertexCache, result);
+                    EncodeEdgeKey(gridB.x, gridB.y, gridB.z, -1), positionB, vertexCache, result);
             }
 
             int axis = gridA.x != gridB.x ? 0 : gridA.y != gridB.y ? 1 : 2;
@@ -230,14 +230,25 @@ namespace ProceduralCreature.Morphology.Extraction
                 _ => gridA.z < gridB.z ? gridA : gridB,
             };
 
-            var key = (lower.x, lower.y, lower.z, axis);
-            return ResolveCachedVertex(key, vertex.Position, vertexCache, result);
+            return ResolveCachedVertex(
+                EncodeEdgeKey(lower.x, lower.y, lower.z, axis), vertex.Position, vertexCache, result);
+        }
+
+        private static int EncodeEdgeKey(int x, int y, int z, int axis)
+        {
+            long cornerIndex = ((long)z * 0x1000_000L) + ((long)y * 0x1000L) + (uint)x;
+            long encoded = cornerIndex * 4L + (uint)(axis + 1);
+            if (encoded > int.MaxValue)
+            {
+                throw new DomainException("Grid edge identity exceeds the compact integer cache range.");
+            }
+            return (int)encoded;
         }
 
         private static int ResolveCachedVertex(
-            (int X, int Y, int Z, int Axis) key,
+            int key,
             Vector3 position,
-            Dictionary<(int X, int Y, int Z, int Axis), int> vertexCache,
+            Dictionary<int, int> vertexCache,
             MeshExtractionResult result)
         {
             if (vertexCache.TryGetValue(key, out int existingIndex)) return existingIndex;
