@@ -20,6 +20,14 @@ namespace ProceduralCreature.Common
                 && IsFinite(value.z) && IsFinite(value.w);
         }
 
+        public static bool IsFinite(Matrix4x4 value)
+        {
+            return IsFinite(value.m00) && IsFinite(value.m01) && IsFinite(value.m02) && IsFinite(value.m03)
+                && IsFinite(value.m10) && IsFinite(value.m11) && IsFinite(value.m12) && IsFinite(value.m13)
+                && IsFinite(value.m20) && IsFinite(value.m21) && IsFinite(value.m22) && IsFinite(value.m23)
+                && IsFinite(value.m30) && IsFinite(value.m31) && IsFinite(value.m32) && IsFinite(value.m33);
+        }
+
         /// <summary>
         /// Returns <paramref name="value"/>.normalized when it is a usable unit
         /// direction (finite and with squared magnitude above
