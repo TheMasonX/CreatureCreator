@@ -7,7 +7,19 @@ namespace ProceduralCreature.Animation.Ik
     /// Forward And Backward Reaching Inverse Kinematics (Aristidou &amp; Lasenby,
     /// 2011). Operates purely on Vector3[] joint positions and float[] link
     /// lengths — no knowledge of Bone, Skeleton, Transform, or GameObject exists
-    /// anywhere in this class.
+    /// anywhere in this class, matching the design doc's explicit requirement
+    /// that the solver stay ignorant of bone ownership so it's testable in
+    /// complete isolation (see IkChainSolver for the adapter that actually
+    /// connects this to a Skeleton).
+    ///
+    /// ALGORITHM: given the chain is UNREACHABLE (root-to-target distance exceeds
+    /// the sum of link lengths), the chain simply stretches straight toward the
+    /// target — no iteration needed, this is the exact solution in that case.
+    /// Otherwise, alternate BACKWARD passes (pull the end effector to the target,
+    /// then walk back toward the root re-fixing each link length) and FORWARD
+    /// passes (re-pin the root at its original position, then walk out toward the
+    /// end effector re-fixing each link length) until the end effector is within
+    /// tolerance of the target or maxIterations is reached.
     /// </summary>
     public static class FabrikSolver
     {
@@ -34,6 +46,10 @@ namespace ProceduralCreature.Animation.Ik
             }
 
             float rootToTargetDistance = Vector3.Distance(root, target);
+            if (!NumericValidity.IsFinite(rootToTargetDistance))
+            {
+                throw new DomainException("Root-to-target distance must be finite.");
+            }
             if (rootToTargetDistance >= totalLength)
             {
                 StretchTowardTarget(positions, linkLengths, root, target);
@@ -78,14 +94,18 @@ namespace ProceduralCreature.Animation.Ik
             for (int i = 1; i < positions.Length; i++)
             {
                 positions[i] = positions[i - 1] + direction * linkLengths[i - 1];
+                if (!NumericValidity.IsFinite(positions[i]))
+                {
+                    throw new DomainException($"IK solution joint {i} became non-finite.");
+                }
             }
         }
 
         /// <summary>
-        /// Direction from <paramref name="from"/> to <paramref name="to"/>, or a
-        /// deterministic fallback when the points coincide. Input validation rejects
-        /// non-finite vectors before the solver starts, preventing NaN/Infinity from
-        /// entering the iterative passes.
+        /// Direction from 'from' to 'to', or Vector3.up if the two points
+        /// coincide (a genuine but rare degenerate case — e.g. a chain whose
+        /// current pose has two joints at the same position). Vector3.up is an
+        /// arbitrary but fixed, deterministic fallback; it never produces NaN.
         /// </summary>
         private static Vector3 SafeDirection(Vector3 from, Vector3 to)
         {
@@ -94,11 +114,8 @@ namespace ProceduralCreature.Animation.Ik
         }
 
         private static void ValidateInputs(
-            Vector3[] positions,
-            float[] linkLengths,
-            Vector3 target,
-            int maxIterations,
-            float tolerance)
+            Vector3[] positions, float[] linkLengths, Vector3 target,
+            int maxIterations, float tolerance)
         {
             if (positions == null) throw new DomainException("initialPositions must not be null.");
             if (linkLengths == null) throw new DomainException("linkLengths must not be null.");
@@ -111,7 +128,6 @@ namespace ProceduralCreature.Animation.Ik
                 throw new DomainException(
                     $"linkLengths.Length ({linkLengths.Length}) must equal positions.Length - 1 ({positions.Length - 1}).");
             }
-
             for (int i = 0; i < positions.Length; i++)
             {
                 if (!NumericValidity.IsFinite(positions[i]))
@@ -123,7 +139,6 @@ namespace ProceduralCreature.Animation.Ik
             {
                 throw new DomainException("target must be finite.");
             }
-
             foreach (float length in linkLengths)
             {
                 if (length <= 0f || float.IsNaN(length) || float.IsInfinity(length))
