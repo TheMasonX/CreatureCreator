@@ -92,13 +92,30 @@ namespace ProceduralCreature.Morphology.Extraction
                 }
             }
 
-            for (int i = 0; i < Triangles.Count; i++)
+            for (int i = 0; i < Triangles.Count; i += 3)
             {
-                int index = Triangles[i];
-                if (index < 0 || index >= Positions.Count)
+                int i0 = Triangles[i];
+                int i1 = Triangles[i + 1];
+                int i2 = Triangles[i + 2];
+                if (i0 < 0 || i0 >= Positions.Count)
                 {
                     throw new DomainException(
-                        $"Triangles[{i}] references vertex {index}, outside Positions (count {Positions.Count}).");
+                        $"Triangles[{i}] references vertex {i0}, outside Positions (count {Positions.Count}).");
+                }
+                if (i1 < 0 || i1 >= Positions.Count)
+                {
+                    throw new DomainException(
+                        $"Triangles[{i + 1}] references vertex {i1}, outside Positions (count {Positions.Count}).");
+                }
+                if (i2 < 0 || i2 >= Positions.Count)
+                {
+                    throw new DomainException(
+                        $"Triangles[{i + 2}] references vertex {i2}, outside Positions (count {Positions.Count}).");
+                }
+                if (i0 == i1 || i1 == i2 || i0 == i2)
+                {
+                    throw new DomainException(
+                        $"Triangle starting at index {i} contains duplicate vertex indices ({i0}, {i1}, {i2}).");
                 }
             }
         }
