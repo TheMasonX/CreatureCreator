@@ -64,8 +64,14 @@ Get-ChildItem -Path $tasksRoot -Filter '*.json' -File -ErrorAction SilentlyConti
 }
 
 $maxKey = 0
+$keysSeen = New-Object 'System.Collections.Generic.HashSet[string]' ([System.StringComparer]::OrdinalIgnoreCase)
 foreach ($task in $existing) {
     if ($task.Key -match '^TSK-(\d{4,})$') {
+        $key = $Matches[0]
+        if (-not $keysSeen.Add($key)) {
+            throw "Duplicate task key '$key' detected in existing records; repair the ledger before importing more tasks."
+        }
+
         $candidate = [int]$Matches[1]
         if ($candidate -gt $maxKey) {
             $maxKey = $candidate
@@ -107,6 +113,10 @@ foreach ($row in $openRows) {
 
     $maxKey++
     $key = ('TSK-{0:0000}' -f $maxKey)
+    if (-not $keysSeen.Add($key)) {
+        throw "Generated task key '$key' already exists; refusing to overwrite an existing task."
+    }
+
     $id = ($key.ToLowerInvariant() + '-' + (Get-Slug $row.Task))
     $now = [DateTime]::UtcNow
 
