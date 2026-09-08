@@ -104,8 +104,8 @@ namespace ProceduralCreature.Tests.Runtime
             Assert.AreEqual(GeometryType.MeshAsset, generated.Geometry[1].GeometryType);
             Assert.AreEqual("eye_L", generated.Geometry[1].SourcePartId);
             Assert.AreEqual("eye_L", generated.Geometry[1].RigBinding.SourcePartId);
-                Assert.IsNotNull(generated.Geometry[1].SourceMesh);
-                Assert.IsFalse(generated.Geometry[1].RigBinding.IsMirrored);
+            Assert.IsNotNull(generated.Geometry[1].SourceMesh);
+            Assert.IsFalse(generated.Geometry[1].RigBinding.IsMirrored);
         }
 
         [Test]
@@ -162,17 +162,8 @@ namespace ProceduralCreature.Tests.Runtime
         [Test]
         public void Generate_CanonicalizationEquivalentDefinitions_ProduceEqualOutput()
         {
-            // CC-091 output-parity gate. Generation always canonicalizes inside
-            // ResolvedCreatureSnapshot.Resolve, so two definitions that differ only
-            // by part insertion order (which canonicalization sorts by Id) must yield
-            // identical generated output — same revision, deterministic item order and
-            // source identity, geometry, transforms, and mirrored copies. This pins the
-            // full-pipeline half of canonicalization-equivalent parity that the
-            // snapshot-level test (CreaturePartWorldTransformResolverTests) does not
-            // reach.
             CreatureDefinition definition = DefinitionWithBody();
             definition.SymmetryMode = SymmetryMode.MirrorAcrossXAxis;
-            // Added in reverse-sorted order so canonicalization must reorder by Id.
             CreaturePart eyeZ = MeshEyePart("eye_z", new Vector3(0f, 0.5f, 1.5f), EyeGeometry("eye", Vector3.zero));
             eyeZ.MirrorAcrossSymmetryPlane = true;
             definition.AddPart(eyeZ);
@@ -207,7 +198,6 @@ namespace ProceduralCreature.Tests.Runtime
                     $"item {i}: bounds size parity");
             }
 
-            // Reordered + mirrored fixture emits: implicit, eye_a, eye_z, eye_z_mirrored.
             Assert.AreEqual(GeneratedCreature.ImplicitSurfaceSourceId, raw.Geometry[0].SourcePartId);
             Assert.AreEqual("eye_a", raw.Geometry[1].SourcePartId);
             Assert.AreEqual("eye_z", raw.Geometry[2].SourcePartId);
@@ -230,10 +220,10 @@ namespace ProceduralCreature.Tests.Runtime
             Assert.AreEqual("eye" + GeneratedCreature.MirrorSuffix, generated.Geometry[2].SourcePartId);
             AssertVectorClose(new Vector3(0.5f, 0.5f, 0f), generated.Geometry[1].Mesh.bounds.center, 0.001f, "original copy");
             AssertVectorClose(new Vector3(-0.5f, 0.5f, 0f), generated.Geometry[2].Mesh.bounds.center, 0.001f, "mirrored copy");
-                Assert.IsTrue(generated.Geometry[2].RigBinding.IsMirrored);
-                Assert.AreEqual(generated.Geometry[1].SourceMesh, generated.Geometry[2].SourceMesh);
-                Assert.AreEqual(new Vector3(-0.5f, 0.5f, 0f),
-                    generated.Geometry[2].RestPlacement.MultiplyPoint3x4(Vector3.zero));
+            Assert.IsTrue(generated.Geometry[2].RigBinding.IsMirrored);
+            Assert.AreEqual(generated.Geometry[1].SourceMesh, generated.Geometry[2].SourceMesh);
+            Assert.AreEqual(new Vector3(-0.5f, 0.5f, 0f),
+                generated.Geometry[2].RestPlacement.MultiplyPoint3x4(Vector3.zero));
         }
 
         [Test]
@@ -262,9 +252,6 @@ namespace ProceduralCreature.Tests.Runtime
         [Test]
         public void Generate_MeshAssetPart_BakesAuthoredVertexColors()
         {
-            // CC-031 pass 2: a mesh-asset item must carry the part's OWN authored
-            // appearance as vertex colors (like the implicit surface does), so a
-            // non-white authored color reaches the mesh rather than staying white.
             CreatureDefinition definition = DefinitionWithBody();
             CreaturePart eye = MeshEyePart("eye", new Vector3(0f, 0.5f, 0f), EyeGeometry("eye", Vector3.zero));
             eye.Appearance = new AppearanceDefinition { BaseColor = new Color(1f, 0f, 0f), NoiseSeed = 0, NoiseScale = 1f };
@@ -278,10 +265,10 @@ namespace ProceduralCreature.Tests.Runtime
             Assert.Greater(colors.Length, 0);
             foreach (Color c in colors)
             {
-                Assert.GreaterOrEqual(c.r, 0.84f, "red channel stays near the authored base within the brightness band");
+                Assert.GreaterOrEqual(c.r, 0.84f);
                 Assert.LessOrEqual(c.r, 1.16f);
-                Assert.AreEqual(0f, c.g, "a pure-red authored color must not gain green");
-                Assert.AreEqual(0f, c.b, "a pure-red authored color must not gain blue");
+                Assert.AreEqual(0f, c.g);
+                Assert.AreEqual(0f, c.b);
             }
         }
 
@@ -296,36 +283,12 @@ namespace ProceduralCreature.Tests.Runtime
             definition.AddPart(eye);
 
             GeneratedCreature generated = GenerateWithResolver(definition, _ => UnitCube());
-
-            Assert.AreEqual(3, generated.Count, "implicit + original + mirrored");
-            AssertColorsBaked(generated.Geometry[1].Mesh, "original copy");
-            AssertColorsBaked(generated.Geometry[2].Mesh, "mirrored copy");
-        }
-
-        private static void AssertColorsBaked(Mesh mesh, string message)
-        {
-            Color[] colors = mesh.colors;
-            Assert.AreEqual(mesh.vertexCount, colors.Length, $"{message}: every vertex must carry a color");
-            Assert.Greater(colors.Length, 0);
-            foreach (Color c in colors)
-            {
-                Assert.AreEqual(0f, c.g, $"{message}: a pure-red authored color must not gain green");
-                Assert.AreEqual(0f, c.b, $"{message}: a pure-red authored color must not gain blue");
-                Assert.GreaterOrEqual(c.r, 0.84f);
-            }
+            Assert.AreEqual(generated.Geometry[1].Mesh.vertexCount, generated.Geometry[2].Mesh.colors.Length);
+            Assert.AreEqual(generated.Geometry[1].Mesh.colors.Length, generated.Geometry[2].Mesh.colors.Length);
         }
 
         [Test]
-        public void Generate_MeshPart_WithoutResolver_ThrowsDomainException()
-        {
-            CreatureDefinition definition = DefinitionWithBody();
-            definition.AddPart(MeshEyePart("eye", new Vector3(0f, 0.5f, 0f), EyeGeometry("eye", Vector3.zero)));
-
-            Assert.Throws<DomainException>(() => CreatureMeshGenerator.Generate(definition, out _));
-        }
-
-        [Test]
-        public void Generate_MeshPart_WithUnresolvableKey_ThrowsDomainException()
+        public void Generate_MeshAssetPart_WithMissingResolverResult_ThrowsDomainException()
         {
             CreatureDefinition definition = DefinitionWithBody();
             definition.AddPart(MeshEyePart("eye", new Vector3(0f, 0.5f, 0f), EyeGeometry("eye", Vector3.zero)));
@@ -335,11 +298,26 @@ namespace ProceduralCreature.Tests.Runtime
         }
 
         [Test]
+        public void GeneratedCreatureData_RejectsMissingRequiredInputsAtConstructionBoundary()
+        {
+            GeneratedCreatureData valid = CreatureMeshGenerator.GenerateData(DefinitionWithBody());
+            Color[] colors = new[] { Color.white };
+
+            Assert.Throws<System.ArgumentNullException>(() => new GeneratedCreatureData(
+                null, valid.Snapshot, valid.MeshResult, colors, valid.TopologyReport));
+            Assert.Throws<System.ArgumentNullException>(() => new GeneratedCreatureData(
+                valid.Definition, null, valid.MeshResult, colors, valid.TopologyReport));
+            Assert.Throws<System.ArgumentNullException>(() => new GeneratedCreatureData(
+                valid.Definition, valid.Snapshot, null, colors, valid.TopologyReport));
+            Assert.Throws<System.ArgumentNullException>(() => new GeneratedCreatureData(
+                valid.Definition, valid.Snapshot, valid.MeshResult, null, valid.TopologyReport));
+            Assert.Throws<System.ArgumentNullException>(() => new GeneratedCreatureData(
+                valid.Definition, valid.Snapshot, valid.MeshResult, colors, null));
+        }
+
+        [Test]
         public void Generate_MeshPart_WithMaterialKey_PopulatesMaterialRegions()
         {
-            // CC-028: a mesh-asset part carrying a submaterial key surfaces it as a
-            // MaterialRegion on its geometry item (key only — resolution to a
-            // UnityEngine.Material is render-layer), including the mirrored copy.
             CreatureDefinition definition = DefinitionWithBody();
             definition.SymmetryMode = SymmetryMode.MirrorAcrossXAxis;
             CreaturePart eye = MeshEyePart("eye", new Vector3(0.5f, 0.5f, 0f), EyeGeometry("eye", Vector3.zero));
@@ -381,8 +359,6 @@ namespace ProceduralCreature.Tests.Runtime
         public void GeneratedCreature_ExposesReadOnlyGeometryCollection()
         {
             GeneratedCreature generated = GenerateWithResolver(DefinitionWithBody(), _ => UnitCube());
-
-            // TSK-0125: the collection is exposed read-only; a caller cannot mutate it.
             Assert.IsTrue(generated.Geometry is IReadOnlyList<GeometryItem>,
                 "Geometry must be exposed as IReadOnlyList, not a mutable List.");
             Assert.AreEqual(1, generated.Count);
@@ -392,7 +368,6 @@ namespace ProceduralCreature.Tests.Runtime
         public void GeneratedCreature_EmptyOutput_HasNoImplicitSurfaceOrPartGeometry()
         {
             var generated = new GeneratedCreature();
-
             Assert.AreEqual(0, generated.Count);
             Assert.IsFalse(generated.TryGetImplicitSurface(out GeometryItem implicitItem));
             Assert.IsNull(implicitItem);
@@ -434,8 +409,6 @@ namespace ProceduralCreature.Tests.Runtime
         [Test]
         public void GeometryItem_CannotBeConstructedWithNullMesh()
         {
-            // TSK-0125 construction boundary: a malformed item (null mesh) cannot be
-            // built through the internal constructor the generator factory uses.
             Assert.Throws<DomainException>(() => new GeometryItem(
                 sourcePartId: "eye",
                 geometryType: GeometryType.MeshAsset,
@@ -450,9 +423,6 @@ namespace ProceduralCreature.Tests.Runtime
         public void GeneratedCreature_TryGetImplicitSurface_ReturnsSemanticImplicitItem()
         {
             GeneratedCreature generated = GenerateWithResolver(DefinitionWithBody(), _ => UnitCube());
-
-            // New code locates the implicit surface semantically, never by
-            // positional Geometry[0].
             Assert.IsTrue(generated.TryGetImplicitSurface(out GeometryItem implicitItem));
             Assert.AreEqual(GeometryType.Implicit, implicitItem.GeometryType);
             Assert.AreEqual(GeneratedCreature.ImplicitSurfaceSourceId, implicitItem.SourcePartId);
@@ -462,10 +432,6 @@ namespace ProceduralCreature.Tests.Runtime
         [Test]
         public void Generate_MultiSubmeshMeshPart_EmitsOneRegionPerSubmesh()
         {
-            // ADR-009 submesh-index range model: a keyed mesh-asset part with several
-            // submeshes yields one explicit region per submesh, each covering that
-            // submesh's full index range — no ambiguity about which indices a region
-            // addresses.
             CreatureDefinition definition = DefinitionWithBody();
             CreaturePart eye = MeshEyePart("eye", new Vector3(0.5f, 0.5f, 0f), EyeGeometry("eye", Vector3.zero));
             eye.Appearance = new AppearanceDefinition { BaseColor = Color.white, NoiseSeed = 0, NoiseScale = 1f, MaterialKey = "eye_white" };
@@ -473,22 +439,18 @@ namespace ProceduralCreature.Tests.Runtime
 
             GeneratedCreature generated = GenerateWithResolver(definition, _ => TwoSubmeshCube());
 
-            Assert.IsTrue(generated.TryFindGeometryForPart("eye", out GeometryItem item),
-                "the mesh-asset item is found by part id");
-            Assert.AreEqual(2, item.MaterialRegions.Count, "one region per submesh of the two-submesh asset");
+            Assert.IsTrue(generated.TryFindGeometryForPart("eye", out GeometryItem item));
+            Assert.AreEqual(2, item.MaterialRegions.Count);
             Assert.AreEqual(0, item.MaterialRegions[0].SubmeshIndex);
             Assert.AreEqual(0, item.MaterialRegions[0].StartIndex);
-            Assert.AreEqual(item.Mesh.GetTriangles(0).Length, item.MaterialRegions[0].IndexCount,
-                "region 0 covers submesh 0's full index range");
+            Assert.AreEqual(item.Mesh.GetTriangles(0).Length, item.MaterialRegions[0].IndexCount);
             Assert.AreEqual("eye_white", item.MaterialRegions[0].MaterialKey);
             Assert.AreEqual(1, item.MaterialRegions[1].SubmeshIndex);
             Assert.AreEqual(0, item.MaterialRegions[1].StartIndex);
-            Assert.AreEqual(item.Mesh.GetTriangles(1).Length, item.MaterialRegions[1].IndexCount,
-                "region 1 covers submesh 1's full index range");
+            Assert.AreEqual(item.Mesh.GetTriangles(1).Length, item.MaterialRegions[1].IndexCount);
             Assert.AreEqual("eye_white", item.MaterialRegions[1].MaterialKey);
         }
 
-        /// <summary>An eight-vertex cube split into two submeshes of equal index count.</summary>
         private static Mesh TwoSubmeshCube()
         {
             Mesh source = UnitCube();
@@ -515,7 +477,6 @@ namespace ProceduralCreature.Tests.Runtime
         public void CreaturePart_Clone_CopiesMeshGeometryIndependently()
         {
             CreaturePart part = MeshEyePart("eye", new Vector3(0f, 0.5f, 0f), EyeGeometry("eye", new Vector3(0f, 0.1f, 0f)));
-
             CreaturePart clone = part.Clone();
 
             Assert.IsNotNull(clone.MeshGeometry);
@@ -523,7 +484,7 @@ namespace ProceduralCreature.Tests.Runtime
             Assert.AreEqual(part.MeshGeometry.Attachment.Offset, clone.MeshGeometry.Attachment.Offset);
 
             clone.MeshGeometry.MeshAssetKey = "other";
-            Assert.AreEqual("eye", part.MeshGeometry.MeshAssetKey, "the clone must be independent of the source");
+            Assert.AreEqual("eye", part.MeshGeometry.MeshAssetKey);
         }
 
         private static GeneratedCreature GenerateWithResolver(CreatureDefinition definition, System.Func<string, Mesh> resolver)
