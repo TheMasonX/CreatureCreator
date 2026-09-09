@@ -1,7 +1,7 @@
 using System.Collections.Generic;
-using System.Linq;
 using UnityEngine;
 using ProceduralCreature.Common;
+using ProceduralCreature.Skeleton;
 
 namespace ProceduralCreature.Animation.Ik
 {
@@ -29,6 +29,14 @@ namespace ProceduralCreature.Animation.Ik
         {
             if (restSkeleton == null) throw new DomainException("restSkeleton must not be null.");
             if (currentPose == null) throw new DomainException("currentPose must not be null.");
+            if (!NumericValidity.IsFinite(targetPosition)) throw new DomainException("targetPosition must be finite.");
+
+            SkeletonSnapshot restSnapshot = SkeletonSnapshot.Capture(restSkeleton);
+            if (!restSnapshot.HasSameBoneOrder(currentPose.Skeleton))
+            {
+                throw new DomainException(
+                    "currentPose must use the same bone structure and rest-pose data as restSkeleton.");
+            }
 
             List<string> chainIds = BoneChain.ExtractChain(restSkeleton, leafBoneId);
             if (chainIds.Count < 2)
@@ -47,7 +55,13 @@ namespace ProceduralCreature.Animation.Ik
             Vector3[] restPositions = BoneChain.ExtractRestPositions(restSkeleton, chainIds);
             float[] linkLengths = BoneChain.ComputeLinkLengths(restPositions);
 
-            Vector3[] seedPositions = chainIds.Select(id => currentPose.GetPosition(id)).ToArray();
+            // Keep this adapter allocation-predictable and avoid LINQ in the
+            // per-solve path; the solver itself still owns its working clone.
+            Vector3[] seedPositions = new Vector3[chainIds.Count];
+            for (int i = 0; i < chainIds.Count; i++)
+            {
+                seedPositions[i] = currentPose.GetPosition(chainIds[i]);
+            }
 
             Vector3[] solved = FabrikSolver.Solve(seedPositions, linkLengths, targetPosition, maxIterations, tolerance);
 
