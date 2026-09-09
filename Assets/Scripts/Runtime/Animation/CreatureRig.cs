@@ -13,11 +13,11 @@ namespace ProceduralCreature.Animation
     /// pose remain pure data; this component owns only its generated Transform
     /// hierarchy and applies poses in world space.
     ///
-    /// Space contract: pose coordinates are creature-space. This adapter applies
-    /// them directly as world positions/rotations on the generated bone Transforms.
-    /// The host GameObject must remain at identity (position zero, rotation identity,
-    /// scale one) for generated hierarchy placement and pose application to be
-    /// predictable. A future root-motion layer can replace this deliberately.
+    /// Space contract: pose coordinates are creature-space and are applied directly
+    /// as world positions/rotations on the generated bone Transforms. The generated
+    /// hierarchy therefore remains independent of the host's local transform; a
+    /// non-identity host is supported and does not offset the requested bone world
+    /// pose. A future explicit root-motion layer can replace this contract.
     /// </summary>
     public sealed class CreatureRig : MonoBehaviour
     {
