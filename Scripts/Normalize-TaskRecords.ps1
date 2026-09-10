@@ -36,7 +36,7 @@ foreach ($file in $files) {
     try {
         $task = Get-Content -LiteralPath $file.FullName -Raw | ConvertFrom-Json
     } catch {
-        Write-Warning "SKIP: $($file.Name) - not valid JSON: $($_.Exception.Message)"
+        Write-Warning "INVALID: $($file.Name) - not valid JSON: $($_.Exception.Message)"
         $skipped++
         continue
     }
@@ -70,6 +70,13 @@ foreach ($file in $files) {
         ExpectedId = $expectedId
         ExpectedKey = $expectedKey
     })
+}
+
+# A skipped record means preflight did not inspect the complete task set. Do not
+# normalize any subset because doing so would violate the all-records safety contract.
+if ($skipped -gt 0) {
+    Write-Host "FAIL: Normalization preflight skipped $skipped invalid task record(s). No files were modified." -ForegroundColor Red
+    throw 'Task record normalization aborted because every task record must be parseable before normalization.'
 }
 
 $identityErrors = New-Object 'System.Collections.Generic.List[string]'
