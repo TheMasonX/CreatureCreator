@@ -4,8 +4,9 @@ using UnityEngine;
 using ProceduralCreature.Animation;
 using ProceduralCreature.Animation.Skinned;
 using ProceduralCreature.Common;
-using SkeletonModel = ProceduralCreature.Skeleton.Skeleton;
+using ProceduralCreature.Definition;
 using ProceduralCreature.Skeleton;
+using SkeletonModel = ProceduralCreature.Skeleton.Skeleton;
 
 namespace ProceduralCreature.Tests.Runtime
 {
@@ -36,7 +37,14 @@ namespace ProceduralCreature.Tests.Runtime
             rig.Build(rigSkeleton);
             CreatureSkinnedMeshRenderer adapter = host.AddComponent<CreatureSkinnedMeshRenderer>();
             var mesh = new Mesh();
-            _objects.Add(mesh.gameObjectPlaceholder());
+            try
+            {
+                Assert.Throws<DomainException>(() => adapter.Bind(rig, differentSkeleton, mesh));
+            }
+            finally
+            {
+                Object.DestroyImmediate(mesh);
+            }
         }
 
         private static SkeletonModel CreateSingleBoneSkeleton(Vector3 position)
