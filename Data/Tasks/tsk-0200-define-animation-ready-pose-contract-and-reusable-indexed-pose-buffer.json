@@ -1,0 +1,43 @@
+{
+  "id": "tsk-0200-define-animation-ready-pose-contract-and-reusable-indexed-pose-buffer",
+  "key": "TSK-0200",
+  "title": "Define animation-ready pose contract and reusable indexed pose buffer",
+  "description": "## Summary\nThe current rig can apply an indexed `PosedSkeleton`, but that payload stores only absolute positions and reconstructs rotations from child directions. That is sufficient for the current procedural/IK proof and insufficient for general animation because terminal twist, explicit local rotation, and rotation without endpoint movement are not representable. Define one animation-ready indexed pose contract and a reusable buffer without introducing an Animator/state-machine framework.\n\n## Scope\n- Define an indexed pose payload with explicit position and rotation semantics. Prefer local/parent-relative bone transforms if the actor-root contract is adopted; otherwise explicitly document the current absolute creature-space bridge and the conversion boundary.\n- Define whether local position is animated, rest position is fixed, and whether scale is unsupported or explicitly represented.\n- Define rotation normalization, finite-value requirements, terminal-bone behavior, root/pelvis semantics, mirror behavior, and compatibility with `SkeletonSnapshot` ordering/signature.\n- Provide a caller-owned reusable `PoseBuffer` or equivalent indexed storage so steady-state animation does not clone arrays or allocate dictionaries.\n- Keep `PosedSkeleton` as a useful immutable/debug/procedural snapshot only if its compatibility role remains justified; do not make it the required per-frame construction path.\n- Preserve `PoseRotationResolver` as a procedural/IK conversion utility, not as the definition of animation pose.\n- Define the adapter from explicit animation pose data into the existing `CreatureRig` and `LinearBlendSkinning` conventions.\n\n## Acceptance Criteria\n- A terminal bone can rotate/twist while its endpoint position remains unchanged.\n- An interior bone can receive an explicit rotation without deriving it from a child direction.\n- The same indexed pose order is consumed by `CreatureRig`, SMR binding, and the pure LBS oracle.\n- Reusing a pose buffer across repeated samples produces zero managed allocations after warmup; no per-frame dictionary or whole-pose clone is required.\n- Pose buffers reject non-finite position/rotation input at the boundary.\n- Local/absolute transform semantics, root-motion ownership, scale policy, mirror rule, and compatibility identity are documented and tested.\n- Existing IK position-based tests remain valid by converting IK output into the explicit pose representation.\n\n## Validation\n- Runtime unit tests for terminal twist, interior explicit rotation, finite validation, buffer reuse, and skeleton compatibility.\n- PlayMode test on a real generated creature proving an explicit terminal rotation deforms the SMR without requiring endpoint movement.\n- Repeated end-to-end pose production plus `CreatureRig.ApplyPose` allocation measurement after warmup.\n- No Animator, Avatar, gait, locomotion, or clip-controller implementation in this task.\n\n## Findings\nThis task is a new representation-level boundary, not a reopening of the fixed continuation-child rotation defect. The prior fix makes procedural position poses better, but animation still cannot express arbitrary rotations. `PosedSkeleton` currently stores only positions, while `PoseRotationResolver` derives rotations and keeps terminal bones at rest rotation. The current external-driver ADR correctly selects direct indexed pose application; this task strengthens the payload that crosses that boundary.\n\n## Blockers\nThe actor-local versus absolute pose decision must be made before a final API is frozen. Coordinate with TSK-0073 and TSK-0203; do not add a second competing transform convention.\n\n## Next Step\nWrite the pose-space decision record, define the indexed buffer shape, then add focused math/runtime tests before connecting any real animation source.",
+  "type": "Architecture",
+  "status": "Backlog",
+  "priority": "High",
+  "assigneeMode": "Custom",
+  "assigneeCustomText": "Agent",
+  "reporter": "audit-synthesis",
+  "labels": [
+    "animation",
+    "pose",
+    "runtime",
+    "skeleton",
+    "performance",
+    "architecture",
+    "audit-synthesis",
+    "net-new",
+    "user-mandated"
+  ],
+  "attachments": [],
+  "externalLinks": [],
+  "linkedPages": [],
+  "comments": [
+    {
+      "id": "c-audit-20260909-pose-contract",
+      "author": "anonymous",
+      "body": "Created from the 2026-09-09 cross-audit synthesis. The current indexed CreatureRig hot path is healthy, but `PosedSkeleton` remains position-only and `WithUpdatedPositions` clones its full array. This task captures the missing animation representation without introducing an internal Animator framework. Provenance: animation/deformation follow-up audit, TSK-0073, ADR-010, current PosedSkeleton/PoseRotationResolver source.",
+      "createdAtUtc": "2026-09-10T03:50:00Z"
+    }
+  ],
+  "epicId": null,
+  "parentId": "tsk-0073-runtime-bone-rig-and-pose-application-drive-bone-transforms-from-a-posedskeleton",
+  "dueDateUtc": null,
+  "createdAtUtc": "2026-09-10T03:50:00Z",
+  "updatedAtUtc": "2026-09-10T03:50:00Z",
+  "revision": 1,
+  "isArchived": false,
+  "hasLoadError": false,
+  "sourceFilePath": "tsk-0200-define-animation-ready-pose-contract-and-reusable-indexed-pose-buffer.json"
+}
