@@ -73,15 +73,21 @@
       "author": "anonymous",
       "body": "Audit synthesis (2026-09-05, deep-dive code reviews): dispositions recorded here, no new task. (1) GenerationTolerances keeps separate named constants; classify by semantic dimension and do NOT collapse equal-valued \u00601e-3\u0060 entries. (2) Local anonymous \u00601e-12f\u0060 thresholds (QuantizeUtil.CanonicalizeQuaternion, MeshExtractionResult normals, MarchingCubes degenerate checks) should be given narrow local names or centralized only if mechanically identical. (3) \u0060_mirror\u0060/\u0060_j\u0060 identity-suffix conventions: finish the ID-policy inventory; decide whether \u0060_mirror\u0060 is shared policy or separate domain encoding. Provenance: docs/audits/creaturecreator-deep-dive-code-review-2026-09-05.md P2 items. Do not duplicate.",
       "createdAtUtc": "2026-09-06T04:26:05.6285974Z"
+    },
+    {
+      "id": "c-4a186b73886a44458288cbb8913dffc8",
+      "author": "anonymous",
+      "body": "## Audit synthesis disposition (2026-09-10)\nRound 16 and the skeleton deep dive confirm segment projection and head-to-tail mechanics are consolidation candidates, not current correctness defects. Extend this owner only after semantic call-site comparison and parity tests; keep domain-specific policy in \u0060ImplicitSurfaceWeightAuthoring\u0060, \u0060MorphologyInfluenceRadiusBridge\u0060, and \u0060AnatomicalBodyRigLayout\u0060.",
+      "createdAtUtc": "2026-09-10T16:26:46.5328771Z"
     }
   ],
   "epicId": null,
   "parentId": null,
   "dueDateUtc": null,
   "createdAtUtc": "2026-09-03T22:37:27.6890853Z",
-  "updatedAtUtc": "2026-09-06T04:26:05.6285974Z",
+  "updatedAtUtc": "2026-09-10T16:26:46.5328771Z",
   "completedAtUtc": null,
-  "revision": 10,
+  "revision": 11,
   "isArchived": false,
   "hasLoadError": false,
   "loadError": null,

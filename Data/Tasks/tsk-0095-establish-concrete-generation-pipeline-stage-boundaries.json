@@ -10,36 +10,137 @@
   "assigneeDirectoryId": null,
   "assigneeCustomText": "Unassigned",
   "reporter": "cc-markdown-import",
-  "labels": ["source-cc", "cc-091", "runtime", "generation", "mesh", "appearance", "architecture"],
+  "labels": [
+    "source-cc",
+    "cc-091",
+    "runtime",
+    "generation",
+    "mesh",
+    "appearance",
+    "architecture"
+  ],
   "attachments": [],
   "externalLinks": [],
   "linkedPages": [],
   "comments": [
-    {"id":"c-f11593d61659438a9b8965d944a679d6","author":"anonymous","body":"Review disposition (2026-09-01): this is the single owner for resolved-snapshot and generation-stage consolidation. The current async runner does not remove the deeper duplication: AppearanceBaker still recompiles individual part and Body SDF programs, and mesh-asset assembly still resolves placement from raw DNA. Integrate one resolved snapshot and explicit derived correspondence through field sampling, appearance, and assembly. Do not create a second CC-087/CC-088 snapshot task. Next gate: preserve synchronous Generate as reference, add snapshot/program reuse and parity tests, then validate topology, appearance, determinism, and mesh-asset placement.","createdAtUtc":"2026-09-02T01:47:00.3527017Z"},
-    {"id":"c-1ab937a585354dd691e434e7b7eb9ccc","author":"anonymous","body":"Incoming handoff from completed TSK-0093 / CC-089 (2026-09-01). Hierarchy consolidation is complete and Unity-validated: ProceduralCreature.Tests.Runtime PlayMode passed 428/428. Advance the one-snapshot generation boundary: CreatureDefinition -> validation/canonicalization -> one resolved snapshot -> field sampling, extraction, appearance, mesh-asset placement, and main-thread assembly. Preserve deterministic ordering, symmetry, attachments, topology, and synchronous fallback; add parity tests before removing duplicate derivation paths. Handoff: docs/tasks/handoffs/2026-09-01-deduplication-god-class-consolidation-handoff.md.","createdAtUtc":"2026-09-02T02:48:20.8671865Z"},
-    {"id":"c-35a5d402b0bb4eee8ae16ac0f5efca14","author":"anonymous","body":"Implementation phase completed (2026-09-02): GenerateData now validates once and creates one ResolvedCreatureSnapshot. Explicit snapshot overloads feed field compilation, individual part/body appearance compilation, and mesh-asset assembly; GeneratedCreatureData retains the snapshot for placement. AppearanceBaker receives precompiled programs, and injected managed resolvers borrow them while legacy standalone resolver paths retain ownership. Compatibility overloads remain for standalone callers. Validation: dotnet build .\\ProceduralCreature.Tests.Runtime.csproj --no-restore passed with 0 warnings/0 errors; Unity 6000.0.35f1 focused AppearanceBakerTests PlayMode passed 7/7; full ProceduralCreature.Tests.Runtime PlayMode passed 428/428. Remaining CC-091 gate: stable revision identity and complete attachment correspondence in the resolved generation context, followed by topology/appearance/determinism/mesh-placement/scheduler parity reruns. Handoff updated at docs/tasks/handoffs/2026-09-01-deduplication-god-class-consolidation-handoff.md.","createdAtUtc":"2026-09-02T02:55:30.0850384Z"},
-    {"id":"c-96e34cb5bd104dda930710dd5bfa133d","author":"anonymous","body":"CC-091 residual phase completed on 2026-09-02. Added ResolvedCreatureSnapshot.RevisionId as a deterministic SHA-256 of canonical DNA. ResolvedPartSnapshot now owns mesh correspondence (HasMeshGeometry, MeshAssetKey, normalized GeometryOffset/GeometryOrientation/GeometryScale, and GeometryPlacementToCreatureSpace), and CreatureMeshGenerator.Assemble uses the captured key and placement instead of raw MeshGeometry attachment fields. Added regression tests for canonical revision stability/change and attachment placement. Evidence: dotnet build .\\ProceduralCreature.Tests.Runtime.csproj --no-restore passed with 0 warnings/0 errors; Unity 6000.0.35f1 focused CreaturePartWorldTransformResolverTests PlayMode passed 28/28; full runtime PlayMode retry failed initialization before tests started after timeout. Known persistent-allocation warning only. Handoff updated to CC-090 then CC-094; no new task created.","createdAtUtc":"2026-09-02T03:10:46.8798867Z"},
-    {"id":"c-69c600b9e81b4bad97c84109e0b5d47d","author":"anonymous","body":"Council review follow-up, 2026-09-02: retain CC-091 implementation but keep the authority/evidence gate active. Extend the resolved generation record to own all output-affecting part decisions used by field compilation, appearance, and assembly; ensure RevisionId corresponds to the exact canonical input used for generation; add canonicalization-equivalent revision/output parity coverage. Unity full ProceduralCreature.Tests.Runtime PlayMode rerun attempted with 120s initialization timeout but 0 tests started, so no assertion result is available.","createdAtUtc":"2026-09-02T04:25:17.7280166Z"},
-    {"id":"c-c8729d592d0c42078ceb2f0796fb9423","author":"anonymous","body":"Council review 2026-09-02: retain InProgress. ResolvedCreatureSnapshot.RevisionId is directionally correct, but raw output-affecting bounds, generation settings, part ordering/source, symmetry/mirror, appearance, and assembly inputs remain reachable in downstream paths. Add snapshot-owned input parity and canonicalization-equivalent revision/output tests, then rerun the full runtime PlayMode suite. Evidence report: docs/audits/2026-09-02-consolidation-handoff-council-review-2.md.","createdAtUtc":"2026-09-02T04:43:05.4669714Z"},
-    {"id":"c-a761e9bdcc5c41b6886169393dc2e5df","author":"anonymous","body":"Authority slice continued 2026-09-02. ResolvedCreatureSnapshot now captures Bounds, GenerationSettings, SymmetryMode, per-part Appearance, and MirrorAcrossSymmetryPlane. CreatureMeshGenerator sampling and mesh-asset assembly consume snapshot-owned values; AppearanceBaker exposes a snapshot-compatible AppearanceDefinition overload. Regression coverage proves captured values remain stable after live DNA mutation. Runtime dotnet build passed with 0 warnings/errors; Unity 6000.0.35f1 focused CreaturePartWorldTransformResolverTests PlayMode passed 29/29. Remaining gate: broader generation parity/full runtime suite and any remaining raw source inputs.","createdAtUtc":"2026-09-02T04:58:18.0350587Z"},
-    {"id":"c-23537d3d21ff411c81c855397a4e9f35","author":"anonymous","body":"Full authority-wave validation completed 2026-09-02 in Unity 6000.0.35f1: ProceduralCreature.Tests.Runtime PlayMode passed 433/433 with 0 failures and 0 skips after snapshot-owned bounds, generation, symmetry, appearance, and mirror changes. Runtime dotnet build remained clean with 0 warnings/errors. TSK-0095 remains InProgress for remaining raw-input audit and canonicalization-equivalent output parity evidence.","createdAtUtc":"2026-09-02T05:01:51.4289422Z"},
-    {"id":"c-68df55bd826248699079ff4205190cd1","author":"anonymous","body":"Council review 2026-09-02: explicit SDF snapshot overloads were found to bypass snapshot authority for part ordering, mesh exclusion, limb/shape selection, mirror, and symmetry. This wave corrected those reads to use ResolvedPartSnapshot and snapshot SymmetryMode. Keep InProgress: Body appearance capture, remaining raw-input audit, canonicalization-equivalent output parity, and final-source full-suite evidence remain required. No new task created.","createdAtUtc":"2026-09-02T05:07:40.1859914Z"},
-    {"id":"c-6172e80d1b164e6ba39a7fbe8fd1e515","author":"anonymous","body":"Audit synthesis 2026-09-02: Delta Audit #14 corroborates the open body-appearance authority concern. AppearanceBaker now threads the already-resolved ResolvedBody into managed and Burst body-gradient paths; BodyVerticalGradientSampler has ResolvedBody overloads and no longer allocates/recomputes segment lengths per body vertex. Definition overloads remain compatibility wrappers that resolve once. Focused runtime build passed 0 warnings/errors; body resolved-vs-definition parity test passes in compilation. Remaining gate: Unity appearance/full runtime validation.","createdAtUtc":"2026-09-02T05:51:44.9267514Z"},
-    {"id":"c-6807495cbd424bd6bf0d3e7f15435989","author":"anonymous","body":"Validation completed 2026-09-02: focused ProceduralCreature.Tests.Runtime PlayMode run passed 56/56, 0 failed, 0 skipped. BodyVerticalGradientAppearanceTests includes resolved-body parity coverage; runtime dotnet build passed 0 warnings/errors.","createdAtUtc":"2026-09-02T05:53:22.8603201Z"},
-    {"id":"c-f5b4a6e0dcf64c938612bba189bc3383","author":"anonymous","body":"User Mandate (STRICT): “Review your work and the tasks with 3 agents, make the necessary changes and task tracking, then commit and push”. Council found one-sample/empty Body appearance edge cases and incomplete snapshot authority. Fixed one-sample sampling, empty-body gray fallback, and threaded snapshot-owned Body appearance, Forward, and part appearances through generation baking. Current-source Unity PlayMode full runtime suite passed 437/437 with 0 failures and 0 skips. Keep InProgress pending mutation-after-snapshot tests and final commit/push evidence.","createdAtUtc":"2026-09-02T06:05:35.0405861Z"},
-    {"id":"c-30f2939c919944ad9df5fb9588c3621c","author":"anonymous","body":"Audit synthesis 2026-09-03, sources S01/S03/S05/S06: retain InProgress as the single resolved-generation owner. Confirmed follow-ups are one batch hierarchy/resolution context, detached snapshot contract and mutation-after-snapshot tests, universal ResolvedLimb downstream signatures, GenerationGridSpec, semantic revision hashing seam, validator non-throwing resolution, and final GenerateData/Unity assembly separation. Existing snapshot authority and body-appearance fixes are corroborated, not reopened. Full canonicalization-equivalent output parity and raw-input audit remain required.","createdAtUtc":"2026-09-03T22:37:37.8532174Z"},
-    {"id":"c-4a4433b71bf04c509a8a2f2aa96cf884","author":"anonymous","body":"Council follow-up 2026-09-03: CC-091 is the sole owner of the batch resolved context and GenerationGridSpec. Add SemanticBoneResolver and CompileIndividualPartsPortable to the raw-input inventory, nested limb mutation isolation tests, and define whether MaxVoxelBudget bounds cells, corners, or total samples. CC-008 remains owner of profiling/execution strategy; do not duplicate grid work in CC-090.","createdAtUtc":"2026-09-03T22:48:20.3562064Z"},
-    {"id":"c-34483c8ed9a246ee8fa66cc965884f98","author":"anonymous","body":"Implementation wave 1, 2026-09-03: GenerationSettings now exposes saturating EstimateSampleCount, counting actual density-grid corner allocations; DefinitionValidator uses it for MaxVoxelBudget and reports grid sample count. Added exact regression coverage for 128 VPU over 2-unit bounds: 16,777,216 cells versus 16,972,609 corner samples, correctly rejected. Focused runtime projects built successfully with --no-restore, zero errors. Unity EditMode bridge jobs started but discovered zero project tests (placeholder CreatureCreator result), so no Unity test pass is claimed.","createdAtUtc":"2026-09-03T23:17:29.3908799Z"},
-    {"id":"c-4f6a8886f95a44c79ee513f0f8960200","author":"anonymous","body":"Next-stage implementation, 2026-09-03: Added snapshot-backed SemanticBoneResolver.ResolveParentBoneId and routed normal SkeletonInferrer generation through ResolvedCreatureSnapshot/ResolvedPartSnapshot. ResolvedPartSnapshot now captures BodySurfaceAnchor segment-start identity so anchored Body binding remains equivalent. Added mutation-after-snapshot coverage for parent limb terminal identity. Runtime and test projects build successfully with --no-restore; touched files have no diagnostics; Unity refresh completed with zero console errors/warnings. Unity test bridge still discovers zero project tests, so CC-091 remains open.","createdAtUtc":"2026-09-03T23:19:00Z"},
-    {"id":"c-20260908-generated-data-contract","author":"anonymous","body":"Current-branch audit hardening 2026-09-08: GeneratedCreatureData now rejects null definition/snapshot/meshResult/colors/topologyReport at its public construction boundary and defensively copies the color array exposed through its read-only collection. The Definition copy is intentionally defensive for now, but this is not considered final ownership architecture: downstream accesses to the mutable CreatureDefinition/Generated MeshResult remain part of the unresolved TSK-0095/TSK-0154 contract and should be consolidated into immutable resolved correspondence rather than repeatedly cloning at later boundaries.","createdAtUtc":"2026-09-08T19:31:32Z"}
+    {
+      "id": "c-f11593d61659438a9b8965d944a679d6",
+      "author": "anonymous",
+      "body": "Review disposition (2026-09-01): this is the single owner for resolved-snapshot and generation-stage consolidation. The current async runner does not remove the deeper duplication: AppearanceBaker still recompiles individual part and Body SDF programs, and mesh-asset assembly still resolves placement from raw DNA. Integrate one resolved snapshot and explicit derived correspondence through field sampling, appearance, and assembly. Do not create a second CC-087/CC-088 snapshot task. Next gate: preserve synchronous Generate as reference, add snapshot/program reuse and parity tests, then validate topology, appearance, determinism, and mesh-asset placement.",
+      "createdAtUtc": "2026-09-02T01:47:00.3527017Z"
+    },
+    {
+      "id": "c-1ab937a585354dd691e434e7b7eb9ccc",
+      "author": "anonymous",
+      "body": "Incoming handoff from completed TSK-0093 / CC-089 (2026-09-01). Hierarchy consolidation is complete and Unity-validated: ProceduralCreature.Tests.Runtime PlayMode passed 428/428. Advance the one-snapshot generation boundary: CreatureDefinition -\u003E validation/canonicalization -\u003E one resolved snapshot -\u003E field sampling, extraction, appearance, mesh-asset placement, and main-thread assembly. Preserve deterministic ordering, symmetry, attachments, topology, and synchronous fallback; add parity tests before removing duplicate derivation paths. Handoff: docs/tasks/handoffs/2026-09-01-deduplication-god-class-consolidation-handoff.md.",
+      "createdAtUtc": "2026-09-02T02:48:20.8671865Z"
+    },
+    {
+      "id": "c-35a5d402b0bb4eee8ae16ac0f5efca14",
+      "author": "anonymous",
+      "body": "Implementation phase completed (2026-09-02): GenerateData now validates once and creates one ResolvedCreatureSnapshot. Explicit snapshot overloads feed field compilation, individual part/body appearance compilation, and mesh-asset assembly; GeneratedCreatureData retains the snapshot for placement. AppearanceBaker receives precompiled programs, and injected managed resolvers borrow them while legacy standalone resolver paths retain ownership. Compatibility overloads remain for standalone callers. Validation: dotnet build .\\ProceduralCreature.Tests.Runtime.csproj --no-restore passed with 0 warnings/0 errors; Unity 6000.0.35f1 focused AppearanceBakerTests PlayMode passed 7/7; full ProceduralCreature.Tests.Runtime PlayMode passed 428/428. Remaining CC-091 gate: stable revision identity and complete attachment correspondence in the resolved generation context, followed by topology/appearance/determinism/mesh-placement/scheduler parity reruns. Handoff updated at docs/tasks/handoffs/2026-09-01-deduplication-god-class-consolidation-handoff.md.",
+      "createdAtUtc": "2026-09-02T02:55:30.0850384Z"
+    },
+    {
+      "id": "c-96e34cb5bd104dda930710dd5bfa133d",
+      "author": "anonymous",
+      "body": "CC-091 residual phase completed on 2026-09-02. Added ResolvedCreatureSnapshot.RevisionId as a deterministic SHA-256 of canonical DNA. ResolvedPartSnapshot now owns mesh correspondence (HasMeshGeometry, MeshAssetKey, normalized GeometryOffset/GeometryOrientation/GeometryScale, and GeometryPlacementToCreatureSpace), and CreatureMeshGenerator.Assemble uses the captured key and placement instead of raw MeshGeometry attachment fields. Added regression tests for canonical revision stability/change and attachment placement. Evidence: dotnet build .\\ProceduralCreature.Tests.Runtime.csproj --no-restore passed with 0 warnings/0 errors; Unity 6000.0.35f1 focused CreaturePartWorldTransformResolverTests PlayMode passed 28/28; full runtime PlayMode retry failed initialization before tests started after timeout. Known persistent-allocation warning only. Handoff updated to CC-090 then CC-094; no new task created.",
+      "createdAtUtc": "2026-09-02T03:10:46.8798867Z"
+    },
+    {
+      "id": "c-69c600b9e81b4bad97c84109e0b5d47d",
+      "author": "anonymous",
+      "body": "Council review follow-up, 2026-09-02: retain CC-091 implementation but keep the authority/evidence gate active. Extend the resolved generation record to own all output-affecting part decisions used by field compilation, appearance, and assembly; ensure RevisionId corresponds to the exact canonical input used for generation; add canonicalization-equivalent revision/output parity coverage. Unity full ProceduralCreature.Tests.Runtime PlayMode rerun attempted with 120s initialization timeout but 0 tests started, so no assertion result is available.",
+      "createdAtUtc": "2026-09-02T04:25:17.7280166Z"
+    },
+    {
+      "id": "c-c8729d592d0c42078ceb2f0796fb9423",
+      "author": "anonymous",
+      "body": "Council review 2026-09-02: retain InProgress. ResolvedCreatureSnapshot.RevisionId is directionally correct, but raw output-affecting bounds, generation settings, part ordering/source, symmetry/mirror, appearance, and assembly inputs remain reachable in downstream paths. Add snapshot-owned input parity and canonicalization-equivalent revision/output tests, then rerun the full runtime PlayMode suite. Evidence report: docs/audits/2026-09-02-consolidation-handoff-council-review-2.md.",
+      "createdAtUtc": "2026-09-02T04:43:05.4669714Z"
+    },
+    {
+      "id": "c-a761e9bdcc5c41b6886169393dc2e5df",
+      "author": "anonymous",
+      "body": "Authority slice continued 2026-09-02. ResolvedCreatureSnapshot now captures Bounds, GenerationSettings, SymmetryMode, per-part Appearance, and MirrorAcrossSymmetryPlane. CreatureMeshGenerator sampling and mesh-asset assembly consume snapshot-owned values; AppearanceBaker exposes a snapshot-compatible AppearanceDefinition overload. Regression coverage proves captured values remain stable after live DNA mutation. Runtime dotnet build passed with 0 warnings/errors; Unity 6000.0.35f1 focused CreaturePartWorldTransformResolverTests PlayMode passed 29/29. Remaining gate: broader generation parity/full runtime suite and any remaining raw source inputs.",
+      "createdAtUtc": "2026-09-02T04:58:18.0350587Z"
+    },
+    {
+      "id": "c-23537d3d21ff411c81c855397a4e9f35",
+      "author": "anonymous",
+      "body": "Full authority-wave validation completed 2026-09-02 in Unity 6000.0.35f1: ProceduralCreature.Tests.Runtime PlayMode passed 433/433 with 0 failures and 0 skips after snapshot-owned bounds, generation, symmetry, appearance, and mirror changes. Runtime dotnet build remained clean with 0 warnings/errors. TSK-0095 remains InProgress for remaining raw-input audit and canonicalization-equivalent output parity evidence.",
+      "createdAtUtc": "2026-09-02T05:01:51.4289422Z"
+    },
+    {
+      "id": "c-68df55bd826248699079ff4205190cd1",
+      "author": "anonymous",
+      "body": "Council review 2026-09-02: explicit SDF snapshot overloads were found to bypass snapshot authority for part ordering, mesh exclusion, limb/shape selection, mirror, and symmetry. This wave corrected those reads to use ResolvedPartSnapshot and snapshot SymmetryMode. Keep InProgress: Body appearance capture, remaining raw-input audit, canonicalization-equivalent output parity, and final-source full-suite evidence remain required. No new task created.",
+      "createdAtUtc": "2026-09-02T05:07:40.1859914Z"
+    },
+    {
+      "id": "c-6172e80d1b164e6ba39a7fbe8fd1e515",
+      "author": "anonymous",
+      "body": "Audit synthesis 2026-09-02: Delta Audit #14 corroborates the open body-appearance authority concern. AppearanceBaker now threads the already-resolved ResolvedBody into managed and Burst body-gradient paths; BodyVerticalGradientSampler has ResolvedBody overloads and no longer allocates/recomputes segment lengths per body vertex. Definition overloads remain compatibility wrappers that resolve once. Focused runtime build passed 0 warnings/errors; body resolved-vs-definition parity test passes in compilation. Remaining gate: Unity appearance/full runtime validation.",
+      "createdAtUtc": "2026-09-02T05:51:44.9267514Z"
+    },
+    {
+      "id": "c-6807495cbd424bd6bf0d3e7f15435989",
+      "author": "anonymous",
+      "body": "Validation completed 2026-09-02: focused ProceduralCreature.Tests.Runtime PlayMode run passed 56/56, 0 failed, 0 skipped. BodyVerticalGradientAppearanceTests includes resolved-body parity coverage; runtime dotnet build passed 0 warnings/errors.",
+      "createdAtUtc": "2026-09-02T05:53:22.8603201Z"
+    },
+    {
+      "id": "c-f5b4a6e0dcf64c938612bba189bc3383",
+      "author": "anonymous",
+      "body": "User Mandate (STRICT): \u201CReview your work and the tasks with 3 agents, make the necessary changes and task tracking, then commit and push\u201D. Council found one-sample/empty Body appearance edge cases and incomplete snapshot authority. Fixed one-sample sampling, empty-body gray fallback, and threaded snapshot-owned Body appearance, Forward, and part appearances through generation baking. Current-source Unity PlayMode full runtime suite passed 437/437 with 0 failures and 0 skips. Keep InProgress pending mutation-after-snapshot tests and final commit/push evidence.",
+      "createdAtUtc": "2026-09-02T06:05:35.0405861Z"
+    },
+    {
+      "id": "c-30f2939c919944ad9df5fb9588c3621c",
+      "author": "anonymous",
+      "body": "Audit synthesis 2026-09-03, sources S01/S03/S05/S06: retain InProgress as the single resolved-generation owner. Confirmed follow-ups are one batch hierarchy/resolution context, detached snapshot contract and mutation-after-snapshot tests, universal ResolvedLimb downstream signatures, GenerationGridSpec, semantic revision hashing seam, validator non-throwing resolution, and final GenerateData/Unity assembly separation. Existing snapshot authority and body-appearance fixes are corroborated, not reopened. Full canonicalization-equivalent output parity and raw-input audit remain required.",
+      "createdAtUtc": "2026-09-03T22:37:37.8532174Z"
+    },
+    {
+      "id": "c-4a4433b71bf04c509a8a2f2aa96cf884",
+      "author": "anonymous",
+      "body": "Council follow-up 2026-09-03: CC-091 is the sole owner of the batch resolved context and GenerationGridSpec. Add SemanticBoneResolver and CompileIndividualPartsPortable to the raw-input inventory, nested limb mutation isolation tests, and define whether MaxVoxelBudget bounds cells, corners, or total samples. CC-008 remains owner of profiling/execution strategy; do not duplicate grid work in CC-090.",
+      "createdAtUtc": "2026-09-03T22:48:20.3562064Z"
+    },
+    {
+      "id": "c-34483c8ed9a246ee8fa66cc965884f98",
+      "author": "anonymous",
+      "body": "Implementation wave 1, 2026-09-03: GenerationSettings now exposes saturating EstimateSampleCount, counting actual density-grid corner allocations; DefinitionValidator uses it for MaxVoxelBudget and reports grid sample count. Added exact regression coverage for 128 VPU over 2-unit bounds: 16,777,216 cells versus 16,972,609 corner samples, correctly rejected. Focused runtime projects built successfully with --no-restore, zero errors. Unity EditMode bridge jobs started but discovered zero project tests (placeholder CreatureCreator result), so no Unity test pass is claimed.",
+      "createdAtUtc": "2026-09-03T23:17:29.3908799Z"
+    },
+    {
+      "id": "c-4f6a8886f95a44c79ee513f0f8960200",
+      "author": "anonymous",
+      "body": "Next-stage implementation, 2026-09-03: Added snapshot-backed SemanticBoneResolver.ResolveParentBoneId and routed normal SkeletonInferrer generation through ResolvedCreatureSnapshot/ResolvedPartSnapshot. ResolvedPartSnapshot now captures BodySurfaceAnchor segment-start identity so anchored Body binding remains equivalent. Added mutation-after-snapshot coverage for parent limb terminal identity. Runtime and test projects build successfully with --no-restore; touched files have no diagnostics; Unity refresh completed with zero console errors/warnings. Unity test bridge still discovers zero project tests, so CC-091 remains open.",
+      "createdAtUtc": "2026-09-03T23:19:00Z"
+    },
+    {
+      "id": "c-20260908-generated-data-contract",
+      "author": "anonymous",
+      "body": "Current-branch audit hardening 2026-09-08: GeneratedCreatureData now rejects null definition/snapshot/meshResult/colors/topologyReport at its public construction boundary and defensively copies the color array exposed through its read-only collection. The Definition copy is intentionally defensive for now, but this is not considered final ownership architecture: downstream accesses to the mutable CreatureDefinition/Generated MeshResult remain part of the unresolved TSK-0095/TSK-0154 contract and should be consolidated into immutable resolved correspondence rather than repeatedly cloning at later boundaries.",
+      "createdAtUtc": "2026-09-08T19:31:32Z"
+    },
+    {
+      "id": "c-59a220d3831241098bbd286d1679acc9",
+      "author": "anonymous",
+      "body": "## Audit synthesis disposition (2026-09-10)\nRound 20 and Round 21 confirm two distinct redundant derivations in one regeneration: SDF part/body programs are compiled again during implicit-surface binding, and \u0060SkeletonInferrer.Infer\u0060 runs again after assembly, including when no mesh-asset parts exist. Reuse explicit generated correspondence or skip unused inference. The semantic Body attachment raw/resolved dual pathway remains a separate consolidation item under this owner. Evidence: \u0060docs/audits/creaturecreator-round20-redundant-sdf-compile-2026-09-09.md\u0060, \u0060docs/audits/creaturecreator-round21-redundant-skeleton-infer-2026-09-09.md\u0060, and current source sweep.",
+      "createdAtUtc": "2026-09-10T16:26:46.4128319Z"
+    }
   ],
   "epicId": null,
   "parentId": null,
+  "dueDateUtc": null,
   "createdAtUtc": "2026-09-01T00:00:00Z",
-  "updatedAtUtc": "2026-09-08T19:31:32Z",
+  "updatedAtUtc": "2026-09-10T16:26:46.4128319Z",
   "completedAtUtc": null,
-  "revision": 13,
+  "revision": 14,
   "isArchived": false,
   "hasLoadError": false,
+  "loadError": null,
   "sourceFilePath": "tsk-0095-establish-concrete-generation-pipeline-stage-boundaries.json"
 }

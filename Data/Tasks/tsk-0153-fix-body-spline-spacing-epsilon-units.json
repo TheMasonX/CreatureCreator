@@ -4,12 +4,19 @@
   "title": "Fix Body spline spacing epsilon unit mismatch",
   "description": "Correct BodySplineAuthoring degenerate-spacing guards that compare the squared-direction epsilon MinSpacingSqr against linear distances. Introduce an explicit linear threshold tied to GenerationTolerances.MinBodySegmentLength, keep squared comparisons using the squared threshold, and add focused regression coverage for near-coincident append/prepend/respace paths.",
   "type": "Task",
-  "status": "Backlog",
+  "status": "Archived",
   "priority": "High",
   "assigneeMode": "Custom",
+  "assigneeDirectoryId": null,
   "assigneeCustomText": "Agent",
   "reporter": "TheMasonX",
-  "labels": ["editor", "body-spline", "correctness", "tolerances", "audit-synthesis"],
+  "labels": [
+    "editor",
+    "body-spline",
+    "correctness",
+    "tolerances",
+    "audit-synthesis"
+  ],
   "attachments": [],
   "externalLinks": [],
   "linkedPages": [],
@@ -17,17 +24,18 @@
     {
       "id": "c-20260909-audit-synthesis",
       "author": "Agent",
-      "body": "Created from the 2026-09-09 eleven-audit takeover synthesis. Repeated audits independently identified MinSpacingSqr as a squared-magnitude epsilon while several BodySplineAuthoring branches compare it to linear magnitudes/distances. The highest-confidence low-risk correction is to make linear-vs-squared units explicit rather than changing the tolerance value arbitrarily. Implementation is intentionally separate from the larger ResolvedPolyline/anatomical-rig work because those require broader planning and validation."
+      "body": "Created from the 2026-09-09 eleven-audit takeover synthesis. Repeated audits independently identified MinSpacingSqr as a squared-magnitude epsilon while several BodySplineAuthoring branches compare it to linear magnitudes/distances. The highest-confidence low-risk correction is to make linear-vs-squared units explicit rather than changing the tolerance value arbitrarily. Implementation is intentionally separate from the larger ResolvedPolyline/anatomical-rig work because those require broader planning and validation.",
+      "createdAtUtc": "0001-01-01T00:00:00"
     }
   ],
   "epicId": null,
   "parentId": null,
   "dueDateUtc": null,
   "createdAtUtc": "2026-09-09T20:45:00Z",
-  "updatedAtUtc": "2026-09-09T20:45:00Z",
+  "updatedAtUtc": "2026-09-10T16:26:46.3474781Z",
   "completedAtUtc": null,
-  "revision": 1,
-  "isArchived": false,
+  "revision": 2,
+  "isArchived": true,
   "hasLoadError": false,
   "loadError": null,
   "sourceFilePath": "tsk-0153-fix-body-spline-spacing-epsilon-units.json"

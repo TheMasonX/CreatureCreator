@@ -59,15 +59,21 @@
       "author": "anonymous",
       "body": "User clarification recorded 2026-09-07: the mirrored-foot cross-limb issue is confirmed fixed for the current report. The separate untouched-leg inward warping must not be treated as a recurrence of this foot task without new evidence. Preserve the historical foot implementation and validation record here; the new separate investigation is owned by TSK-0168.",
       "createdAtUtc": "2026-09-07T19:41:50.7499747Z"
+    },
+    {
+      "id": "c-eaccebe2a64e462d8aea536b51590f6e",
+      "author": "anonymous",
+      "body": "## Audit synthesis disposition (2026-09-10)\nThe skeleton deep dive adds a targeted lead: \u0060ImplicitSurfaceInfluenceDomainResolver.IsMirroredInstance\u0060 selects side by distance to part origin. Instrument the reported right-foot/left-limb vertices before changing weighting domains. This is an extension of the existing cross-side coupling investigation, not a new task.",
+      "createdAtUtc": "2026-09-10T16:26:46.5844819Z"
     }
   ],
   "epicId": null,
   "parentId": "TSK-0077",
   "dueDateUtc": null,
   "createdAtUtc": "2026-09-07T07:30:52.1860927Z",
-  "updatedAtUtc": "2026-09-07T19:41:50.7499747Z",
+  "updatedAtUtc": "2026-09-10T16:26:46.5844819Z",
   "completedAtUtc": null,
-  "revision": 10,
+  "revision": 11,
   "isArchived": false,
   "hasLoadError": false,
   "loadError": null,
