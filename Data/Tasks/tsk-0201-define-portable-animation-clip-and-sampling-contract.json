@@ -1,0 +1,44 @@
+{
+  "id": "tsk-0201-define-portable-animation-clip-and-sampling-contract",
+  "key": "TSK-0201",
+  "title": "Define portable animation clip and deterministic sampling contract",
+  "description": "## Summary\nCreatureCreator has a direct external pose-driver boundary but no animation-clip or sampling contract. Define the minimal portable data needed for an external animation source to produce complete indexed poses deterministically, without creating a Unity Animator/Avatar, locomotion state machine, or gameplay animation graph inside CreatureCreator.\n\n## Scope\n- Define clip identity, duration, looping semantics, sample-time policy, and skeleton compatibility identity/signature.\n- Use sparse per-bone channels/tracks rather than dense bone-by-frame storage unless measured requirements prove otherwise.\n- Define position and rotation channels consistently with TSK-0200; rotation interpolation must use normalized shortest-path quaternion interpolation.\n- Define missing-channel behavior from rest/default pose, duplicate timestamps, out-of-range time, zero-duration clips, and loop-boundary behavior.\n- Define who owns time, interpolation, and playback state: the external animation system owns them; CreatureCreator receives a complete indexed pose for each animation tick.\n- Define how IK/procedural overrides compose with sampled animation, including ordering and whether overrides operate before or after animation sampling.\n- Define mirror semantics using stable semantic bone identity rather than index arithmetic or Unity hierarchy order.\n- Keep exact-skeleton compatibility as the MVP; future retargeting is explicitly out of scope.\n\n## Acceptance Criteria\n- A clip can sample a complete pose for every bone in a compatible `SkeletonSnapshot` deterministically.\n- Missing tracks resolve to documented rest/default transforms.\n- Looping is continuous at the seam within documented interpolation tolerance.\n- Rotation interpolation takes the shortest quaternion path and remains finite/normalized.\n- Invalid clip data fails deterministically at load/validation rather than during the frame loop.\n- A sampled clip produces the reusable indexed pose representation owned by TSK-0200 without per-frame semantic-ID resolution or collection allocation.\n- External time ownership and IK ordering are unambiguous and covered by tests.\n\n## Validation\n- Headless runtime tests for clip validation, compatibility, sample-time boundaries, looping, interpolation, missing channels, duplicate timestamps, and mirror mapping.\n- PlayMode integration test samples a small reference clip over multiple frames on a generated creature and applies it through `CreatureRig`.\n- Record allocation behavior after warmup for repeated sampling into a reusable pose buffer.\n- Explicitly verify no Animator/Avatar/controller framework is introduced.\n\n## Findings\nThe external pose-driver decision in ADR-010 is correct but intentionally narrow. It does not define time, clip data, interpolation, missing-channel defaults, IK ordering, or loop semantics. These omissions are specification gaps rather than evidence that CreatureCreator should own a gameplay animation state machine.\n\n## Blockers\nTSK-0200 must settle the canonical pose payload and transform space before clip tracks are finalized. TSK-0073 remains the runtime pose owner.\n\n## Next Step\nWrite a small animation-data schema/decision record, then implement a pure deterministic sampler that writes directly into the reusable indexed pose buffer.",
+  "type": "Architecture",
+  "status": "Backlog",
+  "priority": "High",
+  "assigneeMode": "Custom",
+  "assigneeCustomText": "Agent",
+  "reporter": "audit-synthesis",
+  "labels": [
+    "animation",
+    "clip",
+    "sampling",
+    "pose",
+    "runtime",
+    "determinism",
+    "architecture",
+    "audit-synthesis",
+    "net-new",
+    "user-mandated"
+  ],
+  "attachments": [],
+  "externalLinks": [],
+  "linkedPages": [],
+  "comments": [
+    {
+      "id": "c-audit-20260909-clip-contract",
+      "author": "anonymous",
+      "body": "Created from the cross-audit synthesis. No current AnimationClip subsystem exists; the repository deliberately rejected Animator/Avatar for the MVP. The missing durable contract is therefore clip representation and deterministic sampling, not a gameplay animation graph. Provenance: ADR-010, TSK-0133, animation/deformation follow-up audit, whole-codebase animation findings.",
+      "createdAtUtc": "2026-09-10T03:51:00Z"
+    }
+  ],
+  "epicId": null,
+  "parentId": "tsk-0073-runtime-bone-rig-and-pose-application-drive-bone-transforms-from-a-posedskeleton",
+  "dueDateUtc": null,
+  "createdAtUtc": "2026-09-10T03:51:00Z",
+  "updatedAtUtc": "2026-09-10T03:51:00Z",
+  "revision": 1,
+  "isArchived": false,
+  "hasLoadError": false,
+  "sourceFilePath": "tsk-0201-define-portable-animation-clip-and-sampling-contract.json"
+}
