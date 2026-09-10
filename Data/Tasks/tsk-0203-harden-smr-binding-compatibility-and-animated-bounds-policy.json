@@ -1,0 +1,33 @@
+{
+  "id": "tsk-0203-harden-smr-binding-compatibility-and-animated-bounds-policy",
+  "key": "TSK-0203",
+  "title": "Harden SkinnedMeshRenderer binding compatibility and animated bounds policy",
+  "description": "## Summary\nThe runtime skinned renderer must consume the same authoritative skeleton that its CreatureRig was built from, and its animated visibility/bounds behavior must have an explicit contract. Equal bone count alone is insufficient for safe indexed binding.\n\n## Scope\n- Require the supplied rest skeleton to structurally match the rig's authoritative SkeletonSnapshot before binding.\n- Preserve one indexed bone order across rig transforms, bindposes, bone weights, and the renderer bone array.\n- Add regression coverage for same-count but structurally different skeletons.\n- Define and validate an animated bounds/culling policy for valid poses; do not blindly force updateWhenOffscreen without evidence.\n- Keep build/rebind work separate from the steady-state animation path.\n\n## Acceptance Criteria\n- Bind rejects same-count skeletons whose IDs, parent topology, semantic metadata, rest frames, segment state, or attachment structure differ from the built rig.\n- A successful bind uses one authoritative skeleton ordering for bindposes, weights, and renderer bones.\n- Real generated-creature tests cover the compatibility gate.\n- Valid exaggerated poses have a documented and validated renderer bounds/culling behavior.\n- No per-frame binding, weight authoring, mesh copying, or skeleton recapture is introduced.\n\n## Implementation\nThe binding adapter now compares the captured supplied skeleton against `CreatureRig.RestSkeleton` using the existing structural `SkeletonSnapshot.HasSameBoneOrder` contract in addition to the bone-count guard. This is a small, fail-fast boundary correction that prevents a same-count index mismatch from reaching Unity. A focused runtime regression was added for a same-count skeleton with a different root position.\n\n## Validation\nSource-level validation is complete for the compatibility guard and regression fixture. Unity execution remains required for the regression test and for the animated bounds/culling portion of the task.\n\n## Blockers\nAnimated bounds/culling behavior is Unity-gated.\n\n## Provenance\nCreated from the 2026-09-09 audit-synthesis hidden finding F-01. The broader pose-space and reusable-buffer work remains under TSK-0200; performance benchmarking remains under TSK-0134.",
+  "type": "Bug",
+  "status": "InProgress",
+  "priority": "High",
+  "assigneeMode": "Custom",
+  "assigneeCustomText": "Agent",
+  "reporter": "audit-synthesis",
+  "labels": ["animation", "skinning", "renderer", "binding", "bounds", "audit-synthesis", "net-new"],
+  "attachments": [],
+  "externalLinks": [],
+  "linkedPages": [],
+  "comments": [
+    {
+      "id": "c-20260910-compat-guard",
+      "author": "anonymous",
+      "body": "Safe source fix landed: CreatureSkinnedMeshRenderer.Bind now rejects a supplied rest skeleton unless it structurally matches the authoritative CreatureRig.RestSkeleton via SkeletonSnapshot.HasSameBoneOrder. Added a focused same-count/different-rest-frame regression. Unity execution remains the validation gate; animated bounds policy is still open.",
+      "createdAtUtc": "2026-09-10T04:10:00Z"
+    }
+  ],
+  "epicId": null,
+  "parentId": "tsk-0132-build-and-validate-runtime-skinned-mesh-renderer",
+  "dueDateUtc": null,
+  "createdAtUtc": "2026-09-10T04:10:00Z",
+  "updatedAtUtc": "2026-09-10T04:10:00Z",
+  "revision": 1,
+  "isArchived": false,
+  "hasLoadError": false,
+  "sourceFilePath": "tsk-0203-harden-smr-binding-compatibility-and-animated-bounds-policy.json"
+}
