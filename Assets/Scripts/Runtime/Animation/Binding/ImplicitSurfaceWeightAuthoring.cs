@@ -222,7 +222,7 @@ namespace ProceduralCreature.Animation.Binding
                 if (radiiByBoneIndex != null && i < radiiByBoneIndex.Count)
                 {
                     float supplied = radiiByBoneIndex[i];
-                    if (supplied > 0f) radius = supplied;
+                    if (supplied > 0f && NumericValidity.IsFinite(supplied)) radius = supplied;
                 }
 
                 result.Add(new BoneSegmentInfluence(
