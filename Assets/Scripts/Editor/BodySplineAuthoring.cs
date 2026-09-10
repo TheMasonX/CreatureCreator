@@ -40,7 +40,10 @@ namespace ProceduralCreature.Editor
     {
         public const int DefaultMinSampleCount = 5;
 
-        private const float MinSpacingSqr = 1e-10f;
+        // Keep linear and squared thresholds explicit. Linear distances are compared
+        // with MinSpacing; vector magnitudes use MinSpacingSqr.
+        private const float MinSpacing = GenerationTolerances.MinBodySegmentLength;
+        private const float MinSpacingSqr = MinSpacing * MinSpacing;
         private const int DragMaxFabrikIterations = 32;
         private const float DragFabrikTolerance = 1e-4f;
         private const int ResampleBisectionIterations = 48;
@@ -94,7 +97,7 @@ namespace ProceduralCreature.Editor
                 float spacing = tailDelta.magnitude;
 
                 Vector3 tailDirection;
-                if (spacing <= MinSpacingSqr)
+                if (spacing <= MinSpacing)
                 {
                     tailDirection = NumericValidity.NormalizeOr(fallbackDirection, Vector3.forward, MinSpacingSqr);
                     spacing = 1f;
@@ -143,7 +146,7 @@ namespace ProceduralCreature.Editor
                 float spacing = headDelta.magnitude;
 
                 Vector3 direction;
-                if (spacing <= MinSpacingSqr)
+                if (spacing <= MinSpacing)
                 {
                     direction = NumericValidity.NormalizeOr(fallbackDirection, Vector3.forward, MinSpacingSqr);
                     spacing = 1f;
@@ -288,7 +291,7 @@ namespace ProceduralCreature.Editor
             if (bodyNeighbor < 0 || bodyNeighbor >= count) return;
             if (spline.Samples[bodyNeighbor] == null) return;
             float l0 = Vector3.Distance(spline.Samples[anchor].Position, spline.Samples[bodyNeighbor].Position);
-            if (l0 <= MinSpacingSqr) return;
+            if (l0 <= MinSpacing) return;
 
             // Build the free-tail run in ascending index, then walk equal chords of
             // length l0 from the anchor toward the tip so the anchor (region end on the
@@ -466,7 +469,7 @@ namespace ProceduralCreature.Editor
 
             float[] arc = ArcCoordinates(source);
             float totalLength = arc[source.Length - 1];
-            if (totalLength <= MinSpacingSqr) return null;
+            if (totalLength <= MinSpacing) return null;
 
             float tolerance = 1e-4f * Mathf.Max(1f, totalLength);
             float low = 0f;
@@ -547,7 +550,7 @@ namespace ProceduralCreature.Editor
 
             float totalLength = 0f;
             for (int i = 1; i < count; i++) totalLength += Vector3.Distance(positions[i], positions[i - 1]);
-            if (totalLength <= MinSpacingSqr) return;
+            if (totalLength <= MinSpacing) return;
 
             int targetCount = Mathf.Clamp(
                 Mathf.RoundToInt(totalLength / targetSpacing) + 1,
@@ -621,7 +624,7 @@ namespace ProceduralCreature.Editor
                 totalLength += Vector3.Distance(positions[i], positions[i - 1]);
             }
             float linkLength = totalLength / (count - 1);
-            if (linkLength <= MinSpacingSqr)
+            if (linkLength <= MinSpacing)
             {
                 // Degenerate coincident spline; no meaningful chain to bend.
                 spline.Samples[draggedIndex].Position = target;
