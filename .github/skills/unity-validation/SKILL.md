@@ -17,7 +17,7 @@ editor and Unity Test Framework over source inspection.
 
 ## Project facts
 
-- Unity editor version: `6000.0.35f1`.
+- Unity editor version: `6000.5.9f1`.
 - The project uses URP, Input System, and Unity Test Framework.
 - Runtime tests are under `Assets/Scripts/Tests/Runtime`.
 - Editor tests are under `Assets/Scripts/Tests/Editor`.
@@ -26,20 +26,21 @@ editor and Unity Test Framework over source inspection.
 ## Procedure
 
 1. Identify the changed assembly and nearest test fixture.
-2. Run the narrowest matching Unity Test Framework test.
-3. For editor changes, run the relevant EditMode test or perform the manual
+2. Before running the focused test, confirm the whole solution/project compiles. A narrow test proves the targeted behavior; it does not prove adjacent files still reference this one correctly.
+3. Run the narrowest matching Unity Test Framework test.
+4. For editor changes, run the relevant EditMode test or perform the manual
    editor check in the actual Unity session.
-4. For mesh changes, inspect triangle count, vertex welding, winding, and
+5. For mesh changes, inspect triangle count, vertex welding, winding, and
    `MeshTopologyValidator` results.
-5. For DNA changes, test validation, canonical ordering, and save-load-save
+6. For DNA changes, test validation, canonical ordering, and save-load-save
    byte stability.
-6. For SDF changes, test signed distances, transforms, empty definitions, and
+7. For SDF changes, test signed distances, transforms, empty definitions, and
    deterministic composition.
-7. For appearance changes, test deterministic noise, normal generation, part
+8. For appearance changes, test deterministic noise, normal generation, part
    selection, and color bounds.
-8. For skeleton or IK changes, test parent links, symmetry, root pinning, link
+9. For skeleton or IK changes, test parent links, symmetry, root pinning, link
    lengths, and non-mutation of input poses.
-9. Record the exact check, result, and environment in the task tracker.
+10. Record the exact check, result, and environment in the task tracker.
 
 Before relying on an editor result, confirm that compilation has finished and
 inspect the Unity console for errors and warnings. Record the Unity version,
