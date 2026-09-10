@@ -1,0 +1,43 @@
+{
+  "id": "tsk-0203-harden-skinned-mesh-binding-compatibility-and-animated-bounds",
+  "key": "TSK-0203",
+  "title": "Harden SkinnedMeshRenderer binding compatibility and animated bounds",
+  "description": "## Summary\nThe runtime `CreatureSkinnedMeshRenderer.Bind` currently proves only that the supplied rest-skeleton bone count equals the rig bone count. It then builds bindposes/weights from the supplied snapshot while wiring renderer bones from the rig. Equal counts do not guarantee identical semantic order, parent topology, rest transforms, mirror identity, or segment metadata. Separately, the binding path recalculates the copied mesh bounds once and does not define an animation-time culling policy. Harden the renderer boundary before animation becomes a long-lived playback path.\n\n## Scope\n- Require exact structural compatibility between the binding snapshot and `CreatureRig.RestSkeleton`; preferably consume the rig's authoritative immutable snapshot rather than recapturing a second skeleton.\n- Reject same-count/different-structure binding attempts with a deterministic diagnostic.\n- Keep bind-index ordering identical across `SkeletonSnapshot`, rig transforms, authored weights, bindposes, and `SkinnedMeshRenderer.bones`.\n- Define the actor-local/mesh-local/bone-local bindpose contract together with TSK-0073/TSK-0200.\n- Define how `SkinnedMeshRenderer.localBounds` are established for the expected animation envelope, including whether an explicit conservative rest/pose envelope is stored or the renderer is configured otherwise. Do not rely on accidental one-time `Mesh.RecalculateBounds()` semantics without a documented policy.\n- Validate bounds behavior under exaggerated but valid animation poses so a visible animated creature is not culled solely because its deformed extents exceed the bind-time bounds.\n- Keep rebind transactional and keep all mesh/weight/bindpose work out of the steady-state animation loop.\n\n## Acceptance Criteria\n- `Bind` rejects a rest skeleton with the same bone count but incompatible IDs, parent topology, semantic identity, mirror state, segment metadata, or rest frames.\n- The adapter has exactly one authoritative skeleton snapshot per bind; no second independently-derived index ordering can reach renderer setup.\n- Rest, posed, restore, mirror, and actor-root composition continue to match the LBS oracle within documented tolerance.\n- An intentionally exaggerated valid pose remains visible when on-screen; culling does not incorrectly remove the SMR because its bind-time bounds are too small.\n- The bounds policy is deterministic, documented, and independent of a particular creature species.\n- No per-frame mesh rebuild, bindpose rebuild, weight authoring, skeleton recapture, or renderer rebind occurs during ordinary animation playback.\n\n## Validation\n- Runtime tests for same-count incompatible skeleton rejection and authoritative-snapshot reuse.\n- PlayMode tests on a real generated creature for actor translation/rotation, exaggerated limb/body poses, rest restoration, and SMR visibility.\n- Record renderer `localBounds` and pose envelope evidence from Unity rather than asserting a source-only bound claim.\n- Allocation/performance evidence belongs to TSK-0134; this task supplies the renderer correctness inputs needed by that benchmark.\n\n## Findings\nThis is a hidden renderer-boundary issue uncovered by re-reading the current adapter: the count check is weaker than the `SkeletonSnapshot.HasSameBoneOrder` compatibility contract already used by pose application, yet the adapter constructs bind data from the supplied snapshot and bones from the rig. A mismatched same-count skeleton can therefore pair the wrong weights/bindposes with the rig's transform indices. The same sweep found no explicit animated-bounds policy, so frustum-culling correctness is currently an undocumented Unity integration assumption.\n\n## Blockers\nThe final local-space actor contract depends on TSK-0200/TSK-0073. The animated-bounds behavior requires executable Unity evidence. Do not solve this by enabling arbitrary always-on offscreen updates unless that choice is intentionally accepted as the product/performance policy.\n\n## Next Step\nFirst harden exact skeleton compatibility using the rig's snapshot, then build a Unity envelope fixture that poses the generated creature beyond its rest extents and records the chosen bounds policy.",
+  "type": "Bug",
+  "status": "Backlog",
+  "priority": "High",
+  "assigneeMode": "Custom",
+  "assigneeCustomText": "Agent",
+  "reporter": "audit-synthesis",
+  "labels": [
+    "animation",
+    "skinning",
+    "unity",
+    "renderer",
+    "skeleton",
+    "bounds",
+    "compatibility",
+    "audit-synthesis",
+    "net-new"
+  ],
+  "attachments": [],
+  "externalLinks": [],
+  "linkedPages": [],
+  "comments": [
+    {
+      "id": "c-audit-20260909-smr-boundary",
+      "author": "anonymous",
+      "body": "Created from the current-adapter sweep. `CreatureSkinnedMeshRenderer.Bind` checks only bone count before building bind data from one snapshot and binding renderer bones from the rig. The established skeleton compatibility contract is materially stronger. The same source review found no explicit animated-culling/bounds policy. This task keeps both issues together at the renderer boundary and requires Unity proof.",
+      "createdAtUtc": "2026-09-10T03:53:00Z"
+    }
+  ],
+  "epicId": null,
+  "parentId": "tsk-0132-runtime-skinnedmeshrenderer-adapter-for-resolved-creature-geometry",
+  "dueDateUtc": null,
+  "createdAtUtc": "2026-09-10T03:53:00Z",
+  "updatedAtUtc": "2026-09-10T03:53:00Z",
+  "revision": 1,
+  "isArchived": false,
+  "hasLoadError": false,
+  "sourceFilePath": "tsk-0203-harden-skinned-mesh-binding-compatibility-and-animated-bounds.json"
+}
