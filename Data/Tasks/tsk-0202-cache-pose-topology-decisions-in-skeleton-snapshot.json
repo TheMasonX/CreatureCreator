@@ -1,0 +1,42 @@
+{
+  "id": "tsk-0202-cache-pose-topology-decisions-in-skeleton-snapshot",
+  "key": "TSK-0202",
+  "title": "Cache pose topology decisions in SkeletonSnapshot",
+  "description": "## Summary\nThe indexed skeleton foundation removed repeated hierarchy scans, but `PoseRotationResolver.ResolveIntoCompatible` still recomputes semantic child-selection decisions every pose application. It loops the children of each bone to rediscover the continuation child for segmented bones and the primary child for non-segment bones. Cache these stable topology decisions at snapshot-capture time so the steady-state pose path is purely indexed.\n\n## Scope\n- Add explicit snapshot-owned indices for a segmented bone's continuation child and for any non-segment primary child needed by pose rotation.\n- Derive them once using the same deterministic rules currently implemented (`SourcePartId` preference/endpoint matching and deterministic ID selection).\n- Validate ambiguity and missing continuation metadata at capture/build time; do not silently select a different child per frame.\n- Update `PoseRotationResolver` to consume cached indices with no per-frame child traversal or string comparison.\n- Preserve the current behavior and existing deterministic bent-chain/attachment-branch tests.\n- Consider the cached choice part of skeleton compatibility so two snapshots cannot differ only in pose-topology metadata while passing compatibility.\n\n## Acceptance Criteria\n- Steady-state `CreatureRig.ApplyPose` performs no child-list iteration, semantic string comparison, or per-bone topology discovery.\n- Existing continuation-child and primary-child selection outputs remain identical for valid snapshots.\n- Branching skeletons retain deterministic behavior independent of authored child insertion order.\n- Snapshot capture rejects structurally ambiguous continuation metadata rather than deferring the failure to animation frames.\n- Focused benchmarks show the cached path scales with bone count and not with repeated child-search work.\n\n## Validation\n- Runtime tests for straight chains, bent two/three-segment chains, branch-plus-attachment cases, terminals, and ambiguous topology.\n- Repeated `ApplyPose` allocation test remains zero managed allocations after warmup.\n- A focused microbenchmark or repeated-call measurement demonstrates that no topology discovery occurs per call.\n- PlayMode confirmation on a generated creature covers a bent segmented chain and attachment branch.\n\n## Findings\nThis is a second-order performance finding, not a reopening of the fixed continuation-child correctness bug. `SkeletonSnapshot.GetChildren(i)` is already O(1), but `PoseRotationResolver` still loops those children on every call to rediscover a stable relationship. The same pattern appears in the snapshot philosophy generally: stable structural facts should be resolved once at the immutable boundary and consumed by index thereafter.\n\n## Blockers\nCoordinate with TSK-0118 and TSK-0200 so the cached topology and final animation-pose representation share one compatibility contract.\n\n## Next Step\nAdd the cached child indices to `SkeletonSnapshot`, port the resolver, and compare current-versus-cached pose outputs over the existing regression matrix.",
+  "type": "Task",
+  "status": "Backlog",
+  "priority": "Medium",
+  "assigneeMode": "Custom",
+  "assigneeCustomText": "Agent",
+  "reporter": "audit-synthesis",
+  "labels": [
+    "animation",
+    "skeleton",
+    "ik",
+    "performance",
+    "determinism",
+    "architecture",
+    "audit-synthesis",
+    "net-new"
+  ],
+  "attachments": [],
+  "externalLinks": [],
+  "linkedPages": [],
+  "comments": [
+    {
+      "id": "c-audit-20260909-topology-cache",
+      "author": "anonymous",
+      "body": "Created from peer review of the current PoseRotationResolver. Earlier audits correctly celebrated precomputed child lists, but the resolver still scans children to choose continuation/primary relationships on every frame. This task preserves those deterministic rules while moving the decision to immutable snapshot capture.",
+      "createdAtUtc": "2026-09-10T03:52:00Z"
+    }
+  ],
+  "epicId": null,
+  "parentId": "tsk-0118-close-indexed-pose-application-hot-path-and-skeleton-coverage-gaps",
+  "dueDateUtc": null,
+  "createdAtUtc": "2026-09-10T03:52:00Z",
+  "updatedAtUtc": "2026-09-10T03:52:00Z",
+  "revision": 1,
+  "isArchived": false,
+  "hasLoadError": false,
+  "sourceFilePath": "tsk-0202-cache-pose-topology-decisions-in-skeleton-snapshot.json"
+}
