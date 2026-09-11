@@ -21,7 +21,6 @@ namespace ProceduralCreature.Appearance
     public static class AppearanceBaker
     {
         private const float BrightnessVariation = 0.15f;
-        private const int ScratchValueBudget = 8 * 1024 * 1024;
         internal static bool UseBurstResolve = true;
 
         public static Color[] Bake(CreatureDefinition definition, MeshExtractionResult mesh)
@@ -120,30 +119,9 @@ namespace ProceduralCreature.Appearance
                     partScales[p] = app.NoiseScale;
                 }
 
-                int batchSize = Mathf.Max(1, ScratchValueBudget / Mathf.Max(maxOps, 1));
-                var scratch = new NativeArray<float>(batchSize * maxOps, Allocator.Persistent);
-                try
-                {
-                    for (int p = 0; p < compiledParts.Count; p++)
-                    {
-                        SdfProgram program = compiledParts[p].Program;
-                        if (program == null || !program.Operations.IsCreated) continue;
-                        RunNearestBatches(
-                            program, vertices, nearestDistances, nearestPrograms,
-                            p, isBody: false, maxOps, batchSize, scratch);
-                    }
-
-                    if (bodyProgram != null && bodyProgram.Operations.IsCreated)
-                    {
-                        RunNearestBatches(
-                            bodyProgram, vertices, nearestDistances, nearestPrograms,
-                            compiledParts.Count, isBody: true, maxOps, batchSize, scratch);
-                    }
-                }
-                finally
-                {
-                    scratch.Dispose();
-                }
+                AppearanceResolveBurst.ResolveAll(
+                    compiledParts, bodyProgram, vertices, maxOps,
+                    nearestDistances, nearestPrograms);
 
                 Color defaultColor = AppearanceDefinition.Default.BaseColor;
                 for (int i = 0; i < vertexCount; i++)
@@ -151,7 +129,7 @@ namespace ProceduralCreature.Appearance
                     int winner = nearestPrograms[i];
                     if (winner == compiledParts.Count)
                     {
-                        // Body wins: the managed tail applies the vertical gradient.
+                        // Body wins: the managed tail applies the authored vertical gradient.
                         Color bodyColor = BodyVerticalGradientSampler.EvaluateColor(
                             snapshot == null ? definition.Body?.Appearance : snapshot.BodyAppearance,
                             body, snapshot == null ? definition.Forward : snapshot.Forward, mesh.Positions[i]);
@@ -186,33 +164,6 @@ namespace ProceduralCreature.Appearance
             }
         }
 
-        private static void RunNearestBatches(
-            SdfProgram program, NativeArray<float3> vertices,
-            NativeArray<float> nearestDistances, NativeArray<int> nearestPrograms,
-            int programIndex, bool isBody, int maxOps, int batchSize, NativeArray<float> scratch)
-        {
-            int vertexCount = vertices.Length;
-            for (int start = 0; start < vertexCount; start += batchSize)
-            {
-                int count = Mathf.Min(batchSize, vertexCount - start);
-                var job = new NearestAppearanceCandidateJob
-                {
-                    Operations = program.Operations,
-                    RootIndex = program.RootIndex,
-                    InfluenceRadius = program.InfluenceRadius,
-                    Vertices = vertices,
-                    NearestDistances = nearestDistances,
-                    NearestPrograms = nearestPrograms,
-                    ProgramIndex = programIndex,
-                    IsBody = isBody,
-                    VertexStart = start,
-                    ScratchValues = scratch,
-                    ScratchStride = maxOps,
-                };
-                job.Schedule(count, 64).Complete();
-            }
-        }
-
         public static Color[] BakePart(CreaturePart part, IReadOnlyList<Vector3> positions, IReadOnlyList<Vector3> normals)
         {
             if (part == null) throw new DomainException("part must not be null.");
@@ -235,43 +186,6 @@ namespace ProceduralCreature.Appearance
             float brightness = 1f + (noise * 2f - 1f) * BrightnessVariation;
             return new Color(Mathf.Clamp01(baseColor.r * brightness), Mathf.Clamp01(baseColor.g * brightness),
                 Mathf.Clamp01(baseColor.b * brightness), baseColor.a);
-        }
-    }
-
-    [BurstCompile]
-    public struct NearestAppearanceCandidateJob : IJobParallelFor
-    {
-        [ReadOnly] public NativeArray<SdfOperation>.ReadOnly Operations;
-        [ReadOnly] public NativeArray<float3> Vertices;
-        public NativeArray<float> NearestDistances;
-        public NativeArray<int> NearestPrograms;
-        public NativeArray<float> ScratchValues;
-        public int RootIndex;
-        public int ProgramIndex;
-        public int VertexStart;
-        public int ScratchStride;
-        public float InfluenceRadius;
-        public bool IsBody;
-
-        public void Execute(int index)
-        {
-            int vertexIndex = VertexStart + index;
-            float3 point = Vertices[vertexIndex];
-            float raw = SdfProgramEvaluator.EvaluateInto(
-                Operations, RootIndex, point, ScratchValues, index * ScratchStride,
-                InfluenceRadius, allowCulling: true);
-            float candidate = math.abs(raw);
-            if (float.IsPositiveInfinity(candidate)) return;
-
-            float current = NearestDistances[vertexIndex];
-            // Parts use strict-less ordering, preserving compiled-part order.
-            // The Body uses non-strict comparison and therefore wins an exact tie.
-            bool wins = IsBody ? candidate <= current : candidate < current;
-            if (wins)
-            {
-                NearestDistances[vertexIndex] = candidate;
-                NearestPrograms[vertexIndex] = ProgramIndex;
-            }
         }
     }
 }
