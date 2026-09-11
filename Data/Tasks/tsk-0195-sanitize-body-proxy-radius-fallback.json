@@ -20,14 +20,21 @@
   "attachments": [],
   "externalLinks": [],
   "linkedPages": [],
-  "comments": [],
+  "comments": [
+    {
+      "id": "c-8a2d79c67c8344f7a8b3e9f9d9195c11",
+      "author": "anonymous",
+      "body": "Implemented 2026-09-11. ResolveBodyProxyRadius now sanitizes BoneSpec.Radius before accumulation, preserving the documented deterministic fallback for non-finite/non-positive values. Added a single parameterized regression covering NaN, +Infinity, and -Infinity and asserting finite fallback output. Validation blocker: Unity 6000.5.9f1 is not available in this cloud environment, so PlayMode execution and Done status remain deferred; source-level change is complete pending executable evidence.",
+      "createdAtUtc": "2026-09-11T04:00:00Z"
+    }
+  ],
   "epicId": null,
   "parentId": "TSK-0077",
   "dueDateUtc": null,
   "createdAtUtc": "2026-09-11T03:55:00Z",
-  "updatedAtUtc": "2026-09-11T03:55:00Z",
+  "updatedAtUtc": "2026-09-11T04:00:00Z",
   "completedAtUtc": null,
-  "revision": 1,
+  "revision": 2,
   "isArchived": false,
   "hasLoadError": false,
   "loadError": null,
