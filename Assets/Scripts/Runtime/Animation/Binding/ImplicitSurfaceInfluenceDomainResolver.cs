@@ -65,7 +65,12 @@ namespace ProceduralCreature.Animation.Binding
                 scratchLength = Math.Max(scratchLength, parts[i].Program.Operations.Length);
             }
 
-            var scratch = new NativeArray<float>(scratchLength, Allocator.Temp);
+            // GenerateData executes on the scheduler's .NET thread-pool worker,
+            // not a Unity main/job worker thread. Allocator.Temp is therefore
+            // invalid here; keep this short-lived build-time scratch allocation
+            // explicitly cross-thread-safe. The array is always disposed in the
+            // finally block below, so its lifetime remains bounded to this call.
+            var scratch = new NativeArray<float>(scratchLength, Allocator.Persistent);
             try
             {
                 // Build the hierarchy domains once per resolved part/side. Domain
