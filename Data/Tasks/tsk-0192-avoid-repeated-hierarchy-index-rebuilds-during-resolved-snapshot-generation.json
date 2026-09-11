@@ -21,16 +21,23 @@
   "attachments": [],
   "externalLinks": [],
   "linkedPages": [],
-  "comments": [],
+  "comments": [
+    {
+      "id": "c-36d017226a5e4a1abbf2af473e4b7d2e",
+      "author": "anonymous",
+      "body": "## Audit corroboration (2026-09-10)\nRound 22 \u0060docs/audits/creaturecreator-round22-definitionvalidator-hierarchy-rebuild-2026-09-09.md\u0060 confirms the hierarchy-index mechanism is broader than resolved generation: \u0060DefinitionValidator.Validate\u0060 rebuilds the index eight times per call, with six \u0060.Parts\u0060 loops that do not need an index. Keep this finding under TSK-0192, extending its acceptance criteria to thread one index through validation or use direct \u0060definition.Parts\u0060 where no hierarchy lookup is required. Do not create a duplicate hierarchy task.",
+      "createdAtUtc": "2026-09-10T23:08:22.5902196Z"
+    }
+  ],
   "epicId": null,
   "parentId": "TSK-0077",
   "dueDateUtc": null,
   "createdAtUtc": "2026-09-10T16:26:54.2933729Z",
-  "updatedAtUtc": "2026-09-10T16:26:54.2933729Z",
+  "updatedAtUtc": "2026-09-10T23:08:22.5902196Z",
   "completedAtUtc": null,
-  "revision": 1,
+  "revision": 2,
   "isArchived": false,
   "hasLoadError": false,
   "loadError": null,
-  "sourceFilePath": null
+  "sourceFilePath": "tsk-0192-avoid-repeated-hierarchy-index-rebuilds-during-resolved-snapshot-generation.json"
 }
