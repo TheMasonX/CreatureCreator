@@ -48,13 +48,15 @@ namespace ProceduralCreature.Generation
             GenerationDiagnostics diagnostics = null)
         {
             ResolvedCreatureSnapshot snapshot = ValidateAndResolve(definition, diagnostics);
+            SkeletonSnapshot skeletonSnapshot = SkeletonSnapshot.Capture(SkeletonInferrer.Infer(snapshot));
 
             DensityGrid grid = GenerateImplicitField(definition, snapshot, diagnostics);
             MeshExtractionResult meshResult = ExtractMesh(grid, diagnostics);
             MeshTopologyReport generatedTopologyReport = ValidateMesh(meshResult, diagnostics);
             Color[] colors = BakeAppearance(definition, snapshot, meshResult, diagnostics);
 
-            return new GeneratedCreatureData(definition, snapshot, meshResult, colors, generatedTopologyReport);
+            return new GeneratedCreatureData(
+                definition, snapshot, meshResult, colors, generatedTopologyReport, skeletonSnapshot);
         }
 
         private static ResolvedCreatureSnapshot ValidateAndResolve(
@@ -219,7 +221,12 @@ namespace ProceduralCreature.Generation
             GeneratedCreatureData data,
             Func<string, Mesh> meshResolver)
         {
-            SkeletonSnapshot skeleton = SkeletonSnapshot.Capture(SkeletonInferrer.Infer(data.Snapshot));
+            SkeletonSnapshot skeleton = data.SkeletonSnapshot;
+            if (skeleton == null)
+            {
+                throw new DomainException("generated data must carry a resolved skeleton snapshot for mesh-asset binding.");
+            }
+
             var meshParts = data.Snapshot.PartsById.Values
                 .Where(p => p.HasMeshGeometry)
                 .OrderBy(p => p.Id, StringComparer.Ordinal);
