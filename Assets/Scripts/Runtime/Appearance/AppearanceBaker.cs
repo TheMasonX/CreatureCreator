@@ -15,8 +15,7 @@ namespace ProceduralCreature.Appearance
     /// Bakes per-vertex colors onto an extracted mesh: for each vertex, resolves
     /// which part's appearance parameters apply (PartAppearanceSampler), then
     /// modulates that part's BaseColor by triplanar noise (TriplanarNoise) for
-    /// surface variation. A separate stage from mesh extraction (design doc §8),
-    /// consuming MeshExtractionResult's plain data rather than a Unity Mesh.
+    /// surface variation.
     /// </summary>
     public static class AppearanceBaker
     {
@@ -99,9 +98,14 @@ namespace ProceduralCreature.Appearance
             var vertices = new NativeArray<float3>(vertexCount, Allocator.Persistent);
             var nearestDistances = new NativeArray<float>(vertexCount, Allocator.Persistent);
             var nearestPrograms = new NativeArray<int>(vertexCount, Allocator.Persistent);
-            var partColors = new NativeArray<float4>(compiledParts.Count, Allocator.Persistent);
-            var partSeeds = new NativeArray<int>(compiledParts.Count, Allocator.Persistent);
-            var partScales = new NativeArray<float>(compiledParts.Count, Allocator.Persistent);
+
+            // Body frames are part of the resolved snapshot when the main generation
+            // path is used. For compatibility callers without a snapshot still derive
+            // them once per bake — never once per vertex.
+            Vector3 forward = snapshot == null ? definition.Forward : snapshot.Forward;
+            BodyFrame[] bodyFrames = body.SamplePositions != null && body.SamplePositions.Count > 0
+                ? snapshot?.BodyFrames ?? BodyFrameResolver.ComputeSampleFrames(body, forward)
+                : null;
             try
             {
                 for (int i = 0; i < vertexCount; i++)
@@ -109,14 +113,6 @@ namespace ProceduralCreature.Appearance
                     vertices[i] = new float3(mesh.Positions[i].x, mesh.Positions[i].y, mesh.Positions[i].z);
                     nearestDistances[i] = float.PositiveInfinity;
                     nearestPrograms[i] = -1;
-                }
-
-                for (int p = 0; p < compiledParts.Count; p++)
-                {
-                    AppearanceDefinition app = compiledParts[p].Part.Appearance;
-                    partColors[p] = new float4(app.BaseColor.r, app.BaseColor.g, app.BaseColor.b, app.BaseColor.a);
-                    partSeeds[p] = app.NoiseSeed;
-                    partScales[p] = app.NoiseScale;
                 }
 
                 AppearanceResolveBurst.ResolveAll(
@@ -129,10 +125,9 @@ namespace ProceduralCreature.Appearance
                     int winner = nearestPrograms[i];
                     if (winner == compiledParts.Count)
                     {
-                        // Body wins: the managed tail applies the authored vertical gradient.
                         Color bodyColor = BodyVerticalGradientSampler.EvaluateColor(
                             snapshot == null ? definition.Body?.Appearance : snapshot.BodyAppearance,
-                            body, snapshot == null ? definition.Forward : snapshot.Forward, mesh.Positions[i]);
+                            body, forward, bodyFrames, mesh.Positions[i]);
                         colors[i] = BakeVertexColor(mesh.Positions[i], mesh.Normals[i], bodyColor, 0, 1f);
                     }
                     else
@@ -142,10 +137,10 @@ namespace ProceduralCreature.Appearance
                         float scale;
                         if (winner >= 0)
                         {
-                            float4 resolvedColor = partColors[winner];
-                            baseColor = new Color(resolvedColor.x, resolvedColor.y, resolvedColor.z, resolvedColor.w);
-                            seed = partSeeds[winner];
-                            scale = partScales[winner];
+                            AppearanceDefinition appearance = compiledParts[winner].Part.Appearance;
+                            baseColor = appearance.BaseColor;
+                            seed = appearance.NoiseSeed;
+                            scale = appearance.NoiseScale;
                         }
                         else
                         {
@@ -160,7 +155,6 @@ namespace ProceduralCreature.Appearance
             finally
             {
                 vertices.Dispose(); nearestDistances.Dispose(); nearestPrograms.Dispose();
-                partColors.Dispose(); partSeeds.Dispose(); partScales.Dispose();
             }
         }
 
