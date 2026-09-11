@@ -32,15 +32,21 @@
       "author": "ChatGPT",
       "body": "Review correction before validation: the first row-batching implementation shared one scratch buffer across parallel work items, which could race. The current implementation allocates bounded per-work-item scratch slices (RowsPerExecute chosen under an 8 MB budget) and offsets each row into its own slice. The unsafe version is no longer the branch state.",
       "createdAtUtc": "2026-09-10T00:00:00Z"
+    },
+    {
+      "id": "c-chatgpt-20260911-council",
+      "author": "ChatGPT",
+      "body": "Council review 2026-09-11: 14-seat review passed the compile/dependency, Burst ABI, threading/allocator, scratch-isolation, row-layout/parity, streamed appearance semantics, Body-frame reuse integration, integer ownership, numerical safety, topology/winding, determinism, profiling methodology, task architecture, and maintainability dimensions with no new confirmed correctness defect beyond the compiler import. The compile error is fixed in bc40c3e08ae050fa4b61c8adc5e7be8eb9ca28fa by adding Unity.Burst to DensityGrid. The council requires Unity compilation plus focused sampling/appearance/extraction parity, repeated determinism, topology, and fresh benchmark validation before this task can close. Dense ownership memory at very high grids and the sparse candidate-region prototype remain explicitly unvalidated follow-up concerns.",
+      "createdAtUtc": "2026-09-11T00:00:00Z"
     }
   ],
   "epicId": null,
   "parentId": "tsk-0008-profile-and-optimize-preview-generation-hotspots",
   "dueDateUtc": null,
   "createdAtUtc": "2026-09-10T00:00:00Z",
-  "updatedAtUtc": "2026-09-10T00:00:00Z",
+  "updatedAtUtc": "2026-09-11T00:00:00Z",
   "completedAtUtc": null,
-  "revision": 3,
+  "revision": 4,
   "isArchived": false,
   "hasLoadError": false,
   "loadError": null,
