@@ -34,5 +34,9 @@
   "createdAtUtc": "2026-09-10T00:00:00Z",
   "updatedAtUtc": "2026-09-11T00:00:00Z",
   "completedAtUtc": null,
+  "revision": 3,
+  "isArchived": false,
+  "hasLoadError": false,
+  "loadError": null,
   "sourceFilePath": "tsk-0199-reuse-resolved-body-frames-in-appearance-bake.json"
 }
