@@ -4,6 +4,7 @@ using System.Collections.ObjectModel;
 using ProceduralCreature.Morphology.Extraction;
 using ProceduralCreature.Definition;
 using ProceduralCreature.Common;
+using ProceduralCreature.Skeleton;
 using UnityEngine;
 
 namespace ProceduralCreature.Generation
@@ -12,6 +13,8 @@ namespace ProceduralCreature.Generation
     /// Immutable handoff between pure generation and Unity assembly.
     /// Mutable definition/array inputs supplied by a producer are defensively copied
     /// so consumers cannot mutate the generated result through this object.
+    /// Resolved runtime correspondence such as the skeleton snapshot is carried
+    /// forward so downstream assembly does not reinterpret or re-infer the definition.
     /// </summary>
     public sealed class GeneratedCreatureData
     {
@@ -23,6 +26,17 @@ namespace ProceduralCreature.Generation
             MeshExtractionResult meshResult,
             Color[] colors,
             MeshTopologyReport topologyReport)
+            : this(definition, snapshot, meshResult, colors, topologyReport, null)
+        {
+        }
+
+        public GeneratedCreatureData(
+            CreatureDefinition definition,
+            ResolvedCreatureSnapshot snapshot,
+            MeshExtractionResult meshResult,
+            Color[] colors,
+            MeshTopologyReport topologyReport,
+            SkeletonSnapshot skeletonSnapshot)
         {
             if (definition == null) throw new ArgumentNullException(nameof(definition));
             if (snapshot == null) throw new ArgumentNullException(nameof(snapshot));
@@ -35,6 +49,7 @@ namespace ProceduralCreature.Generation
             MeshResult = meshResult;
             _colors = new ReadOnlyCollection<Color>((Color[])colors.Clone());
             TopologyReport = topologyReport;
+            SkeletonSnapshot = skeletonSnapshot;
         }
 
         public CreatureDefinition Definition { get; }
@@ -42,5 +57,6 @@ namespace ProceduralCreature.Generation
         public MeshExtractionResult MeshResult { get; }
         public IReadOnlyList<Color> Colors => _colors;
         public MeshTopologyReport TopologyReport { get; }
+        public SkeletonSnapshot SkeletonSnapshot { get; }
     }
 }
