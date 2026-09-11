@@ -10,30 +10,59 @@ using ProceduralCreature.Morphology.Sdf;
 
 namespace ProceduralCreature.Morphology.Extraction
 {
+    /// <summary>
+    /// A fixed-resolution 3D grid of SDF corner samples covering a creature's
+    /// bounds. Corner-count per axis follows the same ceiling formula as
+    /// <c>GenerationSettings.EstimateVoxelCount</c>; callers must have run the
+    /// corner-sample budget check before calling <see cref="SamplePortable"/>.
+    ///
+    /// CC-064 non-finite contract: fast samples may read <c>+inf</c>
+    /// (outside/culled), never NaN. Grid consumers (min/max, interpolation,
+    /// gradient) must treat <c>+inf</c> as absent, not as a giant finite distance.
+    /// </summary>
     public sealed class DensityGrid : IDisposable
     {
         private const int ScratchValueBudget = 8 * 1024 * 1024;
         private const int MaxRowsPerExecute = 8;
         private NativeArray<float> _samples;
+
         public int CellsX { get; }
         public int CellsY { get; }
         public int CellsZ { get; }
         public Vector3 Origin { get; }
         public float CellSize { get; }
         public int SampleCount => _samples.Length;
+
+        /// <summary>
+        /// Native corner samples, exposed for Burst consumers (for example the
+        /// active-cell scan). Read-only for callers; the grid owns the buffer's
+        /// lifetime and releases it in <see cref="Dispose"/>.
+        /// </summary>
         public NativeArray<float>.ReadOnly Samples => _samples.AsReadOnly();
+
         internal NativeArray<float> MutableSamples => _samples;
+
         private int CornersX => CellsX + 1;
         private int CornersY => CellsY + 1;
+        private int CornersZ => CellsZ + 1;
 
         private DensityGrid(int cellsX, int cellsY, int cellsZ, Vector3 origin, float cellSize, NativeArray<float> samples)
         {
-            CellsX = cellsX; CellsY = cellsY; CellsZ = cellsZ; Origin = origin; CellSize = cellSize; _samples = samples;
+            CellsX = cellsX;
+            CellsY = cellsY;
+            CellsZ = cellsZ;
+            Origin = origin;
+            CellSize = cellSize;
+            _samples = samples;
         }
 
         public void Dispose()
         {
-            if (_samples.IsCreated) { _samples.Dispose(); _samples = default; }
+            if (_samples.IsCreated)
+            {
+                _samples.Dispose();
+                _samples = default;
+            }
         }
 
         public static DensityGrid SamplePortable(SdfProgram program, BoundsDefinition bounds, GenerationSettings settings)
@@ -49,44 +78,46 @@ namespace ProceduralCreature.Morphology.Extraction
             int cornersY = cellsY + 1;
             int cornersZ = cellsZ + 1;
             long cornerCountLong = (long)cornersX * cornersY * cornersZ;
-            if (cornerCountLong > int.MaxValue) throw new DomainException("Grid corner count exceeds addressable array size.");
+            if (cornerCountLong > int.MaxValue)
+            {
+                throw new DomainException("Grid corner count exceeds addressable array size.");
+            }
 
             var origin = new Vector3(-bounds.MaxX, -bounds.MaxY, -bounds.MaxZ);
-            var samples = new NativeArray<float>((int)cornerCountLong, Allocator.Persistent, NativeArrayOptions.UninitializedMemory);
+            var samples = new NativeArray<float>((int)cornerCountLong, Allocator.Persistent);
             int operationCount = program.Operations.Length;
-            if (operationCount <= 0) { samples.Dispose(); throw new DomainException("Portable program must contain at least one operation."); }
-            if (program.RootIndex < 0 || program.RootIndex >= operationCount) { samples.Dispose(); throw new DomainException("Portable program root index must identify an operation."); }
-
-            long rowScratchLength = (long)cornersX * operationCount;
-            if (rowScratchLength > int.MaxValue)
+            if (operationCount <= 0)
             {
                 samples.Dispose();
-                throw new DomainException("Portable sampler scratch buffer exceeds addressable array size.");
+                throw new DomainException("Portable program must contain at least one operation.");
             }
-            int rowsPerExecute = Mathf.Max(1, Mathf.Min(MaxRowsPerExecute, (int)(ScratchValueBudget / Mathf.Max(rowScratchLength, 1L))));
-            long scratchLength = rowScratchLength * rowsPerExecute;
+
+            if (program.RootIndex < 0 || program.RootIndex >= operationCount)
+            {
+                samples.Dispose();
+                throw new DomainException("Portable program root index must identify an operation.");
+            }
+
+            // Work is naturally row-shaped: one parallel item owns one (y,z)
+            // row and walks x contiguously. This preserves the exact point
+            // expression/evaluator semantics while removing per-sample index
+            // decomposition and reducing scratch storage to one row.
+            long scratchLength = (long)cornersX * operationCount;
             if (scratchLength > int.MaxValue)
             {
                 samples.Dispose();
                 throw new DomainException("Portable sampler scratch buffer exceeds addressable array size.");
             }
 
-            var scratchValues = new NativeArray<float>((int)scratchLength, Allocator.Persistent, NativeArrayOptions.UninitializedMemory);
+            var scratchValues = new NativeArray<float>((int)scratchLength, Allocator.Persistent);
             try
             {
-                bool sparse = program.HasPotentialBounds && TryComputeCandidateBox(
-                    origin, cellSize, cellsX, cellsY, cellsZ,
-                    program.PotentialMinBound, program.PotentialMaxBound, program.InfluenceRadius,
-                    out int minX, out int maxX, out int minY, out int maxY, out int minZ, out int maxZ)
-                    && !(minX == 0 && maxX == cellsX && minY == 0 && maxY == cellsY && minZ == 0 && maxZ == cellsZ);
+                bool rootHasPotentialBounds = program.HasPotentialBounds;
+                float3 rootMin = program.PotentialMinBound;
+                float3 rootMax = program.PotentialMaxBound;
+                int rowCount = cornersY * cornersZ;
 
-                JobHandle dependency = default;
-                if (sparse)
-                {
-                    dependency = new FillInfinityJob { Samples = samples }.Schedule(samples.Length, 256);
-                }
-
-                var job = new SdfSamplingRowBatchJob
+                var job = new SdfSamplingRowJob
                 {
                     Operations = program.Operations,
                     ScratchValues = scratchValues,
@@ -97,22 +128,11 @@ namespace ProceduralCreature.Morphology.Extraction
                     Origin = new float3(origin.x, origin.y, origin.z),
                     CellSize = cellSize,
                     InfluenceRadius = program.InfluenceRadius,
-                    RootHasPotentialBounds = program.HasPotentialBounds,
-                    RootPotentialMinBound = program.PotentialMinBound,
-                    RootPotentialMaxBound = program.PotentialMaxBound,
-                    RowsPerExecute = rowsPerExecute,
-                    Sparse = sparse,
-                    MinX = sparse ? minX : 0,
-                    MaxX = sparse ? maxX : cellsX,
-                    MinY = sparse ? minY : 0,
-                    MaxY = sparse ? maxY : cellsY,
-                    MinZ = sparse ? minZ : 0,
-                    MaxZ = sparse ? maxZ : cellsZ,
+                    RootHasPotentialBounds = rootHasPotentialBounds,
+                    RootPotentialMinBound = rootMin,
+                    RootPotentialMaxBound = rootMax,
                 };
-
-                int candidateRows = (job.MaxY - job.MinY + 1) * (job.MaxZ - job.MinZ + 1);
-                int workItemCount = (candidateRows + rowsPerExecute - 1) / rowsPerExecute;
-                job.Schedule(workItemCount, 1, dependency).Complete();
+                job.Schedule(rowCount, 1).Complete();
 
                 var grid = new DensityGrid(cellsX, cellsY, cellsZ, origin, cellSize, samples);
                 samples = default;
@@ -121,59 +141,54 @@ namespace ProceduralCreature.Morphology.Extraction
             finally
             {
                 scratchValues.Dispose();
-                if (samples.IsCreated) samples.Dispose();
+                if (samples.IsCreated)
+                {
+                    samples.Dispose();
+                }
             }
-        }
-
-        private static bool TryComputeCandidateBox(
-            Vector3 origin, float cellSize,
-            int cellsX, int cellsY, int cellsZ,
-            float3 potentialMin, float3 potentialMax, float influenceRadius,
-            out int minX, out int maxX, out int minY, out int maxY, out int minZ, out int maxZ)
-        {
-            minX = maxX = minY = maxY = minZ = maxZ = 0;
-            if (!NumericValidity.IsFinite(potentialMin.x) || !NumericValidity.IsFinite(potentialMin.y) || !NumericValidity.IsFinite(potentialMin.z)
-                || !NumericValidity.IsFinite(potentialMax.x) || !NumericValidity.IsFinite(potentialMax.y) || !NumericValidity.IsFinite(potentialMax.z)
-                || !NumericValidity.IsFinite(influenceRadius) || influenceRadius < 0f)
-            {
-                return false;
-            }
-
-            float expandedMinX = potentialMin.x - influenceRadius;
-            float expandedMinY = potentialMin.y - influenceRadius;
-            float expandedMinZ = potentialMin.z - influenceRadius;
-            float expandedMaxX = potentialMax.x + influenceRadius;
-            float expandedMaxY = potentialMax.y + influenceRadius;
-            float expandedMaxZ = potentialMax.z + influenceRadius;
-
-            minX = Mathf.Clamp(Mathf.FloorToInt((expandedMinX - origin.x) / cellSize), 0, cellsX);
-            maxX = Mathf.Clamp(Mathf.CeilToInt((expandedMaxX - origin.x) / cellSize), 0, cellsX);
-            minY = Mathf.Clamp(Mathf.FloorToInt((expandedMinY - origin.y) / cellSize), 0, cellsY);
-            maxY = Mathf.Clamp(Mathf.CeilToInt((expandedMaxY - origin.y) / cellSize), 0, cellsY);
-            minZ = Mathf.Clamp(Mathf.FloorToInt((expandedMinZ - origin.z) / cellSize), 0, cellsZ);
-            maxZ = Mathf.Clamp(Mathf.CeilToInt((expandedMaxZ - origin.z) / cellSize), 0, cellsZ);
-            return minX <= maxX && minY <= maxY && minZ <= maxZ;
         }
 
         private static void ValidateSamplingInputs(BoundsDefinition bounds, GenerationSettings settings)
         {
-            if (!bounds.IsFinite() || !bounds.IsPositive()) throw new DomainException("Cannot sample a grid over invalid bounds; validate first.");
-            if (!settings.IsFinite() || !settings.IsPositive()) throw new DomainException("Cannot sample a grid with invalid GenerationSettings; validate first.");
+            if (!bounds.IsFinite() || !bounds.IsPositive())
+            {
+                throw new DomainException("Cannot sample a grid over invalid bounds; validate first.");
+            }
+            if (!settings.IsFinite() || !settings.IsPositive())
+            {
+                throw new DomainException("Cannot sample a grid with invalid GenerationSettings; validate first.");
+            }
         }
 
-        public Vector3 CornerPosition(int x, int y, int z) => Origin + new Vector3(x, y, z) * CellSize;
-        public float GetSample(int x, int y, int z) => _samples[Index(x, y, z)];
+        public Vector3 CornerPosition(int x, int y, int z)
+        {
+            return Origin + new Vector3(x, y, z) * CellSize;
+        }
+
+        public float GetSample(int x, int y, int z)
+        {
+            return _samples[Index(x, y, z)];
+        }
 
         public void CopyCellCornerSamples(int x, int y, int z, float[] destination)
         {
-            if (destination == null || destination.Length < 8) throw new DomainException("destination must have at least 8 entries.");
+            if (destination == null || destination.Length < 8)
+            {
+                throw new DomainException("destination must have at least 8 entries.");
+            }
+
             int rowStride = CornersX;
             int sliceStride = CornersX * CornersY;
             int baseIndex = (z * CornersY + y) * CornersX + x;
-            destination[0] = _samples[baseIndex]; destination[1] = _samples[baseIndex + 1];
-            destination[2] = _samples[baseIndex + rowStride]; destination[3] = _samples[baseIndex + rowStride + 1];
-            destination[4] = _samples[baseIndex + sliceStride]; destination[5] = _samples[baseIndex + sliceStride + 1];
-            destination[6] = _samples[baseIndex + sliceStride + rowStride]; destination[7] = _samples[baseIndex + sliceStride + rowStride + 1];
+
+            destination[0] = _samples[baseIndex];
+            destination[1] = _samples[baseIndex + 1];
+            destination[2] = _samples[baseIndex + rowStride];
+            destination[3] = _samples[baseIndex + rowStride + 1];
+            destination[4] = _samples[baseIndex + sliceStride];
+            destination[5] = _samples[baseIndex + sliceStride + 1];
+            destination[6] = _samples[baseIndex + sliceStride + rowStride];
+            destination[7] = _samples[baseIndex + sliceStride + rowStride + 1];
         }
 
         public Vector3 EstimateGradient(Vector3 point)
@@ -181,53 +196,104 @@ namespace ProceduralCreature.Morphology.Extraction
             int x = Mathf.Clamp(Mathf.RoundToInt((point.x - Origin.x) / CellSize), 0, CellsX);
             int y = Mathf.Clamp(Mathf.RoundToInt((point.y - Origin.y) / CellSize), 0, CellsY);
             int z = Mathf.Clamp(Mathf.RoundToInt((point.z - Origin.z) / CellSize), 0, CellsZ);
-            int previousX = Mathf.Max(x - 1, 0); int nextX = Mathf.Min(x + 1, CellsX);
-            int previousY = Mathf.Max(y - 1, 0); int nextY = Mathf.Min(y + 1, CellsY);
-            int previousZ = Mathf.Max(z - 1, 0); int nextZ = Mathf.Min(z + 1, CellsZ);
-            float gx = EstimateAxis(GetSample(previousX, y, z), GetSample(x, y, z), GetSample(nextX, y, z), (nextX - previousX) * CellSize);
-            float gy = EstimateAxis(GetSample(x, previousY, z), GetSample(x, y, z), GetSample(x, nextY, z), (nextY - previousY) * CellSize);
-            float gz = EstimateAxis(GetSample(x, y, previousZ), GetSample(x, y, z), GetSample(x, y, nextZ), (nextZ - previousZ) * CellSize);
+
+            int previousX = Mathf.Max(x - 1, 0);
+            int nextX = Mathf.Min(x + 1, CellsX);
+            int previousY = Mathf.Max(y - 1, 0);
+            int nextY = Mathf.Min(y + 1, CellsY);
+            int previousZ = Mathf.Max(z - 1, 0);
+            int nextZ = Mathf.Min(z + 1, CellsZ);
+
+            float gx = EstimateAxis(GetSample(previousX, y, z), GetSample(x, y, z), GetSample(nextX, y, z),
+                (nextX - previousX) * CellSize);
+            float gy = EstimateAxis(GetSample(x, previousY, z), GetSample(x, y, z), GetSample(x, nextY, z),
+                (nextY - previousY) * CellSize);
+            float gz = EstimateAxis(GetSample(x, y, previousZ), GetSample(x, y, z), GetSample(x, y, nextZ),
+                (nextZ - previousZ) * CellSize);
+
             return new Vector3(gx, gy, gz);
         }
 
         public bool TryEstimateGradient(Vector3 point, out Vector3 gradient)
         {
             gradient = Vector3.zero;
-            float fx = (point.x - Origin.x) / CellSize; float fy = (point.y - Origin.y) / CellSize; float fz = (point.z - Origin.z) / CellSize;
-            int x = Mathf.Clamp(Mathf.FloorToInt(fx), 0, CellsX - 1); int y = Mathf.Clamp(Mathf.FloorToInt(fy), 0, CellsY - 1); int z = Mathf.Clamp(Mathf.FloorToInt(fz), 0, CellsZ - 1);
-            int x1 = x + 1, y1 = y + 1, z1 = z + 1;
-            float u = fx - x, v = fy - y, w = fz - z;
-            float c000 = _samples[Index(x, y, z)], c100 = _samples[Index(x1, y, z)], c010 = _samples[Index(x, y1, z)], c110 = _samples[Index(x1, y1, z)];
-            float c001 = _samples[Index(x, y, z1)], c101 = _samples[Index(x1, y, z1)], c011 = _samples[Index(x, y1, z1)], c111 = _samples[Index(x1, y1, z1)];
-            if (!NumericValidity.IsFinite(c000) || !NumericValidity.IsFinite(c100) || !NumericValidity.IsFinite(c010) || !NumericValidity.IsFinite(c110) || !NumericValidity.IsFinite(c001) || !NumericValidity.IsFinite(c101) || !NumericValidity.IsFinite(c011) || !NumericValidity.IsFinite(c111)) return false;
-            float du = (c100 - c000) * (1f - v) * (1f - w) + (c110 - c010) * v * (1f - w) + (c101 - c001) * (1f - v) * w + (c111 - c011) * v * w;
-            float dv = (c010 - c000) * (1f - u) * (1f - w) + (c110 - c100) * u * (1f - w) + (c011 - c001) * (1f - u) * w + (c111 - c101) * u * w;
-            float dw = (c001 - c000) * (1f - u) * (1f - v) + (c101 - c100) * u * (1f - v) + (c011 - c001) * (1f - u) * v + (c111 - c110) * u * v;
-            gradient = new Vector3(du / CellSize, dv / CellSize, dw / CellSize); return true;
+            float fx = (point.x - Origin.x) / CellSize;
+            float fy = (point.y - Origin.y) / CellSize;
+            float fz = (point.z - Origin.z) / CellSize;
+
+            int x = Mathf.Clamp(Mathf.FloorToInt(fx), 0, CellsX - 1);
+            int y = Mathf.Clamp(Mathf.FloorToInt(fy), 0, CellsY - 1);
+            int z = Mathf.Clamp(Mathf.FloorToInt(fz), 0, CellsZ - 1);
+            int x1 = x + 1;
+            int y1 = y + 1;
+            int z1 = z + 1;
+            float u = fx - x;
+            float v = fy - y;
+            float w = fz - z;
+
+            float c000 = _samples[Index(x, y, z)];
+            float c100 = _samples[Index(x1, y, z)];
+            float c010 = _samples[Index(x, y1, z)];
+            float c110 = _samples[Index(x1, y1, z)];
+            float c001 = _samples[Index(x, y, z1)];
+            float c101 = _samples[Index(x1, y, z1)];
+            float c011 = _samples[Index(x, y1, z1)];
+            float c111 = _samples[Index(x1, y1, z1)];
+
+            if (!NumericValidity.IsFinite(c000) || !NumericValidity.IsFinite(c100)
+                || !NumericValidity.IsFinite(c010) || !NumericValidity.IsFinite(c110)
+                || !NumericValidity.IsFinite(c001) || !NumericValidity.IsFinite(c101)
+                || !NumericValidity.IsFinite(c011) || !NumericValidity.IsFinite(c111))
+            {
+                return false;
+            }
+
+            float du = (c100 - c000) * (1f - v) * (1f - w)
+                + (c110 - c010) * v * (1f - w)
+                + (c101 - c001) * (1f - v) * w
+                + (c111 - c011) * v * w;
+            float dv = (c010 - c000) * (1f - u) * (1f - w)
+                + (c110 - c100) * u * (1f - w)
+                + (c011 - c001) * (1f - u) * w
+                + (c111 - c101) * u * w;
+            float dw = (c001 - c000) * (1f - u) * (1f - v)
+                + (c101 - c100) * u * (1f - v)
+                + (c011 - c010) * (1f - u) * v
+                + (c111 - c110) * u * v;
+
+            gradient = new Vector3(du / CellSize, dv / CellSize, dw / CellSize);
+            return true;
         }
 
         private static float EstimateAxis(float previous, float center, float next, float span)
         {
             if (span <= 0f || float.IsNaN(center) || float.IsInfinity(center)) return 0f;
-            bool previousFinite = !float.IsNaN(previous) && !float.IsInfinity(previous); bool nextFinite = !float.IsNaN(next) && !float.IsInfinity(next);
-            if (previousFinite && nextFinite) return (next - previous) / span;
-            if (previousFinite) return (center - previous) / (span * 0.5f);
-            if (nextFinite) return (next - center) / (span * 0.5f);
+
+            bool previousFinite = !float.IsNaN(previous) && !float.IsInfinity(previous);
+            bool nextFinite = !float.IsNaN(next) && !float.IsInfinity(next);
+            if (previousFinite && nextFinite)
+            {
+                return (next - previous) / span;
+            }
+            if (previousFinite)
+            {
+                return (center - previous) / (span * 0.5f);
+            }
+            if (nextFinite)
+            {
+                return (next - center) / (span * 0.5f);
+            }
             return 0f;
         }
 
-        private int Index(int x, int y, int z) => (z * CornersY + y) * CornersX + x;
+        private int Index(int x, int y, int z)
+        {
+            return (z * CornersY + y) * CornersX + x;
+        }
     }
 
     [BurstCompile]
-    public struct FillInfinityJob : IJobParallelFor
-    {
-        public NativeArray<float> Samples;
-        public void Execute(int index) => Samples[index] = float.PositiveInfinity;
-    }
-
-    [BurstCompile]
-    public struct SdfSamplingRowBatchJob : IJobParallelFor
+    public struct SdfSamplingRowJob : IJobParallelFor
     {
         [ReadOnly] public NativeArray<SdfOperation>.ReadOnly Operations;
         [NativeDisableParallelForRestriction] public NativeArray<float> ScratchValues;
@@ -241,44 +307,31 @@ namespace ProceduralCreature.Morphology.Extraction
         public bool RootHasPotentialBounds;
         public float3 RootPotentialMinBound;
         public float3 RootPotentialMaxBound;
-        public int RowsPerExecute;
-        public bool Sparse;
-        public int MinX, MaxX, MinY, MaxY, MinZ, MaxZ;
 
-        public void Execute(int workItemIndex)
+        public void Execute(int rowIndex)
         {
-            int firstLocalRow = workItemIndex * RowsPerExecute;
-            int rowCount = (MaxY - MinY + 1) * (MaxZ - MinZ + 1);
-            int localRowEnd = math.min(firstLocalRow + RowsPerExecute, rowCount);
+            int y = rowIndex % CornersY;
+            int z = rowIndex / CornersY;
             int operationCount = Operations.Length;
-            int rowScratchStride = CornersX * operationCount;
+            int sampleBase = (z * CornersY + y) * CornersX;
 
-            for (int localRow = firstLocalRow; localRow < localRowEnd; localRow++)
+            for (int x = 0; x < CornersX; x++)
             {
-                int yzYCount = MaxY - MinY + 1;
-                int zOffset = localRow / yzYCount;
-                int yOffset = localRow - zOffset * yzYCount;
-                int y = MinY + yOffset;
-                int z = MinZ + zOffset;
-                int sampleBase = (z * CornersY + y) * CornersX;
-                int localBatchRow = localRow - firstLocalRow;
-                int rowValueOffset = localBatchRow * rowScratchStride;
+                float3 point = Origin + new float3(x, y, z) * CellSize;
+                int sampleIndex = sampleBase + x;
 
-                for (int x = MinX; x <= MaxX; x++)
+                if (RootHasPotentialBounds &&
+                    (point.x < RootPotentialMinBound.x - InfluenceRadius || point.x > RootPotentialMaxBound.x + InfluenceRadius ||
+                     point.y < RootPotentialMinBound.y - InfluenceRadius || point.y > RootPotentialMaxBound.y + InfluenceRadius ||
+                     point.z < RootPotentialMinBound.z - InfluenceRadius || point.z > RootPotentialMaxBound.z + InfluenceRadius))
                 {
-                    float3 point = Origin + new float3(x, y, z) * CellSize;
-                    int sampleIndex = sampleBase + x;
-                    if (RootHasPotentialBounds &&
-                        (point.x < RootPotentialMinBound.x - InfluenceRadius || point.x > RootPotentialMaxBound.x + InfluenceRadius ||
-                         point.y < RootPotentialMinBound.y - InfluenceRadius || point.y > RootPotentialMaxBound.y + InfluenceRadius ||
-                         point.z < RootPotentialMinBound.z - InfluenceRadius || point.z > RootPotentialMaxBound.z + InfluenceRadius))
-                    {
-                        Samples[sampleIndex] = float.PositiveInfinity;
-                        continue;
-                    }
-                    int valueOffset = rowValueOffset + x * operationCount;
-                    Samples[sampleIndex] = SdfProgramEvaluator.EvaluateInto(Operations, RootIndex, point, ScratchValues, valueOffset, InfluenceRadius, allowCulling: true);
+                    Samples[sampleIndex] = float.PositiveInfinity;
+                    continue;
                 }
+
+                int valueOffset = x * operationCount;
+                Samples[sampleIndex] = SdfProgramEvaluator.EvaluateInto(
+                    Operations, RootIndex, point, ScratchValues, valueOffset, InfluenceRadius, allowCulling: true);
             }
         }
     }
