@@ -10,7 +10,6 @@ using ProceduralCreature.Generation;
 using ProceduralCreature.Skeleton;
 using UnityEditor;
 using UnityEngine;
-using SkeletonModel = ProceduralCreature.Skeleton.Skeleton;
 
 namespace ProceduralCreature.Editor
 {
@@ -109,7 +108,45 @@ namespace ProceduralCreature.Editor
 
             ClearGeometryObjects();
             BindImplicitSurface(implicitSurface.Mesh, definition, snapshot);
+            AttachMeshAssets(generated, snapshot);
+        }
 
+        public void ApplyPreviewGeometry(
+            GeneratedCreature generated,
+            GeneratedCreatureData data)
+        {
+            if (generated == null) throw new ArgumentNullException(nameof(generated));
+            if (data == null) throw new ArgumentNullException(nameof(data));
+            if (_disposed) throw new ObjectDisposedException(nameof(CreaturePreviewController));
+
+            if (!generated.TryGetImplicitSurface(out GeometryItem implicitSurface))
+            {
+                ClearGeometryObjects();
+                return;
+            }
+            if (data.VertexInfluenceDomains == null ||
+                data.VertexInfluenceDomains.Count != implicitSurface.Mesh.vertexCount)
+            {
+                throw new DomainException(
+                    "Generated data has no complete implicit-surface influence-domain correspondence.");
+            }
+            if (data.SkeletonSnapshot == null || data.SkeletonSnapshot.Count == 0)
+            {
+                throw new DomainException("Generated data has no resolved skeleton snapshot for preview binding.");
+            }
+
+            ClearGeometryObjects();
+            BindImplicitSurface(
+                implicitSurface.Mesh,
+                data.Definition,
+                data.Snapshot,
+                data.SkeletonSnapshot,
+                data.VertexInfluenceDomains);
+            AttachMeshAssets(generated, data.Snapshot);
+        }
+
+        private void AttachMeshAssets(GeneratedCreature generated, ResolvedCreatureSnapshot snapshot)
+        {
             CreatureRig rig = GetSingleOwnedComponent<CreatureRig>(clearGeneratedState: false);
             if (rig == null || rig.RestSkeleton == null)
             {
@@ -211,7 +248,59 @@ namespace ProceduralCreature.Editor
             PersistRootEntity(PreviewGameObject.GetEntityId());
         }
 
-        private void BindImplicitSurface(Mesh sourceMesh, CreatureDefinition definition, ResolvedCreatureSnapshot snapshot)
+        private void BindImplicitSurface(
+            Mesh sourceMesh,
+            CreatureDefinition definition,
+            ResolvedCreatureSnapshot snapshot)
+        {
+            SkeletonModel skeleton = SkeletonInferrer.Infer(snapshot);
+            if (skeleton == null || skeleton.Bones.Count == 0)
+            {
+                throw new DomainException("Preview snapshot did not produce a skeleton for the implicit surface.");
+            }
+
+            SkeletonSnapshot snapshotForBinding = SkeletonSnapshot.Capture(skeleton);
+            // This compatibility path predates GeneratedCreatureData correspondence.
+            // Production generation uses the overload below so the binding pass cannot
+            // silently recompile SDF programs or reclassify every vertex.
+            float[] radiiByBoneIndex = MorphologyInfluenceRadiusBridge.BuildRadiiByBoneIndex(
+                snapshotForBinding, snapshot);
+            InfluenceDomain[] vertexDomains = ImplicitSurfaceInfluenceDomainResolver.Resolve(
+                definition, snapshot, sourceMesh.vertices);
+            BindImplicitSurface(
+                sourceMesh,
+                definition,
+                snapshot,
+                snapshotForBinding,
+                vertexDomains,
+                radiiByBoneIndex);
+        }
+
+        private void BindImplicitSurface(
+            Mesh sourceMesh,
+            CreatureDefinition definition,
+            ResolvedCreatureSnapshot snapshot,
+            SkeletonSnapshot skeletonSnapshot,
+            IReadOnlyList<InfluenceDomain> vertexDomains)
+        {
+            float[] radiiByBoneIndex = MorphologyInfluenceRadiusBridge.BuildRadiiByBoneIndex(
+                skeletonSnapshot, snapshot);
+            BindImplicitSurface(
+                sourceMesh,
+                definition,
+                snapshot,
+                skeletonSnapshot,
+                vertexDomains,
+                radiiByBoneIndex);
+        }
+
+        private void BindImplicitSurface(
+            Mesh sourceMesh,
+            CreatureDefinition definition,
+            ResolvedCreatureSnapshot snapshot,
+            SkeletonSnapshot skeletonSnapshot,
+            IReadOnlyList<InfluenceDomain> vertexDomains,
+            IReadOnlyList<float> radiiByBoneIndex)
         {
             EnsurePreviewRoot();
 
@@ -229,29 +318,32 @@ namespace ProceduralCreature.Editor
             if (collider == null) collider = PreviewGameObject.AddComponent<MeshCollider>();
             collider.sharedMesh = sourceMesh;
 
-            SkeletonModel skeleton = SkeletonInferrer.Infer(snapshot);
-            if (skeleton == null || skeleton.Bones.Count == 0)
+            if (skeletonSnapshot == null || skeletonSnapshot.Count == 0)
             {
                 throw new DomainException("Preview snapshot did not produce a skeleton for the implicit surface.");
             }
+            if (vertexDomains == null || vertexDomains.Count != sourceMesh.vertexCount)
+            {
+                throw new DomainException("Preview implicit surface has incomplete influence-domain correspondence.");
+            }
 
-            SkeletonSnapshot snapshotForBinding = SkeletonSnapshot.Capture(skeleton);
             CreatureRig rig = GetSingleOwnedComponent<CreatureRig>();
             if (rig == null) rig = PreviewGameObject.AddComponent<CreatureRig>();
-            rig.Build(skeleton);
-            rig.ApplyPose(PosedSkeleton.FromRestPose(skeleton));
+            rig.Build(skeletonSnapshot);
+            rig.ApplyPose(PosedSkeleton.FromRestPose(skeletonSnapshot));
 
             CreatureSkinnedMeshRenderer skinnedRenderer = GetSingleOwnedComponent<CreatureSkinnedMeshRenderer>();
             if (skinnedRenderer == null) skinnedRenderer = PreviewGameObject.AddComponent<CreatureSkinnedMeshRenderer>();
 
-            float[] radiiByBoneIndex = MorphologyInfluenceRadiusBridge.BuildRadiiByBoneIndex(
-                snapshotForBinding, snapshot);
-            InfluenceDomain[] vertexDomains = ImplicitSurfaceInfluenceDomainResolver.Resolve(
-                definition, snapshot, sourceMesh.vertices);
-
             Material defaultMaterial = _defaultMaterialResolver();
             Material[] materials = defaultMaterial != null ? new[] { defaultMaterial } : null;
-            skinnedRenderer.Bind(rig, skeleton, sourceMesh, radiiByBoneIndex, materials, vertexDomains);
+            skinnedRenderer.Bind(
+                rig,
+                skeletonSnapshot,
+                sourceMesh,
+                radiiByBoneIndex,
+                materials,
+                vertexDomains);
             if (skinnedRenderer.Renderer != null) skinnedRenderer.Renderer.enabled = true;
         }
 
