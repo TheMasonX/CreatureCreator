@@ -1,6 +1,8 @@
 using NUnit.Framework;
+using ProceduralCreature.Common;
 using ProceduralCreature.Definition;
 using ProceduralCreature.Generation;
+using ProceduralCreature.Morphology.Extraction;
 using UnityEngine;
 using System.Collections.Generic;
 
@@ -17,12 +19,13 @@ namespace ProceduralCreature.Tests.Runtime
                 Color.red,
                 Color.green,
             };
+            CreatureDefinition definition = CreateValidDefinition();
             var data = new GeneratedCreatureData(
-                CreatureDefinition.CreateEmpty(),
-                snapshot: null,
-                meshResult: null,
-                colors: source,
-                topologyReport: null);
+                definition,
+                ResolvedCreatureSnapshot.Resolve(definition),
+                new MeshExtractionResult(),
+                source,
+                new MeshTopologyReport());
 
             source[0] = Color.blue;
 
@@ -34,16 +37,16 @@ namespace ProceduralCreature.Tests.Runtime
         [Test]
         public void Constructor_DefensivelyCopiesDefinitionOwnership()
         {
-            CreatureDefinition source = CreatureDefinition.CreateEmpty();
+            CreatureDefinition source = CreateValidDefinition();
             source.Forward = Vector3.right;
             source.Generation = GenerationSettings.Default;
 
             var data = new GeneratedCreatureData(
                 source,
-                snapshot: null,
-                meshResult: null,
-                colors: new[] { Color.white },
-                topologyReport: null);
+                ResolvedCreatureSnapshot.Resolve(source),
+                new MeshExtractionResult(),
+                new[] { Color.white },
+                new MeshTopologyReport());
 
             source.Forward = Vector3.up;
             source.Generation.VoxelsPerUnit = 99;
@@ -56,12 +59,33 @@ namespace ProceduralCreature.Tests.Runtime
         [Test]
         public void Constructor_NullColors_ThrowsDomainException()
         {
-            Assert.Throws<ProceduralCreature.Common.DomainException>(() => new GeneratedCreatureData(
-                CreatureDefinition.CreateEmpty(),
-                snapshot: null,
-                meshResult: null,
+            CreatureDefinition definition = CreateValidDefinition();
+            Assert.Throws<ArgumentNullException>(() => new GeneratedCreatureData(
+                definition,
+                ResolvedCreatureSnapshot.Resolve(definition),
+                new MeshExtractionResult(),
                 colors: null,
-                topologyReport: null));
+                topologyReport: new MeshTopologyReport()));
+        }
+
+        private static CreatureDefinition CreateValidDefinition()
+        {
+            var definition = CreatureDefinition.CreateEmpty();
+            definition.Forward = Vector3.forward;
+            definition.Body.Samples.Clear();
+            definition.Body.Samples.Add(new BodySample
+            {
+                Id = 1,
+                Position = new Vector3(0f, 0f, -1f),
+                Radius = 0.5f,
+            });
+            definition.Body.Samples.Add(new BodySample
+            {
+                Id = 2,
+                Position = new Vector3(0f, 0f, 1f),
+                Radius = 0.5f,
+            });
+            return definition;
         }
     }
 }
