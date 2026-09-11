@@ -73,6 +73,12 @@ Important behaviors:
 5. Add implementation and validation evidence with
    `memorysmith_task_add_comment`.
 6. Create and link a follow-up task for deferred or out-of-scope work.
+7. Before ending a turn that created or renumbered any `TSK-####` record, run
+   `Scripts/Normalize-TaskRecords.ps1` and confirm it reports zero collisions
+   and zero skipped files. Do not rely on visual inspection of the assigned
+   number. If it reports a collision or a skipped file, treat that as an
+   integrity blocker: record it and resolve it before claiming task-board
+   integrity.
 
 ## User Mandates
 

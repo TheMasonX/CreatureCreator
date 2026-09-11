@@ -107,7 +107,12 @@ re-researching from scratch.
   `Data/Tasks/*.json` by hand; change task state only through MemorySmith MCP
   task tools. Do not create legacy `CC-###`/Markdown tickets.
 - Do not commit or create branches unless explicitly requested. Do not revert
-  unrelated worktree changes.
+  unrelated worktree changes. When a branch is explicitly requested, first check
+  whether an existing branch already covers the same scope, and sync new
+  task-key allocation against `main`'s current `Data/Tasks/` state at creation
+  time, not just at merge time. Evidence: recurring `TSK-####` collisions from
+  branch-local numbering (`TSK-0136`, `TSK-0172`, `TSK-0153`, `TSK-0188`,
+  `TSK-0189`).
 
 ## MemorySmith task tools
 

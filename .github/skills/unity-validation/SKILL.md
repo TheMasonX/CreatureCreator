@@ -48,6 +48,12 @@ test mode, selected test or manual action, and any unavailable validation.
 Treat a successful tool call as an operation result, not proof that the editor
 is ready or that the behavior is correct.
 
+Before trusting new debug or visualization tooling as evidence for diagnosing a
+different bug, validate the tool itself against a posed, non-identity state.
+`RigDebugView` mixed rest-space and posed-space coordinates during the
+shoulder-pinch investigation, which confounded the screenshots used as
+diagnostic evidence.
+
 ## When Unity is unavailable
 
 Do not invent a successful Unity result. State that Unity execution is
