@@ -65,6 +65,19 @@ namespace ProceduralCreature.Tests.Editor
             return mesh;
         }
 
+        private static CreaturePart MakePreviewMeshPart(string id)
+        {
+            return new CreaturePart
+            {
+                Id = id,
+                ParentId = CreatureDefinition.BodyId,
+                PartType = PartType.Body,
+                Transform = TransformData.Identity,
+                Shape = ShapeDefinition.DefaultSphere,
+                Appearance = AppearanceDefinition.Default,
+            };
+        }
+
         private static GeneratedCreature BuildGenerated(int extraItems)
         {
             // TSK-0125: GeneratedCreature is immutable to consumers and built only
@@ -83,14 +96,15 @@ namespace ProceduralCreature.Tests.Editor
                 rigBinding: new RigBindingMetadata(GeneratedCreature.ImplicitSurfaceSourceId, null, false)));
             for (int i = 0; i < extraItems; i++)
             {
+                string partId = "extra-" + i;
                 generated.AddGeometry(new GeometryItem(
-                    sourcePartId: "extra-" + i,
+                    sourcePartId: partId,
                     geometryType: GeometryType.MeshAsset,
                     mesh: MakeMesh(),
                     sourceMesh: null,
                     restPlacement: Matrix4x4.identity,
                     materialRegions: null,
-                    rigBinding: new RigBindingMetadata("extra-" + i, null, false)));
+                    rigBinding: new RigBindingMetadata(partId, CreatureDefinition.BodyId, false)));
             }
             return generated;
         }
@@ -145,7 +159,7 @@ namespace ProceduralCreature.Tests.Editor
 
             // Simulated domain reload: the prior controller is dropped but does not
             // destroy the root, so a fresh controller must recover the SAME root by
-            // its recorded instance handle rather than recreating it.
+            // its recorded handle rather than recreating it.
             first.Dispose();
 
             CreaturePreviewController recoveredController = CreateController();
@@ -236,6 +250,11 @@ namespace ProceduralCreature.Tests.Editor
                 Position = new Vector3(0f, 0f, 1f),
                 Radius = 1f,
             });
+            for (int i = 0; i < extraItems; i++)
+            {
+                definition.AddPart(MakePreviewMeshPart("extra-" + i));
+            }
+
             controller.ApplyPreviewGeometry(
                 BuildGenerated(extraItems),
                 definition,
