@@ -36,7 +36,7 @@
     {
       "id": "c-chatgpt-20260911-council",
       "author": "ChatGPT",
-      "body": "Council review 2026-09-11: 14 seats reviewed compiler/dependency, Burst ABI, threading/allocator, scratch isolation, sampling parity, sparse-region safety, appearance semantics, Body-frame reuse, extraction ownership, high-resolution memory, determinism, numerical safety, profiling methodology, and architecture/task hygiene. The user-reported compiler error is fixed in bc40c3e08ae050fa4b61c8adc5e7be8eb9ca28fa. The council initially found an additional shared-scratch race in the retained parallel sampler; this was fixed in 0c20d167b206d3a8cf5d6314dcc933374b770e90 by isolating scratch per work item. The unvalidated sparse candidate-region prototype was removed and moved to TSK-0200. Unity compilation, parity, topology, determinism, allocator safety, and fresh benchmark gates remain open.",
+      "body": "Second static council re-audit 2026-09-11: no regression was found in the corrected row-batched sampler, streamed appearance reducer, or dense extraction ownership. One additional resource-lifetime defect was found outside the prior slice: the public AppearanceBaker.Bake cleanup scope did not cover a failure during body-program compilation, so compiled part programs could leak on that exception path. Fixed in 13c72f2fcaa3704319aa45dd8b581ba810eefef8. Follow-up performance/design findings are tracked under TSK-0201 through TSK-0203; Unity compilation, parity, topology, determinism, and fresh benchmarks remain mandatory gates.",
       "createdAtUtc": "2026-09-11T00:00:00Z"
     }
   ],
@@ -46,9 +46,9 @@
   "createdAtUtc": "2026-09-10T00:00:00Z",
   "updatedAtUtc": "2026-09-11T00:00:00Z",
   "completedAtUtc": null,
-  "revision": 5,
   "isArchived": false,
   "hasLoadError": false,
   "loadError": null,
+  "revision": 6,
   "sourceFilePath": "tsk-0198-stream-preview-generation-hotpaths-and-direct-edge-ownership.json"
 }
