@@ -50,8 +50,14 @@ namespace ProceduralCreature.Animation
         public void Build(Skeleton.Skeleton restSkeleton)
         {
             if (restSkeleton == null) throw new DomainException("restSkeleton must not be null.");
+            Build(SkeletonSnapshot.Capture(restSkeleton));
+        }
 
-            SkeletonSnapshot nextSkeleton = SkeletonSnapshot.Capture(restSkeleton);
+        public void Build(SkeletonSnapshot restSkeleton)
+        {
+            if (restSkeleton == null) throw new DomainException("restSkeleton must not be null.");
+
+            SkeletonSnapshot nextSkeleton = restSkeleton;
             var nextBones = new Dictionary<string, Transform>(nextSkeleton.Count);
             var nextIndexedBones = new Transform[nextSkeleton.Count];
             var nextGeneratedObjects = new List<GameObject>(nextSkeleton.Count);
