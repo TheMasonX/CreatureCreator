@@ -176,30 +176,7 @@ namespace ProceduralCreature.Generation
             CreatureDefinition definition,
             ResolvedCreatureSnapshot snapshot,
             MeshExtractionResult meshResult,
-            GenerationDiagnostics diagnostics)
-        {
-            List<ResolvedPartProgram> compiledParts = SdfProgramBuilder.CompileIndividualPartsPortable(definition, snapshot);
-            SdfProgram bodyProgram = SdfProgramBuilder.CompilePortableBodyField(definition, snapshot);
-            try
-            {
-                return BakeAppearance(
-                    definition, snapshot, meshResult, compiledParts, bodyProgram, diagnostics);
-            }
-            finally
-            {
-                foreach (ResolvedPartProgram partProgram in compiledParts)
-                {
-                    partProgram.Program?.Dispose();
-                }
-                bodyProgram?.Dispose();
-            }
-        }
-
-        private static Color[] BakeAppearance(
-            CreatureDefinition definition,
-            ResolvedCreatureSnapshot snapshot,
-            MeshExtractionResult meshResult,
-            IReadOnlyList<ResolvedPartProgram> compiledParts,
+            List<ResolvedPartProgram> compiledParts,
             SdfProgram bodyProgram,
             GenerationDiagnostics diagnostics)
         {
@@ -209,7 +186,7 @@ namespace ProceduralCreature.Generation
                     definition,
                     meshResult,
                     null,
-                    compiledParts as List<ResolvedPartProgram>,
+                    compiledParts,
                     bodyProgram,
                     snapshot.Body,
                     snapshot));
