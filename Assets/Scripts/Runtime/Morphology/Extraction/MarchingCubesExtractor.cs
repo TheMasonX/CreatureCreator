@@ -77,7 +77,8 @@ namespace ProceduralCreature.Morphology.Extraction
 
         private static bool ShouldSuppressCoarseLoop(List<CubeContourResolver.LoopVertex> loop, DensityGrid grid)
         {
-            if (loop == null || loop.Count < 3 || grid.CellSize < CoarseLoopSuppressionCellSize) return loop == null || loop.Count < 3;
+            if (loop == null || loop.Count < 3) return true;
+            if (grid.CellSize < CoarseLoopSuppressionCellSize) return false;
             var min = new Vector3(float.PositiveInfinity, float.PositiveInfinity, float.PositiveInfinity);
             var max = new Vector3(float.NegativeInfinity, float.NegativeInfinity, float.NegativeInfinity);
             foreach (CubeContourResolver.LoopVertex vertex in loop)
@@ -154,8 +155,9 @@ namespace ProceduralCreature.Morphology.Extraction
             if (faceNormal.sqrMagnitude < 1e-12f) return;
             Vector3 centroid = (p0 + p1 + p2) / 3f;
             result.GradientEvaluationCount++;
-            if (grid.TryEstimateGradient(centroid, out Vector3 gradient) && Vector3.Dot(faceNormal, gradient) >= 0f
-                || !grid.TryEstimateGradient(centroid, out gradient) && Vector3.Dot(faceNormal, grid.EstimateGradient(centroid)) >= 0f)
+            Vector3 gradient;
+            if (!grid.TryEstimateGradient(centroid, out gradient)) gradient = grid.EstimateGradient(centroid);
+            if (Vector3.Dot(faceNormal, gradient) >= 0f)
             {
                 result.Triangles.Add(i0); result.Triangles.Add(i1); result.Triangles.Add(i2);
             }
