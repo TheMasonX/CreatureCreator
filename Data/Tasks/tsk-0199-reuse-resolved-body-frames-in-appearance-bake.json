@@ -20,15 +20,20 @@
       "author": "ChatGPT",
       "body": "Implemented in commit cac197c8322619239b9e11decc46771482108c3d. AppearanceBaker.BakeBurst now takes snapshot.BodyFrames on the main generation path and derives frames once for compatibility callers without a snapshot. The four-argument BodyVerticalGradientSampler convenience overload is no longer used per vertex by the generation path. Unity benchmark/parity validation is pending.",
       "createdAtUtc": "2026-09-10T00:00:00Z"
+    },
+    {
+      "id": "c-chatgpt-20260911-council",
+      "author": "ChatGPT",
+      "body": "Council review 2026-09-11: the implementation is source-confirmed and correctly routes the generation path through the precomputed ResolvedCreatureSnapshot.BodyFrames, while compatibility callers derive frames once per bake. No new correctness defect found. Keep InProgress until Unity parity and a fresh AppearanceBake benchmark demonstrate unchanged colors and measurable cost reduction; do not close on source inspection alone.",
+      "createdAtUtc": "2026-09-11T00:00:00Z"
     }
   ],
   "epicId": null,
   "parentId": "tsk-0008-profile-and-optimize-preview-generation-hotspots",
   "dueDateUtc": null,
   "createdAtUtc": "2026-09-10T00:00:00Z",
-  "updatedAtUtc": "2026-09-10T00:00:00Z",
-  "completedAtUtc": null,
-  "revision": 1,
+  "updatedAtUtc": "2026-09-11T00:00:00Z",
+  "revision": 2,
   "isArchived": false,
   "hasLoadError": false,
   "loadError": null,
