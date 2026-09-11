@@ -24,7 +24,7 @@
     {
       "id": "c-chatgpt-20260911-council",
       "author": "ChatGPT",
-      "body": "Council review 2026-09-11: the implementation is source-confirmed and correctly routes the generation path through the precomputed ResolvedCreatureSnapshot.BodyFrames, while compatibility callers derive frames once per bake. No new correctness defect found. Keep InProgress until Unity parity and a fresh AppearanceBake benchmark demonstrate unchanged colors and measurable cost reduction; do not close on source inspection alone.",
+      "body": "Second static council re-audit 2026-09-11: the snapshot frame reuse remains structurally correct. No new defect was found in this task. Keep InProgress until Unity parity confirms exact Body gradient colors and fresh profiling demonstrates the intended AppearanceBake reduction. A separate remaining O(vertices × body-segments) arc-length prefix walk is tracked by TSK-0202 rather than folded into this task.",
       "createdAtUtc": "2026-09-11T00:00:00Z"
     }
   ],
@@ -33,9 +33,6 @@
   "dueDateUtc": null,
   "createdAtUtc": "2026-09-10T00:00:00Z",
   "updatedAtUtc": "2026-09-11T00:00:00Z",
-  "revision": 2,
-  "isArchived": false,
-  "hasLoadError": false,
-  "loadError": null,
+  "completedAtUtc": null,
   "sourceFilePath": "tsk-0199-reuse-resolved-body-frames-in-appearance-bake.json"
 }
