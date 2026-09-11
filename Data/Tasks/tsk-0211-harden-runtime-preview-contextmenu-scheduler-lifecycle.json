@@ -1,0 +1,33 @@
+{
+  "id": "tsk-0211-harden-runtime-preview-contextmenu-scheduler-lifecycle",
+  "key": "TSK-0211",
+  "title": "Harden runtime preview ContextMenu scheduler lifecycle",
+  "description": "`CreatureRuntimePreview.Generate()` is exposed through `[ContextMenu(\"Generate Creature\")]`, but `_generationScheduler` is initialized only in `Awake()`. A manual edit-time ContextMenu invocation therefore deserves an explicit lifecycle contract: either ensure the scheduler is initialized before any public/manual Generate entry point, or explicitly prohibit ContextMenu generation outside a valid lifecycle and report a clear diagnostic. Verify how Unity invokes ContextMenu methods in the supported project workflow, add focused editor/manual coverage for the chosen contract, and preserve scheduler disposal/OnDestroy ownership. Do not create a second generation-scheduler abstraction; this is a narrow entry-point lifecycle hardening task.",
+  "type": "Bug Fix",
+  "status": "Backlog",
+  "priority": "Medium",
+  "assigneeMode": "Custom",
+  "assigneeDirectoryId": null,
+  "assigneeCustomText": "Unassigned",
+  "reporter": "ChatGPT",
+  "labels": ["user-mandated", "codebase-health", "preview", "lifecycle", "editor", "runtime"],
+  "attachments": [],
+  "externalLinks": [],
+  "linkedPages": [],
+  "comments": [
+    {
+      "id": "c-0211-audit-20260911",
+      "author": "ChatGPT",
+      "body": "Audit evidence 2026-09-11: current source has `[ContextMenu(\"Generate Creature\")] public void Generate()` and `_generationScheduler = new CreatureGenerationScheduler()` only in `Awake()`. Static source inspection cannot prove Unity's exact edit-time invocation lifecycle, so this ticket records the boundary as a verification/hardening item rather than asserting a confirmed runtime defect. No source code was changed during the audit.",
+      "createdAtUtc": "2026-09-11T22:30:00Z"
+    }
+  ],
+  "epicId": null,
+  "parentId": null,
+  "createdAtUtc": "2026-09-11T22:30:00Z",
+  "updatedAtUtc": "2026-09-11T22:30:00Z",
+  "completedAtUtc": null,
+  "isArchived": false,
+  "hasLoadError": false,
+  "sourceFilePath": "tsk-0211-harden-runtime-preview-contextmenu-scheduler-lifecycle.json"
+}
