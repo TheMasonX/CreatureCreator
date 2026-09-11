@@ -28,15 +28,21 @@
       "author": "anonymous",
       "body": "Validation capture confirmation (2026-09-10): Unity Test Framework completed the full EditMode run (148 completed, 4 failed) and full PlayMode run (738 completed). The PlayMode result artifact independently reports total=738, passed=689, failed=49, skipped=0, inconclusive=0, result=Failed(Child). The MCP runner displayed 25 PlayMode failure entries and capped the list; the remaining 24 must be recovered with a recursive parse of the nested TestResults.xml suites. Active Unity instance was CreatureCreator@3edd5d3b, Unity 6000.5.9f1. No implementation changes were made during capture.",
       "createdAtUtc": "2026-09-10T22:35:23.2922084Z"
+    },
+    {
+      "id": "c-6f3b2e6a3f0b4e9f8b1e0194campaign",
+      "author": "anonymous",
+      "body": "Test-failure campaign update (static review, Unity unavailable):\n\nDiagnosis:\n- The captured 53 aggregate failures are not all independent production defects. A major PlayMode cluster was synthetic-fixture contract drift: ImplicitSurfaceWeightAuthoringTests constructed multiple independent roots while SkeletonSnapshot.Capture intentionally requires one root. The production invariant is retained.\n- The four EditMode preview failures shared a second fixture defect: BuildGenerated fabricated mesh-asset RigBindingMetadata for extra-0/extra-1 without corresponding authoritative CreaturePart entries in the resolved snapshot. CreaturePreviewController correctly resolves attachment bones from snapshot semantics and should not invent missing bones.\n- Several other captured failures are already contradicted by current source on this branch and therefore may be stale capture evidence rather than current defects: FabrikSolver currently checks for finite total-link overflow; IkChainSolver currently seeds from currentPose; SemanticBoneResolver currently maps limb mesh attachments to segment 0. These require fresh Unity rerun before reopening them.\n- Remaining topology, anatomy mapping, skinning, influence-domain, and non-finite-validation failures remain unverified here and should stay with their existing owners until the full result XML and focused Unity reruns are available.\n\nFixes committed:\n- 7a94c5cbaa948756ad09dea5a9757089056b3308 — Assets/Scripts/Tests/Runtime/ImplicitSurfaceWeightAuthoringTests.cs: repaired the shared Capture fixture by inferring explicit geometric parentage from coincident segment endpoints and deterministically attaching any remaining disconnected roots beneath the lexicographically first root. No production skeleton invariant was changed.\n- 10bc4f8856702d408b37fb266cfa325ae78d9102 — Assets/Scripts/Tests/Editor/CreaturePreviewControllerOwnershipTests.cs: added real authoritative CreaturePart fixtures for every fabricated mesh-asset sourcePartId and retained those IDs in RigBindingMetadata. The resolver/production contract remains unchanged.\n\nRemaining validation:\n- Unity tests could not be executed in this environment; no pass/compile/runtime result is claimed.\n- Local Unity agent should first rerun the 12 affected fixture tests (9 ImplicitSurfaceWeightAuthoringTests plus 4 preview tests, noting one count overlap in the captured inventory is not expected) and then rerun the full EditMode + PlayMode suites on Unity 6000.5.9f1.\n- If the synthetic-root cluster clears, the next focused reruns should target AnatomyBodyRigLayout, CreatureSkinnedMeshRenderer mirrored/two-bone tests, MorphologyInfluenceRadiusBridge, DensityGridGradientPolicy, GeneratedCreatureData, and ImplicitSurfaceInfluenceDomainResolver.\n- Keep TSK-0104 for preview ownership, TSK-0129 for coarse topology, TSK-0147 for influence domains, and TSK-0134 for performance/allocation work; do not create duplicates from these stale/blocked observations.\n\nConfidence: high that the two changed fixture classes match the captured root causes; low-to-medium on the remaining failure inventory until the uncapped Unity XML is rerun. This update intentionally does not mark TSK-0194 complete.",
+      "createdAtUtc": "2026-09-11T02:46:00Z"
     }
   ],
   "epicId": null,
   "parentId": null,
   "dueDateUtc": null,
   "createdAtUtc": "2026-09-10T22:35:10.5880725Z",
-  "updatedAtUtc": "2026-09-10T22:35:23.2922084Z",
+  "updatedAtUtc": "2026-09-11T02:46:00Z",
   "completedAtUtc": null,
-  "revision": 2,
+  "revision": 3,
   "isArchived": false,
   "hasLoadError": false,
   "loadError": null,
