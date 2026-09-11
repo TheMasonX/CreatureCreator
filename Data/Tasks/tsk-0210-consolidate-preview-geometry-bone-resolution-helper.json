@@ -1,0 +1,34 @@
+{
+  "id": "tsk-0210-consolidate-preview-geometry-bone-resolution-helper",
+  "key": "TSK-0210",
+  "title": "Consolidate duplicated preview geometry-bone resolution helper",
+  "description": "`CreaturePreviewController` and `CreatureRuntimePreview` each contain an equivalent `TryResolveGeometryBone` implementation: validate the local binding/rig/snapshot boundary, call `SemanticBoneResolver.ResolveGeometryAttachmentBoneId(snapshot, binding.SourcePartId, binding.IsMirrored)`, then call `CreatureRig.TryGetBone`. The editor and runtime controllers should keep lifecycle/rendering policy separate, but this pure lookup adapter is mechanically identical and has no reason to diverge. Extract the smallest shared runtime helper for this exact resolution operation and route both preview controllers through it. Preserve the existing false-on-missing boundary and leave semantic-bone policy owned by `SemanticBoneResolver`.",
+  "type": "Cleanup",
+  "status": "Backlog",
+  "priority": "Low",
+  "assigneeMode": "Custom",
+  "assigneeDirectoryId": null,
+  "assigneeCustomText": "Unassigned",
+  "reporter": "ChatGPT",
+  "labels": ["user-mandated", "codebase-health", "deduplication", "preview", "geometry", "skeleton"],
+  "attachments": [],
+  "externalLinks": [],
+  "linkedPages": [],
+  "comments": [
+    {
+      "id": "c-0210-audit-20260911",
+      "author": "ChatGPT",
+      "body": "Audit evidence 2026-09-11: direct source comparison confirms mechanically identical `TryResolveGeometryBone` methods in `CreaturePreviewController` and `CreatureRuntimePreview`. Existing TSK-0095/TSK-0105 ownership covers semantic-bone and geometry policy, but no task covers this exact adapter deduplication. No source code was changed during the audit.",
+      "createdAtUtc": "2026-09-11T22:29:00Z"
+    }
+  ],
+  "epicId": null,
+  "parentId": null,
+  "createdAtUtc": "2026-09-11T22:29:00Z",
+  "updatedAtUtc": "2026-09-11T22:29:00Z",
+  "completedAtUtc": null,
+  "isArchived": false,
+  "hasLoadError": false,
+  "loadError": null,
+  "sourceFilePath": "tsk-0210-consolidate-preview-geometry-bone-resolution-helper.json"
+}
