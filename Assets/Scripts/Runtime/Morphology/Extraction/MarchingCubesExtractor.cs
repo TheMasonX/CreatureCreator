@@ -7,28 +7,17 @@ namespace ProceduralCreature.Morphology.Extraction
 {
     /// <summary>
     /// Extracts a triangle mesh from a DensityGrid using CubeContourResolver's
-    /// per-cube loops. Two things happen here that CubeContourResolver
-    /// deliberately doesn't do, because they're extraction-loop concerns, not
-    /// per-cube concerns:
+    /// per-cube loops. The extractor owns shared grid-edge/corner identity and
+    /// winding; CubeContourResolver owns only per-cube contour topology.
     ///
-    /// VERTEX WELDING: a loop vertex sits on a specific grid edge (identified by
-    /// its lower corner's grid coordinates + axis, independent of which of the up
-    ///-to-8 cubes touching that edge computed it). Two neighboring cubes sharing
-    /// an edge will each produce a loop vertex for it; keying a shared dictionary
-    /// by that edge identity means both cubes reuse the SAME output vertex,
-    /// producing a connected mesh instead of duplicated coincident vertices per
-    /// cube — this is what actually delivers "avoid the fragmentation that
-    /// complicates smooth skinning," not just the hole-closing itself.
+    /// Vertex welding uses direct integer ownership tables rather than a hash map.
+    /// Each canonical X/Y/Z grid edge has one stable slot, and exact surface
+    /// corners use a separate corner table. An owner is stored as vertexIndex + 1,
+    /// leaving zero as the allocation-free "unclaimed" sentinel.
     ///
-    /// WINDING CONSISTENCY: CubeContourResolver's loop traversal direction isn't
-    /// guaranteed to produce outward-facing winding on its own. Rather than solve
-    /// global winding consistency analytically, each triangle's winding is
-    /// corrected independently using a finite-difference gradient estimated from
-    /// the cached DensityGrid samples: a correctly wound outward-facing triangle's
-    /// face normal points in the same general direction as the gradient (density
-    /// increases from inside/negative to outside/positive). This is a safe, local,
-    /// per-triangle fix that doesn't depend on getting a global traversal-order
-    /// argument right, and it avoids re-evaluating the full SDF during extraction.
+    /// Winding uses the cached DensityGrid gradient; no SDF evaluation occurs during
+    /// extraction. The output order is deterministic because cells, contour loops,
+    /// and each ownership table are traversed in fixed integer order.
     /// </summary>
     public static partial class MarchingCubesExtractor
     {
@@ -50,26 +39,15 @@ namespace ProceduralCreature.Morphology.Extraction
             if (grid == null) throw new DomainException("grid must not be null.");
 
             var result = new MeshExtractionResult();
-            // A canonical edge/corner identity is encoded to one Int64. This
-            // preserves the tuple-key ownership contract without allocating a
-            // value tuple key for each cache probe, while remaining collision-free
-            // on rectangular grids because both corner dimensions participate.
-            var vertexCache = new Dictionary<long, int>();
+            var ownership = new GridVertexOwnership(grid);
 
             var cornerDensities = new float[8];
             var cornerPositions = new Vector3[8];
-            // Cube contours can contain at most the cube's 12 edges. Reuse one
-            // bounded scratch array rather than allocating an int[] per loop.
             var loopIndices = new int[MaxCubeEdges];
             long contourResolutionTicks = 0;
             long vertexWeldingTicks = 0;
             long triangleEmissionTicks = 0;
 
-            // One dense scan classifies every cell and retains only the mixed-sign
-            // cells as an ordered active-cell list. The extractor then iterates
-            // that list instead of re-classifying the whole volume, so empty
-            // volume is never re-traversed during contour resolution. Dense
-            // sampling itself is unchanged; this is purely the classification pass.
             Stopwatch activeCellStopwatch = collectTimings ? Stopwatch.StartNew() : null;
             ActiveCellEntry[] activeCells = ActiveCellBuilder.Build(grid);
             if (collectTimings)
@@ -85,19 +63,12 @@ namespace ProceduralCreature.Morphology.Extraction
                 ActiveCellBuilder.DecodeCellIndex(
                     cell.CellIndex, grid.CellsX, grid.CellsY, out int cx, out int cy, out int cz);
 
-                // Active cells are mixed-sign by construction, so a sign
-                // classification here is redundant; only the surface-epsilon
-                // normalization that feeds contour resolution is reapplied.
                 grid.CopyCellCornerSamples(cx, cy, cz, cornerDensities);
                 for (int c = 0; c < 8; c++)
                 {
                     cornerDensities[c] = GenerationTolerances.NormalizeSurfaceDensity(cornerDensities[c]);
                 }
 
-                // Positions are consumed only by mixed cells. Avoiding eight
-                // Vector3 constructions per cell is what kept the old dense loop
-                // cheap for empty volume; active cells are few, but the rule still
-                // keeps this tight.
                 for (int c = 0; c < 8; c++)
                 {
                     Vector3Int offset = CubeTopology.CornerGridOffsets[c];
@@ -121,13 +92,10 @@ namespace ProceduralCreature.Morphology.Extraction
 
                 foreach (List<CubeContourResolver.LoopVertex> loop in loops)
                 {
-                    if (ShouldSuppressCoarseLoop(loop, grid))
-                    {
-                        continue;
-                    }
+                    if (ShouldSuppressCoarseLoop(loop, grid)) continue;
 
                     EmitLoop(
-                        grid, loop, cx, cy, cz, vertexCache, result, loopIndices,
+                        grid, loop, cx, cy, cz, ownership, result, loopIndices,
                         collectTimings, ref vertexWeldingTicks, ref triangleEmissionTicks);
                 }
             }
@@ -135,31 +103,14 @@ namespace ProceduralCreature.Morphology.Extraction
             result.ContourResolutionTime = StopwatchTicksToTimeSpan(contourResolutionTicks);
             result.VertexWeldingTime = StopwatchTicksToTimeSpan(vertexWeldingTicks);
             result.TriangleEmissionTime = StopwatchTicksToTimeSpan(triangleEmissionTicks);
-
             return result;
         }
 
         private static bool ShouldSuppressCoarseLoop(List<CubeContourResolver.LoopVertex> loop, DensityGrid grid)
         {
-            if (loop == null || loop.Count < 3)
-            {
-                return true;
-            }
+            if (loop == null || loop.Count < 3) return true;
+            if (grid.CellSize < CoarseLoopSuppressionCellSize) return false;
 
-            // This heuristic is only for genuinely coarse preview grids. Applying
-            // it at normal resolutions removes valid small surface loops (notably
-            // around rounded poles and small creature parts), which opens holes in
-            // otherwise closed meshes.
-            if (grid.CellSize < CoarseLoopSuppressionCellSize)
-            {
-                return false;
-            }
-
-            // Coarse preview sampling can resolve a tiny under-sampled feature as a
-            // small sub-cell loop whose world-space extent is far smaller than a
-            // grid cell. Emitting that loop creates a boundary hole in the otherwise
-            // closed outer mesh; suppressing it keeps the coarse surface stable
-            // without introducing per-triangle SDF checks or large allocations.
             var min = new Vector3(float.PositiveInfinity, float.PositiveInfinity, float.PositiveInfinity);
             var max = new Vector3(float.NegativeInfinity, float.NegativeInfinity, float.NegativeInfinity);
             foreach (CubeContourResolver.LoopVertex vertex in loop)
@@ -175,19 +126,14 @@ namespace ProceduralCreature.Morphology.Extraction
 
             Vector3 extent = max - min;
             float maximumExtent = Mathf.Max(extent.x, Mathf.Max(extent.y, extent.z));
-            if (maximumExtent <= grid.CellSize * 0.75f)
-            {
-                return true;
-            }
-
-            return false;
+            return maximumExtent <= grid.CellSize * 0.75f;
         }
 
         private static void EmitLoop(
             DensityGrid grid,
             List<CubeContourResolver.LoopVertex> loop,
             int cx, int cy, int cz,
-            Dictionary<long, int> vertexCache,
+            GridVertexOwnership ownership,
             MeshExtractionResult result,
             int[] indices,
             bool collectTimings,
@@ -206,21 +152,15 @@ namespace ProceduralCreature.Morphology.Extraction
                 if (collectTimings)
                 {
                     long weldingStart = Stopwatch.GetTimestamp();
-                    indices[i] = ResolveVertexIndex(loop[i], grid, cx, cy, cz, vertexCache, result);
+                    indices[i] = ResolveVertexIndex(loop[i], grid, cx, cy, cz, ownership, result);
                     vertexWeldingTicks += Stopwatch.GetTimestamp() - weldingStart;
                 }
                 else
                 {
-                    indices[i] = ResolveVertexIndex(loop[i], grid, cx, cy, cz, vertexCache, result);
+                    indices[i] = ResolveVertexIndex(loop[i], grid, cx, cy, cz, ownership, result);
                 }
             }
 
-            // Fan triangulation from the first vertex. Safe and non-self-intersecting
-            // for the star-shaped loops that arise from a single cube's surface
-            // crossing at the grid resolutions this system targets; documented as a
-            // known simplification rather than a proven-general polygon
-            // triangulation (ear clipping) — revisit if golden-fixture testing at
-            // very coarse resolution surfaces a self-intersecting fan.
             for (int i = 1; i < loop.Count - 1; i++)
             {
                 if (collectTimings)
@@ -245,7 +185,7 @@ namespace ProceduralCreature.Morphology.Extraction
             CubeContourResolver.LoopVertex vertex,
             DensityGrid grid,
             int cx, int cy, int cz,
-            Dictionary<long, int> vertexCache,
+            GridVertexOwnership ownership,
             MeshExtractionResult result)
         {
             (int A, int B) edgeCorners = CubeTopology.EdgeCorners[vertex.EdgeIndex];
@@ -258,23 +198,16 @@ namespace ProceduralCreature.Morphology.Extraction
             Vector3 positionA = grid.CornerPosition(gridA.x, gridA.y, gridA.z);
             Vector3 positionB = grid.CornerPosition(gridB.x, gridB.y, gridB.z);
 
-            int cornersX = grid.CellsX + 1;
-            int cornersY = grid.CellsY + 1;
-            // An exact zero-valued grid corner is represented as an intersection
-            // on every incident crossed edge. Use the normalized endpoint value
-            // rather than comparing interpolated positions, because near-zero
-            // values can produce slightly different floating-point positions on
-            // edges incident to the same grid corner.
-            if (GenerationTolerances.NormalizeSurfaceDensity(grid.GetSample(gridA.x, gridA.y, gridA.z)) == 0f)
+            float sampleA = GenerationTolerances.NormalizeSurfaceDensity(grid.GetSample(gridA.x, gridA.y, gridA.z));
+            if (sampleA == 0f)
             {
-                return ResolveCachedVertex(
-                    EncodeEdgeKey(gridA.x, gridA.y, gridA.z, -1, cornersX, cornersY), positionA, vertexCache, result);
+                return ownership.ResolveCorner(gridA.x, gridA.y, gridA.z, positionA, result);
             }
 
-            if (GenerationTolerances.NormalizeSurfaceDensity(grid.GetSample(gridB.x, gridB.y, gridB.z)) == 0f)
+            float sampleB = GenerationTolerances.NormalizeSurfaceDensity(grid.GetSample(gridB.x, gridB.y, gridB.z));
+            if (sampleB == 0f)
             {
-                return ResolveCachedVertex(
-                    EncodeEdgeKey(gridB.x, gridB.y, gridB.z, -1, cornersX, cornersY), positionB, vertexCache, result);
+                return ownership.ResolveCorner(gridB.x, gridB.y, gridB.z, positionB, result);
             }
 
             int axis = gridA.x != gridB.x ? 0 : gridA.y != gridB.y ? 1 : 2;
@@ -285,39 +218,7 @@ namespace ProceduralCreature.Morphology.Extraction
                 _ => gridA.z < gridB.z ? gridA : gridB,
             };
 
-            return ResolveCachedVertex(
-                EncodeEdgeKey(lower.x, lower.y, lower.z, axis, cornersX, cornersY),
-                vertex.Position, vertexCache, result);
-        }
-
-        private static long EncodeEdgeKey(int x, int y, int z, int axis, int cornersX, int cornersY)
-        {
-            if (axis < -1 || axis > 2) throw new DomainException("axis must be -1, 0, 1, or 2.");
-            if (x < 0 || y < 0 || z < 0) throw new DomainException("edge coordinates must be non-negative.");
-            if (cornersX <= 0 || cornersY <= 0)
-            {
-                throw new DomainException("grid corner dimensions must be positive.");
-            }
-
-            long cornerIndex = ((long)z * cornersY + y) * cornersX + x;
-            return cornerIndex * 4L + axis + 1L;
-        }
-
-        private static int ResolveCachedVertex(
-            long key,
-            Vector3 position,
-            Dictionary<long, int> vertexCache,
-            MeshExtractionResult result)
-        {
-            if (vertexCache.TryGetValue(key, out int existingIndex))
-            {
-                return existingIndex;
-            }
-
-            int newIndex = result.Positions.Count;
-            result.Positions.Add(position);
-            vertexCache[key] = newIndex;
-            return newIndex;
+            return ownership.ResolveEdge(axis, lower.x, lower.y, lower.z, vertex.Position, result);
         }
 
         private static void EmitTriangle(DensityGrid grid, MeshExtractionResult result, int i0, int i1, int i2)
@@ -327,24 +228,11 @@ namespace ProceduralCreature.Morphology.Extraction
             Vector3 p2 = result.Positions[i2];
 
             Vector3 faceNormal = Vector3.Cross(p1 - p0, p2 - p0);
-            if (faceNormal.sqrMagnitude < 1e-12f)
-            {
-                return; // degenerate triangle (zero area) — skip rather than emit garbage
-            }
+            if (faceNormal.sqrMagnitude < 1e-12f) return;
 
             Vector3 centroid = (p0 + p1 + p2) / 3f;
             result.GradientEvaluationCount++;
 
-            // Winding reference: prefer the analytic trilinear derivative at the
-            // centroid, derived from this cached grid's own cell corners. Unlike
-            // the nearest-corner EstimateGradient, it varies smoothly as the
-            // centroid moves and so does not flip a marginal triangle when the
-            // centroid crosses a corner-rounding boundary. It uses only
-            // already-loaded cell data (never a fresh SDF evaluation). Only when
-            // the containing cell has a non-finite (culled/absent) corner do we
-            // fall back to the finite-aware centered/one-sided estimate — a
-            // deterministic reference from existing grid data, never arbitrary
-            // loop order.
             Vector3 gradient;
             if (!grid.TryEstimateGradient(centroid, out gradient))
             {
@@ -352,7 +240,6 @@ namespace ProceduralCreature.Morphology.Extraction
             }
 
             bool correctlyWound = Vector3.Dot(faceNormal, gradient) >= 0f;
-
             if (correctlyWound)
             {
                 result.Triangles.Add(i0);
@@ -367,5 +254,83 @@ namespace ProceduralCreature.Morphology.Extraction
             }
         }
 
+        private sealed class GridVertexOwnership
+        {
+            private readonly int _cornersX;
+            private readonly int _cornersY;
+            private readonly int _cellsX;
+            private readonly int _cellsY;
+            private readonly int _cellsZ;
+            private readonly int _xEdgeCount;
+            private readonly int _yEdgeCount;
+            private readonly int[] _cornerOwners;
+            private readonly int[] _edgeOwners;
+
+            public GridVertexOwnership(DensityGrid grid)
+            {
+                _cornersX = checked(grid.CellsX + 1);
+                _cornersY = checked(grid.CellsY + 1);
+                _cellsX = grid.CellsX;
+                _cellsY = grid.CellsY;
+                _cellsZ = grid.CellsZ;
+
+                long cornerCount = (long)_cornersX * _cornersY * checked(_cellsZ + 1);
+                long xEdgeCount = (long)_cellsX * _cornersY * checked(_cellsZ + 1);
+                long yEdgeCount = (long)_cornersX * _cellsY * checked(_cellsZ + 1);
+                long zEdgeCount = (long)_cornersX * _cornersY * _cellsZ;
+                long edgeCount = xEdgeCount + yEdgeCount + zEdgeCount;
+                if (cornerCount > int.MaxValue || edgeCount > int.MaxValue)
+                {
+                    throw new DomainException("Grid vertex ownership table exceeds addressable array size.");
+                }
+
+                _xEdgeCount = (int)xEdgeCount;
+                _yEdgeCount = (int)yEdgeCount;
+                _cornerOwners = new int[(int)cornerCount];
+                _edgeOwners = new int[(int)edgeCount];
+            }
+
+            public int ResolveCorner(int x, int y, int z, Vector3 position, MeshExtractionResult result)
+            {
+                int key = ((z * _cornersY) + y) * _cornersX + x;
+                return GetOrCreate(_cornerOwners, key, position, result);
+            }
+
+            public int ResolveEdge(int axis, int x, int y, int z, Vector3 position, MeshExtractionResult result)
+            {
+                int localIndex;
+                int offset;
+                switch (axis)
+                {
+                    case 0:
+                        localIndex = ((z * _cornersY) + y) * _cellsX + x;
+                        offset = 0;
+                        break;
+                    case 1:
+                        localIndex = ((z * _cellsY) + y) * _cornersX + x;
+                        offset = _xEdgeCount;
+                        break;
+                    case 2:
+                        localIndex = ((z * _cornersY) + y) * _cornersX + x;
+                        offset = _xEdgeCount + _yEdgeCount;
+                        break;
+                    default:
+                        throw new DomainException("edge axis must be X (0), Y (1), or Z (2).");
+                }
+
+                return GetOrCreate(_edgeOwners, checked(offset + localIndex), position, result);
+            }
+
+            private static int GetOrCreate(int[] owners, int key, Vector3 position, MeshExtractionResult result)
+            {
+                int encodedOwner = owners[key];
+                if (encodedOwner != 0) return encodedOwner - 1;
+
+                int newIndex = result.Positions.Count;
+                result.Positions.Add(position);
+                owners[key] = checked(newIndex + 1);
+                return newIndex;
+            }
+        }
     }
 }
