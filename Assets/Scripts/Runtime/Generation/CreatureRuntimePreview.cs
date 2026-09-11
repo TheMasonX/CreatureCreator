@@ -60,7 +60,7 @@ namespace ProceduralCreature.Generation
                 MeshTopologyReport topology = result.Data.TopologyReport;
 
                 DestroyGeneratedGeometry();
-                BindImplicitSurfaceToRig(generated, result.Data.Definition, result.Data.Snapshot);
+                BindImplicitSurfaceToRig(generated, result.Data);
                 CreateRigAttachedGeometry(generated, result.Data.Snapshot);
 
                 int implicitTriangles = 0;
@@ -207,27 +207,26 @@ namespace ProceduralCreature.Generation
 
         private void BindImplicitSurfaceToRig(
             GeneratedCreature generated,
-            CreatureDefinition definition,
-            ResolvedCreatureSnapshot snapshot)
+            GeneratedCreatureData data)
         {
-            if (generated == null || definition == null || snapshot == null) return;
+            if (generated == null || data == null || data.Snapshot == null) return;
             if (!generated.TryGetImplicitSurface(out GeometryItem implicitItem))
             {
                 Debug.LogWarning("[CreatureCreator] Runtime preview has no implicit surface to bind to a SkinnedMeshRenderer.", this);
                 return;
             }
 
-            SkeletonModel skeleton = SkeletonInferrer.Infer(snapshot);
-            if (skeleton == null || skeleton.Bones.Count == 0)
+            SkeletonSnapshot skeletonSnapshot = data.SkeletonSnapshot;
+            if (skeletonSnapshot == null || skeletonSnapshot.Count == 0)
             {
-                Debug.LogWarning("[CreatureCreator] Runtime preview could not infer a skeleton for the implicit surface.", this);
+                Debug.LogWarning("[CreatureCreator] Runtime preview generated data has no resolved skeleton snapshot.", this);
                 return;
             }
 
             if (_rig == null)
                 _rig = gameObject.GetComponent<CreatureRig>() ?? gameObject.AddComponent<CreatureRig>();
-            _rig.Build(skeleton);
-            _rig.ApplyPose(PosedSkeleton.FromRestPose(skeleton));
+            _rig.Build(skeletonSnapshot);
+            _rig.ApplyPose(PosedSkeleton.FromRestPose(skeletonSnapshot));
 
             if (_skinnedRenderer == null)
             {
@@ -235,15 +234,14 @@ namespace ProceduralCreature.Generation
                     ?? gameObject.AddComponent<CreatureSkinnedMeshRenderer>();
             }
 
-            SkeletonSnapshot skeletonSnapshot = SkeletonSnapshot.Capture(skeleton);
             float[] radiiByBoneIndex = MorphologyInfluenceRadiusBridge.BuildRadiiByBoneIndex(
-                skeletonSnapshot, snapshot);
+                skeletonSnapshot, data.Snapshot);
             InfluenceDomain[] vertexDomains = ImplicitSurfaceInfluenceDomainResolver.Resolve(
-                definition, snapshot, implicitItem.Mesh.vertices);
+                data.Definition, data.Snapshot, implicitItem.Mesh.vertices);
             Material defaultMaterial = MaterialResolver.ResolveDefault(ResolveMaterialPalette());
             Material[] materials = defaultMaterial != null ? new[] { defaultMaterial } : null;
             _skinnedRenderer.Bind(
-                _rig, skeleton, implicitItem.Mesh, radiiByBoneIndex, materials, vertexDomains);
+                _rig, skeletonSnapshot, implicitItem.Mesh, radiiByBoneIndex, materials, vertexDomains);
             if (_skinnedRenderer.Renderer != null) _skinnedRenderer.Renderer.enabled = true;
         }
 
