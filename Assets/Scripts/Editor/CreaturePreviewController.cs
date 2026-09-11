@@ -10,6 +10,7 @@ using ProceduralCreature.Generation;
 using ProceduralCreature.Skeleton;
 using UnityEditor;
 using UnityEngine;
+using SkeletonModel = ProceduralCreature.Skeleton.Skeleton;
 
 namespace ProceduralCreature.Editor
 {
@@ -27,6 +28,7 @@ namespace ProceduralCreature.Editor
         private readonly CreaturePreviewRequestState _requestState = new CreaturePreviewRequestState();
         private readonly Func<Material> _defaultMaterialResolver;
         private readonly Func<string, Material> _materialResolver;
+        private GeneratedCreatureData _lastAcceptedData;
         private bool _disposed;
 
         public CreaturePreviewController(
@@ -86,6 +88,13 @@ namespace ProceduralCreature.Editor
                         result.Sequence,
                         result.Data?.Snapshot?.RevisionId,
                         currentRevisionId)) continue;
+
+                // The accepted generation data is the authoritative correspondence
+                // package for this preview. Retaining it lets the existing public
+                // ApplyPreviewGeometry compatibility overload consume the already
+                // computed skeleton/domain decisions rather than re-running SDF
+                // compilation just to bind the editor presentation.
+                _lastAcceptedData = result.Data;
                 onCompleted(result);
             }
         }
@@ -100,15 +109,22 @@ namespace ProceduralCreature.Editor
             if (snapshot == null) throw new ArgumentNullException(nameof(snapshot));
             if (_disposed) throw new ObjectDisposedException(nameof(CreaturePreviewController));
 
-            if (!generated.TryGetImplicitSurface(out GeometryItem implicitSurface))
+            // Preserve the established compatibility seam used by focused editor
+            // tests and external callers. Normal editor generation reaches here
+            // after ProcessCompletions accepted a matching GeneratedCreatureData,
+            // so the actual preview binding consumes cached generation decisions.
+            if (_lastAcceptedData != null &&
+                string.Equals(_lastAcceptedData.Snapshot.RevisionId, snapshot.RevisionId, StringComparison.Ordinal) &&
+                _lastAcceptedData.VertexInfluenceDomains != null &&
+                generated.TryGetImplicitSurface(out GeometryItem cachedImplicit) &&
+                cachedImplicit.Mesh != null &&
+                _lastAcceptedData.VertexInfluenceDomains.Count == cachedImplicit.Mesh.vertexCount)
             {
-                ClearGeometryObjects();
+                ApplyPreviewGeometry(generated, _lastAcceptedData);
                 return;
             }
 
-            ClearGeometryObjects();
-            BindImplicitSurface(implicitSurface.Mesh, definition, snapshot);
-            AttachMeshAssets(generated, snapshot);
+            ApplyPreviewGeometryLegacy(generated, definition, snapshot);
         }
 
         public void ApplyPreviewGeometry(
@@ -143,6 +159,22 @@ namespace ProceduralCreature.Editor
                 data.SkeletonSnapshot,
                 data.VertexInfluenceDomains);
             AttachMeshAssets(generated, data.Snapshot);
+        }
+
+        private void ApplyPreviewGeometryLegacy(
+            GeneratedCreature generated,
+            CreatureDefinition definition,
+            ResolvedCreatureSnapshot snapshot)
+        {
+            if (!generated.TryGetImplicitSurface(out GeometryItem implicitSurface))
+            {
+                ClearGeometryObjects();
+                return;
+            }
+
+            ClearGeometryObjects();
+            BindImplicitSurface(implicitSurface.Mesh, definition, snapshot);
+            AttachMeshAssets(generated, snapshot);
         }
 
         private void AttachMeshAssets(GeneratedCreature generated, ResolvedCreatureSnapshot snapshot)
@@ -248,10 +280,7 @@ namespace ProceduralCreature.Editor
             PersistRootEntity(PreviewGameObject.GetEntityId());
         }
 
-        private void BindImplicitSurface(
-            Mesh sourceMesh,
-            CreatureDefinition definition,
-            ResolvedCreatureSnapshot snapshot)
+        private void BindImplicitSurface(Mesh sourceMesh, CreatureDefinition definition, ResolvedCreatureSnapshot snapshot)
         {
             SkeletonModel skeleton = SkeletonInferrer.Infer(snapshot);
             if (skeleton == null || skeleton.Bones.Count == 0)
@@ -261,7 +290,7 @@ namespace ProceduralCreature.Editor
 
             SkeletonSnapshot snapshotForBinding = SkeletonSnapshot.Capture(skeleton);
             // This compatibility path predates GeneratedCreatureData correspondence.
-            // Production generation uses the overload below so the binding pass cannot
+            // Production generation uses the overload above so the binding pass cannot
             // silently recompile SDF programs or reclassify every vertex.
             float[] radiiByBoneIndex = MorphologyInfluenceRadiusBridge.BuildRadiiByBoneIndex(
                 snapshotForBinding, snapshot);
@@ -434,6 +463,7 @@ namespace ProceduralCreature.Editor
         {
             if (_disposed) return;
             _disposed = true;
+            _lastAcceptedData = null;
             _requestState.Clear();
             _scheduler.Dispose();
         }
