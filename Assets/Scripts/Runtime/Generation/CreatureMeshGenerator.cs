@@ -50,13 +50,41 @@ namespace ProceduralCreature.Generation
             ResolvedCreatureSnapshot snapshot = ValidateAndResolve(definition, diagnostics);
             SkeletonSnapshot skeletonSnapshot = SkeletonSnapshot.Capture(SkeletonInferrer.Infer(snapshot));
 
-            DensityGrid grid = GenerateImplicitField(definition, snapshot, diagnostics);
-            MeshExtractionResult meshResult = ExtractMesh(grid, diagnostics);
-            MeshTopologyReport generatedTopologyReport = ValidateMesh(meshResult, diagnostics);
-            Color[] colors = BakeAppearance(definition, snapshot, meshResult, diagnostics);
+            List<ResolvedPartProgram> compiledParts = null;
+            SdfProgram bodyProgram = null;
+            try
+            {
+                compiledParts = SdfProgramBuilder.CompileIndividualPartsPortable(definition, snapshot);
+                bodyProgram = SdfProgramBuilder.CompilePortableBodyField(definition, snapshot);
 
-            return new GeneratedCreatureData(
-                definition, snapshot, meshResult, colors, generatedTopologyReport, skeletonSnapshot);
+                DensityGrid grid = GenerateImplicitField(definition, snapshot, diagnostics);
+                MeshExtractionResult meshResult = ExtractMesh(grid, diagnostics);
+                MeshTopologyReport generatedTopologyReport = ValidateMesh(meshResult, diagnostics);
+                Color[] colors = BakeAppearance(
+                    definition, snapshot, meshResult, compiledParts, bodyProgram, diagnostics);
+                InfluenceDomain[] vertexInfluenceDomains =
+                    ResolveInfluenceDomains(snapshot, meshResult, compiledParts, bodyProgram);
+
+                return new GeneratedCreatureData(
+                    definition,
+                    snapshot,
+                    meshResult,
+                    colors,
+                    generatedTopologyReport,
+                    skeletonSnapshot,
+                    vertexInfluenceDomains);
+            }
+            finally
+            {
+                if (compiledParts != null)
+                {
+                    foreach (ResolvedPartProgram partProgram in compiledParts)
+                    {
+                        partProgram.Program?.Dispose();
+                    }
+                }
+                bodyProgram?.Dispose();
+            }
         }
 
         private static ResolvedCreatureSnapshot ValidateAndResolve(
@@ -150,30 +178,52 @@ namespace ProceduralCreature.Generation
             MeshExtractionResult meshResult,
             GenerationDiagnostics diagnostics)
         {
-            Color[] colors = null;
-            List<ResolvedPartProgram> compiledParts = null;
-            SdfProgram bodyProgram = null;
+            List<ResolvedPartProgram> compiledParts = SdfProgramBuilder.CompileIndividualPartsPortable(definition, snapshot);
+            SdfProgram bodyProgram = SdfProgramBuilder.CompilePortableBodyField(definition, snapshot);
             try
             {
-                compiledParts = SdfProgramBuilder.CompileIndividualPartsPortable(definition, snapshot);
-                bodyProgram = SdfProgramBuilder.CompilePortableBodyField(definition, snapshot);
-
-                Time(diagnostics, GenerationStage.AppearanceBake,
-                    () => colors = AppearanceBaker.Bake(
-                        definition, meshResult, null, compiledParts, bodyProgram, snapshot.Body, snapshot));
-                return colors;
+                return BakeAppearance(
+                    definition, snapshot, meshResult, compiledParts, bodyProgram, diagnostics);
             }
             finally
             {
-                if (compiledParts != null)
+                foreach (ResolvedPartProgram partProgram in compiledParts)
                 {
-                    foreach (ResolvedPartProgram partProgram in compiledParts)
-                    {
-                        partProgram.Program?.Dispose();
-                    }
+                    partProgram.Program?.Dispose();
                 }
                 bodyProgram?.Dispose();
             }
+        }
+
+        private static Color[] BakeAppearance(
+            CreatureDefinition definition,
+            ResolvedCreatureSnapshot snapshot,
+            MeshExtractionResult meshResult,
+            IReadOnlyList<ResolvedPartProgram> compiledParts,
+            SdfProgram bodyProgram,
+            GenerationDiagnostics diagnostics)
+        {
+            Color[] colors = null;
+            Time(diagnostics, GenerationStage.AppearanceBake,
+                () => colors = AppearanceBaker.Bake(
+                    definition,
+                    meshResult,
+                    null,
+                    compiledParts as List<ResolvedPartProgram>,
+                    bodyProgram,
+                    snapshot.Body,
+                    snapshot));
+            return colors;
+        }
+
+        private static InfluenceDomain[] ResolveInfluenceDomains(
+            ResolvedCreatureSnapshot snapshot,
+            MeshExtractionResult meshResult,
+            IReadOnlyList<ResolvedPartProgram> compiledParts,
+            SdfProgram bodyProgram)
+        {
+            return ImplicitSurfaceInfluenceDomainResolver.Resolve(
+                snapshot, meshResult.Positions, compiledParts, bodyProgram);
         }
 
         public static GeneratedCreature Assemble(GeneratedCreatureData data, Func<string, Mesh> meshResolver = null)
