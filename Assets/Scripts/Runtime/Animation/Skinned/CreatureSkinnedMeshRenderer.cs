@@ -42,6 +42,11 @@ namespace ProceduralCreature.Animation.Skinned
                 throw new DomainException("The rest skeleton does not match the rig: bind bone count " + snapshot.Count +
                     " != rig indexed bone count " + rig.IndexedBones.Count + ".");
             }
+            if (rig.RestSkeleton == null || !rig.RestSkeleton.HasSameBoneOrder(snapshot))
+            {
+                throw new DomainException(
+                    "The rest skeleton does not match the built rig's authoritative skeleton structure.");
+            }
 
             Vector3[] restVertices = sourceMesh.vertices;
             if (restVertices == null || restVertices.Length == 0) throw new DomainException("sourceMesh has no vertices to bind.");

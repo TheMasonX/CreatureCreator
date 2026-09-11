@@ -31,7 +31,13 @@ namespace ProceduralCreature.Morphology.Extraction
         public float CellSize { get; }
         public int SampleCount => _samples.Length;
 
+        /// <summary>
+        /// Native corner samples, exposed for Burst consumers (for example the
+        /// active-cell scan). Read-only for callers; the grid owns the buffer's
+        /// lifetime and releases it in <see cref="Dispose"/>.
+        /// </summary>
         public NativeArray<float>.ReadOnly Samples => _samples.AsReadOnly();
+
         internal NativeArray<float> MutableSamples => _samples;
 
         private int CornersX => CellsX + 1;
@@ -134,7 +140,10 @@ namespace ProceduralCreature.Morphology.Extraction
             finally
             {
                 scratchValues.Dispose();
-                if (samples.IsCreated) samples.Dispose();
+                if (samples.IsCreated)
+                {
+                    samples.Dispose();
+                }
             }
         }
 
@@ -207,12 +216,9 @@ namespace ProceduralCreature.Morphology.Extraction
         public bool TryEstimateGradient(Vector3 point, out Vector3 gradient)
         {
             gradient = Vector3.zero;
-            if (!NumericValidity.IsFinite(point)) return false;
-            if (!NumericValidity.IsFinite(CellSize) || CellSize <= 0f) return false;
-
-            float fx = Mathf.Clamp((point.x - Origin.x) / CellSize, 0f, CellsX);
-            float fy = Mathf.Clamp((point.y - Origin.y) / CellSize, 0f, CellsY);
-            float fz = Mathf.Clamp((point.z - Origin.z) / CellSize, 0f, CellsZ);
+            float fx = (point.x - Origin.x) / CellSize;
+            float fy = (point.y - Origin.y) / CellSize;
+            float fz = (point.z - Origin.z) / CellSize;
 
             int x = Mathf.Clamp(Mathf.FloorToInt(fx), 0, CellsX - 1);
             int y = Mathf.Clamp(Mathf.FloorToInt(fy), 0, CellsY - 1);
@@ -220,9 +226,9 @@ namespace ProceduralCreature.Morphology.Extraction
             int x1 = x + 1;
             int y1 = y + 1;
             int z1 = z + 1;
-            float u = Mathf.Clamp01(fx - x);
-            float v = Mathf.Clamp01(fy - y);
-            float w = Mathf.Clamp01(fz - z);
+            float u = fx - x;
+            float v = fy - y;
+            float w = fz - z;
 
             float c000 = _samples[Index(x, y, z)];
             float c100 = _samples[Index(x1, y, z)];
@@ -255,29 +261,26 @@ namespace ProceduralCreature.Morphology.Extraction
                 + (c111 - c110) * u * v;
 
             gradient = new Vector3(du / CellSize, dv / CellSize, dw / CellSize);
-            return NumericValidity.IsFinite(gradient);
+            return true;
         }
 
         private static float EstimateAxis(float previous, float center, float next, float span)
         {
-            if (span <= 0f || !NumericValidity.IsFinite(center)) return 0f;
+            if (span <= 0f || float.IsNaN(center) || float.IsInfinity(center)) return 0f;
 
-            bool previousFinite = NumericValidity.IsFinite(previous);
-            bool nextFinite = NumericValidity.IsFinite(next);
+            bool previousFinite = !float.IsNaN(previous) && !float.IsInfinity(previous);
+            bool nextFinite = !float.IsNaN(next) && !float.IsInfinity(next);
             if (previousFinite && nextFinite)
             {
-                float result = (next - previous) / span;
-                return NumericValidity.IsFinite(result) ? result : 0f;
+                return (next - previous) / span;
             }
             if (previousFinite)
             {
-                float result = (center - previous) / (span * 0.5f);
-                return NumericValidity.IsFinite(result) ? result : 0f;
+                return (center - previous) / (span * 0.5f);
             }
             if (nextFinite)
             {
-                float result = (next - center) / (span * 0.5f);
-                return NumericValidity.IsFinite(result) ? result : 0f;
+                return (next - center) / (span * 0.5f);
             }
             return 0f;
         }

@@ -1,0 +1,44 @@
+﻿{
+  "id": "tsk-0198-define-portable-animation-clip-and-sampling-contract",
+  "key": "TSK-0198",
+  "title": "Define portable animation clip and deterministic sampling contract",
+  "description": "## Summary\nDefine a runtime-portable animation clip and deterministic sampling contract for indexed creature poses.\n\n## User Mandate\n\u003E Please take everything from this good branch and take over for this agent:\n\nSTRICT. Preserve the uncaptured clip and sampling finding from the reviewed follow-up branch without importing its raw task JSON or duplicate records.\n\n## Scope\n- Define clip channels against authoritative indexed skeleton identity.\n- Specify deterministic time sampling, looping, endpoint behavior, missing-channel behavior, and malformed-data rejection.\n- Keep Unity Animator/Avatar integration, locomotion, blending policy, and editor authoring out of scope.\n- Coordinate with TSK-0190 and TSK-0191 without duplicating their pose contract or buffer ownership.\n\n## Acceptance Criteria\n- The contract is portable runtime data with stable indexed identity and deterministic sampling results.\n- Tests cover exact endpoints, looping, non-looping clamp, malformed channel lengths, incompatible skeletons, and non-finite values.\n- Sampling can feed the reusable indexed pose buffer without per-sample semantic ID resolution.\n- No raw branch task JSON or duplicate TSK key is imported.\n\n## Validation\nRun whole-project .NET compilation, focused runtime tests, and Unity PlayMode validation for the concrete sampling path. Record exact results and Unity availability.\n\n## Findings\nThe reviewed follow-up branch identified a portable animation clip plus deterministic sampling contract that is not captured by the existing full-pose contract or reusable-buffer tasks.\n\n## Blockers\nNo implementation or Unity execution has been performed for this finding.\n\n## Next Step\nDesign the portable clip/channel schema and deterministic sampling tests with TSK-0190 and TSK-0191 as dependencies.",
+  "type": "Task",
+  "status": "Backlog",
+  "priority": "High",
+  "assigneeMode": "Custom",
+  "assigneeDirectoryId": null,
+  "assigneeCustomText": "Agent",
+  "reporter": "anonymous",
+  "labels": [
+    "runtime",
+    "animation",
+    "skeleton",
+    "sampling",
+    "architecture",
+    "audit-followup",
+    "user-mandated"
+  ],
+  "attachments": [],
+  "externalLinks": [],
+  "linkedPages": [],
+  "comments": [
+    {
+      "id": "c-a24237fb2b644e1bb7a30da07bcfacda",
+      "author": "anonymous",
+      "body": "Task created from reviewed follow-up finding. Task-record integrity validation is currently blocked by pre-existing normalized-key collisions in TSK-0153, TSK-0188, and TSK-0189; Scripts/Normalize-TaskRecords.ps1 reported all three and modified no files. This task remains Backlog.",
+      "createdAtUtc": "2026-09-11T02:20:05.6110819Z"
+    }
+  ],
+  "epicId": null,
+  "parentId": "TSK-0077",
+  "dueDateUtc": null,
+  "createdAtUtc": "2026-09-11T02:18:23.1118609Z",
+  "updatedAtUtc": "2026-09-11T02:20:05.6110819Z",
+  "completedAtUtc": null,
+  "revision": 2,
+  "isArchived": false,
+  "hasLoadError": false,
+  "loadError": null,
+  "sourceFilePath": "tsk-0198-define-portable-animation-clip-and-sampling-contract.json"
+}
