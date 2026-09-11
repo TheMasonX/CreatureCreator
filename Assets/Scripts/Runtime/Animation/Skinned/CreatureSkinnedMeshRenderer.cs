@@ -9,6 +9,12 @@ using SkeletonModel = ProceduralCreature.Skeleton.Skeleton;
 
 namespace ProceduralCreature.Animation.Skinned
 {
+    /// <summary>
+    /// Runtime presenter that binds a generated rest mesh to an already-built
+    /// <see cref="CreatureRig"/>. Weight authoring, bindpose construction, and the
+    /// Unity mesh copy are bind-time work; the steady-state animation loop remains
+    /// owned by <see cref="CreatureRig.ApplyPose"/>.
+    /// </summary>
     public sealed class CreatureSkinnedMeshRenderer : MonoBehaviour
     {
         private const string SkinnedObjectName = "SkinnedMesh";
@@ -31,12 +37,23 @@ namespace ProceduralCreature.Animation.Skinned
             IReadOnlyList<Material> materials = null,
             IReadOnlyList<InfluenceDomain> vertexDomains = null)
         {
-            if (rig == null) throw new DomainException("rig must not be null.");
             if (restSkeleton == null) throw new DomainException("restSkeleton must not be null.");
+            Bind(rig, SkeletonSnapshot.Capture(restSkeleton), sourceMesh, radiiByBoneIndex, materials, vertexDomains);
+        }
+
+        public void Bind(
+            CreatureRig rig,
+            SkeletonSnapshot snapshot,
+            Mesh sourceMesh,
+            IReadOnlyList<float> radiiByBoneIndex = null,
+            IReadOnlyList<Material> materials = null,
+            IReadOnlyList<InfluenceDomain> vertexDomains = null)
+        {
+            if (rig == null) throw new DomainException("rig must not be null.");
+            if (snapshot == null) throw new DomainException("snapshot must not be null.");
             if (sourceMesh == null) throw new DomainException("sourceMesh must not be null.");
             if (rig.IndexedBones.Count == 0) throw new DomainException("rig must be built (Build) before binding a mesh.");
 
-            SkeletonSnapshot snapshot = SkeletonSnapshot.Capture(restSkeleton);
             if (snapshot.Count != rig.IndexedBones.Count)
             {
                 throw new DomainException("The rest skeleton does not match the rig: bind bone count " + snapshot.Count +
