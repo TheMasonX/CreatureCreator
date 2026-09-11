@@ -1,5 +1,6 @@
 using System;
 using UnityEngine;
+using Unity.Burst;
 using Unity.Collections;
 using Unity.Jobs;
 using Unity.Mathematics;
@@ -138,10 +139,6 @@ namespace ProceduralCreature.Morphology.Extraction
                 return false;
             }
 
-            // floor/ceil intentionally add at most one extra grid coordinate on
-            // each side. This makes the candidate box conservative despite floating
-            // point boundary rounding; the job's existing exact envelope test is
-            // retained as the final point-level guard.
             float expandedMinX = potentialMin.x - influenceRadius;
             float expandedMinY = potentialMin.y - influenceRadius;
             float expandedMinZ = potentialMin.z - influenceRadius;
@@ -205,7 +202,7 @@ namespace ProceduralCreature.Morphology.Extraction
             if (!NumericValidity.IsFinite(c000) || !NumericValidity.IsFinite(c100) || !NumericValidity.IsFinite(c010) || !NumericValidity.IsFinite(c110) || !NumericValidity.IsFinite(c001) || !NumericValidity.IsFinite(c101) || !NumericValidity.IsFinite(c011) || !NumericValidity.IsFinite(c111)) return false;
             float du = (c100 - c000) * (1f - v) * (1f - w) + (c110 - c010) * v * (1f - w) + (c101 - c001) * (1f - v) * w + (c111 - c011) * v * w;
             float dv = (c010 - c000) * (1f - u) * (1f - w) + (c110 - c100) * u * (1f - w) + (c011 - c001) * (1f - u) * w + (c111 - c101) * u * w;
-            float dw = (c001 - c000) * (1f - u) * (1f - v) + (c101 - c100) * u * (1f - v) + (c011 - c010) * (1f - u) * v + (c111 - c110) * u * v;
+            float dw = (c001 - c000) * (1f - u) * (1f - v) + (c101 - c100) * u * (1f - v) + (c011 - c001) * (1f - u) * v + (c111 - c110) * u * v;
             gradient = new Vector3(du / CellSize, dv / CellSize, dw / CellSize); return true;
         }
 
@@ -276,9 +273,6 @@ namespace ProceduralCreature.Morphology.Extraction
                          point.y < RootPotentialMinBound.y - InfluenceRadius || point.y > RootPotentialMaxBound.y + InfluenceRadius ||
                          point.z < RootPotentialMinBound.z - InfluenceRadius || point.z > RootPotentialMaxBound.z + InfluenceRadius))
                     {
-                        // In sparse mode the buffer was pre-filled with +inf. This
-                        // guard exists for conservatism when the integer candidate
-                        // box contains one extra boundary layer.
                         Samples[sampleIndex] = float.PositiveInfinity;
                         continue;
                     }
