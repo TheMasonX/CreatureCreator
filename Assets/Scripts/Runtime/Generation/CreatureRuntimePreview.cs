@@ -10,7 +10,6 @@ using ProceduralCreature.Morphology.Extraction;
 using ProceduralCreature.Serialization;
 using ProceduralCreature.Skeleton;
 using UnityEngine;
-using SkeletonModel = ProceduralCreature.Skeleton.Skeleton;
 
 namespace ProceduralCreature.Generation
 {
@@ -223,6 +222,13 @@ namespace ProceduralCreature.Generation
                 return;
             }
 
+            IReadOnlyList<InfluenceDomain> vertexDomains = data.VertexInfluenceDomains;
+            if (vertexDomains == null || vertexDomains.Count != implicitItem.Mesh.vertexCount)
+            {
+                throw new DomainException(
+                    "Generated data has no complete implicit-surface influence-domain correspondence.");
+            }
+
             if (_rig == null)
                 _rig = gameObject.GetComponent<CreatureRig>() ?? gameObject.AddComponent<CreatureRig>();
             _rig.Build(skeletonSnapshot);
@@ -236,8 +242,6 @@ namespace ProceduralCreature.Generation
 
             float[] radiiByBoneIndex = MorphologyInfluenceRadiusBridge.BuildRadiiByBoneIndex(
                 skeletonSnapshot, data.Snapshot);
-            InfluenceDomain[] vertexDomains = ImplicitSurfaceInfluenceDomainResolver.Resolve(
-                data.Definition, data.Snapshot, implicitItem.Mesh.vertices);
             Material defaultMaterial = MaterialResolver.ResolveDefault(ResolveMaterialPalette());
             Material[] materials = defaultMaterial != null ? new[] { defaultMaterial } : null;
             _skinnedRenderer.Bind(
