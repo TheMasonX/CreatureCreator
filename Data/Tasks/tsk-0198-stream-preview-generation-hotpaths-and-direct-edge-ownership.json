@@ -18,13 +18,19 @@
     {
       "id": "c-chatgpt-20260910-0198-implementation",
       "author": "ChatGPT",
-      "body": "Implementation round 2026-09-10: DensityGrid.SamplePortable now uses SdfSamplingRowJob with fixed (y,z) rows and contiguous x traversal. AppearanceBaker now streams nearest absolute SDF distance through AppearanceResolveBurst instead of allocating a full distance matrix and merge pass. MarchingCubesExtractor now uses GridVertexOwnership with direct integer corner/X-edge/Y-edge/Z-edge slots and owner+1 sentinel encoding. Existing AppearanceBakerTests already contain Bake_BurstResolve_MatchesManagedResolveExactly; existing extraction tests cover watertightness and welding invariants. Unity test execution and fresh benchmark comparison are pending in this environment.",
+      "body": "Implementation round 2026-09-10: DensityGrid.SamplePortable now uses row-oriented Burst sampling with bounded per-work-item scratch isolation and contiguous x traversal. AppearanceBaker routes nearest appearance selection through the consolidated AppearanceResolveBurst streamed candidate reducer instead of a full distance matrix and merge pass. MarchingCubesExtractor now uses GridVertexOwnership with direct integer corner/X-edge/Y-edge/Z-edge slots and owner+1 sentinel encoding. Existing AppearanceBakerTests already contain Bake_BurstResolve_MatchesManagedResolveExactly; existing extraction tests cover watertightness and welding invariants. Unity test execution and fresh benchmark comparison remain pending in this environment.",
       "createdAtUtc": "2026-09-10T00:00:00Z"
     },
     {
       "id": "c-user-benchmark-20260910",
       "author": "user",
       "body": "User-supplied Quality 16 steady-state editor logs: TotalGeneration 701.9, 700.6, 798.8, 720.5, 702.8 ms; FieldSampling 386.8-407.5 ms; MeshExtraction 112.6-208.9 ms, normally ~113-117 ms except one 208.9 ms run driven by MeshContourResolution 147 ms; MeshValidation ~5 ms; AppearanceBake 188.7-196.0 ms. Mesh output was stable at 20,962 triangles / 10,483 vertices. These measurements are the post-threading-fix baseline supplied by the user and should be compared with the new implementation after Unity warm-up.",
+      "createdAtUtc": "2026-09-10T00:00:00Z"
+    },
+    {
+      "id": "c-chatgpt-20260910-scratch-correction",
+      "author": "ChatGPT",
+      "body": "Review correction before validation: the first row-batching implementation shared one scratch buffer across parallel work items, which could race. The current implementation allocates bounded per-work-item scratch slices (RowsPerExecute chosen under an 8 MB budget) and offsets each row into its own slice. The unsafe version is no longer the branch state.",
       "createdAtUtc": "2026-09-10T00:00:00Z"
     }
   ],
@@ -34,7 +40,8 @@
   "createdAtUtc": "2026-09-10T00:00:00Z",
   "updatedAtUtc": "2026-09-10T00:00:00Z",
   "completedAtUtc": null,
-  "revision": 1,
+  "completedAtUtc": null,
+  "revision": 2,
   "isArchived": false,
   "hasLoadError": false,
   "loadError": null,
