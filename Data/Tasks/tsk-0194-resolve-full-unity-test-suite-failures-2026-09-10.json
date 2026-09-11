@@ -40,15 +40,21 @@
       "author": "anonymous",
       "body": "Unity Test Framework result (2026-09-10, Unity EditMode): Run completed with status Failed. Completed 148/148 tests. Reported failures: 1; failure list was not capped. Failing test: \u0060ProceduralCreature.Tests.Editor.CreaturePreviewControllerOwnershipTests.RegenerationDestroysOnlyRegisteredGeometryChildren\u0060. Assertion: \u0022Two owned geometry children should be created and parented under the root.\u0022 Expected: 2. Actual: 0. Job ID: \u0060ee79f8679054481f9a5c42a81673c5b8\u0060.",
       "createdAtUtc": "2026-09-11T02:58:00.0804889Z"
+    },
+    {
+      "id": "c-a9f3c6e9646040eca209ef157bf25544",
+      "author": "anonymous",
+      "body": "Unity Test Framework rerun after code changes (2026-09-10, Unity 6000.5.9f1):\n\n- EditMode job \u0060825de58d512c44cc8514fd406715240c\u0060: Succeeded. 148/148 completed, 148 passed, 0 failed, 0 skipped. Duration 0.7817s.\n- PlayMode job \u0060d461a343cd9b4f388f0b008f52ff71f0\u0060: Failed. 739/739 completed; 49 failures reported. Failure details were capped by the runner at 25 entries. The run included failures in anatomy/attachment mapping, coarse topology/watertightness, skinned mesh/LBS parity, validation contracts, FABRIK overflow handling, generated data constructor contracts, IK seed behavior, influence domains, marching-cubes parity/topology, morphology radius handling, and pose rotation validation. No test result is inferred beyond the runner-reported counts.",
+      "createdAtUtc": "2026-09-11T03:12:41.8839985Z"
     }
   ],
   "epicId": null,
   "parentId": null,
   "dueDateUtc": null,
   "createdAtUtc": "2026-09-10T22:35:10.5880725Z",
-  "updatedAtUtc": "2026-09-11T02:58:00.0804889Z",
+  "updatedAtUtc": "2026-09-11T03:12:41.8839985Z",
   "completedAtUtc": null,
-  "revision": 4,
+  "revision": 5,
   "isArchived": false,
   "hasLoadError": false,
   "loadError": null,
