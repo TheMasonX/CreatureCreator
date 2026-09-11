@@ -74,6 +74,22 @@ namespace ProceduralCreature.Tests.Runtime
                 Is.EqualTo(ImplicitSurfaceWeightAuthoring.DefaultInfluenceRadius).Within(Tolerance));
         }
 
+        [TestCase(float.NaN)]
+        [TestCase(float.PositiveInfinity)]
+        [TestCase(float.NegativeInfinity)]
+        public void BuildRadii_NonFiniteBodyRadius_UsesDeterministicFiniteFallback(float radius)
+        {
+            CreatureDefinition definition = CreateDefinition(bodyRadius: radius, limb: null);
+            SkeletonSnapshot snapshot = SkeletonSnapshot.Capture(SkeletonInferrer.Infer(definition));
+
+            float[] radii = MorphologyInfluenceRadiusBridge.BuildRadiiByBoneIndex(
+                snapshot, ResolvedCreatureSnapshot.Resolve(definition));
+
+            AssertFinite(radii);
+            Assert.That(radii[snapshot.GetIndex(AnatomicalBodyRigLayout.BodyRootBoneId)],
+                Is.EqualTo(ImplicitSurfaceWeightAuthoring.DefaultInfluenceRadius).Within(Tolerance));
+        }
+
         [Test]
         public void BuildRadii_DegenerateFirstSegment_ClampsMidpointAtLowerBound()
         {
