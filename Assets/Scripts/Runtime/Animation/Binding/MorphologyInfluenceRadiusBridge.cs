@@ -109,15 +109,17 @@ namespace ProceduralCreature.Animation.Binding
             ResolvedBody body,
             Vector3 forward)
         {
+            float radius = NumericValidity.IsFinite(bone.Radius) && bone.Radius > 0f
+                ? bone.Radius
+                : ImplicitSurfaceWeightAuthoring.DefaultInfluenceRadius;
             if (body.SamplePositions == null || body.SamplePositions.Count == 0)
             {
-                return bone.Radius;
+                return radius;
             }
 
             bool storedHeadToTail = IsStoredHeadToTail(body.SamplePositions, forward);
             float minT = Mathf.Min(bone.StartT, bone.EndT);
             float maxT = Mathf.Max(bone.StartT, bone.EndT);
-            float radius = bone.Radius;
 
             for (int i = 0; i < body.SamplePositions.Count; i++)
             {
@@ -131,10 +133,10 @@ namespace ProceduralCreature.Animation.Binding
                 float distance = DistanceToSegment(body.SamplePositions[i], bone.Position, bone.EndPosition);
                 float sampleRadius = body.SampleRadii != null && i < body.SampleRadii.Count
                     ? body.SampleRadii[i]
-                    : bone.Radius;
+                    : radius;
                 if (!NumericValidity.IsFinite(sampleRadius) || sampleRadius <= 0f)
                 {
-                    sampleRadius = bone.Radius;
+                    sampleRadius = radius;
                 }
 
                 float requiredRadius = distance + sampleRadius;
