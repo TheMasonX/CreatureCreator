@@ -51,13 +51,17 @@ namespace ProceduralCreature.Morphology.Extraction
             if (cornerCountLong > int.MaxValue) throw new DomainException("Grid corner count exceeds addressable array size.");
 
             var origin = new Vector3(-bounds.MaxX, -bounds.MaxY, -bounds.MaxZ);
-            var samples = new NativeArray<float>((int)cornerCountLong, Allocator.Persistent);
+            var samples = new NativeArray<float>((int)cornerCountLong, Allocator.Persistent, NativeArrayOptions.UninitializedMemory);
             int operationCount = program.Operations.Length;
             if (operationCount <= 0) { samples.Dispose(); throw new DomainException("Portable program must contain at least one operation."); }
             if (program.RootIndex < 0 || program.RootIndex >= operationCount) { samples.Dispose(); throw new DomainException("Portable program root index must identify an operation."); }
 
             long rowScratchLength = (long)cornersX * operationCount;
-            if (rowScratchLength > ScratchValueBudget) rowScratchLength = (long)cornersX * operationCount;
+            if (rowScratchLength > int.MaxValue)
+            {
+                samples.Dispose();
+                throw new DomainException("Portable sampler scratch buffer exceeds addressable array size.");
+            }
             int rowsPerExecute = Mathf.Max(1, Mathf.Min(MaxRowsPerExecute, (int)(ScratchValueBudget / Mathf.Max(rowScratchLength, 1L))));
             long scratchLength = rowScratchLength * rowsPerExecute;
             if (scratchLength > int.MaxValue)
@@ -66,9 +70,21 @@ namespace ProceduralCreature.Morphology.Extraction
                 throw new DomainException("Portable sampler scratch buffer exceeds addressable array size.");
             }
 
-            var scratchValues = new NativeArray<float>((int)scratchLength, Allocator.Persistent);
+            var scratchValues = new NativeArray<float>((int)scratchLength, Allocator.Persistent, NativeArrayOptions.UninitializedMemory);
             try
             {
+                bool sparse = program.HasPotentialBounds && TryComputeCandidateBox(
+                    origin, cellSize, cellsX, cellsY, cellsZ,
+                    program.PotentialMinBound, program.PotentialMaxBound, program.InfluenceRadius,
+                    out int minX, out int maxX, out int minY, out int maxY, out int minZ, out int maxZ)
+                    && !(minX == 0 && maxX == cellsX && minY == 0 && maxY == cellsY && minZ == 0 && maxZ == cellsZ);
+
+                JobHandle dependency = default;
+                if (sparse)
+                {
+                    dependency = new FillInfinityJob { Samples = samples }.Schedule(samples.Length, 256);
+                }
+
                 var job = new SdfSamplingRowBatchJob
                 {
                     Operations = program.Operations,
@@ -84,10 +100,18 @@ namespace ProceduralCreature.Morphology.Extraction
                     RootPotentialMinBound = program.PotentialMinBound,
                     RootPotentialMaxBound = program.PotentialMaxBound,
                     RowsPerExecute = rowsPerExecute,
+                    Sparse = sparse,
+                    MinX = sparse ? minX : 0,
+                    MaxX = sparse ? maxX : cellsX,
+                    MinY = sparse ? minY : 0,
+                    MaxY = sparse ? maxY : cellsY,
+                    MinZ = sparse ? minZ : 0,
+                    MaxZ = sparse ? maxZ : cellsZ,
                 };
-                int rowCount = cornersY * cornersZ;
-                int workItemCount = (rowCount + rowsPerExecute - 1) / rowsPerExecute;
-                job.Schedule(workItemCount, 1).Complete();
+
+                int candidateRows = (job.MaxY - job.MinY + 1) * (job.MaxZ - job.MinZ + 1);
+                int workItemCount = (candidateRows + rowsPerExecute - 1) / rowsPerExecute;
+                job.Schedule(workItemCount, 1, dependency).Complete();
 
                 var grid = new DensityGrid(cellsX, cellsY, cellsZ, origin, cellSize, samples);
                 samples = default;
@@ -98,6 +122,40 @@ namespace ProceduralCreature.Morphology.Extraction
                 scratchValues.Dispose();
                 if (samples.IsCreated) samples.Dispose();
             }
+        }
+
+        private static bool TryComputeCandidateBox(
+            Vector3 origin, float cellSize,
+            int cellsX, int cellsY, int cellsZ,
+            float3 potentialMin, float3 potentialMax, float influenceRadius,
+            out int minX, out int maxX, out int minY, out int maxY, out int minZ, out int maxZ)
+        {
+            minX = maxX = minY = maxY = minZ = maxZ = 0;
+            if (!NumericValidity.IsFinite(potentialMin.x) || !NumericValidity.IsFinite(potentialMin.y) || !NumericValidity.IsFinite(potentialMin.z)
+                || !NumericValidity.IsFinite(potentialMax.x) || !NumericValidity.IsFinite(potentialMax.y) || !NumericValidity.IsFinite(potentialMax.z)
+                || !NumericValidity.IsFinite(influenceRadius) || influenceRadius < 0f)
+            {
+                return false;
+            }
+
+            // floor/ceil intentionally add at most one extra grid coordinate on
+            // each side. This makes the candidate box conservative despite floating
+            // point boundary rounding; the job's existing exact envelope test is
+            // retained as the final point-level guard.
+            float expandedMinX = potentialMin.x - influenceRadius;
+            float expandedMinY = potentialMin.y - influenceRadius;
+            float expandedMinZ = potentialMin.z - influenceRadius;
+            float expandedMaxX = potentialMax.x + influenceRadius;
+            float expandedMaxY = potentialMax.y + influenceRadius;
+            float expandedMaxZ = potentialMax.z + influenceRadius;
+
+            minX = Mathf.Clamp(Mathf.FloorToInt((expandedMinX - origin.x) / cellSize), 0, cellsX);
+            maxX = Mathf.Clamp(Mathf.CeilToInt((expandedMaxX - origin.x) / cellSize), 0, cellsX);
+            minY = Mathf.Clamp(Mathf.FloorToInt((expandedMinY - origin.y) / cellSize), 0, cellsY);
+            maxY = Mathf.Clamp(Mathf.CeilToInt((expandedMaxY - origin.y) / cellSize), 0, cellsY);
+            minZ = Mathf.Clamp(Mathf.FloorToInt((expandedMinZ - origin.z) / cellSize), 0, cellsZ);
+            maxZ = Mathf.Clamp(Mathf.CeilToInt((expandedMaxZ - origin.z) / cellSize), 0, cellsZ);
+            return minX <= maxX && minY <= maxY && minZ <= maxZ;
         }
 
         private static void ValidateSamplingInputs(BoundsDefinition bounds, GenerationSettings settings)
@@ -165,6 +223,13 @@ namespace ProceduralCreature.Morphology.Extraction
     }
 
     [BurstCompile]
+    public struct FillInfinityJob : IJobParallelFor
+    {
+        public NativeArray<float> Samples;
+        public void Execute(int index) => Samples[index] = float.PositiveInfinity;
+    }
+
+    [BurstCompile]
     public struct SdfSamplingRowBatchJob : IJobParallelFor
     {
         [ReadOnly] public NativeArray<SdfOperation>.ReadOnly Operations;
@@ -180,25 +245,29 @@ namespace ProceduralCreature.Morphology.Extraction
         public float3 RootPotentialMinBound;
         public float3 RootPotentialMaxBound;
         public int RowsPerExecute;
+        public bool Sparse;
+        public int MinX, MaxX, MinY, MaxY, MinZ, MaxZ;
 
         public void Execute(int workItemIndex)
         {
-            int firstRow = workItemIndex * RowsPerExecute;
-            int totalRows = Samples.Length / CornersX;
-            int rowEnd = math.min(firstRow + RowsPerExecute, totalRows);
+            int firstLocalRow = workItemIndex * RowsPerExecute;
+            int rowCount = (MaxY - MinY + 1) * (MaxZ - MinZ + 1);
+            int localRowEnd = math.min(firstLocalRow + RowsPerExecute, rowCount);
             int operationCount = Operations.Length;
             int rowScratchStride = CornersX * operationCount;
 
-            for (int row = firstRow; row < rowEnd; row++)
+            for (int localRow = firstLocalRow; localRow < localRowEnd; localRow++)
             {
-                int localRow = row - firstRow;
-                int rowIndex = row;
-                int y = rowIndex % CornersY;
-                int z = rowIndex / CornersY;
+                int yzYCount = MaxY - MinY + 1;
+                int zOffset = localRow / yzYCount;
+                int yOffset = localRow - zOffset * yzYCount;
+                int y = MinY + yOffset;
+                int z = MinZ + zOffset;
                 int sampleBase = (z * CornersY + y) * CornersX;
-                int rowValueOffset = localRow * rowScratchStride;
+                int localBatchRow = localRow - firstLocalRow;
+                int rowValueOffset = localBatchRow * rowScratchStride;
 
-                for (int x = 0; x < CornersX; x++)
+                for (int x = MinX; x <= MaxX; x++)
                 {
                     float3 point = Origin + new float3(x, y, z) * CellSize;
                     int sampleIndex = sampleBase + x;
@@ -207,6 +276,9 @@ namespace ProceduralCreature.Morphology.Extraction
                          point.y < RootPotentialMinBound.y - InfluenceRadius || point.y > RootPotentialMaxBound.y + InfluenceRadius ||
                          point.z < RootPotentialMinBound.z - InfluenceRadius || point.z > RootPotentialMaxBound.z + InfluenceRadius))
                     {
+                        // In sparse mode the buffer was pre-filled with +inf. This
+                        // guard exists for conservatism when the integer candidate
+                        // box contains one extra boundary layer.
                         Samples[sampleIndex] = float.PositiveInfinity;
                         continue;
                     }
