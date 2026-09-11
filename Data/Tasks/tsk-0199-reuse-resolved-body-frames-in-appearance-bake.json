@@ -1,0 +1,36 @@
+﻿{
+  "id": "tsk-0199-reuse-resolved-body-frames-in-appearance-bake",
+  "key": "TSK-0199",
+  "title": "Reuse resolved Body frames in appearance baking",
+  "description": "Performance correctness slice discovered while tracing the user-supplied Quality 16 AppearanceBake hotspot. BodyVerticalGradientSampler exposes a frames-aware EvaluateColor overload specifically to reuse ResolvedCreatureSnapshot.BodyFrames, but AppearanceBaker's Burst path was calling the convenience overload and therefore recomputing BodyFrameResolver.ComputeSampleFrames for every Body-winning vertex. Route the main generation path through snapshot.BodyFrames; compatibility callers without a snapshot must derive frames once per bake, never once per vertex. Preserve exact authored Gradient/AnimationCurve behavior and add parity coverage.",
+  "type": "Performance",
+  "status": "InProgress",
+  "priority": "High",
+  "assigneeMode": "Custom",
+  "assigneeDirectoryId": null,
+  "assigneeCustomText": "Unassigned",
+  "reporter": "ChatGPT",
+  "labels": ["performance", "appearance", "body", "snapshot", "generation", "determinism"],
+  "attachments": [],
+  "externalLinks": [],
+  "linkedPages": [],
+  "comments": [
+    {
+      "id": "c-chatgpt-20260910-0199-implementation",
+      "author": "ChatGPT",
+      "body": "Implemented in commit cac197c8322619239b9e11decc46771482108c3d. AppearanceBaker.BakeBurst now takes snapshot.BodyFrames on the main generation path and derives frames once for compatibility callers without a snapshot. The four-argument BodyVerticalGradientSampler convenience overload is no longer used per vertex by the generation path. Unity benchmark/parity validation is pending.",
+      "createdAtUtc": "2026-09-10T00:00:00Z"
+    }
+  ],
+  "epicId": null,
+  "parentId": "tsk-0008-profile-and-optimize-preview-generation-hotspots",
+  "dueDateUtc": null,
+  "createdAtUtc": "2026-09-10T00:00:00Z",
+  "updatedAtUtc": "2026-09-10T00:00:00Z",
+  "completedAtUtc": null,
+  "revision": 1,
+  "isArchived": false,
+  "hasLoadError": false,
+  "loadError": null,
+  "sourceFilePath": "tsk-0199-reuse-resolved-body-frames-in-appearance-bake.json"
+}
