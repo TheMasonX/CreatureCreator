@@ -139,7 +139,7 @@ namespace ProceduralCreature.Tests.Runtime
             InfluenceDomain[] domains = ImplicitSurfaceInfluenceDomainResolver.Resolve(
                 definition,
                 snapshot,
-                new[] { new Vector3(2f, -0.55f, 0f) });
+                new[] { new Vector3(2f, -0.95f, 0f) });
 
             Assert.AreEqual(1, domains.Length);
             Assert.AreEqual("toe_left", domains[0].DomainId);
