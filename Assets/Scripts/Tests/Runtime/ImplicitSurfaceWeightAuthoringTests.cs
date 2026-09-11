@@ -52,6 +52,49 @@ namespace ProceduralCreature.Tests.Runtime
         {
             var skeleton = new SkeletonModel();
             skeleton.Bones.AddRange(bones);
+
+            // Synthetic fixtures in this file model resolved segments, not disconnected
+            // skeletons. Preserve explicit hierarchy first; for intentionally abbreviated
+            // fixtures, infer geometric parentage from coincident segment endpoints. Any
+            // remaining disconnected roots are attached under the deterministic
+            // lexicographically-first root so the fixture still satisfies the production
+            // single-root contract without changing production behavior.
+            for (int i = 0; i < bones.Length; i++)
+            {
+                Bone child = bones[i];
+                if (child == null || child.ParentBoneId != null) continue;
+
+                Bone parent = null;
+                for (int j = 0; j < bones.Length; j++)
+                {
+                    if (i == j) continue;
+                    Bone candidate = bones[j];
+                    if (candidate == null || !candidate.HasSegment) continue;
+                    if (candidate.EndPosition != child.Position) continue;
+                    if (parent == null || StringComparer.Ordinal.Compare(candidate.Id, parent.Id) < 0)
+                    {
+                        parent = candidate;
+                    }
+                }
+
+                if (parent != null)
+                {
+                    child.ParentBoneId = parent.Id;
+                }
+            }
+
+            var roots = new List<Bone>();
+            for (int i = 0; i < bones.Length; i++)
+            {
+                if (bones[i] != null && bones[i].ParentBoneId == null) roots.Add(bones[i]);
+            }
+            roots.Sort((left, right) => StringComparer.Ordinal.Compare(left.Id, right.Id));
+            if (roots.Count > 1)
+            {
+                Bone root = roots[0];
+                for (int i = 1; i < roots.Count; i++) roots[i].ParentBoneId = root.Id;
+            }
+
             return SkeletonSnapshot.Capture(skeleton);
         }
 
