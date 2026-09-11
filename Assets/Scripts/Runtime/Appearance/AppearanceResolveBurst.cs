@@ -36,15 +36,13 @@ namespace ProceduralCreature.Appearance
                 {
                     SdfProgram program = compiledParts[p].Program;
                     if (program == null || !program.Operations.IsCreated) continue;
-                    RunNearestBatches(
-                        program, vertices, nearestDistances, nearestPrograms,
+                    RunNearestBatches(program, vertices, nearestDistances, nearestPrograms,
                         p, isBody: false, maxOps, batchSize, scratch);
                 }
 
                 if (bodyProgram != null && bodyProgram.Operations.IsCreated)
                 {
-                    RunNearestBatches(
-                        bodyProgram, vertices, nearestDistances, nearestPrograms,
+                    RunNearestBatches(bodyProgram, vertices, nearestDistances, nearestPrograms,
                         compiledParts.Count, isBody: true, maxOps, batchSize, scratch);
                 }
             }
@@ -87,9 +85,9 @@ namespace ProceduralCreature.Appearance
     {
         [ReadOnly] public NativeArray<SdfOperation>.ReadOnly Operations;
         [ReadOnly] public NativeArray<float3> Vertices;
-        public NativeArray<float> NearestDistances;
-        public NativeArray<int> NearestPrograms;
-        public NativeArray<float> ScratchValues;
+        [NativeDisableParallelForRestriction] public NativeArray<float> NearestDistances;
+        [NativeDisableParallelForRestriction] public NativeArray<int> NearestPrograms;
+        [NativeDisableParallelForRestriction] public NativeArray<float> ScratchValues;
         public int RootIndex;
         public int ProgramIndex;
         public int VertexStart;
@@ -108,8 +106,6 @@ namespace ProceduralCreature.Appearance
             if (float.IsPositiveInfinity(candidate)) return;
 
             float current = NearestDistances[vertexIndex];
-            // Parts use strict-less ordering, preserving compiled-part order.
-            // The Body uses non-strict comparison and therefore wins an exact tie.
             bool wins = IsBody ? candidate <= current : candidate < current;
             if (wins)
             {
