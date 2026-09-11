@@ -10,16 +10,6 @@ using ProceduralCreature.Morphology.Sdf;
 
 namespace ProceduralCreature.Morphology.Extraction
 {
-    /// <summary>
-    /// A fixed-resolution 3D grid of SDF corner samples covering a creature's
-    /// bounds. Corner-count per axis follows the same ceiling formula as
-    /// <c>GenerationSettings.EstimateVoxelCount</c>; callers must have run the
-    /// corner-sample budget check before calling <see cref="SamplePortable"/>.
-    ///
-    /// CC-064 non-finite contract: fast samples may read <c>+inf</c>
-    /// (outside/culled), never NaN. Grid consumers (min/max, interpolation,
-    /// gradient) must treat <c>+inf</c> as absent, not as a giant finite distance.
-    /// </summary>
     public sealed class DensityGrid : IDisposable
     {
         private const int ScratchValueBudget = 8 * 1024 * 1024;
@@ -32,16 +22,8 @@ namespace ProceduralCreature.Morphology.Extraction
         public Vector3 Origin { get; }
         public float CellSize { get; }
         public int SampleCount => _samples.Length;
-
-        /// <summary>
-        /// Native corner samples, exposed for Burst consumers (for example the
-        /// active-cell scan). Read-only for callers; the grid owns the buffer's
-        /// lifetime and releases it in <see cref="Dispose"/>.
-        /// </summary>
         public NativeArray<float>.ReadOnly Samples => _samples.AsReadOnly();
-
         internal NativeArray<float> MutableSamples => _samples;
-
         private int CornersX => CellsX + 1;
         private int CornersY => CellsY + 1;
         private int CornersZ => CellsZ + 1;
@@ -84,40 +66,41 @@ namespace ProceduralCreature.Morphology.Extraction
             }
 
             var origin = new Vector3(-bounds.MaxX, -bounds.MaxY, -bounds.MaxZ);
-            var samples = new NativeArray<float>((int)cornerCountLong, Allocator.Persistent);
+            var samples = new NativeArray<float>((int)cornerCountLong, Allocator.Persistent, NativeArrayOptions.UninitializedMemory);
             int operationCount = program.Operations.Length;
             if (operationCount <= 0)
             {
                 samples.Dispose();
                 throw new DomainException("Portable program must contain at least one operation.");
             }
-
             if (program.RootIndex < 0 || program.RootIndex >= operationCount)
             {
                 samples.Dispose();
                 throw new DomainException("Portable program root index must identify an operation.");
             }
 
-            // Work is naturally row-shaped: one parallel item owns one (y,z)
-            // row and walks x contiguously. This preserves the exact point
-            // expression/evaluator semantics while removing per-sample index
-            // decomposition and reducing scratch storage to one row.
-            long scratchLength = (long)cornersX * operationCount;
+            long rowScratchLength = (long)cornersX * operationCount;
+            if (rowScratchLength > int.MaxValue)
+            {
+                samples.Dispose();
+                throw new DomainException("Portable sampler scratch buffer exceeds addressable array size.");
+            }
+            int rowsPerExecute = Mathf.Max(1, Mathf.Min(MaxRowsPerExecute, (int)(ScratchValueBudget / Mathf.Max(rowScratchLength, 1L))));
+            long scratchLength = rowScratchLength * rowsPerExecute;
             if (scratchLength > int.MaxValue)
             {
                 samples.Dispose();
                 throw new DomainException("Portable sampler scratch buffer exceeds addressable array size.");
             }
 
-            var scratchValues = new NativeArray<float>((int)scratchLength, Allocator.Persistent);
+            var scratchValues = new NativeArray<float>((int)scratchLength, Allocator.Persistent, NativeArrayOptions.UninitializedMemory);
             try
             {
                 bool rootHasPotentialBounds = program.HasPotentialBounds;
                 float3 rootMin = program.PotentialMinBound;
                 float3 rootMax = program.PotentialMaxBound;
-                int rowCount = cornersY * cornersZ;
 
-                var job = new SdfSamplingRowJob
+                var job = new SdfSamplingRowBatchJob
                 {
                     Operations = program.Operations,
                     ScratchValues = scratchValues,
@@ -131,8 +114,12 @@ namespace ProceduralCreature.Morphology.Extraction
                     RootHasPotentialBounds = rootHasPotentialBounds,
                     RootPotentialMinBound = rootMin,
                     RootPotentialMaxBound = rootMax,
+                    RowsPerExecute = rowsPerExecute,
                 };
-                job.Schedule(rowCount, 1).Complete();
+
+                int rowCount = cornersY * cornersZ;
+                int workItemCount = (rowCount + rowsPerExecute - 1) / rowsPerExecute;
+                job.Schedule(workItemCount, 1).Complete();
 
                 var grid = new DensityGrid(cellsX, cellsY, cellsZ, origin, cellSize, samples);
                 samples = default;
@@ -180,7 +167,6 @@ namespace ProceduralCreature.Morphology.Extraction
             int rowStride = CornersX;
             int sliceStride = CornersX * CornersY;
             int baseIndex = (z * CornersY + y) * CornersX + x;
-
             destination[0] = _samples[baseIndex];
             destination[1] = _samples[baseIndex + 1];
             destination[2] = _samples[baseIndex + rowStride];
@@ -293,7 +279,7 @@ namespace ProceduralCreature.Morphology.Extraction
     }
 
     [BurstCompile]
-    public struct SdfSamplingRowJob : IJobParallelFor
+    public struct SdfSamplingRowBatchJob : IJobParallelFor
     {
         [ReadOnly] public NativeArray<SdfOperation>.ReadOnly Operations;
         [NativeDisableParallelForRestriction] public NativeArray<float> ScratchValues;
@@ -307,31 +293,42 @@ namespace ProceduralCreature.Morphology.Extraction
         public bool RootHasPotentialBounds;
         public float3 RootPotentialMinBound;
         public float3 RootPotentialMaxBound;
+        public int RowsPerExecute;
 
-        public void Execute(int rowIndex)
+        public void Execute(int workItemIndex)
         {
-            int y = rowIndex % CornersY;
-            int z = rowIndex / CornersY;
+            int firstLocalRow = workItemIndex * RowsPerExecute;
+            int totalRows = Samples.Length / CornersX;
+            int rowEnd = math.min(firstLocalRow + RowsPerExecute, totalRows);
             int operationCount = Operations.Length;
-            int sampleBase = (z * CornersY + y) * CornersX;
+            int rowScratchStride = CornersX * operationCount;
 
-            for (int x = 0; x < CornersX; x++)
+            for (int row = firstLocalRow; row < rowEnd; row++)
             {
-                float3 point = Origin + new float3(x, y, z) * CellSize;
-                int sampleIndex = sampleBase + x;
+                int localRow = row - firstLocalRow;
+                int y = row % CornersY;
+                int z = row / CornersY;
+                int sampleBase = row * CornersX;
+                int rowValueOffset = localRow * rowScratchStride;
 
-                if (RootHasPotentialBounds &&
-                    (point.x < RootPotentialMinBound.x - InfluenceRadius || point.x > RootPotentialMaxBound.x + InfluenceRadius ||
-                     point.y < RootPotentialMinBound.y - InfluenceRadius || point.y > RootPotentialMaxBound.y + InfluenceRadius ||
-                     point.z < RootPotentialMinBound.z - InfluenceRadius || point.z > RootPotentialMaxBound.z + InfluenceRadius))
+                for (int x = 0; x < CornersX; x++)
                 {
-                    Samples[sampleIndex] = float.PositiveInfinity;
-                    continue;
-                }
+                    float3 point = Origin + new float3(x, y, z) * CellSize;
+                    int sampleIndex = sampleBase + x;
 
-                int valueOffset = x * operationCount;
-                Samples[sampleIndex] = SdfProgramEvaluator.EvaluateInto(
-                    Operations, RootIndex, point, ScratchValues, valueOffset, InfluenceRadius, allowCulling: true);
+                    if (RootHasPotentialBounds &&
+                        (point.x < RootPotentialMinBound.x - InfluenceRadius || point.x > RootPotentialMaxBound.x + InfluenceRadius ||
+                         point.y < RootPotentialMinBound.y - InfluenceRadius || point.y > RootPotentialMaxBound.y + InfluenceRadius ||
+                         point.z < RootPotentialMinBound.z - InfluenceRadius || point.z > RootPotentialMaxBound.z + InfluenceRadius))
+                    {
+                        Samples[sampleIndex] = float.PositiveInfinity;
+                        continue;
+                    }
+
+                    int valueOffset = rowValueOffset + x * operationCount;
+                    Samples[sampleIndex] = SdfProgramEvaluator.EvaluateInto(
+                        Operations, RootIndex, point, ScratchValues, valueOffset, InfluenceRadius, allowCulling: true);
+                }
             }
         }
     }
