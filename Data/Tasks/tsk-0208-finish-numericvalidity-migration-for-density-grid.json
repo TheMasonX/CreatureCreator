@@ -1,0 +1,36 @@
+{
+  "id": "tsk-0208-finish-numericvalidity-migration-for-density-grid",
+  "key": "TSK-0208",
+  "title": "Finish NumericValidity migration for DensityGrid",
+  "description": "A current-branch inventory found one remaining mechanically identical scalar finite predicate outside `NumericValidity`: `Assets/Scripts/Runtime/Morphology/Extraction/DensityGrid.cs` has a private `IsFinite(float value)` duplicating the shared `NumericValidity.IsFinite(float)`. TSK-0094 is correctly Done for its verified finite-check scope, so do not mutate its historical completion claim. Confirm all current DensityGrid call sites have identical semantics, replace the local helper with `NumericValidity.IsFinite`, remove only the now-dead private predicate, and run focused extraction/numeric-validation tests plus runtime build. Re-scan Runtime/Editor afterward for any remaining exact scalar finite duplicates before declaring this follow-up complete.",
+  "type": "Cleanup",
+  "status": "Backlog",
+  "priority": "Low",
+  "assigneeMode": "Custom",
+  "assigneeDirectoryId": null,
+  "assigneeCustomText": "Unassigned",
+  "reporter": "ChatGPT",
+  "labels": ["user-mandated", "codebase-health", "cleanup", "common", "numeric-validity", "deduplication"],
+  "attachments": [],
+  "externalLinks": [],
+  "linkedPages": [],
+  "comments": [
+    {
+      "id": "c-0208-audit-20260911",
+      "author": "ChatGPT",
+      "body": "Audit evidence 2026-09-11: current source search finds `NumericValidity.IsFinite(float)` as the shared owner and `DensityGrid.cs` as a remaining private scalar duplicate. The current TSK-0094 record explicitly says to reopen only for a concrete mechanically-identical utility family; this task records the bounded missed call-site without changing TSK-0094 history. No source changes are included in this audit.",
+      "createdAtUtc": "2026-09-11T22:27:00Z"
+    }
+  ],
+  "epicId": null,
+  "parentId": null,
+  "dueDateUtc": null,
+  "createdAtUtc": "2026-09-11T22:27:00Z",
+  "updatedAtUtc": "2026-09-11T22:27:00Z",
+  "completedAtUtc": null,
+  "revision": 1,
+  "isArchived": false,
+  "hasLoadError": false,
+  "loadError": null,
+  "sourceFilePath": "tsk-0208-finish-numericvalidity-migration-for-density-grid.json"
+}
