@@ -32,18 +32,25 @@ namespace ProceduralCreature.Appearance
             if (definition == null) throw new DomainException("definition must not be null.");
             if (mesh == null) throw new DomainException("mesh must not be null.");
 
-            var compiledParts = SdfProgramBuilder.CompileIndividualPartsPortable(definition);
-            SdfProgram bodyProgram = SdfProgramBuilder.CompilePortableBodyField(definition);
-            ResolvedBody body = definition.Body == null || definition.Body.Samples == null || definition.Body.Samples.Count == 0
-                ? default : ResolvedBody.Resolve(definition.Body);
+            List<ResolvedPartProgram> compiledParts = null;
+            SdfProgram bodyProgram = null;
             try
             {
+                compiledParts = SdfProgramBuilder.CompileIndividualPartsPortable(definition);
+                bodyProgram = SdfProgramBuilder.CompilePortableBodyField(definition);
+                ResolvedBody body = definition.Body == null || definition.Body.Samples == null || definition.Body.Samples.Count == 0
+                    ? default : ResolvedBody.Resolve(definition.Body);
+
                 return Bake(definition, mesh, diagnostics, compiledParts, bodyProgram, body);
             }
             finally
             {
-                foreach (ResolvedPartProgram partProgram in compiledParts) partProgram.Program.Dispose();
-                bodyProgram.Dispose();
+                if (compiledParts != null)
+                {
+                    foreach (ResolvedPartProgram partProgram in compiledParts)
+                        partProgram.Program?.Dispose();
+                }
+                bodyProgram?.Dispose();
             }
         }
 
