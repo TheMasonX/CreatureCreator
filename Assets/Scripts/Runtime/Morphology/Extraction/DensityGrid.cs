@@ -11,6 +11,8 @@ namespace ProceduralCreature.Morphology.Extraction
 {
     public sealed class DensityGrid : IDisposable
     {
+        private const int ScratchValueBudget = 8 * 1024 * 1024;
+        private const int MaxRowsPerExecute = 8;
         private NativeArray<float> _samples;
         public int CellsX { get; }
         public int CellsY { get; }
@@ -22,7 +24,6 @@ namespace ProceduralCreature.Morphology.Extraction
         internal NativeArray<float> MutableSamples => _samples;
         private int CornersX => CellsX + 1;
         private int CornersY => CellsY + 1;
-        private int CornersZ => CellsZ + 1;
 
         private DensityGrid(int cellsX, int cellsY, int cellsZ, Vector3 origin, float cellSize, NativeArray<float> samples)
         {
@@ -55,8 +56,15 @@ namespace ProceduralCreature.Morphology.Extraction
             if (operationCount <= 0) { samples.Dispose(); throw new DomainException("Portable program must contain at least one operation."); }
             if (program.RootIndex < 0 || program.RootIndex >= operationCount) { samples.Dispose(); throw new DomainException("Portable program root index must identify an operation."); }
 
-            long scratchLength = (long)cornersX * operationCount;
-            if (scratchLength > int.MaxValue) { samples.Dispose(); throw new DomainException("Portable sampler scratch buffer exceeds addressable array size."); }
+            long rowScratchLength = (long)cornersX * operationCount;
+            if (rowScratchLength > ScratchValueBudget) rowScratchLength = (long)cornersX * operationCount;
+            int rowsPerExecute = Mathf.Max(1, Mathf.Min(MaxRowsPerExecute, (int)(ScratchValueBudget / Mathf.Max(rowScratchLength, 1L))));
+            long scratchLength = rowScratchLength * rowsPerExecute;
+            if (scratchLength > int.MaxValue)
+            {
+                samples.Dispose();
+                throw new DomainException("Portable sampler scratch buffer exceeds addressable array size.");
+            }
 
             var scratchValues = new NativeArray<float>((int)scratchLength, Allocator.Persistent);
             try
@@ -75,9 +83,10 @@ namespace ProceduralCreature.Morphology.Extraction
                     RootHasPotentialBounds = program.HasPotentialBounds,
                     RootPotentialMinBound = program.PotentialMinBound,
                     RootPotentialMaxBound = program.PotentialMaxBound,
+                    RowsPerExecute = rowsPerExecute,
                 };
                 int rowCount = cornersY * cornersZ;
-                int workItemCount = (rowCount + SdfSamplingRowBatchJob.RowsPerExecute - 1) / SdfSamplingRowBatchJob.RowsPerExecute;
+                int workItemCount = (rowCount + rowsPerExecute - 1) / rowsPerExecute;
                 job.Schedule(workItemCount, 1).Complete();
 
                 var grid = new DensityGrid(cellsX, cellsY, cellsZ, origin, cellSize, samples);
@@ -158,12 +167,19 @@ namespace ProceduralCreature.Morphology.Extraction
     [BurstCompile]
     public struct SdfSamplingRowBatchJob : IJobParallelFor
     {
-        public const int RowsPerExecute = 8;
         [ReadOnly] public NativeArray<SdfOperation>.ReadOnly Operations;
         [NativeDisableParallelForRestriction] public NativeArray<float> ScratchValues;
         [NativeDisableParallelForRestriction] public NativeArray<float> Samples;
-        public int RootIndex; public int CornersX; public int CornersY; public float3 Origin; public float CellSize; public float InfluenceRadius;
-        public bool RootHasPotentialBounds; public float3 RootPotentialMinBound; public float3 RootPotentialMaxBound;
+        public int RootIndex;
+        public int CornersX;
+        public int CornersY;
+        public float3 Origin;
+        public float CellSize;
+        public float InfluenceRadius;
+        public bool RootHasPotentialBounds;
+        public float3 RootPotentialMinBound;
+        public float3 RootPotentialMaxBound;
+        public int RowsPerExecute;
 
         public void Execute(int workItemIndex)
         {
@@ -171,11 +187,17 @@ namespace ProceduralCreature.Morphology.Extraction
             int totalRows = Samples.Length / CornersX;
             int rowEnd = math.min(firstRow + RowsPerExecute, totalRows);
             int operationCount = Operations.Length;
-            for (int rowIndex = firstRow; rowIndex < rowEnd; rowIndex++)
+            int rowScratchStride = CornersX * operationCount;
+
+            for (int row = firstRow; row < rowEnd; row++)
             {
+                int localRow = row - firstRow;
+                int rowIndex = row;
                 int y = rowIndex % CornersY;
                 int z = rowIndex / CornersY;
                 int sampleBase = (z * CornersY + y) * CornersX;
+                int rowValueOffset = localRow * rowScratchStride;
+
                 for (int x = 0; x < CornersX; x++)
                 {
                     float3 point = Origin + new float3(x, y, z) * CellSize;
@@ -188,7 +210,7 @@ namespace ProceduralCreature.Morphology.Extraction
                         Samples[sampleIndex] = float.PositiveInfinity;
                         continue;
                     }
-                    int valueOffset = x * operationCount;
+                    int valueOffset = rowValueOffset + x * operationCount;
                     Samples[sampleIndex] = SdfProgramEvaluator.EvaluateInto(Operations, RootIndex, point, ScratchValues, valueOffset, InfluenceRadius, allowCulling: true);
                 }
             }
