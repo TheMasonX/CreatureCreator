@@ -21,6 +21,7 @@ namespace ProceduralCreature.Appearance
     public static class AppearanceBaker
     {
         private const float BrightnessVariation = 0.15f;
+        private const int ScratchValueBudget = 8 * 1024 * 1024;
         internal static bool UseBurstResolve = true;
 
         public static Color[] Bake(CreatureDefinition definition, MeshExtractionResult mesh)
@@ -90,7 +91,6 @@ namespace ProceduralCreature.Appearance
         private static void BakeBurst(CreatureDefinition definition, MeshExtractionResult mesh, Color[] colors,
             List<ResolvedPartProgram> compiledParts, SdfProgram bodyProgram, ResolvedBody body, ResolvedCreatureSnapshot snapshot)
         {
-            int programCount = compiledParts.Count + 1;
             int maxOps = 1;
             foreach (ResolvedPartProgram partProgram in compiledParts)
                 maxOps = Mathf.Max(maxOps, partProgram.Program.Operations.IsCreated ? partProgram.Program.Operations.Length : 1);
@@ -100,10 +100,6 @@ namespace ProceduralCreature.Appearance
             var vertices = new NativeArray<float3>(vertexCount, Allocator.Persistent);
             var nearestDistances = new NativeArray<float>(vertexCount, Allocator.Persistent);
             var nearestPrograms = new NativeArray<int>(vertexCount, Allocator.Persistent);
-            var outBase = new NativeArray<float4>(vertexCount, Allocator.Persistent);
-            var outSeed = new NativeArray<int>(vertexCount, Allocator.Persistent);
-            var outScale = new NativeArray<float>(vertexCount, Allocator.Persistent);
-            var outBody = new NativeArray<bool>(vertexCount, Allocator.Persistent);
             var partColors = new NativeArray<float4>(compiledParts.Count, Allocator.Persistent);
             var partSeeds = new NativeArray<int>(compiledParts.Count, Allocator.Persistent);
             var partScales = new NativeArray<float>(compiledParts.Count, Allocator.Persistent);
@@ -159,41 +155,36 @@ namespace ProceduralCreature.Appearance
                         Color bodyColor = BodyVerticalGradientSampler.EvaluateColor(
                             snapshot == null ? definition.Body?.Appearance : snapshot.BodyAppearance,
                             body, snapshot == null ? definition.Forward : snapshot.Forward, mesh.Positions[i]);
-                        outBase[i] = new float4(bodyColor.r, bodyColor.g, bodyColor.b, bodyColor.a);
-                        outSeed[i] = 0;
-                        outScale[i] = 1f;
-                        outBody[i] = true;
+                        colors[i] = BakeVertexColor(mesh.Positions[i], mesh.Normals[i], bodyColor, 0, 1f);
                     }
                     else
                     {
-                        outBody[i] = false;
+                        Color baseColor;
+                        int seed;
+                        float scale;
                         if (winner >= 0)
                         {
-                            outBase[i] = partColors[winner];
-                            outSeed[i] = partSeeds[winner];
-                            outScale[i] = partScales[winner];
+                            float4 resolvedColor = partColors[winner];
+                            baseColor = new Color(resolvedColor.x, resolvedColor.y, resolvedColor.z, resolvedColor.w);
+                            seed = partSeeds[winner];
+                            scale = partScales[winner];
                         }
                         else
                         {
-                            outBase[i] = new float4(defaultColor.r, defaultColor.g, defaultColor.b, defaultColor.a);
-                            outSeed[i] = 0;
-                            outScale[i] = 1f;
+                            baseColor = defaultColor;
+                            seed = 0;
+                            scale = 1f;
                         }
+                        colors[i] = BakeVertexColor(mesh.Positions[i], mesh.Normals[i], baseColor, seed, scale);
                     }
-                    colors[i] = BakeVertexColor(mesh.Positions[i], mesh.Normals[i],
-                        new Color(outBase[i].x, outBase[i].y, outBase[i].z, outBase[i].w),
-                        outSeed[i], outScale[i]);
                 }
             }
             finally
             {
                 vertices.Dispose(); nearestDistances.Dispose(); nearestPrograms.Dispose();
-                outBase.Dispose(); outSeed.Dispose(); outScale.Dispose(); outBody.Dispose();
                 partColors.Dispose(); partSeeds.Dispose(); partScales.Dispose();
             }
         }
-
-        private const int ScratchValueBudget = 8 * 1024 * 1024;
 
         private static void RunNearestBatches(
             SdfProgram program, NativeArray<float3> vertices,
@@ -252,9 +243,9 @@ namespace ProceduralCreature.Appearance
     {
         [ReadOnly] public NativeArray<SdfOperation>.ReadOnly Operations;
         [ReadOnly] public NativeArray<float3> Vertices;
-        [NativeDisableParallelForRestriction] public NativeArray<float> NearestDistances;
-        [NativeDisableParallelForRestriction] public NativeArray<int> NearestPrograms;
-        [NativeDisableParallelForRestriction] public NativeArray<float> ScratchValues;
+        public NativeArray<float> NearestDistances;
+        public NativeArray<int> NearestPrograms;
+        public NativeArray<float> ScratchValues;
         public int RootIndex;
         public int ProgramIndex;
         public int VertexStart;
@@ -266,13 +257,14 @@ namespace ProceduralCreature.Appearance
         {
             int vertexIndex = VertexStart + index;
             float3 point = Vertices[vertexIndex];
-            float candidate = SdfProgramEvaluator.EvaluateInto(
+            float raw = SdfProgramEvaluator.EvaluateInto(
                 Operations, RootIndex, point, ScratchValues, index * ScratchStride,
                 InfluenceRadius, allowCulling: true);
+            float candidate = math.abs(raw);
             if (float.IsPositiveInfinity(candidate)) return;
 
             float current = NearestDistances[vertexIndex];
-            // Parts use strict-less ordering, preserving authored compiled-part order.
+            // Parts use strict-less ordering, preserving compiled-part order.
             // The Body uses non-strict comparison and therefore wins an exact tie.
             bool wins = IsBody ? candidate <= current : candidate < current;
             if (wins)
