@@ -38,7 +38,7 @@
     {
       "id": "c-20260907-body-smear-followup",
       "author": "anonymous",
-      "body": "User visual validation (2026-09-07): moving Body rig parts causes noticeable mesh smearing/weird deformation on \u0060dinus_uprightus\u0060. This is not yet assigned to a specific algorithmic cause. Next validation must inspect actual bone weights and use controlled isolated bone poses before changing falloff/weight policy. Preserve performance by keeping any repair build-time only.",
+      "body": "User visual validation (2026-09-07): moving Body rig parts causes noticeable mesh smearing/weird deformation on \u0060dinus_uprightus\u0060. This is not yet assigned to a specific algorithmic cause. Next validation must inspect actual \u0060BoneWeight\u0060 distributions and a controlled one-bone pose before changing falloff/weight policy. Preserve performance by keeping any repair build-time only.",
       "createdAtUtc": "2026-09-07T17:10:00Z"
     },
     {
@@ -52,15 +52,21 @@
       "author": "anonymous",
       "body": "## Audit synthesis disposition (2026-09-10)\nF-13\u0027s finite-radius builder inconsistency is fixed at the source boundary in the current branch, but Unity/generated-creature closure remains open. Keep this task InProgress and do not create a duplicate radius task. Continue with controlled generated-body deformation evidence.",
       "createdAtUtc": "2026-09-10T16:26:46.4978243Z"
+    },
+    {
+      "id": "c-chatgpt-20260911-domain-fallback",
+      "author": "ChatGPT",
+      "body": "Static reproduction diagnosis: ImplicitSurfaceWeightAuthoring.Author previously threw when an explicit InfluenceDomain excluded every positive falloff candidate. The runtime binding path always supplies generated InfluenceDomain[] and therefore could abort regeneration on valid welded vertices that fell just outside the finite weighting tube. Fixed in commit 841e85ce479d0315d6f68a000d5d4d994d785a69: when a domain-constrained vertex has no positive falloff candidate, choose the nearest segment admitted by that already-resolved domain, deterministically tie-breaking by BoneIndex, with weight 1.0. No sibling/opposite-side fallback is permitted. The unrestricted helper remains strict. Unity/generated-creature deformation validation remains required.",
+      "createdAtUtc": "2026-09-11T16:40:00Z"
     }
   ],
   "epicId": null,
   "parentId": "TSK-0077",
   "dueDateUtc": null,
   "createdAtUtc": "2026-09-07T06:27:32.3039768Z",
-  "updatedAtUtc": "2026-09-10T16:26:46.4978243Z",
+  "updatedAtUtc": "2026-09-11T16:40:00Z",
   "completedAtUtc": null,
-  "revision": 13,
+  "revision": 14,
   "isArchived": false,
   "hasLoadError": false,
   "loadError": null,
