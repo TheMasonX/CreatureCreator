@@ -40,7 +40,12 @@ editor and Unity Test Framework over source inspection.
    selection, and color bounds.
 9. For skeleton or IK changes, test parent links, symmetry, root pinning, link
    lengths, and non-mutation of input poses.
-10. Record the exact check, result, and environment in the task tracker.
+10. For Burst/job, parallel-`NativeArray`, or
+    `[NativeDisableParallelForRestriction]` changes, repeat the run many times
+    and compare exact output fingerprints (density-grid and extracted mesh). A
+    single passing run does not falsify a data race: scheduling interleaving can
+    hide it, so one-shot parity is not sufficient evidence for a concurrency fix.
+11. Record the exact check, result, and environment in the task tracker.
 
 Before relying on an editor result, confirm that compilation has finished and
 inspect the Unity console for errors and warnings. Record the Unity version,

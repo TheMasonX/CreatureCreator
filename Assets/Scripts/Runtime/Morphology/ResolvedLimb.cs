@@ -125,11 +125,13 @@ namespace ProceduralCreature.Morphology
         /// <summary>
         /// Non-throwing resolve for validator-only envelope checks (CC-089).
         /// Returns false instead of throwing when the chain is null, has no
-        /// joints, or contains a null joint — the routine incomplete-authoring
-        /// states <c>DefinitionValidator.ValidateLimbChains</c> already reports
-        /// separately, so they must not use exceptions for control flow. When it
-        /// returns true the value is exactly what <see cref="Resolve"/> would
-        /// produce. A single-joint (degenerate) chain still resolves; the
+        /// joints, contains a null joint, or contains a non-finite joint
+        /// position — the routine incomplete-authoring states
+        /// <c>DefinitionValidator.ValidateLimbChains</c> already reports
+        /// separately, so they must not use exceptions for control flow. This
+        /// mirrors <see cref="ResolvedBody.CanResolve"/>. When it returns true the
+        /// value is exactly what <see cref="Resolve"/> would produce. A
+        /// single-joint (degenerate) chain still resolves; the
         /// &gt;=2-joint invariant is enforced by validation
         /// (<c>GenerationTolerances.MinLimbJointCount</c>), not by this
         /// derivation type.
@@ -143,7 +145,8 @@ namespace ProceduralCreature.Morphology
             }
             for (int i = 0; i < chain.Joints.Count; i++)
             {
-                if (chain.Joints[i] == null)
+                LimbJoint joint = chain.Joints[i];
+                if (joint == null || !NumericValidity.IsFinite(joint.Position))
                 {
                     resolved = default;
                     return false;

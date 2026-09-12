@@ -59,35 +59,23 @@ namespace ProceduralCreature.Tests.Runtime
         }
 
         [Test]
-        public void BuildRadii_NonPositiveBodyRadius_UsesDeterministicFiniteFallback()
+        public void BuildRadii_NonPositiveBodyRadius_IsRejected()
         {
             CreatureDefinition definition = CreateDefinition(bodyRadius: 0f, limb: null);
-            SkeletonSnapshot snapshot = SkeletonSnapshot.Capture(SkeletonInferrer.Infer(definition));
 
-            float[] first = MorphologyInfluenceRadiusBridge.BuildRadiiByBoneIndex(
-                snapshot, ResolvedCreatureSnapshot.Resolve(definition));
-            float[] second = MorphologyInfluenceRadiusBridge.BuildRadiiByBoneIndex(
-                snapshot, ResolvedCreatureSnapshot.Resolve(definition));
-
-            AssertFiniteAndDeterministic(first, second);
-            Assert.That(first[snapshot.GetIndex(AnatomicalBodyRigLayout.BodyRootBoneId)],
-                Is.EqualTo(ImplicitSurfaceWeightAuthoring.DefaultInfluenceRadius).Within(Tolerance));
+            // Strict rejection: invalid DNA is reported by DefinitionValidator and
+            // never resolved, so the resolver must not repair the radius.
+            Assert.Throws<DomainException>(() => ResolvedCreatureSnapshot.Resolve(definition));
         }
 
         [TestCase(float.NaN)]
         [TestCase(float.PositiveInfinity)]
         [TestCase(float.NegativeInfinity)]
-        public void BuildRadii_NonFiniteBodyRadius_UsesDeterministicFiniteFallback(float radius)
+        public void BuildRadii_NonFiniteBodyRadius_IsRejected(float radius)
         {
             CreatureDefinition definition = CreateDefinition(bodyRadius: radius, limb: null);
-            SkeletonSnapshot snapshot = SkeletonSnapshot.Capture(SkeletonInferrer.Infer(definition));
 
-            float[] radii = MorphologyInfluenceRadiusBridge.BuildRadiiByBoneIndex(
-                snapshot, ResolvedCreatureSnapshot.Resolve(definition));
-
-            AssertFinite(radii);
-            Assert.That(radii[snapshot.GetIndex(AnatomicalBodyRigLayout.BodyRootBoneId)],
-                Is.EqualTo(ImplicitSurfaceWeightAuthoring.DefaultInfluenceRadius).Within(Tolerance));
+            Assert.Throws<DomainException>(() => ResolvedCreatureSnapshot.Resolve(definition));
         }
 
         [Test]

@@ -130,15 +130,21 @@
       "author": "anonymous",
       "body": "## Audit synthesis disposition (2026-09-10)\nRound 20 and Round 21 confirm two distinct redundant derivations in one regeneration: SDF part/body programs are compiled again during implicit-surface binding, and \u0060SkeletonInferrer.Infer\u0060 runs again after assembly, including when no mesh-asset parts exist. Reuse explicit generated correspondence or skip unused inference. The semantic Body attachment raw/resolved dual pathway remains a separate consolidation item under this owner. Evidence: \u0060docs/audits/creaturecreator-round20-redundant-sdf-compile-2026-09-09.md\u0060, \u0060docs/audits/creaturecreator-round21-redundant-skeleton-infer-2026-09-09.md\u0060, and current source sweep.",
       "createdAtUtc": "2026-09-10T16:26:46.4128319Z"
+    },
+    {
+      "id": "c-3914e1e346f648eab6d4052bf135a873",
+      "author": "anonymous",
+      "body": "2026-09-11 audit synthesis evidence. \u0060docs/audits/creaturecreator-council-review-next-phase-ordering-2026-09-11.md\u0060 restates the two confirmed unaddressed redundancy sub-items: (a) duplicate SDF operation-tree compilation and (b) duplicate \u0060SkeletonInferrer.Infer\u0060 per regeneration on the live preview/runtime path. \u0060docs/audits/creaturecreator-animation-mvp-takeover-audit-26-09-11-04-05-00.md\u0060 confirms \u0060GenerateData\u0060 now compiles part/body programs once and \u0060ImplicitSurfaceInfluenceDomainResolver\u0060 gained a precompiled-program overload, so the remaining duplication is the preview \u0060BindImplicitSurfaceToRig\u0060 path and the appearance baker. Related fixed-at-source item: \u0060AppearanceBaker.Bake\u0060 program-leak remediation landed in \u006013c72f2fcaa3704319aa45dd8b581ba810eefef8\u0060 (performance council reaudit). Keep the raw-vs-resolved Body attachment policy duplication under this owner.",
+      "createdAtUtc": "2026-09-12T02:47:31.8530457Z"
     }
   ],
   "epicId": null,
   "parentId": null,
   "dueDateUtc": null,
   "createdAtUtc": "2026-09-01T00:00:00Z",
-  "updatedAtUtc": "2026-09-10T16:26:46.4128319Z",
+  "updatedAtUtc": "2026-09-12T02:47:31.8530457Z",
   "completedAtUtc": null,
-  "revision": 14,
+  "revision": 15,
   "isArchived": false,
   "hasLoadError": false,
   "loadError": null,

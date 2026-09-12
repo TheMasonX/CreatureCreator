@@ -85,8 +85,15 @@ namespace ProceduralCreature.Morphology.Extraction
                 samples.Dispose();
                 throw new DomainException("Portable sampler scratch buffer exceeds addressable array size.");
             }
-            int rowsPerExecute = Mathf.Max(1, Mathf.Min(MaxRowsPerExecute, (int)(ScratchValueBudget / Mathf.Max(rowScratchLength, 1L))));
-            long scratchLength = rowScratchLength * rowsPerExecute;
+            int rowScratchStride = (int)rowScratchLength;
+            int rowsPerExecute = Mathf.Max(1, Mathf.Min(MaxRowsPerExecute, (int)(ScratchValueBudget / Mathf.Max(rowScratchStride, 1L))));
+            int scratchPerWorkItem = rowsPerExecute * rowScratchStride;
+            // Each concurrently scheduled work item owns a disjoint scratch slice, so
+            // the scratch buffer must cover every work item in a schedule. Bound that
+            // set to ScratchValueBudget and process the grid in row windows; each
+            // window is a self-contained schedule whose work items fit the buffer.
+            int workItemsPerWindow = Mathf.Max(1, (int)(ScratchValueBudget / Mathf.Max(scratchPerWorkItem, 1L)));
+            long scratchLength = (long)scratchPerWorkItem * workItemsPerWindow;
             if (scratchLength > int.MaxValue)
             {
                 samples.Dispose();
@@ -100,26 +107,31 @@ namespace ProceduralCreature.Morphology.Extraction
                 float3 rootMin = program.PotentialMinBound;
                 float3 rootMax = program.PotentialMaxBound;
 
-                var job = new SdfSamplingRowBatchJob
-                {
-                    Operations = program.Operations,
-                    ScratchValues = scratchValues,
-                    Samples = samples,
-                    RootIndex = program.RootIndex,
-                    CornersX = cornersX,
-                    CornersY = cornersY,
-                    Origin = new float3(origin.x, origin.y, origin.z),
-                    CellSize = cellSize,
-                    InfluenceRadius = program.InfluenceRadius,
-                    RootHasPotentialBounds = rootHasPotentialBounds,
-                    RootPotentialMinBound = rootMin,
-                    RootPotentialMaxBound = rootMax,
-                    RowsPerExecute = rowsPerExecute,
-                };
-
                 int rowCount = cornersY * cornersZ;
-                int workItemCount = (rowCount + rowsPerExecute - 1) / rowsPerExecute;
-                job.Schedule(workItemCount, 1).Complete();
+                int rowsPerWindow = workItemsPerWindow * rowsPerExecute;
+                for (int rowStart = 0; rowStart < rowCount; rowStart += rowsPerWindow)
+                {
+                    int rowsThisWindow = Mathf.Min(rowsPerWindow, rowCount - rowStart);
+                    int workItemCount = (rowsThisWindow + rowsPerExecute - 1) / rowsPerExecute;
+                    var job = new SdfSamplingRowBatchJob
+                    {
+                        Operations = program.Operations,
+                        ScratchValues = scratchValues,
+                        Samples = samples,
+                        RootIndex = program.RootIndex,
+                        CornersX = cornersX,
+                        CornersY = cornersY,
+                        Origin = new float3(origin.x, origin.y, origin.z),
+                        CellSize = cellSize,
+                        InfluenceRadius = program.InfluenceRadius,
+                        RootHasPotentialBounds = rootHasPotentialBounds,
+                        RootPotentialMinBound = rootMin,
+                        RootPotentialMaxBound = rootMax,
+                        RowStart = rowStart,
+                        RowsPerExecute = rowsPerExecute,
+                    };
+                    job.Schedule(workItemCount, 1).Complete();
+                }
 
                 var grid = new DensityGrid(cellsX, cellsY, cellsZ, origin, cellSize, samples);
                 samples = default;
@@ -293,20 +305,25 @@ namespace ProceduralCreature.Morphology.Extraction
         public bool RootHasPotentialBounds;
         public float3 RootPotentialMinBound;
         public float3 RootPotentialMaxBound;
+
+        /// <summary>Global row index where the scheduled window starts.</summary>
+        public int RowStart;
+
+        /// <summary>Rows each work item owns. Scratch is sized per work item from this.</summary>
         public int RowsPerExecute;
 
         public void Execute(int workItemIndex)
         {
-            int firstLocalRow = workItemIndex * RowsPerExecute;
+            int firstRow = RowStart + workItemIndex * RowsPerExecute;
             int totalRows = Samples.Length / CornersX;
-            int rowEnd = math.min(firstLocalRow + RowsPerExecute, totalRows);
+            int rowEnd = math.min(firstRow + RowsPerExecute, totalRows);
             int operationCount = Operations.Length;
             int rowScratchStride = CornersX * operationCount;
             int workItemScratchOffset = checked(workItemIndex * RowsPerExecute * rowScratchStride);
 
-            for (int row = firstLocalRow; row < rowEnd; row++)
+            for (int row = firstRow; row < rowEnd; row++)
             {
-                int localRow = row - firstLocalRow;
+                int localRow = row - firstRow;
                 int y = row % CornersY;
                 int z = row / CornersY;
                 int sampleBase = row * CornersX;

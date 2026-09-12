@@ -44,7 +44,10 @@ and during every non-trivial code change.
 - Allocate a new task key against `main`'s current `Data/Tasks/` state, not just
   the local branch's view. Keys assigned independently on diverging branches
   collide. Evidence: `TSK-0136`->`TSK-0187`, `TSK-0172` renumbering, `TSK-0153`,
-  `TSK-0188`, `TSK-0189`.
+  `TSK-0188`, `TSK-0189`. Creation must preflight every existing id and key, not
+  only the normalizer's repair path: the 2026-09-11 window produced nine
+  duplicate keys (`TSK-0197`..`TSK-0205`) from independent sessions that each
+  allocated the same next number (TSK-0213).
 
 ## CreatureCreator recurring traps
 
@@ -89,6 +92,16 @@ Task history identifies these local failure patterns. Check them explicitly:
 - Treat non-finite SDF values and culling as an explicit contract. Preserve the
   documented `+inf` outside/culled behavior and guard invalid program roots
   before Burst execution. Evidence: TSK-0066, TSK-0067, TSK-0068, TSK-0079.
+- Treat `[NativeDisableParallelForRestriction]` as a manual safety claim on par
+  with `unsafe`. It suppresses the Unity job-safety check that would otherwise
+  catch aliased writes, so every index a job writes must be proven disjoint
+  across the real parallel dimension (`workItemIndex`), not just within one loop
+  iteration. A per-work-item scratch buffer must include the work-item index in
+  its offset and be sized for the concurrent work-item set; a loop-local row
+  index that resets to `0` in every work item does not isolate scratch, even if
+  the job is renamed or re-batched. Evidence: `SdfSamplingRowBatchJob`
+  (`DensityGrid.cs`) still aliases `ScratchValues` across work items after a
+  14-seat council declared the race fixed (TSK-0212, TSK-0198).
 - When a per-vertex or per-sample decision must pick one owning part, bone, or
   segment among nearby candidates, treat a hard cutover with no blend region as
   known-risky at seams where the underlying geometry is smoothly connected. Two

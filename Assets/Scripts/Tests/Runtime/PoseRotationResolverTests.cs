@@ -115,7 +115,7 @@ namespace ProceduralCreature.Tests.Runtime
         }
 
         [Test]
-        public void Resolve_NonUnitRestRotation_RemainsFinite()
+        public void Resolve_NonUnitRestRotation_IsRejected()
         {
             var skeleton = new Skeleton.Skeleton();
             skeleton.Bones.Add(new Bone
@@ -132,9 +132,10 @@ namespace ProceduralCreature.Tests.Runtime
                 Rotation = Quaternion.identity,
             });
 
-            Dictionary<string, Quaternion> rotations = PoseRotationResolver.Resolve(
-                skeleton, PosedSkeleton.FromRestPose(skeleton));
-            Assert.IsTrue(NumericValidity.IsFinite(rotations["root"]));
+            // A degenerate rest rotation is invalid DNA. Strict rejection: the pose
+            // pipeline rejects it instead of repairing or silently normalizing it.
+            Assert.Throws<DomainException>(() => PoseRotationResolver.Resolve(
+                skeleton, PosedSkeleton.FromRestPose(skeleton)));
         }
 
         [Test]

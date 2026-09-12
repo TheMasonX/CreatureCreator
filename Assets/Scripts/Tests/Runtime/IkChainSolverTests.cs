@@ -44,11 +44,16 @@ namespace ProceduralCreature.Tests.Runtime
                     ["tip"] = new Vector3(1f, 0.5f, 0f),
                 });
 
+            // The fixture is one rigid link of rest length 1 pinned at the seeded root
+            // (0, 0.5, 0), so the target must sit exactly reach-length away. A closer
+            // target lies inside the reach sphere and no rigid link can touch it.
+            // This still discriminates current-pose seeding: seeding from rest pins the
+            // root at (0, 0, 0) and leaves the tip at (0, 1, 0), failing both asserts.
             PosedSkeleton solved = IkChainSolver.SolveChainTarget(
-                rest, pose, "tip", new Vector3(0f, 1f, 0f), maxIterations: 20, tolerance: 1e-4f);
+                rest, pose, "tip", new Vector3(0f, 1.5f, 0f), maxIterations: 20, tolerance: 1e-4f);
 
             Assert.That(Vector3.Distance(solved.GetPosition("root"), new Vector3(0f, 0.5f, 0f)), Is.LessThan(1e-5f));
-            Assert.That(Vector3.Distance(solved.GetPosition("tip"), new Vector3(0f, 1f, 0f)), Is.LessThan(1e-4f));
+            Assert.That(Vector3.Distance(solved.GetPosition("tip"), new Vector3(0f, 1.5f, 0f)), Is.LessThan(1e-4f));
         }
 
         private static Skeleton.Skeleton CreateTwoBoneSkeleton(Vector3 tipPosition)

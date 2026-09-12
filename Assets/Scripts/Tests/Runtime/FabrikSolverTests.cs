@@ -152,8 +152,9 @@ namespace ProceduralCreature.Tests.Runtime
         public void Solve_RejectsFiniteLinkLengthsWhoseTotalOverflows()
         {
             Vector3[] initial = { Vector3.zero, Vector3.right, Vector3.right * 2f };
-            float halfMax = float.MaxValue / 2f;
-            float[] lengths = { halfMax, halfMax };
+            // Two finite links whose accumulation overflows the finite float range.
+            // halfMax + halfMax saturates at float.MaxValue and is not an overflow.
+            float[] lengths = { float.MaxValue, float.MaxValue };
             Assert.Throws<DomainException>(() =>
                 FabrikSolver.Solve(initial, lengths, Vector3.one, 10, 0.01f));
         }

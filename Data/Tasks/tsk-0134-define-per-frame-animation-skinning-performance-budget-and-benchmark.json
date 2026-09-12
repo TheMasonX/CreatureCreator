@@ -41,15 +41,21 @@
       "author": "anonymous",
       "body": "## Audit synthesis disposition (2026-09-10)\nKeep this task open as the sole performance evidence owner. Absorb F-11\u0027s per-solve \u0060Dictionary\u003Cstring, Vector3\u003E\u0060 allocation only after measurement, and F-12\u0027s missing bind/rebind budget for implicit weight authoring and mesh-array copying. Separate steady-state pose/skinning budget from generation/rebind budget; require Unity PlayMode/profiler evidence.",
       "createdAtUtc": "2026-09-10T16:26:46.4490376Z"
+    },
+    {
+      "id": "c-b5e2df7a989f43569d0f948f6b4784a1",
+      "author": "anonymous",
+      "body": "2026-09-11 audit synthesis evidence (\u0060docs/audits/creaturecreator-round25-invisible-binding-cost-2026-09-11.md\u0060). \u0060GenerationStage\u0060 in \u0060Generation/GenerationDiagnostics.cs\u0060 only names \u0060GenerateData\u0060 stages; \u0060CreatureRuntimePreview\u0060/\u0060CreatureEditorWindow\u0060 then call \u0060BindImplicitSurfaceToRig\u0060 outside the timed scope, so \u0060TotalGeneration\u0060 cannot include domain resolution, weight authoring, rig bind, or the second skeleton pass. Add \u0060DomainResolution\u0060/\u0060WeightAuthoring\u0060/\u0060RigBind\u0060 (or equivalent) stages and instrument the bind path before defining the bind-time budget (F-12). Note \u0060CreatureRuntimePreview.cs:43\u0060 also constructs \u0060GenerationDiagnostics(collectTimings: false)\u0060. This measurement slice enables the \u0060TSK-0201\u0060/\u0060TSK-0202\u0060 comparisons; \u0060TSK-0202\u0060 (Body arc-length prefix cache) remains the highest-priority measured follow-up.",
+      "createdAtUtc": "2026-09-12T02:47:31.7779186Z"
     }
   ],
   "epicId": null,
   "parentId": "TSK-0077",
   "dueDateUtc": null,
   "createdAtUtc": "2026-09-06T19:15:13.3211971Z",
-  "updatedAtUtc": "2026-09-10T16:26:46.4490376Z",
+  "updatedAtUtc": "2026-09-12T02:47:31.7779186Z",
   "completedAtUtc": null,
-  "revision": 5,
+  "revision": 6,
   "isArchived": false,
   "hasLoadError": false,
   "loadError": null,

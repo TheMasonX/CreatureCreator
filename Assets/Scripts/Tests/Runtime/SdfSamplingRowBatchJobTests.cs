@@ -3,6 +3,7 @@ using Unity.Collections;
 using Unity.Jobs;
 using Unity.Mathematics;
 using UnityEngine;
+using ProceduralCreature.Morphology.Extraction;
 using ProceduralCreature.Morphology.Sdf;
 
 namespace ProceduralCreature.Tests.Runtime
@@ -34,7 +35,19 @@ namespace ProceduralCreature.Tests.Runtime
 
             int rowScratchStride = cornersX * operations.Length;
             int workItemCount = (totalRows + rowsPerExecute - 1) / rowsPerExecute;
-            var scratch = new NativeArray<float>(rowScratchStride * workItemCount, Allocator.Persistent);
+            // Each work item owns rowsPerExecute rows of disjoint scratch, so the
+            // backing array must cover the whole scheduled work-item set. The trailing
+            // half is a sentinel guard and must stay untouched: Burst disables NativeArray
+            // bounds checks, so an escaped scratch base offset corrupts memory silently
+            // instead of throwing.
+            int scratchLength = rowScratchStride * rowsPerExecute * workItemCount;
+            const float sentinel = -98765.5f;
+            var scratchBacking = new NativeArray<float>(scratchLength * 2, Allocator.Persistent);
+            for (int i = scratchLength; i < scratchBacking.Length; i++)
+            {
+                scratchBacking[i] = sentinel;
+            }
+            NativeArray<float> scratch = scratchBacking.GetSubArray(0, scratchLength);
             var samples = new NativeArray<float>(cornersX * totalRows, Allocator.Persistent);
             try
             {
@@ -52,6 +65,7 @@ namespace ProceduralCreature.Tests.Runtime
                     RootHasPotentialBounds = false,
                     RootPotentialMinBound = default,
                     RootPotentialMaxBound = default,
+                    RowStart = 0,
                     RowsPerExecute = rowsPerExecute,
                 };
 
@@ -60,6 +74,12 @@ namespace ProceduralCreature.Tests.Runtime
                 // scratch array. A missing work-item slice offset creates a real
                 // data race and can corrupt operation values between dependent ops.
                 job.Schedule(workItemCount, 1).Complete();
+
+                for (int i = scratchLength; i < scratchBacking.Length; i++)
+                {
+                    Assert.AreEqual(sentinel, scratchBacking[i],
+                        $"scratch writes escaped the {scratchLength}-float slice into guard index {i}");
+                }
 
                 for (int row = 0; row < totalRows; row++)
                 for (int x = 0; x < cornersX; x++)
@@ -75,7 +95,7 @@ namespace ProceduralCreature.Tests.Runtime
             finally
             {
                 samples.Dispose();
-                scratch.Dispose();
+                scratchBacking.Dispose();
                 operations.Dispose();
             }
         }

@@ -20,6 +20,13 @@ namespace ProceduralCreature.Tests.Runtime
 
         private static SkeletonSnapshot Capture(params Bone[] bones)
         {
+            // SkeletonSnapshot.Capture requires exactly one root bone, so chain the
+            // fixture bones into a single hierarchy. Breadth-first ordering over the
+            // chain keeps snapshot index equal to argument order.
+            for (int i = 0; i < bones.Length; i++)
+            {
+                bones[i].ParentBoneId = i == 0 ? null : bones[i - 1].Id;
+            }
             var skeleton = new SkeletonModel();
             skeleton.Bones.AddRange(bones);
             return SkeletonSnapshot.Capture(skeleton);
@@ -52,11 +59,11 @@ namespace ProceduralCreature.Tests.Runtime
         [Test]
         public void ComputeBindposes_NonFiniteRestPosition_Throws()
         {
-            SkeletonSnapshot snapshot = Capture(
-                BoneAt("root", new Vector3(float.NaN, 0f, 0f), Quaternion.identity));
-
+            // SkeletonSnapshot.Capture rejects a non-finite rest position before the
+            // binding builder runs, so assert the whole capture-and-convert path.
             Assert.Throws<ProceduralCreature.Common.DomainException>(
-                () => SkinnedMeshBindingBuilder.ComputeBindposes(snapshot));
+                () => SkinnedMeshBindingBuilder.ComputeBindposes(Capture(
+                    BoneAt("root", new Vector3(float.NaN, 0f, 0f), Quaternion.identity))));
         }
 
         [Test]
