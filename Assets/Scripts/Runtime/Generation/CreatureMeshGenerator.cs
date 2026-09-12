@@ -59,16 +59,22 @@ namespace ProceduralCreature.Generation
             SdfProgram bodyProgram = null;
             try
             {
-                compiledParts = SdfProgramBuilder.CompileIndividualPartsPortable(definition, snapshot);
-                bodyProgram = SdfProgramBuilder.CompilePortableBodyField(definition, snapshot);
+                Time(diagnostics, GenerationStage.SdfCompile, () =>
+                {
+                    compiledParts = SdfProgramBuilder.CompileIndividualPartsPortable(definition, snapshot);
+                    bodyProgram = SdfProgramBuilder.CompilePortableBodyField(definition, snapshot);
+                });
 
                 DensityGrid grid = GenerateImplicitField(definition, snapshot, diagnostics);
                 MeshExtractionResult meshResult = ExtractMesh(grid, diagnostics);
                 MeshTopologyReport generatedTopologyReport = ValidateMesh(meshResult, diagnostics);
                 Color[] colors = BakeAppearance(
                     definition, snapshot, meshResult, compiledParts, bodyProgram, diagnostics);
-                InfluenceDomain[] vertexInfluenceDomains =
-                    ResolveInfluenceDomains(snapshot, meshResult, compiledParts, bodyProgram);
+                InfluenceDomain[] vertexInfluenceDomains = null;
+                Time(diagnostics, GenerationStage.InfluenceDomainResolution, () =>
+                {
+                    vertexInfluenceDomains = ResolveInfluenceDomains(snapshot, meshResult, compiledParts, bodyProgram);
+                });
 
                 return new GeneratedCreatureData(
                     definition,
