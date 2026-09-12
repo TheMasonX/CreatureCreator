@@ -22,6 +22,10 @@ namespace ProceduralCreature.Animation.Binding
                 throw new DomainException("definition must not be null.");
             }
 
+            // Resolve once and derive every downstream value from the same snapshot.
+            // The previous convenience path resolved once through SkeletonInferrer
+            // and then resolved the same definition again here, creating two
+            // independent derived-state constructions for one request.
             ResolvedCreatureSnapshot snapshot = ResolvedCreatureSnapshot.Resolve(definition);
             SkeletonModel skeleton = SkeletonInferrer.Infer(snapshot);
             return BuildRadiiByBoneIndex(SkeletonSnapshot.Capture(skeleton), snapshot);
