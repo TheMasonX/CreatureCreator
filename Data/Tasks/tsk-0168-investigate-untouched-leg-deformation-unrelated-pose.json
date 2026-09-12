@@ -30,15 +30,21 @@
       "author": "anonymous",
       "body": "Created after the user\u0027s clarification that mirrored-foot coupling is fixed and the leg warp is separate. This task owns reproduction and mechanism identification; it must not add a weighting heuristic before a generated-creature pose-isolation fixture identifies the controlling path.",
       "createdAtUtc": "2026-09-07T19:41:50.7904156Z"
+    },
+    {
+      "id": "c-6c008186703241d7b47d08d89a17d5b6",
+      "author": "anonymous",
+      "body": "Audit synthesis 2026-09-12 (CC-AUDIT-SKIN-20260912-1D83F0A4, CC-AUDIT-20260912-7A5E0C31 F-05): mandatory diagnosis protocol before any weight/radius tuning. The audit is explicit that the same \u0022untouched limb moves\u0022 symptom can originate from wrong influence classification, an over-broad Body influence radius, wrong pose rotation, wrong bindpose, actor/world-space mismatch, or a debug visualisation using the wrong coordinate space. Do not infer a weight bug from screenshots or source inspection.\n\nRequired experiment on a real generated creature:\n1. capture the top four influences for every affected vertex;\n2. visualise the dominant influence;\n3. pose one non-leg Body bone at a time;\n4. compare untouched-leg vertex displacement;\n5. compare the pure LBS oracle against the actual SMR result;\n6. classify the fault, then tune.\n\nAlso note: a debug/visualisation tool must be validated against a posed, non-identity state before it is trusted as evidence for diagnosing a different bug (RigDebugView mixed rest-space and posed-space coordinates in an earlier round).\n\nOwnership separation to preserve: TSK-0150 is the foot/domain isolation mechanism; this task is the untouched-limb deformation mechanism. The audit explicitly says these must not be folded together. Related: TSK-0172 (body smear), TSK-0194 (LBS parity failure cluster D).",
+      "createdAtUtc": "2026-09-12T05:54:43.5049112Z"
     }
   ],
   "epicId": null,
   "parentId": "TSK-0077",
   "dueDateUtc": null,
   "createdAtUtc": "2026-09-07T19:41:46.7343141Z",
-  "updatedAtUtc": "2026-09-07T19:41:50.7904156Z",
+  "updatedAtUtc": "2026-09-12T05:54:43.5049112Z",
   "completedAtUtc": null,
-  "revision": 2,
+  "revision": 3,
   "isArchived": false,
   "hasLoadError": false,
   "loadError": null,

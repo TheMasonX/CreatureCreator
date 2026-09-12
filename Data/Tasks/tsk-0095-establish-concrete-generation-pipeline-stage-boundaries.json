@@ -136,15 +136,21 @@
       "author": "anonymous",
       "body": "2026-09-11 audit synthesis evidence. \u0060docs/audits/creaturecreator-council-review-next-phase-ordering-2026-09-11.md\u0060 restates the two confirmed unaddressed redundancy sub-items: (a) duplicate SDF operation-tree compilation and (b) duplicate \u0060SkeletonInferrer.Infer\u0060 per regeneration on the live preview/runtime path. \u0060docs/audits/creaturecreator-animation-mvp-takeover-audit-26-09-11-04-05-00.md\u0060 confirms \u0060GenerateData\u0060 now compiles part/body programs once and \u0060ImplicitSurfaceInfluenceDomainResolver\u0060 gained a precompiled-program overload, so the remaining duplication is the preview \u0060BindImplicitSurfaceToRig\u0060 path and the appearance baker. Related fixed-at-source item: \u0060AppearanceBaker.Bake\u0060 program-leak remediation landed in \u006013c72f2fcaa3704319aa45dd8b581ba810eefef8\u0060 (performance council reaudit). Keep the raw-vs-resolved Body attachment policy duplication under this owner.",
       "createdAtUtc": "2026-09-12T02:47:31.8530457Z"
+    },
+    {
+      "id": "c-e9782023c1114c6fad9f9bace04e0fec",
+      "author": "anonymous",
+      "body": "Audit synthesis 2026-09-12 (CC-AUDIT-DATA-20260912-7AC31E90, CC-AUDIT-GEN-20260912-83C17B4E, CC-AUDIT-20260912-7A5E0C31): canonical owner for the generation publish boundary and stage authority. Consolidated mechanism: \u0022immutable\u0022 is currently a property of the container API, not of the whole object graph.\n\n- F-06 / DC-01 / GP-07: \u0060GeneratedCreatureData\u0060 is only shallowly immutable. Read-only properties and copied arrays do not make a published result immutable while it still references mutable definition/appearance/list objects. Under async scheduling a graph that can change after publication is conceptually a race even with no concurrent CLR field write.\n- F-07 / DC-02: \u0060ResolvedCreatureSnapshot\u0060 needs explicit per-field ownership guarantees (scalar/vector value; array detached or immutable wrapper; curve/program immutable value; Unity object only at the presentation edge).\n- F-12 / DC-03: raw definition and resolved snapshot are both passed into the same generation/display boundary; some downstream APIs accept raw DNA and resolve internally. Target shape: raw DNA -\u003E validate/canonicalize -\u003E one resolved snapshot -\u003E all downstream consumers. Compatibility overloads at the outer edge only, funnelling immediately into the canonical path.\n- DC-04: canonicalization must stay idempotent and gain a version/schema revision so cached or generated assets are distinguishable across semantic revisions. Coordinate with TSK-0219.\n- DC-07 / GP-10: define \u0060EffectiveGenerationConfig = asset defaults \u002B request overrides\u0060 and \u0060GenerationSignature = hash(effective config \u002B canonical DNA \u002B generator revision)\u0060, otherwise equivalent-looking requests can legitimately produce different meshes with no cache/test/log signal.\n- DC-10 / DC-12: do not serialize derived data that can drift from DNA; document asset references as non-owned dependencies that preview cleanup must never \u0060Destroy\u0060.\n- CH-07: read-only wrappers are not immutable values.\n\nRequired invariants (from the data audit): raw DNA is mutable and authoring-owned; canonical DNA is detached; resolved snapshots are immutable object graphs; generated data holds no live authoring reference; config assets are shared dependencies, not runtime-owned; generation signatures include every effective input; presentation code cannot mutate the source model through result references.\n\nExplicitly rejected: adding more defensive clones indefinitely, and reopening the resolved \u0060IDnaSerializer\u0060 interface-shape finding.\n\nProvenance caveat: audit bases are not ancestors of current HEAD \u0060b5ba54b\u0060. Related: TSK-0076, TSK-0219.",
+      "createdAtUtc": "2026-09-12T05:54:30.3498405Z"
     }
   ],
   "epicId": null,
   "parentId": null,
   "dueDateUtc": null,
   "createdAtUtc": "2026-09-01T00:00:00Z",
-  "updatedAtUtc": "2026-09-12T02:47:31.8530457Z",
+  "updatedAtUtc": "2026-09-12T05:54:30.3498405Z",
   "completedAtUtc": null,
-  "revision": 15,
+  "revision": 16,
   "isArchived": false,
   "hasLoadError": false,
   "loadError": null,

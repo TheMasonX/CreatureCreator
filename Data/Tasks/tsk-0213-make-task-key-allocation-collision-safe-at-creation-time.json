@@ -34,15 +34,21 @@
       "author": "anonymous",
       "body": "Real-world collision evidence (2026-09-11). Two distinct records currently share key \u0060TSK-0198\u0060:\n- \u0060tsk-0198-stream-preview-generation-hotpaths-and-direct-edge-ownership\u0060 (Performance; reporter ChatGPT; the stream-preview/extraction perf slice)\n- \u0060tsk-0198-define-portable-animation-clip-and-sampling-contract\u0060 (Task; animation clip/sampling contract)\n\nImpact observed: \u0060task_add_comment\u0060 called with \u0060idOrKey: \u0022TSK-0198\u0022\u0060 was mis-routed to the animation task. The bare key is not sufficient to identify the record; callers must pass the full slug id. This also means any key-based lookup, status change, or handoff reference to \u0060TSK-0198\u0060 is ambiguous.\n\nRequested behaviour: make key allocation collision-safe at creation time (refuse or disambiguate), and make key-based resolution fail loudly on ambiguity instead of silently choosing one record. Suggested validation: a test that creates a second record whose normalized key collides and asserts creation fails (or produces a distinct key), plus a resolution test that asserts an ambiguous key returns an error rather than a record.",
       "createdAtUtc": "2026-09-12T03:55:36.9231847Z"
+    },
+    {
+      "id": "c-758755ce44ab422b8f9a92ec1545dd50",
+      "author": "anonymous",
+      "body": "Audit synthesis 2026-09-12: this task (creation-time collision safety) is necessary but not sufficient. Two new confirmations from this pass:\n\n1. Prevention did not repair the backlog. \u0060Scripts/Test-TaskRecords.ps1\u0060 fails with 44 issues, including 15 records over 14 duplicated keys (TSK-0153, 0188, 0189, 0195, 0196, 0197, 0198, 0199, 0200 x3, 0201, 0202, 0203, 0204, 0205) and 30 records missing required schema fields, plus one unloadable record (\u0060tsk-0206\u0060). Because the MemorySmith index is keyed by task key, colliding records shadow each other and drop out of \u0060memorysmith_task_list\u0060. Backlog repair is owned by TSK-0217.\n\n2. Cross-branch key divergence produces phantom owners. The 2026-09-12 deep-dive audit cites \u0060TSK-0203\u0060 as the \u0022SMR compatibility guard \u002B animated bounds\u0022 owner (its top-ranked owner for findings F-11, HG-01, HG-03, HG-04). On this branch \u0060TSK-0203\u0060 is two unrelated memory-measurement records, and no task here owns the SMR compatibility guard \u2014 even though the guard is verified present in the worktree (\u0060CreatureSkinnedMeshRenderer.Bind\u0060 checks \u0060snapshot.Count != rig.IndexedBones.Count\u0060 and \u0060rig.RestSkeleton.HasSameBoneOrder(snapshot)\u0060). An audit\u0027s canonical-owner table is therefore not trustworthy across branches; owner keys must be re-resolved on the branch under work, not carried over.\n\nRecommended safeguard (in addition to collision-safe allocation at creation): whenever a synthesis or audit cites a \u0060TSK-####\u0060 owner, resolve that key on the branch under work and confirm the record exists and matches the cited mechanism; if it does not, treat the citation as provenance-only and assign a real owner.\n\nEvidence: \u0060Scripts/Test-TaskRecords.ps1\u0060 run 2026-09-12; \u0060Data/Tasks/tsk-0203-*.json\u0060; \u0060Assets/Scripts/Runtime/Animation/Skinned/CreatureSkinnedMeshRenderer.cs:58-70\u0060. Related: TSK-0217, TSK-0189, TSK-0220.",
+      "createdAtUtc": "2026-09-12T05:54:34.365462Z"
     }
   ],
   "epicId": null,
   "parentId": null,
   "dueDateUtc": null,
   "createdAtUtc": "2026-09-12T02:47:21.5250769Z",
-  "updatedAtUtc": "2026-09-12T03:55:36.9231847Z",
+  "updatedAtUtc": "2026-09-12T05:54:34.365462Z",
   "completedAtUtc": null,
-  "revision": 3,
+  "revision": 4,
   "isArchived": false,
   "hasLoadError": false,
   "loadError": null,
