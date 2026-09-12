@@ -48,7 +48,12 @@ namespace ProceduralCreature.Generation
             GenerationDiagnostics diagnostics = null)
         {
             ResolvedCreatureSnapshot snapshot = ValidateAndResolve(definition, diagnostics);
-            SkeletonSnapshot skeletonSnapshot = SkeletonSnapshot.Capture(SkeletonInferrer.Infer(snapshot));
+
+            SkeletonSnapshot skeletonSnapshot = null;
+            Time(diagnostics, GenerationStage.SkeletonInference, () =>
+            {
+                skeletonSnapshot = SkeletonSnapshot.Capture(SkeletonInferrer.Infer(snapshot));
+            });
 
             List<ResolvedPartProgram> compiledParts = null;
             SdfProgram bodyProgram = null;
@@ -392,7 +397,7 @@ namespace ProceduralCreature.Generation
             else UnityEngine.Object.DestroyImmediate(mesh);
         }
 
-        private static void Time(GenerationDiagnostics diagnostics, GenerationStage stage, System.Action action)
+        private static void Time(GenerationDiagnostics diagnostics, GenerationStage stage, Action action)
         {
             if (diagnostics == null)
             {
