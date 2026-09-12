@@ -106,6 +106,9 @@ namespace ProceduralCreature.Generation
         private CreatureMaterialPalette ResolveMaterialPalette()
             => generationConfig != null ? generationConfig.MaterialPalette : null;
 
+        private InfluenceWeightingPolicy ResolveWeightingPolicy()
+            => generationConfig != null ? generationConfig.WeightingPolicy : InfluenceWeightingPolicy.Default;
+
         private void CreateRigAttachedGeometry(GeneratedCreature generated, ResolvedCreatureSnapshot snapshot)
         {
             if (generated == null || _rig == null || snapshot == null) return;
@@ -245,7 +248,7 @@ namespace ProceduralCreature.Generation
             Material defaultMaterial = MaterialResolver.ResolveDefault(ResolveMaterialPalette());
             Material[] materials = defaultMaterial != null ? new[] { defaultMaterial } : null;
             _skinnedRenderer.Bind(
-                _rig, skeletonSnapshot, implicitItem.Mesh, radiiByBoneIndex, materials, vertexDomains);
+                _rig, skeletonSnapshot, implicitItem.Mesh, radiiByBoneIndex, materials, vertexDomains, ResolveWeightingPolicy());
             if (_skinnedRenderer.Renderer != null) _skinnedRenderer.Renderer.enabled = true;
         }
 

@@ -35,10 +35,11 @@ namespace ProceduralCreature.Animation.Skinned
             Mesh sourceMesh,
             IReadOnlyList<float> radiiByBoneIndex = null,
             IReadOnlyList<Material> materials = null,
-            IReadOnlyList<InfluenceDomain> vertexDomains = null)
+            IReadOnlyList<InfluenceDomain> vertexDomains = null,
+            InfluenceWeightingPolicy? weightingPolicy = null)
         {
             if (restSkeleton == null) throw new DomainException("restSkeleton must not be null.");
-            Bind(rig, SkeletonSnapshot.Capture(restSkeleton), sourceMesh, radiiByBoneIndex, materials, vertexDomains);
+            Bind(rig, SkeletonSnapshot.Capture(restSkeleton), sourceMesh, radiiByBoneIndex, materials, vertexDomains, weightingPolicy);
         }
 
         public void Bind(
@@ -47,7 +48,8 @@ namespace ProceduralCreature.Animation.Skinned
             Mesh sourceMesh,
             IReadOnlyList<float> radiiByBoneIndex = null,
             IReadOnlyList<Material> materials = null,
-            IReadOnlyList<InfluenceDomain> vertexDomains = null)
+            IReadOnlyList<InfluenceDomain> vertexDomains = null,
+            InfluenceWeightingPolicy? weightingPolicy = null)
         {
             if (rig == null) throw new DomainException("rig must not be null.");
             if (snapshot == null) throw new DomainException("snapshot must not be null.");
@@ -69,8 +71,8 @@ namespace ProceduralCreature.Animation.Skinned
             if (restVertices == null || restVertices.Length == 0) throw new DomainException("sourceMesh has no vertices to bind.");
 
             List<BoneSegmentInfluence> segments =
-                ImplicitSurfaceWeightAuthoring.BuildBindingInfluences(snapshot, radiiByBoneIndex);
-            VertexInfluence[][] weights = ImplicitSurfaceWeightAuthoring.Author(segments, restVertices, vertexDomains);
+                ImplicitSurfaceWeightAuthoring.BuildBindingInfluences(snapshot, radiiByBoneIndex, weightingPolicy);
+            VertexInfluence[][] weights = ImplicitSurfaceWeightAuthoring.Author(segments, restVertices, vertexDomains, weightingPolicy);
             Matrix4x4[] bindposes = SkinnedMeshBindingBuilder.ComputeBindposes(snapshot);
             BoneWeight[] boneWeights = SkinnedMeshBindingBuilder.BuildBoneWeights(weights, snapshot.Count);
 

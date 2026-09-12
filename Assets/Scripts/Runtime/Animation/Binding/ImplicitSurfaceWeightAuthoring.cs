@@ -52,50 +52,52 @@ namespace ProceduralCreature.Animation.Binding
     public static class ImplicitSurfaceWeightAuthoring
     {
         public const int MaxInfluencesPerVertex = LinearBlendSkinning.MaxBoneInfluencesPerVertex;
-        public const float RadiusScale = 3f;
-        public const float WeightFalloffPower = 2f;
-        public const float DefaultInfluenceRadius = 0.5f;
+
+        /// <summary>Radius used when a bone has no finite positive resolved morphology radius.</summary>
+        public const float DefaultInfluenceRadius = InfluenceWeightingPolicy.DefaultBoneRadius;
 
         public static List<BoneSegmentInfluence> BuildSegmentInfluences(
-            SkeletonSnapshot skeleton, IReadOnlyList<float> radiiByBoneIndex = null)
+            SkeletonSnapshot skeleton, IReadOnlyList<float> radiiByBoneIndex = null, InfluenceWeightingPolicy? policy = null)
         {
+            InfluenceWeightingPolicy resolvedPolicy = policy ?? InfluenceWeightingPolicy.Default;
             if (skeleton == null) throw new DomainException("skeleton must not be null.");
             var result = new List<BoneSegmentInfluence>(skeleton.Count);
             for (int i = 0; i < skeleton.Count; i++)
             {
                 BoneSnapshot bone = skeleton[i];
                 if (!bone.HasSegment) continue;
-                float radius = DefaultInfluenceRadius;
-                if (radiiByBoneIndex != null && i < radiiByBoneIndex.Count)
-                {
-                    float supplied = radiiByBoneIndex[i];
-                    if (supplied > 0f && NumericValidity.IsFinite(supplied)) radius = supplied;
-                }
+                float radius = ResolveBoneRadius(radiiByBoneIndex, i, resolvedPolicy);
                 result.Add(new BoneSegmentInfluence(i, bone.IsMirrored, bone.Position, bone.EndPosition, radius, ResolveDomainId(bone)));
             }
             return result;
         }
 
         public static List<BoneSegmentInfluence> BuildBindingInfluences(
-            SkeletonSnapshot skeleton, IReadOnlyList<float> radiiByBoneIndex = null)
+            SkeletonSnapshot skeleton, IReadOnlyList<float> radiiByBoneIndex = null, InfluenceWeightingPolicy? policy = null)
         {
+            InfluenceWeightingPolicy resolvedPolicy = policy ?? InfluenceWeightingPolicy.Default;
             if (skeleton == null) throw new DomainException("skeleton must not be null.");
-            List<BoneSegmentInfluence> result = BuildSegmentInfluences(skeleton, radiiByBoneIndex);
+            List<BoneSegmentInfluence> result = BuildSegmentInfluences(skeleton, radiiByBoneIndex, resolvedPolicy);
             var included = new bool[skeleton.Count];
             for (int i = 0; i < result.Count; i++) included[result[i].BoneIndex] = true;
             for (int i = 0; i < skeleton.Count; i++)
             {
                 if (included[i]) continue;
-                float radius = DefaultInfluenceRadius;
-                if (radiiByBoneIndex != null && i < radiiByBoneIndex.Count)
-                {
-                    float supplied = radiiByBoneIndex[i];
-                    if (supplied > 0f && NumericValidity.IsFinite(supplied)) radius = supplied;
-                }
+                float radius = ResolveBoneRadius(radiiByBoneIndex, i, resolvedPolicy);
                 Vector3 position = skeleton[i].Position;
                 result.Add(new BoneSegmentInfluence(i, skeleton[i].IsMirrored, position, position, radius, ResolveDomainId(skeleton[i])));
             }
             return result;
+        }
+
+        private static float ResolveBoneRadius(IReadOnlyList<float> radiiByBoneIndex, int boneIndex, InfluenceWeightingPolicy policy)
+        {
+            if (radiiByBoneIndex != null && boneIndex < radiiByBoneIndex.Count)
+            {
+                float supplied = radiiByBoneIndex[boneIndex];
+                if (supplied > 0f && NumericValidity.IsFinite(supplied)) return supplied;
+            }
+            return policy.FallbackBoneRadius;
         }
 
         private static string ResolveDomainId(BoneSnapshot bone)
@@ -107,8 +109,10 @@ namespace ProceduralCreature.Animation.Binding
         public static VertexInfluence[][] Author(
             IReadOnlyList<BoneSegmentInfluence> segments,
             IReadOnlyList<Vector3> restVertices,
-            IReadOnlyList<InfluenceDomain> vertexDomains = null)
+            IReadOnlyList<InfluenceDomain> vertexDomains = null,
+            InfluenceWeightingPolicy? policy = null)
         {
+            InfluenceWeightingPolicy resolvedPolicy = policy ?? InfluenceWeightingPolicy.Default;
             if (segments == null) throw new DomainException("segments must not be null.");
             if (restVertices == null) throw new DomainException("restVertices must not be null.");
             if (vertexDomains != null && vertexDomains.Count != restVertices.Count)
@@ -135,19 +139,17 @@ namespace ProceduralCreature.Animation.Binding
                 if (!NumericValidity.IsFinite(vertex)) throw new DomainException($"Rest vertex {v} is not finite.");
 
                 candidates.Clear();
-                for (int s = 0; s < segments.Count; s++)
+                FillCandidates(vertex, segments, vertexDomains, v, resolvedPolicy, weightBySegment, candidates);
+
+                if (candidates.Count == 0 && resolvedPolicy.ChainAwareLocality)
                 {
-                    BoneSegmentInfluence seg = segments[s];
-                    if (vertexDomains != null && !vertexDomains[v].Allows(seg.DomainId))
-                    {
-                        weightBySegment[s] = 0f;
-                        continue;
-                    }
-                    float distance = DistanceToSegment(vertex, seg.Start, seg.End);
-                    float effectiveRadius = seg.Radius * RadiusScale;
-                    float falloff = 1f - distance / effectiveRadius;
-                    weightBySegment[s] = falloff > 0f ? Mathf.Pow(falloff, WeightFalloffPower) : 0f;
-                    if (weightBySegment[s] > 0f) candidates.Add(s);
+                    // Totality guard: the longitudinal gate must never leave a vertex
+                    // with no influence, for example a surface point that sits outside
+                    // every bone's own span. Fall back to the ungated radial model for
+                    // that vertex only and keep the resolved domain filter.
+                    candidates.Clear();
+                    FillCandidates(vertex, segments, vertexDomains, v,
+                        resolvedPolicy.WithoutChainAwareLocality(), weightBySegment, candidates);
                 }
 
                 if (candidates.Count == 0 && vertexDomains != null)
@@ -212,12 +214,66 @@ namespace ProceduralCreature.Animation.Binding
             return result;
         }
 
-        public static float WeightFor(Vector3 vertex, BoneSegmentInfluence segment)
+        public static float WeightFor(Vector3 vertex, BoneSegmentInfluence segment, InfluenceWeightingPolicy? policy = null)
         {
+            return FalloffFor(vertex, segment, policy ?? InfluenceWeightingPolicy.Default);
+        }
+
+        private static void FillCandidates(
+            Vector3 vertex,
+            IReadOnlyList<BoneSegmentInfluence> segments,
+            IReadOnlyList<InfluenceDomain> vertexDomains,
+            int vertexIndex,
+            InfluenceWeightingPolicy policy,
+            float[] weightBySegment,
+            List<int> candidates)
+        {
+            for (int s = 0; s < segments.Count; s++)
+            {
+                BoneSegmentInfluence seg = segments[s];
+                if (vertexDomains != null && !vertexDomains[vertexIndex].Allows(seg.DomainId))
+                {
+                    weightBySegment[s] = 0f;
+                    continue;
+                }
+                weightBySegment[s] = FalloffFor(vertex, seg, policy);
+                if (weightBySegment[s] > 0f) candidates.Add(s);
+            }
+        }
+
+        /// <summary>
+        /// Radial falloff plus the optional chain-aware longitudinal gate. A bone only
+        /// reaches its own span plus a blend band past each endpoint, so a forearm
+        /// segment cannot reach up and drag the upper arm.
+        /// </summary>
+        private static float FalloffFor(Vector3 vertex, BoneSegmentInfluence segment, InfluenceWeightingPolicy policy)
+        {
+            float effectiveRadius = segment.Radius * policy.RadiusScale;
+            if (!(effectiveRadius > 0f)) return 0f;
+
+            Vector3 ab = segment.End - segment.Start;
+            float abSqr = ab.sqrMagnitude;
+            if (abSqr <= 1e-12f)
+            {
+                float pointDistance = Vector3.Distance(vertex, segment.Start);
+                float pointFalloff = 1f - pointDistance / effectiveRadius;
+                return pointFalloff > 0f ? Mathf.Pow(pointFalloff, policy.FalloffPower) : 0f;
+            }
+
+            if (policy.ChainAwareLocality)
+            {
+                // Bone-local span gate: the unclamped projection must fall inside the
+                // segment plus a band of LongitudinalBlendMarginRadii bone radii at each
+                // end. Geometry behind the bone's own start belongs to an upstream bone.
+                float abLength = Mathf.Sqrt(abSqr);
+                float longitudinalT = Vector3.Dot(vertex - segment.Start, ab) / abSqr;
+                float marginT = policy.LongitudinalBlendMarginRadii * segment.Radius / abLength;
+                if (longitudinalT < -marginT || longitudinalT > 1f + marginT) return 0f;
+            }
+
             float distance = DistanceToSegment(vertex, segment.Start, segment.End);
-            float effectiveRadius = segment.Radius * RadiusScale;
             float falloff = 1f - distance / effectiveRadius;
-            return falloff > 0f ? Mathf.Pow(falloff, WeightFalloffPower) : 0f;
+            return falloff > 0f ? Mathf.Pow(falloff, policy.FalloffPower) : 0f;
         }
 
         public static float SqrDistanceToSegment(Vector3 point, Vector3 a, Vector3 b)

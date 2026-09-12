@@ -4,6 +4,7 @@ using System.Linq;
 using UnityEditor;
 using UnityEngine;
 using ProceduralCreature.Appearance;
+using ProceduralCreature.Animation.Binding;
 using ProceduralCreature.Common;
 using ProceduralCreature.Definition;
 using ProceduralCreature.Generation;
@@ -289,7 +290,8 @@ namespace ProceduralCreature.Editor
 
             _previewController = new CreaturePreviewController(
                 ResolveDefaultMaterial,
-                key => MaterialResolver.Resolve(EffectiveMaterialPalette, key));
+                key => MaterialResolver.Resolve(EffectiveMaterialPalette, key),
+                () => EffectiveWeightingPolicy);
             // Recover a preview root left by a previous controller instance across
             // a domain reload by its structural instance handle, not by name, so
             // an unrelated same-named object is never adopted (TSK-0122).
@@ -468,6 +470,69 @@ namespace ProceduralCreature.Editor
             DrawEditorSettings();
         }
 
+        private bool _showWeightSettings = true;
+
+        /// <summary>
+        /// TSK-0147: live controls for the build-time influence weighting policy that
+        /// decides how far each bone's skinning influence reaches. The values live on
+        /// the shared Generation Config asset so the editor and runtime previews agree
+        /// and the tuning persists with the project. Editing them re-authors weights on
+        /// the next generation; nothing here touches DNA or the per-frame pose path.
+        /// </summary>
+        private void DrawSkinningWeightSettings()
+        {
+            _showWeightSettings = EditorGUILayout.Foldout(_showWeightSettings, "Skinning Weights");
+            if (!_showWeightSettings) return;
+
+            if (_generationConfig == null)
+            {
+                EditorGUILayout.HelpBox(
+                    "Assign a Generation Config to tune skinning weights.", MessageType.Info);
+                return;
+            }
+
+            var serialized = new SerializedObject(_generationConfig);
+            serialized.Update();
+
+            SerializedProperty radiusScale = serialized.FindProperty("influenceRadiusScale");
+            SerializedProperty falloffPower = serialized.FindProperty("influenceFalloffPower");
+            SerializedProperty defaultRadius = serialized.FindProperty("defaultBoneInfluenceRadius");
+            SerializedProperty chainAware = serialized.FindProperty("chainAwareWeightLocality");
+            SerializedProperty blendMargin = serialized.FindProperty("longitudinalBlendMarginRadii");
+            if (radiusScale == null || falloffPower == null || defaultRadius == null
+                || chainAware == null || blendMargin == null)
+            {
+                EditorGUILayout.HelpBox(
+                    "Generation Config is missing skinning-weight fields. Re-create the asset.", MessageType.Warning);
+                return;
+            }
+
+            EditorGUILayout.PropertyField(radiusScale, new GUIContent(
+                "Influence Radius Scale",
+                "Falloff tube radius as a multiple of each bone's morphology radius. Higher spreads influence further."));
+            EditorGUILayout.PropertyField(falloffPower, new GUIContent(
+                "Falloff Power",
+                "Exponent on the normalized falloff. Higher tightens the blend toward the bone."));
+            EditorGUILayout.PropertyField(defaultRadius, new GUIContent(
+                "Default Bone Radius",
+                "Radius used for bones with no resolved morphology radius."));
+            EditorGUILayout.PropertyField(chainAware, new GUIContent(
+                "Chain-Aware Locality",
+                "Limit each bone to its own span plus a blend band past each endpoint, so a forearm cannot drag the upper arm."));
+            using (new EditorGUI.DisabledScope(!chainAware.boolValue))
+            {
+                EditorGUILayout.PropertyField(blendMargin, new GUIContent(
+                    "Blend Band (bone radii)",
+                    "How far past a bone endpoint the blend reaches. 1 is a tight joint; higher softens it."));
+            }
+
+            if (serialized.ApplyModifiedProperties())
+            {
+                EditorUtility.SetDirty(_generationConfig);
+                ScheduleAutoRegeneration();
+            }
+        }
+
         private void DrawEditorSettings()
         {
             _showEditorSettings = EditorGUILayout.Foldout(_showEditorSettings, "Editor Settings");
@@ -485,6 +550,8 @@ namespace ProceduralCreature.Editor
                     _generationConfig != null ? AssetDatabase.GetAssetPath(_generationConfig) : string.Empty);
                 Repaint();
             }
+
+            DrawSkinningWeightSettings();
 
             if (EffectiveMeshPalette != null && EffectiveMeshPalette.HasDuplicateKeys(out string duplicateKey))
             {
@@ -3098,6 +3165,9 @@ namespace ProceduralCreature.Editor
 
         private CreatureMaterialPalette EffectiveMaterialPalette =>
             _generationConfig != null ? _generationConfig.MaterialPalette : null;
+
+        private InfluenceWeightingPolicy EffectiveWeightingPolicy =>
+            _generationConfig != null ? _generationConfig.WeightingPolicy : InfluenceWeightingPolicy.Default;
 
         /// <summary>
         /// CC-074: the editor surface material is the material palette's default

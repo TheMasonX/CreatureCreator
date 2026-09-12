@@ -28,15 +28,18 @@ namespace ProceduralCreature.Editor
         private readonly CreaturePreviewRequestState _requestState = new CreaturePreviewRequestState();
         private readonly Func<Material> _defaultMaterialResolver;
         private readonly Func<string, Material> _materialResolver;
+        private readonly Func<InfluenceWeightingPolicy> _weightingPolicyResolver;
         private GeneratedCreatureData _lastAcceptedData;
         private bool _disposed;
 
         public CreaturePreviewController(
             Func<Material> defaultMaterialResolver,
-            Func<string, Material> materialResolver)
+            Func<string, Material> materialResolver,
+            Func<InfluenceWeightingPolicy> weightingPolicyResolver = null)
         {
             _defaultMaterialResolver = defaultMaterialResolver ?? throw new ArgumentNullException(nameof(defaultMaterialResolver));
             _materialResolver = materialResolver ?? throw new ArgumentNullException(nameof(materialResolver));
+            _weightingPolicyResolver = weightingPolicyResolver;
         }
 
         public GameObject PreviewGameObject { get; private set; }
@@ -366,13 +369,17 @@ namespace ProceduralCreature.Editor
 
             Material defaultMaterial = _defaultMaterialResolver();
             Material[] materials = defaultMaterial != null ? new[] { defaultMaterial } : null;
+            InfluenceWeightingPolicy? weightingPolicy = _weightingPolicyResolver != null
+                ? _weightingPolicyResolver()
+                : (InfluenceWeightingPolicy?)null;
             skinnedRenderer.Bind(
                 rig,
                 skeletonSnapshot,
                 sourceMesh,
                 radiiByBoneIndex,
                 materials,
-                vertexDomains);
+                vertexDomains,
+                weightingPolicy);
             if (skinnedRenderer.Renderer != null) skinnedRenderer.Renderer.enabled = true;
         }
 
