@@ -84,7 +84,10 @@ namespace ProceduralCreature.Animation.Skinned
             {
                 skinnedMesh = BuildSkinningMeshCopy(sourceMesh, bindposes, boneWeights);
 
-                skinnedObject = new GameObject(SkinnedObjectName);
+                // Created unnamed so the reload-orphan sweep in Clear() (which runs at
+                // commit) cannot mistake this replacement for a previous child. The
+                // name is applied immediately after Clear().
+                skinnedObject = new GameObject();
                 skinnedObject.transform.SetParent(transform, worldPositionStays: false);
                 SkinnedMeshRenderer renderer = skinnedObject.AddComponent<SkinnedMeshRenderer>();
                 renderer.sharedMesh = skinnedMesh;
@@ -104,6 +107,7 @@ namespace ProceduralCreature.Animation.Skinned
                 // previous bind. This keeps rebinding failure-safe without changing the
                 // per-frame animation path.
                 Clear();
+                skinnedObject.name = SkinnedObjectName;
 
                 _renderer = renderer;
                 _bones = bones;
@@ -141,6 +145,21 @@ namespace ProceduralCreature.Animation.Skinned
                 else DestroyImmediate(_generatedObjects[i]);
             }
             _generatedObjects.Clear();
+
+            // The tracked list is not serialized, so after a domain reload it can be
+            // empty while a previous presentation child still exists. Remove any
+            // untracked direct child by name so rebinding cannot accumulate duplicate
+            // skinned objects. Bind creates its replacement unnamed until after this
+            // runs, so the fresh object is never mistaken for a previous one.
+            for (int i = transform.childCount - 1; i >= 0; i--)
+            {
+                Transform child = transform.GetChild(i);
+                if (child == null) continue;
+                if (!string.Equals(child.name, SkinnedObjectName, StringComparison.Ordinal)) continue;
+                if (Application.isPlaying) Destroy(child.gameObject);
+                else DestroyImmediate(child.gameObject);
+            }
+
             for (int i = _ownedMeshes.Count - 1; i >= 0; i--)
             {
                 Mesh mesh = _ownedMeshes[i];

@@ -22,6 +22,11 @@ namespace ProceduralCreature.Editor
             "R",
             "Rotate selected CreatureRig bone at its actual pivot.");
 
+        private static Transform _dragBone;
+        private static Quaternion _dragHandleFrame = Quaternion.identity;
+        private static Quaternion _dragStartRotation = Quaternion.identity;
+        private static bool _dragUndoRecorded;
+
         public override GUIContent toolbarIcon => Icon;
 
         public override bool IsAvailable()
@@ -45,19 +50,62 @@ namespace ProceduralCreature.Editor
         public override void OnToolGUI(EditorWindow window)
         {
             if (!(window is SceneView)) return;
-            if (!TryGetSelectedRigBone(out Transform bone)) return;
+            if (!TryGetSelectedRigBone(out Transform bone))
+            {
+                ResetDrag();
+                return;
+            }
 
-            Quaternion handleRotation = Tools.pivotRotation == PivotRotation.Local
-                ? bone.rotation
-                : Quaternion.identity;
+            // Handles.RotationHandle reports the rotation relative to the frame it
+            // was given when the drag started, and it does not update that frame
+            // while the drag runs. The handle frame and the bone's start rotation
+            // must therefore be captured once per gesture. Recomputing either from
+            // the moving bone every frame multiplies the accumulated delta again and
+            // spins the bone; that was the "moves too fast, independent of drag"
+            // regression.
+            bool dragging = ReferenceEquals(_dragBone, bone) && GUIUtility.hotControl != 0;
+            if (!dragging)
+            {
+                _dragBone = bone;
+                _dragHandleFrame = RigBoneRotation.ResolveHandleFrame(
+                    bone.rotation,
+                    Tools.pivotRotation == PivotRotation.Local);
+                _dragStartRotation = bone.rotation;
+                _dragUndoRecorded = false;
+            }
 
             EditorGUI.BeginChangeCheck();
-            Quaternion nextRotation = Handles.RotationHandle(handleRotation, bone.position);
-            if (!EditorGUI.EndChangeCheck()) return;
+            Quaternion handleResult = Handles.RotationHandle(_dragHandleFrame, bone.position);
+            bool changed = EditorGUI.EndChangeCheck();
 
-            Undo.RecordObject(bone, "Rotate Creature Rig Bone");
-            bone.rotation = nextRotation;
-            EditorUtility.SetDirty(bone);
+            if (changed)
+            {
+                if (!_dragUndoRecorded)
+                {
+                    Undo.RecordObject(bone, "Rotate Creature Rig Bone");
+                    _dragUndoRecorded = true;
+                }
+
+                // The handle result is the world-space drag delta composed with the
+                // locked frame (result = worldDelta * frame), so recovering the delta
+                // and applying it once to the bone's start rotation is exact and
+                // independent of the previous frame.
+                bone.rotation = RigBoneRotation.ApplyHandleDelta(
+                    _dragStartRotation,
+                    _dragHandleFrame,
+                    handleResult);
+                EditorUtility.SetDirty(bone);
+            }
+
+            if (Event.current.type == EventType.MouseUp) ResetDrag();
+        }
+
+        private static void ResetDrag()
+        {
+            _dragBone = null;
+            _dragHandleFrame = Quaternion.identity;
+            _dragStartRotation = Quaternion.identity;
+            _dragUndoRecorded = false;
         }
 
         private static bool TryGetSelectedRigBone(out Transform bone)

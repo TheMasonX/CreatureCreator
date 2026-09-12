@@ -61,6 +61,12 @@ namespace ProceduralCreature.Animation
             var nextBones = new Dictionary<string, Transform>(nextSkeleton.Count);
             var nextIndexedBones = new Transform[nextSkeleton.Count];
             var nextGeneratedObjects = new List<GameObject>(nextSkeleton.Count);
+
+            // Capture the previous hierarchy before the new one is created. Cleanup
+            // runs only after a successful build so a failed build still preserves the
+            // previous valid rig, while reload orphans are still removed.
+            List<GameObject> previousRoots = CaptureGeneratedBoneRoots();
+
             try
             {
                 for (int i = 0; i < nextSkeleton.Count; i++)
@@ -85,8 +91,10 @@ namespace ProceduralCreature.Animation
             }
 
             DestroyGeneratedObjects(_generatedObjects);
-            _bones.Clear();
             _generatedObjects.Clear();
+            DestroyGeneratedObjects(previousRoots);
+
+            _bones.Clear();
             foreach (KeyValuePair<string, Transform> bone in nextBones)
             {
                 _bones.Add(bone.Key, bone.Value);
@@ -130,12 +138,34 @@ namespace ProceduralCreature.Animation
         {
             DestroyGeneratedObjects(_generatedObjects);
             _generatedObjects.Clear();
+            DestroyGeneratedObjects(CaptureGeneratedBoneRoots());
+
             _bones.Clear();
             _restSkeleton = null;
             _validatedPoseSkeleton = null;
             _indexedBones = new Transform[0];
             _indexedBonesView = Array.AsReadOnly(_indexedBones);
             _indexedRotations = new Quaternion[0];
+        }
+
+        /// <summary>
+        /// Direct children that look like generated bone roots. The tracked list is
+        /// not serialized, so after a domain reload it can be empty while a previous
+        /// hierarchy still exists in the scene; this snapshot lets the post-swap
+        /// cleanup remove those reload orphans without a prefix sweep that would also
+        /// match the freshly created bones. Every bone is a descendant of the root
+        /// bone, so removing matching direct children removes the whole hierarchy.
+        /// </summary>
+        private List<GameObject> CaptureGeneratedBoneRoots()
+        {
+            var roots = new List<GameObject>();
+            for (int i = 0; i < transform.childCount; i++)
+            {
+                Transform child = transform.GetChild(i);
+                if (child != null && child.name.StartsWith(BoneObjectPrefix, StringComparison.Ordinal))
+                    roots.Add(child.gameObject);
+            }
+            return roots;
         }
 
         private static void DestroyGeneratedObjects(List<GameObject> generatedObjects)

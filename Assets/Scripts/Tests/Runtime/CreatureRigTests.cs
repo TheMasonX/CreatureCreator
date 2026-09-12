@@ -65,7 +65,10 @@ namespace ProceduralCreature.Tests.Runtime
 
             Assert.That(Vector3.Distance(rig.Bones["root"].position, new Vector3(2f, 0f, 0f)), Is.LessThan(1e-5f));
             Assert.That(Vector3.Distance(rig.Bones["tip"].position, new Vector3(2f, 1f, 0f)), Is.LessThan(1e-5f));
-            Assert.Greater(Vector3.Dot(rig.Bones["root"].rotation * Vector3.forward, Vector3.up), 0.999f);
+            // TSK-0216: the rest bone direction (up) is unchanged by a translation-only
+            // pose, so the bone must keep its bind rotation instead of being force-aimed
+            // onto the child direction.
+            Assert.Less(Quaternion.Angle(rig.Bones["root"].rotation, Quaternion.Euler(0f, 15f, 0f)), 1e-3f);
 
             rig.Clear();
             Assert.AreSame(unrelated.transform, host.transform.GetChild(0));

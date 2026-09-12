@@ -29,6 +29,7 @@ namespace ProceduralCreature.Editor
         private const string RawMeshKey = "ProceduralCreature.RigDebug.ShowRawMesh";
         private const float GeometryEpsilonSqr = 1e-10f;
         private const float AttachmentMarkerScale = 0.06f;
+        private const float SelectionPickRadiusScale = 2.5f;
 
         private static bool _enabled = EditorPrefs.GetBool(EnabledKey, false);
         private static bool _alwaysOnTop = EditorPrefs.GetBool(AlwaysOnTopKey, true);
@@ -62,16 +63,39 @@ namespace ProceduralCreature.Editor
             if (!_enabled) return;
 
             CreatureRig[] rigs = UnityEngine.Object.FindObjectsByType<CreatureRig>();
+            CreatureRig focusRig = ResolveFocusRig(rigs);
             for (int i = 0; i < rigs.Length; i++)
             {
                 CreatureRig rig = rigs[i];
                 if (rig == null || !rig.isActiveAndEnabled || rig.RestSkeleton == null) continue;
                 if (rig.IndexedBones.Count == 0) continue;
-                DrawRig(rig);
+                DrawRig(rig, focusRig == null || ReferenceEquals(focusRig, rig));
             }
         }
 
-        private static void DrawRig(CreatureRig rig)
+        /// <summary>
+        /// The rig that owns the current selection, if any. Once a bone is selected
+        /// only that rig's bones remain pickable, so when two rigs overlap a click
+        /// can no longer rotate a different creature's bone. With no rig selection
+        /// all rigs stay interactive (unchanged single-rig behavior).
+        /// </summary>
+        private static CreatureRig ResolveFocusRig(CreatureRig[] rigs)
+        {
+            if (rigs == null) return null;
+            Transform selected = Selection.activeTransform;
+            if (selected == null) return null;
+
+            CreatureRig selectedRig = selected.GetComponentInParent<CreatureRig>();
+            if (selectedRig == null) return null;
+
+            for (int i = 0; i < rigs.Length; i++)
+            {
+                if (ReferenceEquals(rigs[i], selectedRig)) return selectedRig;
+            }
+            return null;
+        }
+
+        private static void DrawRig(CreatureRig rig, bool interactive)
         {
             CompareFunction previousZTest = Handles.zTest;
             Color previousColor = Handles.color;
@@ -100,13 +124,15 @@ namespace ProceduralCreature.Editor
 
                 DrawParentAttachment(i, boneData, bone, bones, snapshot, handleSize, width);
 
-                if (_selectable)
+                if (interactive)
                 {
+                    // Pick radius is larger than the drawn cap so small joint
+                    // spheres (for example a limb elbow) stay easy to click.
                     if (Handles.Button(
                         bone.position,
                         Quaternion.identity,
                         jointSize,
-                        jointSize,
+                        jointSize * SelectionPickRadiusScale,
                         Handles.SphereHandleCap))
                     {
                         Selection.objects = new UnityEngine.Object[] { bone.gameObject };
@@ -158,10 +184,16 @@ namespace ProceduralCreature.Editor
                 snapshot);
             if ((attachment - bone.position).sqrMagnitude <= GeometryEpsilonSqr) return;
 
-            Handles.DrawAAPolyLine(width, attachment, bone.position);
+            // The parent attachment is a derived, non-selectable link, not a bone.
+            // Draw it dim and thin so it never reads as a clickable joint, and
+            // restore the caller's color so the real joint cap is unaffected.
+            Color previousColor = Handles.color;
+            Handles.color = new Color(0.6f, 0.6f, 0.6f, 0.5f);
+            Handles.DrawAAPolyLine(Mathf.Max(1f, width * 0.5f), attachment, bone.position);
 
-            float markerSize = handleSize * AttachmentMarkerScale;
+            float markerSize = handleSize * AttachmentMarkerScale * 0.5f;
             Handles.SphereHandleCap(0, attachment, Quaternion.identity, markerSize, EventType.Repaint);
+            Handles.color = previousColor;
         }
 
         private static Vector3 ResolveParentAttachmentPoint(

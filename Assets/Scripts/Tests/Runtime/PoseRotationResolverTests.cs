@@ -49,7 +49,11 @@ namespace ProceduralCreature.Tests.Runtime
 
             Dictionary<string, Quaternion> rotations = PoseRotationResolver.Resolve(skeleton, pose);
 
-            Assert.Greater(Vector3.Dot(rotations["root"] * Vector3.forward, Vector3.up), 0.999f);
+            // TSK-0216 contract change: the root swings its REST direction to its child
+            // (x) onto the posed direction to that child (up). The bind forward axis is
+            // preserved instead of being force-aligned, so the swing is observed on the
+            // rest direction rather than on Vector3.forward.
+            Assert.Greater(Vector3.Dot(rotations["root"] * Vector3.right, Vector3.up), 0.999f);
         }
 
         [Test]
@@ -181,7 +185,13 @@ namespace ProceduralCreature.Tests.Runtime
             Dictionary<string, Quaternion> rotations = PoseRotationResolver.Resolve(skeleton, pose);
 
             Assert.Greater(Vector3.Dot(rotations["segment_0"] * Vector3.forward, Vector3.up), 0.999f);
-            Assert.Greater(Vector3.Dot(rotations["segment_1"] * Vector3.forward, Vector3.right), 0.999f);
+
+            // TSK-0216 contract change: segment_1's geometric direction is right in
+            // both rest and posed space, so it must keep its rest rotation. The old
+            // LookRotation contract force-aligned the baked forward onto the child
+            // direction, rotating bind-inconsistent bones and deforming the mesh even
+            // with no animation.
+            Assert.Less(Quaternion.Angle(rotations["segment_1"], Quaternion.identity), 1e-3f);
         }
 
         [Test]

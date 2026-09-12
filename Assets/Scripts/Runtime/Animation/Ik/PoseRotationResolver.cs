@@ -53,7 +53,6 @@ namespace ProceduralCreature.Animation.Ik
             for (int i = 0; i < restSkeleton.Count; i++)
             {
                 BoneSnapshot bone = restSkeleton[i];
-                Vector3 position = pose.GetPosition(i);
                 IReadOnlyList<int> children = restSkeleton.GetChildren(i);
                 if (children.Count == 0)
                 {
@@ -61,21 +60,86 @@ namespace ProceduralCreature.Animation.Ik
                     continue;
                 }
 
-                Vector3 targetPosition;
-                if (bone.HasSegment)
+                Vector3 position = pose.GetPosition(i);
+                if (!TryResolveAimDirections(restSkeleton, pose, bone, children, position,
+                        out Vector3 restDirection, out Vector3 posedDirection))
                 {
-                    int continuationChild = FindSegmentContinuationChild(restSkeleton, bone, children);
-                    targetPosition = continuationChild >= 0
-                        ? pose.GetPosition(continuationChild)
-                        : position + (bone.EndPosition - bone.Position);
-                }
-                else
-                {
-                    targetPosition = pose.GetPosition(FindPrimaryChild(restSkeleton, children));
+                    // No usable reference direction: keep the bind rotation rather than
+                    // inventing one. This is also the rest-pose identity.
+                    rotations[i] = bone.Rotation;
+                    continue;
                 }
 
-                rotations[i] = ResolveLookRotation(targetPosition - position, bone.Rotation);
+                rotations[i] = ResolveAimRotation(restDirection, posedDirection, bone.Rotation);
             }
+        }
+
+        /// <summary>
+        /// The world-space direction from the bone to its reference child, measured in
+        /// the REST snapshot and in the POSED snapshot. Using the same child for both
+        /// makes the rest pose an exact identity (the two directions are equal) while
+        /// posed bones still aim at the child they are bound to.
+        /// </summary>
+        private static bool TryResolveAimDirections(
+            SkeletonSnapshot restSkeleton,
+            PosedSkeleton pose,
+            BoneSnapshot bone,
+            IReadOnlyList<int> children,
+            Vector3 posedPosition,
+            out Vector3 restDirection,
+            out Vector3 posedDirection)
+        {
+            restDirection = Vector3.zero;
+            posedDirection = Vector3.zero;
+
+            int referenceChild;
+            if (bone.HasSegment)
+            {
+                referenceChild = FindSegmentContinuationChild(restSkeleton, bone, children);
+                if (referenceChild < 0)
+                {
+                    // No child sits on the segment endpoint, so the segment itself is
+                    // the reference direction; a rigid segment cannot re-aim itself.
+                    restDirection = bone.EndPosition - bone.Position;
+                    posedDirection = restDirection;
+                    return true;
+                }
+            }
+            else
+            {
+                referenceChild = FindPrimaryChild(restSkeleton, children);
+            }
+
+            if (referenceChild < 0 || referenceChild >= restSkeleton.Count) return false;
+
+            restDirection = restSkeleton[referenceChild].Position - bone.Position;
+            posedDirection = pose.GetPosition(referenceChild) - posedPosition;
+            return true;
+        }
+
+        private static Quaternion ResolveAimRotation(Vector3 restDirection, Vector3 posedDirection, Quaternion restRotation)
+        {
+            // Guard against subtraction overflow: two large but individually finite
+            // coordinates can produce a non-finite delta even though every input is
+            // finite.
+            if (!NumericValidity.IsFinite(restDirection) || !NumericValidity.IsFinite(posedDirection))
+                return restRotation;
+
+            float restLengthSqr = restDirection.sqrMagnitude;
+            float posedLengthSqr = posedDirection.sqrMagnitude;
+            if (restLengthSqr <= DirectionEpsilonSqr || posedLengthSqr <= DirectionEpsilonSqr)
+                return restRotation;
+
+            Vector3 restForward = restDirection / Mathf.Sqrt(restLengthSqr);
+            Vector3 posedForward = posedDirection / Mathf.Sqrt(posedLengthSqr);
+
+            // Swing the bone from its REST direction to the posed direction and apply
+            // that delta to the bind rotation. At rest the directions are identical,
+            // so the delta is identity and the bone keeps its exact bind rotation (the
+            // bound mesh must not deform with no animation). Posed, the bone still aims
+            // at the same reference child and keeps its authored roll; a raw
+            // LookRotation would re-derive the roll and discard it.
+            return Quaternion.FromToRotation(restForward, posedForward) * restRotation;
         }
 
         private static void ValidateCompatibility(SkeletonSnapshot restSkeleton, PosedSkeleton pose)
@@ -116,28 +180,6 @@ namespace ProceduralCreature.Animation.Ik
                 if (string.CompareOrdinal(skeleton[candidate].Id, skeleton[primaryChild].Id) < 0) primaryChild = candidate;
             }
             return primaryChild;
-        }
-
-        private static Quaternion ResolveLookRotation(Vector3 direction, Quaternion restRotation)
-        {
-            // Finite endpoints do not guarantee a finite subtraction: two large but
-            // individually valid coordinates can overflow their delta to Infinity.
-            // First normalize the rest-frame axes against a canonical fallback; then
-            // the direction fallback is guaranteed valid even when restRotation is a
-            // malformed-but-finite zero quaternion.
-            Vector3 restForward = NumericValidity.NormalizeOr(restRotation * Vector3.forward, Vector3.forward, DirectionEpsilonSqr);
-            Vector3 forward = NumericValidity.NormalizeOr(direction, restForward, DirectionEpsilonSqr);
-
-            Vector3 up = NumericValidity.NormalizeOr(restRotation * Vector3.up, Vector3.up, DirectionEpsilonSqr);
-            if (Mathf.Abs(Vector3.Dot(forward, up)) > 0.9999f)
-            {
-                up = NumericValidity.NormalizeOr(restRotation * Vector3.right, Vector3.right, DirectionEpsilonSqr);
-            }
-
-            if (Mathf.Abs(Vector3.Dot(forward, up)) > 0.9999f)
-                up = NumericValidity.NormalizeOr(Vector3.Cross(forward, Vector3.right), Vector3.up, DirectionEpsilonSqr);
-
-            return Quaternion.LookRotation(forward, up);
         }
     }
 }
