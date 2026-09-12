@@ -80,17 +80,17 @@ namespace ProceduralCreature.Morphology.Extraction
                 if (use.Count == 1)
                 {
                     report.BoundaryEdgeCount++;
-                    AddExample(report.BoundaryEdgeExamples, FormatEdge(entry.Key, use));
+                    AddExample(report._boundaryEdgeExamples, FormatEdge(entry.Key, use));
                 }
                 else if (use.Count > 2)
                 {
                     report.NonManifoldEdgeCount++;
-                    AddExample(report.NonManifoldEdgeExamples, FormatEdge(entry.Key, use));
+                    AddExample(report._nonManifoldEdgeExamples, FormatEdge(entry.Key, use));
                 }
                 else if (use.Count == 2 && use.ForwardUses != 1)
                 {
                     report.InconsistentWindingEdgeCount++;
-                    AddExample(report.InconsistentWindingEdgeExamples, FormatEdge(entry.Key, use));
+                    AddExample(report._inconsistentWindingEdgeExamples, FormatEdge(entry.Key, use));
                 }
             }
 
@@ -119,14 +119,9 @@ namespace ProceduralCreature.Morphology.Extraction
             return $"edge ({key.Item1},{key.Item2}) uses={use.Count} forward={use.ForwardUses} reverse={use.ReverseUses}";
         }
 
-        private static void AddExample(IReadOnlyList<string> destination, string value)
+        private static void AddExample(List<string> destination, string value)
         {
-            // The concrete collection is owned by the report; this helper is called
-            // only with one of its internal lists through the IReadOnlyList interface.
-            if (destination is List<string> list && list.Count < MaxDiagnosticExamples)
-            {
-                list.Add(value);
-            }
+            if (destination.Count < MaxDiagnosticExamples) destination.Add(value);
         }
     }
 }
