@@ -75,15 +75,21 @@
       "author": "anonymous",
       "body": "Audit synthesis 2026-09-12 (CC-AUDIT-GEN-20260912-83C17B4E, CC-AUDIT-20260912-7A5E0C31): canonical owner for bounded async preview work. Verified consolidated scope against current source:\n\n- GP-01 / F-04 (Confirmed, verified): \u0060CreatureGenerationScheduler.EnqueueCaptured\u0060 increments \u0060_latestSequence\u0060 then calls \u0060Task.Run\u0060 immediately for every request (\u0060CreatureGenerationScheduler.cs:48\u0060); \u0060TryTakeCompleted\u0060 marks older results stale only after the work is done (\u0060:59\u0060). This is latest-result-wins, not latest-work-wins. A ten-frame slider drag can run ten full generations that only one can present.\n- GP-02: \u0060Dispose\u0060 sets \u0060_disposed\u0060 and advances \u0060_latestSequence\u0060 but does not cancel running work (\u0060:64\u0060-\u0060:69\u0060). Late completions can still allocate; safe only while results are pure managed data.\n- GP-03: no backpressure metrics (queued, active, canceled, stale-completed, per-stage duration, peak memory).\n- GP-06: \u0060Enqueue\u0060 clones and \u0060EnqueueCaptured\u0060 assumes detached ownership; the difference is documented only in XML comments.\n- GP-08 / F-16: \u0060CreatureRuntimePreview\u0060 coordinates request, acceptance, mesh assembly, rig build, skin binding, rigid geometry, material fallback and cleanup \u2014 lifecycle god-object pressure. Decompose by state ownership, not by line count.\n- GP-09 / F-17: higher-level preview replacement is not transactional even though \u0060CreatureRig.Build\u0060, \u0060CreatureSkinnedMeshRenderer.Bind\u0060 and mesh assembly now build-before-swap. Rule: build complete replacement state, perform one ownership commit, dispose superseded state second.\n\nRequired architecture (already the correct direction): one active request; at most one replaceable pending request; latest pending overwrites older pending; cooperative cancellation where generation supports it; accepted-result identity check; late-result resource disposal; domain-reload policy; request-scoped diagnostics with a request token carrying cancellation \u002B ownership.\n\nExplicitly rejected by the audit: a superficial fixed-size queue cap, and \u0022cancel every prior Task\u0022 as the whole answer (non-cooperative Unity/native work may continue).\n\nAcceptance evidence: burst edits coalesce and stale work does not grow without bound; a failed replacement leaves the prior valid preview intact; domain reload leaves no duplicate components or leaked generated objects.\n\nProvenance caveat: audit bases are not ancestors of current HEAD \u0060b5ba54b\u0060; cited symbols were re-verified in the worktree. Related: TSK-0098, TSK-0219.",
       "createdAtUtc": "2026-09-12T05:54:25.8603639Z"
+    },
+    {
+      "id": "c-2a651946e69a46a0903c07d47fbbb076",
+      "author": "anonymous",
+      "body": "Corroborated 2026-09-12 by the metaball pivot synthesis: \u0060docs/audits/creaturecreator-spore-metaball-pivot-and-appearance-synthesis-2026-09-12.md\u0060 (report \u0060CC-SYNTH-SPORE-PIVOT-20260912-A7E4D1\u0060), finding F-06.\n\nThe synthesis confirms GP-01 from \u0060creaturecreator-audit-generation-performance-lifecycle-2026-09-12.md\u0060: the scheduler starts every request immediately and rejects stale results only after the work completes. A ten-frame drag therefore produces ten costly generations even though nine can never be presented.\n\nNo new scope is created here. The level-of-detail task TSK-0225 will consume this scheduler and must not create a competing path. Two requests from TSK-0225 back into this task:\n1. Expose the bounded-scheduler counters from GP-03 (queued, active, cancelled, stale-completed) so the interactive tier can prove it coalesces.\n2. Confirm whether cancellation is required for the interactive tier or whether one-running plus one-pending is sufficient. TSK-0225 assumes the latter.\n\nNo code change made.",
+      "createdAtUtc": "2026-09-12T06:24:44.9421382Z"
     }
   ],
   "epicId": null,
   "parentId": "tsk-0098-decompose-creatureeditorwindow-responsibilities",
   "dueDateUtc": null,
   "createdAtUtc": "2026-09-03T22:37:19.7381337Z",
-  "updatedAtUtc": "2026-09-12T05:54:25.8603639Z",
+  "updatedAtUtc": "2026-09-12T06:24:44.9421382Z",
   "completedAtUtc": null,
-  "revision": 9,
+  "revision": 10,
   "isArchived": false,
   "hasLoadError": false,
   "loadError": null,

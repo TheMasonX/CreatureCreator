@@ -22,16 +22,23 @@
   "attachments": [],
   "externalLinks": [],
   "linkedPages": [],
-  "comments": [],
+  "comments": [
+    {
+      "id": "c-5155395f43304235bdc013c6f3fd7aa6",
+      "author": "anonymous",
+      "body": "Audit synthesis delivered 2026-09-12: \u0060docs/audits/creaturecreator-spore-metaball-pivot-and-appearance-synthesis-2026-09-12.md\u0060 (report \u0060CC-SYNTH-SPORE-PIVOT-20260912-A7E4D1\u0060).\n\nThis report satisfies the acceptance criteria of this task. It lists each Spore mechanism with a source reference, maps it to CreatureCreator, names one target model with rejected alternatives, and keeps the documented invariants.\n\nAnswer to the research question: Spore generated skin bone weights from **which body part generated which metaball** (Chris Hecker, \u0022My Liner Notes for Spore\u0022). CreatureCreator uses geometric inference instead: \u0060ImplicitSurfaceInfluenceDomainResolver\u0060 picks the domain by nearest resolved part SDF, and \u0060ImplicitSurfaceWeightAuthoring\u0060 ranks by closest point on segment with \u0060RadiusScale\u0060 falloff. At a joint the geometric answer can be anatomically wrong, which explains the elbow, foot, and tail symptoms and why the knee is comparatively acceptable.\n\nTarget model accepted: provenance-attributed weighting. Provenance selects which chain. Distance selects which bone inside an allowed chain, then a joint-local transfer profile shapes the joint. Rejected alternatives and reasons are in section 9.5.\n\nHonest scope limit: Spore never solved spine weights or torso-attached parts. Target structurally better weighting with documented failure regions, not universal correctness.\n\nPer symptom, the report names a candidate cause and a falsifying observation (section 9.4). The knee is the control: a fix that changes the knee as much as the elbow is not evidence of a correct model.\n\nImplementation is out of scope here and is owned by the new child task TSK-0224. No weighting, radius, or falloff constant was changed.\n\nVerification: all sources re-checked this session. Hecker\u0027s liner notes, the SIGGRAPH 2008 landing page, and Ocean Quigley\u0027s skin-paint post were fetched. Three corrections to the supplied external research are recorded (section 6). Five sources were unavailable: \u0060daniellochner/creature-creator-game\u0060 returned 404, \u0060andrewwillmott.com/s2007\u0060 returned 404, the Mesh Displacement paper returned 401 after redirect, the GDC 2007 deck was not read, and the Blender skin modifier manual returned 403.\n\nUnity execution was not required for this research deliverable.",
+      "createdAtUtc": "2026-09-12T06:24:28.3494639Z"
+    }
+  ],
   "epicId": null,
   "parentId": "TSK-0077",
   "dueDateUtc": null,
   "createdAtUtc": "2026-09-12T05:57:17.3036932Z",
-  "updatedAtUtc": "2026-09-12T05:57:17.3036932Z",
+  "updatedAtUtc": "2026-09-12T06:24:28.3494639Z",
   "completedAtUtc": null,
-  "revision": 1,
+  "revision": 2,
   "isArchived": false,
   "hasLoadError": false,
   "loadError": null,
-  "sourceFilePath": null
+  "sourceFilePath": "tsk-0222-re-research-the-spore-deformation-and-skin-paint-algorithms-to-replace-the-current-segment-distance-weighting.json"
 }

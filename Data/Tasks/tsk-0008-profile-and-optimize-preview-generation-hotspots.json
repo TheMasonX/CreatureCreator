@@ -187,15 +187,21 @@
       "author": "anonymous",
       "body": "Audit synthesis 2026-09-12 (CC-AUDIT-GEN-20260912-83C17B4E, CC-AUDIT-20260912-7A5E0C31): this task remains the canonical owner for preview/generation hotspot performance, including the appearance stage. Added scope from this pass:\n\n- F-08 / GP-04 (Confirmed): the appearance Burst path materializes a distance matrix proportional to \u0060vertexCount x programCount\u0060. For large creatures with many appearance programs this can reach tens to hundreds of MB and dwarfs the final colour buffer. The architecture question is not \u0022can Burst hold it\u0022 but \u0022why materialize all pairwise distances at once\u0022. Do not rewrite blindly: first document which downstream operations consume the matrix and whether they need global pairwise reuse.\n- Preferred optimization: tile the computation (vertex block x program block) with a named memory budget and reusable scratch buffers. Goal is bounded peak memory, not speculative micro-optimization. A per-vertex running best/top-k evaluation may eliminate the matrix outright if no consumer needs global reuse.\n- F-09 / GP-05 (Confirmed, verified): one-shot Burst scratch uses \u0060Allocator.Persistent\u0060 for effectively request-scoped data (\u0060AppearanceResolveBurst.cs:32\u0060, \u0060AppearanceBaker.cs:105-107\u0060, \u0060PartAppearanceSampler.cs:185\u0060, \u0060ImplicitSurfaceInfluenceDomainResolver.cs:73\u0060). Prefer \u0060TempJob\u0060 for short job lifetimes, retained reusable scratch for hot repeated work, and \u0060Persistent\u0060 only for truly retained state.\n\nPriority order from the generation audit: (1) bound scheduler concurrency and stale work (TSK-0104), (2) request cancellation and ownership (TSK-0104), (3) measure appearance memory topology (this task), (4) measure weight-authoring cost (TSK-0218/TSK-0132 lineage), (5) measure Unity bind cost separately from mesh generation (TSK-0134), (6) only then optimize inner loops.\n\nAnti-patterns explicitly rejected: a generalized caching layer first; parallelizing every stage because the maths permits it; pooling before object ownership is explicit.\n\nProvenance caveat: audit bases are not ancestors of current HEAD \u0060b5ba54b\u0060; the allocator usages were re-verified in the worktree, the O(VxP) matrix shape was taken from the audit plus the tiled-scratch analysis and needs a profiling confirmation on the current branch.",
       "createdAtUtc": "2026-09-12T05:54:39.2188414Z"
+    },
+    {
+      "id": "c-298ea0448b954011933c17022edce66c",
+      "author": "anonymous",
+      "body": "Corroborated and re-pointed 2026-09-12 by the metaball pivot synthesis: \u0060docs/audits/creaturecreator-spore-metaball-pivot-and-appearance-synthesis-2026-09-12.md\u0060 (report \u0060CC-SYNTH-SPORE-PIVOT-20260912-A7E4D1\u0060), findings F-07 and F-10.\n\nMeasurement recap from existing records, still the reference: editor generation 216.6 ms at 96\u00B3 after the Slice A\u2013D work, with \u0060FieldSampling\u0060 at 121.4 ms (about 56%). Only 13.3% of grid corners lie inside the root bound, and each of those scans about 250 operations. \u0060GenerateDataBenchmark\u0060 baselines were about 97.5 ms at 10 voxels per unit and about 215.7 ms at 16 on the same fixture. These are environment-sensitive. Re-measure before quoting them.\n\nOwner change: this task remains the measurement gate. Design ownership of the cost model moves to the new child task TSK-0225 (level-of-detail tiers and coalescing). TSK-0223 (metaball field) changes the cost model from an operation tree to a compact-support sum, which makes per-blob bucketing exact.\n\nRequested next evidence, recorded here because this task owns it:\n1. Re-run \u0060GenerateDataBenchmark\u0060 at 10 and 16 voxels per unit and record total and per-stage numbers.\n2. Record sample count per corner before and after TSK-0223.\n3. Confirm whether the 250-operation total is dominated by limb blob chains, since that determines whether blob bucketing or blob reduction is the larger lever.\n\nNo code change made.",
+      "createdAtUtc": "2026-09-12T06:24:41.0221427Z"
     }
   ],
   "epicId": null,
   "parentId": null,
   "dueDateUtc": null,
   "createdAtUtc": "2026-09-01T03:16:25.5654277Z",
-  "updatedAtUtc": "2026-09-12T05:54:39.2188414Z",
+  "updatedAtUtc": "2026-09-12T06:24:41.0221427Z",
   "completedAtUtc": null,
-  "revision": 30,
+  "revision": 31,
   "isArchived": false,
   "hasLoadError": false,
   "loadError": null,
