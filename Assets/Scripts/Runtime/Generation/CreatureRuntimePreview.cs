@@ -196,17 +196,6 @@ namespace ProceduralCreature.Generation
             renderer.sharedMaterials = materials;
         }
 
-        private void AssignFallbackMaterial(MeshRenderer renderer)
-        {
-            Material material = MaterialResolver.ResolveDefault(ResolveMaterialPalette());
-            if (material == null)
-            {
-                if (_previewMaterial == null) _previewMaterial = CreatePreviewMaterial();
-                material = _previewMaterial;
-            }
-            if (material != null) renderer.sharedMaterial = material;
-        }
-
         private void BindImplicitSurfaceToRig(
             GeneratedCreature generated,
             GeneratedCreatureData data)
