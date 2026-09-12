@@ -244,7 +244,7 @@ namespace ProceduralCreature.Morphology.Extraction
                 + (c111 - c101) * u * w;
             float dw = (c001 - c000) * (1f - u) * (1f - v)
                 + (c101 - c100) * u * (1f - v)
-                + (c011 - c010) * (1f - u) * v
+                + (c011 - c001) * (1f - u) * v
                 + (c111 - c110) * u * v;
 
             gradient = new Vector3(du / CellSize, dv / CellSize, dw / CellSize);
@@ -302,6 +302,7 @@ namespace ProceduralCreature.Morphology.Extraction
             int rowEnd = math.min(firstLocalRow + RowsPerExecute, totalRows);
             int operationCount = Operations.Length;
             int rowScratchStride = CornersX * operationCount;
+            int workItemScratchOffset = checked(workItemIndex * RowsPerExecute * rowScratchStride);
 
             for (int row = firstLocalRow; row < rowEnd; row++)
             {
@@ -309,7 +310,7 @@ namespace ProceduralCreature.Morphology.Extraction
                 int y = row % CornersY;
                 int z = row / CornersY;
                 int sampleBase = row * CornersX;
-                int rowValueOffset = localRow * rowScratchStride;
+                int rowValueOffset = checked(workItemScratchOffset + localRow * rowScratchStride);
 
                 for (int x = 0; x < CornersX; x++)
                 {
@@ -325,7 +326,7 @@ namespace ProceduralCreature.Morphology.Extraction
                         continue;
                     }
 
-                    int valueOffset = rowValueOffset + x * operationCount;
+                    int valueOffset = checked(rowValueOffset + x * operationCount);
                     Samples[sampleIndex] = SdfProgramEvaluator.EvaluateInto(
                         Operations, RootIndex, point, ScratchValues, valueOffset, InfluenceRadius, allowCulling: true);
                 }
