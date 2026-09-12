@@ -20,15 +20,21 @@
       "author": "ChatGPT",
       "body": "2026-09-11 evidence: fresh generated meshes showed detached polygon islands and successive regeneration logs varied from roughly 10.6k to 12.1k vertices / 21.3k to 24.1k triangles. The branch now contains GenerationIntegrityTests plus exact field/mesh fingerprints to identify the first divergent stage. Unity execution is the closure gate.",
       "createdAtUtc": "2026-09-11T20:30:00Z"
+    },
+    {
+      "id": "c-chatgpt-20260911-root-cause",
+      "author": "ChatGPT",
+      "body": "Root cause isolated 2026-09-11: SdfSamplingRowBatchJob.Execute reused the same NativeArray scratch region across parallel work items. The per-work-item allocation existed, but rowValueOffset omitted the workItemIndex slice offset. This explains changing field fingerprints, varying topology, and detached generated islands. Production fix committed separately; the task remains InProgress until the Unity suite and real editor regeneration confirm stable output.",
+      "createdAtUtc": "2026-09-11T21:50:00Z"
     }
   ],
   "epicId": null,
   "parentId": "TSK-0008",
   "dueDateUtc": null,
   "createdAtUtc": "2026-09-11T20:30:00Z",
-  "updatedAtUtc": "2026-09-11T20:30:00Z",
+  "updatedAtUtc": "2026-09-11T21:50:00Z",
   "completedAtUtc": null,
-  "revision": 1,
+  "revision": 2,
   "isArchived": false,
   "hasLoadError": false,
   "loadError": null,
