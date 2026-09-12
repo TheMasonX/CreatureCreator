@@ -1,5 +1,6 @@
 using System.Collections.Generic;
 using UnityEngine;
+using ProceduralCreature.Common;
 
 namespace ProceduralCreature.Morphology.Extraction
 {
