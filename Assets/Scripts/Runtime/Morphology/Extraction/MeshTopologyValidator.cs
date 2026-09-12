@@ -20,6 +20,16 @@ namespace ProceduralCreature.Morphology.Extraction
         private readonly List<string> _boundaryEdgeExamples = new List<string>();
         private readonly List<string> _nonManifoldEdgeExamples = new List<string>();
         private readonly List<string> _inconsistentWindingEdgeExamples = new List<string>();
+
+        internal void AddBoundaryEdgeExample(string value) => AddExample(_boundaryEdgeExamples, value);
+        internal void AddNonManifoldEdgeExample(string value) => AddExample(_nonManifoldEdgeExamples, value);
+        internal void AddInconsistentWindingEdgeExample(string value) => AddExample(_inconsistentWindingEdgeExamples, value);
+
+        private static void AddExample(List<string> destination, string value)
+        {
+            const int maxExamples = 8;
+            if (destination.Count < maxExamples) destination.Add(value);
+        }
     }
 
     /// <summary>
@@ -35,8 +45,6 @@ namespace ProceduralCreature.Morphology.Extraction
     /// </summary>
     public static class MeshTopologyValidator
     {
-        private const int MaxDiagnosticExamples = 8;
-
         private readonly struct EdgeUse
         {
             public readonly int Count;
@@ -80,17 +88,17 @@ namespace ProceduralCreature.Morphology.Extraction
                 if (use.Count == 1)
                 {
                     report.BoundaryEdgeCount++;
-                    AddExample(report._boundaryEdgeExamples, FormatEdge(entry.Key, use));
+                    report.AddBoundaryEdgeExample(FormatEdge(entry.Key, use));
                 }
                 else if (use.Count > 2)
                 {
                     report.NonManifoldEdgeCount++;
-                    AddExample(report._nonManifoldEdgeExamples, FormatEdge(entry.Key, use));
+                    report.AddNonManifoldEdgeExample(FormatEdge(entry.Key, use));
                 }
                 else if (use.Count == 2 && use.ForwardUses != 1)
                 {
                     report.InconsistentWindingEdgeCount++;
-                    AddExample(report._inconsistentWindingEdgeExamples, FormatEdge(entry.Key, use));
+                    report.AddInconsistentWindingEdgeExample(FormatEdge(entry.Key, use));
                 }
             }
 
@@ -117,11 +125,6 @@ namespace ProceduralCreature.Morphology.Extraction
         private static string FormatEdge((int, int) key, EdgeUse use)
         {
             return $"edge ({key.Item1},{key.Item2}) uses={use.Count} forward={use.ForwardUses} reverse={use.ReverseUses}";
-        }
-
-        private static void AddExample(List<string> destination, string value)
-        {
-            if (destination.Count < MaxDiagnosticExamples) destination.Add(value);
         }
     }
 }
