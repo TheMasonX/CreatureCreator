@@ -23,16 +23,23 @@
   "attachments": [],
   "externalLinks": [],
   "linkedPages": [],
-  "comments": [],
+  "comments": [
+    {
+      "id": "c-692177cab8e146c3932043ffd97c8d59",
+      "author": "anonymous",
+      "body": "Council re-scope 2026-09-12 (\u0060docs/audits/creaturecreator-council-review-metaball-pivot-2026-09-12.md\u0060, findings C1, C2, C3, C10; gates G1, G2, G9).\n\n**Blocked.** Do not start this task until gate G1 (\u0060TSK-0194\u0060 green rerun) and gate G2 (\u0060TSK-0147\u0060 post-fix re-measurement) both pass. This task\u0027s premise was argued from pre-fix evidence. \u0060TSK-0147\u0060 shipped a chain-aware gate as \u0060f7dd934\u0060, and this task never accounted for it.\n\nRequired scope corrections:\n\n1. **Add a dominance rule.** Seat 2 verified that \u0022a forearm primitive contributed\u0022 preserves the elbow mechanism, because a forearm metaball legitimately contributes on upper-arm surface points near the joint. Eligibility alone relabels the symptom. Specify a dominance threshold and a deterministic tie-break (lowest \u0060BoneIndex\u0060).\n2. **Reframe as a capability, not the symptom fix.** The structural gain is chain selection. Quality still rests on the joint-local transfer profile, which is a new tunable.\n3. **Mirror keying.** Aggregate on \u0060(SourcePartId, IsMirrored)\u0060, because mirrored twins share \u0060SourcePartId\u0060. Add a dominant-side tie-break so a midline vertex does not gain both \u0060X\u0060 and \u0060X_mirror\u0060.\n4. **Make the weld merge commutative.** \u0060GridVertexOwnership\u0060 keys are deterministic grid identities, so a parallel attribution array is safe, but a first-writer-wins merge is cell-order sensitive.\n5. **Distinguish top-K contributions from the four-bone influence cap.** The original acceptance criteria conflated them.\n6. **Replace three non-executable criteria:**\n   - \u0022Zero forearm weight unless a forearm primitive contributed\u0022 is circular. Replace with a numeric leakage gate: at least 50% reduction of maximum forearm weight on upper-arm-dominant vertices against the \u0060TSK-0147\u0060 \u0060Default\u0060 baseline.\n   - \u0022Every shank vertex bit-identical\u0022 contradicts this task\u0027s own joint-local transfer profile, which deliberately moves shank vertices in the ankle band. Replace with a bounded-movement tolerance.\n   - \u0022The knee fixture result is unchanged\u0022 has no fixture and no baseline. Replace with: knee leakage within \u00601e-5\u0060 of the \u0060TSK-0147\u0060 baseline, and no change of dominant bone at the knee.\n7. **No allocation claim without a harness.** Seat 2 verified \u0060Author\u0060 allocates a \u0060VertexInfluence\u0060 array per vertex today. Do not assert zero allocation without a measured threshold.\n8. **Ownership.** This task must not close the foot symptom. \u0060TSK-0150\u0060 is the canonical foot owner. Record that this task feeds it.\n\nOpen question the council could not settle, and the highest-value one in the review: can attribution be threaded through the existing SDF tree without the field-representation change? If yes, this task no longer depends on \u0060TSK-0223\u0060.\n\nNo code change made.",
+      "createdAtUtc": "2026-09-12T06:33:26.1422727Z"
+    }
+  ],
   "epicId": null,
   "parentId": "TSK-0222",
   "dueDateUtc": null,
   "createdAtUtc": "2026-09-12T06:23:58.8681348Z",
-  "updatedAtUtc": "2026-09-12T06:23:58.8681348Z",
+  "updatedAtUtc": "2026-09-12T06:33:26.1422727Z",
   "completedAtUtc": null,
-  "revision": 1,
+  "revision": 2,
   "isArchived": false,
   "hasLoadError": false,
   "loadError": null,
-  "sourceFilePath": null
+  "sourceFilePath": "tsk-0224-provenance-attributed-implicit-surface-bone-weights.json"
 }

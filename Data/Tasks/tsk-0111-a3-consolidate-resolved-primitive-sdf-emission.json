@@ -28,15 +28,21 @@
       "author": "anonymous",
       "body": "Implementation evidence (2026-09-05): SdfProgramBuilder now has one concrete AppendResolvedPrimitive helper for ResolvedShape -\u003E primitive type/parameters, transform, distance scale, world bounds, cullability, and optional symmetry. CompilePortable and CompilePortablePart delegate to it; limb chain emission remains separate. No public API or snapshot boundary changes.\n\nValidation evidence: focused Unity PlayMode parity test CompilePortable_AndIndividualPartCompilationSharePrimitiveOperationData passed 1/1. Existing SdfProgramBuilderTests fixture passed 19/19 in PlayMode. Unity console had no product errors or warnings. dotnet build ProceduralCreature.Tests.Runtime.csproj --no-restore passed with 0 warnings/errors. git diff --check passed. Source inventory confirms one ShapeType mapping switch and one transform/symmetry metadata emission block.\n\nResidual risk: broader full runtime/editor suites were not rerun because this slice is runtime-local; operation parity is covered for Sphere, Capsule, Box, Ellipsoid, mirrored rotated/scaled transforms.",
       "createdAtUtc": "2026-09-05T03:03:13.1069721Z"
+    },
+    {
+      "id": "c-2affc004b12f45bf8a52dcf10c1411f8",
+      "author": "anonymous",
+      "body": "Supersession notice recorded 2026-09-12 by the four-seat council review (\u0060docs/audits/creaturecreator-council-review-metaball-pivot-2026-09-12.md\u0060).\n\nThis task is \u0060Done\u0060 and carries a STRICT user mandate that preserves the documented ellipsoid culling behavior. \u0060TSK-0223\u0060 proposes removing \u0060Ellipsoid\u0060 from the DNA entirely. That reverses this task\u0027s mandate.\n\nDisposition: do NOT archive and do NOT reopen this task. Record this comment as the explicit supersession so the reversal is visible and searchable. The mandate reversal is \u0060TSK-0223\u0060\u0027s to own, and it requires the user\u0027s acknowledgement because a STRICT mandate is being reversed.\n\nNo work is reopened here. This task\u0027s consolidation record remains historically accurate for the vocabulary as it stood at completion.",
+      "createdAtUtc": "2026-09-12T06:33:01.1150452Z"
     }
   ],
   "epicId": null,
   "parentId": null,
   "dueDateUtc": null,
   "createdAtUtc": "2026-09-05T03:00:53.8596815Z",
-  "updatedAtUtc": "2026-09-05T03:03:13.1330274Z",
+  "updatedAtUtc": "2026-09-12T06:33:01.1150452Z",
   "completedAtUtc": "2026-09-05T03:03:13.1330274Z",
-  "revision": 4,
+  "revision": 5,
   "isArchived": false,
   "hasLoadError": false,
   "loadError": null,

@@ -23,16 +23,23 @@
   "attachments": [],
   "externalLinks": [],
   "linkedPages": [],
-  "comments": [],
+  "comments": [
+    {
+      "id": "c-7a00b7ac46784945a3f78c838acd2c38",
+      "author": "anonymous",
+      "body": "Council re-scope 2026-09-12 (\u0060docs/audits/creaturecreator-council-review-metaball-pivot-2026-09-12.md\u0060, findings C7 and C10; gate G10, G11).\n\n1. **Break the circular dependency.** This task states it feeds \u0060TSK-0225\u0060, while \u0060TSK-0225\u0060 states it needs this task for UV-preserving decimation. Record it as: this task lands first and independently; \u0060TSK-0225\u0060\u0027s runtime decimated tier is deferred until a charter exists. Do not list \u0060TSK-0225\u0060 as a blocker here.\n2. **Replace one non-executable criterion.** \u0022No object-space or world-space position node feeds texture sampling\u0022 cannot be tested as written, because no ShaderGraph graph-walker exists. Replace it with a source-review check recorded on this task, plus a rendered comparison: a deformed limb must show stable pattern placement, not a stretched pattern.\n3. **Charter determinism is the primary gate.** Same definition, charted twice, must produce identical UV assignment and identical atlas layout. This is the falsifiable core of the task.\n4. **Keep the determinism deviation explicit.** Spore started on a random uncharted triangle. This task must start on the lowest canonical triangle index. Record that as a deliberate divergence from the source, required by the project\u0027s determinism invariant.\n5. **Ship albedo only, first.** Specular, gloss, and normal channels are deferred. They are not required by the mandate.\n6. **Record the ordering against \u0060TSK-0065\u0060.** \u0060TSK-0065\u0060 proposes a post-extraction vertex-displacement pass. Vertex displacement invalidates UVs if it runs after charting. Decide and record the order: charting after vertex displacement, or re-chart after displacement.\n7. **Add the material-ownership link.** \u0060ADR-003\u0060 and \u0060TSK-0064\u0060 own material ownership. \u0060BuildSkinningMeshCopy\u0060 already preserves UV0 to UV2, so the binding path already carries the channel. State this as a dependency, not a discovery.\n8. **Measure the charter.** Record total charter and paint time per stage. Spore\u0027s published figure is about 10 ms on its minimum specification. That figure is context, not a contractual target for this project, because the hardware and language differ.\n\nOpen question: is the ISO-surface chart cost acceptable at the committed tier only, or is a cheap interactive chart needed for the editor? Answer before implementing.\n\nNo code change made.",
+      "createdAtUtc": "2026-09-12T06:33:36.8116776Z"
+    }
+  ],
   "epicId": null,
   "parentId": null,
   "dueDateUtc": null,
   "createdAtUtc": "2026-09-12T06:24:13.4293865Z",
-  "updatedAtUtc": "2026-09-12T06:24:13.4293865Z",
+  "updatedAtUtc": "2026-09-12T06:33:36.8116776Z",
   "completedAtUtc": null,
-  "revision": 1,
+  "revision": 2,
   "isArchived": false,
   "hasLoadError": false,
   "loadError": null,
-  "sourceFilePath": null
+  "sourceFilePath": "tsk-0226-deterministic-uv-charting-and-procedural-paint-atlas.json"
 }

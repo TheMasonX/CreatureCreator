@@ -21,16 +21,23 @@
   "attachments": [],
   "externalLinks": [],
   "linkedPages": [],
-  "comments": [],
+  "comments": [
+    {
+      "id": "c-35fcd65ebe8741af8824aa486752db9f",
+      "author": "anonymous",
+      "body": "Council re-scope 2026-09-12 (\u0060docs/audits/creaturecreator-council-review-metaball-pivot-2026-09-12.md\u0060, finding C7 and C9; gate G7).\n\nThis task is over-bundled and circular as written.\n\n1. **Circular dependency.** This task states it needs \u0060TSK-0226\u0060 for UV-preserving decimation, while \u0060TSK-0226\u0060 states it feeds this task. Break the cycle. The runtime decimated tier is deferred until \u0060TSK-0226\u0060 lands a charter. Remove the dependency from this task\u0027s blocking criteria and record it as a trigger instead.\n2. **Remove the duplicated acceptance criteria.** The bounded-scheduler criterion (\u0022at most one running and one replaceable pending generation\u0022) duplicates \u0060TSK-0104\u0060 verbatim and belongs there. The bucket-parity criterion duplicates \u0060TSK-0223\u0060. Keep only this task\u0027s own criteria.\n3. **Split into four owners.** (a) exact per-blob bucketing; (b) scheduler bound, which returns to \u0060TSK-0104\u0060; (c) coarse interactive tier; (d) runtime decimated tiers, deferred.\n4. **Bucketing is the performance lever, not compact support.** Seat 1 verified that \u0060EvaluateInto\u0060 loops over all operation indices up to the root, so today is \u0060O(inBound \u00D7 250)\u0060 and culling saves arithmetic but not loop trips. Bucketing makes it \u0060O(inBound \u00D7 bucketsTouched)\u0060. No bucketing measurement exists anywhere. Gate G7 requires extraction to be bit-identical with bucketing on and off, plus sample count per corner.\n5. **Resolve the budget dispute.** This task\u0027s cost model rests on 216.6 ms at 96\u00B3, while \u0060TSK-0147\u0060 recorded a live editor total of 707.4 to 798.8 ms (1314.8 cold) on the same preview. The unexplained 3 to 6 times gap must be resolved before the interactive tier is sized.\n6. **Add the memory budget** requested by Seat 2: per-corner top-K adds K channels to about 941k corners inside the 56% sampling stage. Tie the budget to \u0060TSK-0008\u0060.\n\nNo code change made.",
+      "createdAtUtc": "2026-09-12T06:33:31.2779776Z"
+    }
+  ],
   "epicId": null,
   "parentId": "TSK-0008",
   "dueDateUtc": null,
   "createdAtUtc": "2026-09-12T06:24:05.847001Z",
-  "updatedAtUtc": "2026-09-12T06:24:05.847001Z",
+  "updatedAtUtc": "2026-09-12T06:33:31.2779776Z",
   "completedAtUtc": null,
-  "revision": 1,
+  "revision": 2,
   "isArchived": false,
   "hasLoadError": false,
   "loadError": null,
-  "sourceFilePath": null
+  "sourceFilePath": "tsk-0225-level-of-detail-tiers-and-generation-coalescing.json"
 }

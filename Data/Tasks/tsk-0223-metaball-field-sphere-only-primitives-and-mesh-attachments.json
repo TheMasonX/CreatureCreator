@@ -23,16 +23,23 @@
   "attachments": [],
   "externalLinks": [],
   "linkedPages": [],
-  "comments": [],
+  "comments": [
+    {
+      "id": "c-406c4a1c70b345089d74e9ad240d00ae",
+      "author": "anonymous",
+      "body": "Council re-scope 2026-09-12 (\u0060docs/audits/creaturecreator-council-review-metaball-pivot-2026-09-12.md\u0060, findings C4, C6, C9, C11; gates G3 to G6).\n\nVerified corrections to this task\u0027s scope:\n\n1. **Keep \u0060SdfOperation.Cullable\u0060 and the root region bound.** The synthesis report section 8.3 wrongly listed the root early exit as removed. Only the CC-099 potential-influence envelope is deletable. Removing the root bound regresses the 86.7% of corners that the O(1) pre-fill currently protects. Recompute the bound as the exact union of blob supports.\n2. **Add the \u0060|F|\u0060-as-distance consumer audit as a first-class deliverable**, not a risk row. Four consumers read field magnitude as distance: \u0060PartAppearanceSampler.Resolve\u0060, the \u0060PartBounds\u0060 broad phase, \u0060AppearanceResolveBurst\u0060, and \u0060ImplicitSurfaceInfluenceDomainResolver\u0060. Name each with its replacement or an explicit exemption. Note that nothing depends on unit gradient, so the sign-based extractor path is safe.\n3. **Migration is release-blocking.** Exact census: 17 files under \u0060Assets/Creatures/\u0060, \u0060Capsule\u0060 16 instances in 8 files, \u0060Ellipsoid\u0060 19 in 12 files, \u0060Box\u0060 0. Eleven files need migration, including the user\u0027s live-validation creature \u0060dinus_uprightus.json\u0060. Link \u0060TSK-0204\u0060 (corpus classification) as a prerequisite and reconcile with \u0060TSK-0045\u0060, which is InProgress and implementing the exact parameters this task deletes.\n4. **Split this task into three.** (a) one-limb prototype; (b) migration decision and execution; (c) primitive deletion. Start only the prototype.\n5. **Record the \u0060TSK-0111\u0060 supersession** explicitly. That task is Done with a STRICT mandate preserving the ellipsoid culling behavior. This task reverses it.\n6. **Split the union-operator change from the primitive removal.** Additive metaballs are separable. Seat 1 notes that additive union bulges where smooth-min blends, so current radii do not transfer directly.\n7. **Do not claim a performance win from compact support.** Seat 1 verified that \u0060EvaluateInto\u0060 loops over all operation indices up to the root, so culling saves arithmetic but not loop trips. Bucketing is the performance lever, and it is unmeasured.\n8. **Edge interpolation is linear for a quartic field.** \u0060InterpolateEdge\u0060 uses \u0060t = da/(da-db)\u0060. Re-derive or accept the bias explicitly.\n\nGates: G3 migration decision, G4 corpus census guard, G5 consumer audit, G6 one-limb prototype with sample count, mesh quality, and limb separation.\n\nNo code change made.",
+      "createdAtUtc": "2026-09-12T06:33:20.8883285Z"
+    }
+  ],
   "epicId": null,
   "parentId": null,
   "dueDateUtc": null,
   "createdAtUtc": "2026-09-12T06:23:52.0335721Z",
-  "updatedAtUtc": "2026-09-12T06:23:52.0335721Z",
+  "updatedAtUtc": "2026-09-12T06:33:20.8883285Z",
   "completedAtUtc": null,
-  "revision": 1,
+  "revision": 2,
   "isArchived": false,
   "hasLoadError": false,
   "loadError": null,
-  "sourceFilePath": null
+  "sourceFilePath": "tsk-0223-metaball-field-sphere-only-primitives-and-mesh-attachments.json"
 }

@@ -82,15 +82,21 @@
       "author": "anonymous",
       "body": "Supersession risk flagged 2026-09-12 by the metaball pivot synthesis: \u0060docs/audits/creaturecreator-spore-metaball-pivot-and-appearance-synthesis-2026-09-12.md\u0060 (report \u0060CC-SYNTH-SPORE-PIVOT-20260912-A7E4D1\u0060), findings F-01 and F-08.\n\nThis task owns the chain-aware-domain and tuning mechanism that the reported symptoms implicate. The synthesis concludes that tuning is the wrong lever: \u0060ImplicitSurfaceInfluenceDomainResolver\u0060 selects the domain by nearest resolved part SDF and \u0060ImplicitSurfaceWeightAuthoring\u0060 ranks by closest point on segment, and at a joint the geometric answer can be anatomically wrong.\n\nDisposition: keep this task open. Do not archive it yet. Its diagnostics, gate behaviour, policy type, and editor controls remain useful and are reused by the new task TSK-0224 (provenance-attributed weights, child of TSK-0222). Whether the domain resolver is replaced or retained as a fallback inside an allowed chain is an open design question for TSK-0224.\n\nCoordination request: TSK-0224 must not create a second policy type or a second domain resolver. Extend \u0060InfluenceWeightingPolicy\u0060 with the joint-local transfer profile and reuse the existing gate structure.\n\nEvidence supporting this disposition: the measured defect recorded on this task (323 upper-arm-dominant vertices, mean forearm weight 0.079, maximum 0.383, 61 vertices above 0.25) is exactly the symptom class that provenance attribution addresses structurally.\n\nNo code change made.",
       "createdAtUtc": "2026-09-12T06:24:49.0578759Z"
+    },
+    {
+      "id": "c-79bf2c2cb1554cd895766ed0c798b6d9",
+      "author": "anonymous",
+      "body": "Council disposition 2026-09-12 (\u0060docs/audits/creaturecreator-council-review-metaball-pivot-2026-09-12.md\u0060, findings C1 and C2, gate G2).\n\nThis task\u0027s work has landed as \u0060f7dd934\u0060 on \u0060audit/skeleton-animation-improvements-2026-09-07\u0060 and is pushed to origin. It adds \u0060InfluenceWeightingPolicy\u0060 with \u0060ChainAwareLocality\u0060 and \u0060LongitudinalBlendMarginRadii\u0060, both default ON, plus an EditMode test asserting the forearm is excluded at an upper-arm vertex.\n\nRequired next evidence, because two later tasks now depend on it:\n1. Re-run the read-only live measurement on the same rig with \u0060Default\u0060 against \u0060Legacy\u0060. Record the mean, maximum, and count-above-0.25 forearm weight on upper-arm-dominant vertices for both policies.\n2. Record the maximum cross-chain weight per joint for the elbow, foot, and tail.\n3. State whether the shipped \u0060Default\u0060 gate satisfies the user\u0027s elbow mandate. If it does, the elbow scope is removed from the dependent task.\n\nDo not tune constants to make the measurement pass. If leakage remains, record the residual and the joint where it survives.\n\nThis task also shares the foot symptom with \u0060TSK-0150\u0060, \u0060TSK-0201\u0060, and \u0060TSK-0224\u0060. One canonical owner must be chosen before any of them proceeds.\n\nNo code change made.",
+      "createdAtUtc": "2026-09-12T06:33:09.4977033Z"
     }
   ],
   "epicId": null,
   "parentId": "TSK-0077",
   "dueDateUtc": null,
   "createdAtUtc": "2026-09-07T06:27:32.3039768Z",
-  "updatedAtUtc": "2026-09-12T06:24:49.0578759Z",
+  "updatedAtUtc": "2026-09-12T06:33:09.4977033Z",
   "completedAtUtc": null,
-  "revision": 20,
+  "revision": 21,
   "isArchived": false,
   "hasLoadError": false,
   "loadError": null,

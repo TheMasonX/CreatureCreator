@@ -3,9 +3,47 @@
 **Report ID:** `CC-SYNTH-SPORE-PIVOT-20260912-A7E4D1`
 **Suite:** `CC-AUDIT-SUITE-20260912-9F42C6D1`
 **Mode:** full reconciliation of supplied external research into accepted findings and MemorySmith tasks
-**Branch base:** `ba680631bc0f3afe7574512a1967d61d8ce6d653`
+**Branch base:** `audit/skeleton-animation-improvements-2026-09-07` @ `f7dd934` (corrected 2026-09-12; see section 0)
 **Unity execution:** not required and not performed. This report changes no code.
 **Code changes in this capture:** none.
+
+---
+
+## 0. Amendment after the four-seat council review
+
+The council (`docs/audits/creaturecreator-council-review-metaball-pivot-2026-09-12.md`)
+reviewed this report at `f7dd934`. It accepted the direction and refuted three
+parts. Read this amendment before using the findings below.
+
+1. **Baseline correction.** The fixed point `ba680631` is not an ancestor of the
+   review branch. The correct baseline is `f7dd934`.
+2. **F-01 is narrowed.** `TSK-0147` has already shipped a chain-aware gate in
+   `InfluenceWeightingPolicy` (`ChainAwareLocality` plus
+   `LongitudinalBlendMarginRadii`, defaults ON). This report quoted only the
+   pre-fix measurement. Provenance attribution is therefore not proven to be the
+   fix for the elbow, foot, or tail. A re-measurement decides that.
+3. **The "one change fixes three problems" thesis is withdrawn.** The correct
+   position is narrower: the pivot is justified by simplification and by
+   providing attribution capability. It is not the performance fix, because
+   exact blob bucketing is, and bucketing is independent. It is not the elbow
+   fix, because the shipped gate is the candidate there.
+4. **Section 8.3 is wrong about the root bound.** `SdfOperation.Cullable` and the
+   root region bound must be retained. Only the CC-099 potential-influence
+   envelope is deletable. Removing the root early exit would regress the 86.7% of
+   corners that the O(1) pre-fill currently protects.
+5. **Migration is release-blocking, not a risk row.** Exact census of
+   `Assets/Creatures/` (17 files): `Capsule` 16 instances in 8 files,
+   `Ellipsoid` 19 in 12 files, `Box` 0. Eleven files need migration. The live
+   authoring users are `dino_creature.json` and `dinus_uprightus.json`.
+6. **Four consumers read `|F|` as a distance** and were unlisted:
+   `PartAppearanceSampler.Resolve`, the `PartBounds` broad phase,
+   `AppearanceResolveBurst`, and `ImplicitSurfaceInfluenceDomainResolver`.
+7. **`TSK-0111` is a mandate reversal, not a reopening.** It is `Done` with a
+   STRICT mandate that preserves the documented ellipsoid culling behavior.
+   `TSK-0223` must record an explicit supersession.
+
+Source citations move to
+`docs/audits/creaturecreator-spore-research-source-ledger.md`.
 
 ---
 
@@ -45,8 +83,10 @@ Three accepted findings drive the pivot.
 - **F-01.** Spore generated skin bone weights from *which body part generated
   which metaball* (`S01`). CreatureCreator infers weights from *nearest resolved
   part SDF* plus *closest point on bone segment*. At a joint these two disagree,
-  and the geometric answer can be anatomically wrong. This is the structural
-  cause of the elbow, foot, and tail symptoms.
+  and the geometric answer can be anatomically wrong. This is a structural
+  ambiguity in chain selection. **Narrowed by the council:** it is not proven to
+  be the cause of the elbow, foot, or tail symptoms, and the tail symptom traces
+  to the discrete weight-`1.0` fallback instead. See section 0.
 - **F-02.** CreatureCreator's field is an SDF operation tree evaluated with
   polynomial smooth-min. Smooth-min makes influence non-local. That forced a
   conservative "potential influence envelope" design (`CC-099`) and an ellipsoid
@@ -60,10 +100,12 @@ Three accepted findings drive the pivot.
   the project needs. Spore used a fast UV charter plus procedural paint into the
   atlas (`S01`, `S04`).
 
-F-01 and F-02 share one root cause and one fix. A metaball field with compact
-support gives both cheap local evaluation and the source attribution that Spore
-used for weights. The metaball pivot is therefore not only a simplification. It
-is the enabling step for the weighting fix.
+F-01 and F-02 share one representation, not one fix. A metaball field with compact
+support gives cheap local evaluation and the source attribution Spore used for
+weights. **Withdrawn:** the earlier claim that the pivot is the enabling step for
+the weighting fix. Exact blob bucketing is the performance fix, and it is
+independent and unmeasured. The pivot is justified by simplification and by
+providing attribution capability.
 
 ---
 
@@ -74,7 +116,9 @@ is the enabling step for the weighting fix.
   generation performance, weighting from provenance, and the appearance pivot.
 - **Out of scope:** skeleton inference, DNA authoring, the editor gesture model,
   and IK. The user states these are acceptable.
-- **Fixed point:** `ba680631bc0f3afe7574512a1967d61d8ce6d653`.
+- **Fixed point:** `f7dd934` on `audit/skeleton-animation-improvements-2026-09-07`.
+  Corrected 2026-09-12. The earlier value `ba680631` is not an ancestor of this
+  branch.
 - **Excluded:** production code changes. Implementation is owned by the tasks
   named in section 9.
 
@@ -554,7 +598,9 @@ Complies with the repository invariants.
 - Symmetry stays stored once. A mirrored blob receives the mirror transform at
   generation, as today.
 - Runtime code gains no scene or editor dependency. The field is plain blittable
-  data.
+  data, but the attribution payload is not: it carries string identifiers such as
+  `boneId`, `chainId`, and `regionRole`. Resolve those to integer indices before
+  the hot path.
 - One derivation path is preserved. `ResolvedLimb` and `ResolvedBody` still own
   morphology. The metaball set replaces the SDF operation tree as the field
   representation, not as a second morphology source.
