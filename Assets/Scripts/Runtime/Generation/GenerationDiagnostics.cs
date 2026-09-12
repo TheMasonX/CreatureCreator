@@ -20,6 +20,7 @@ namespace ProceduralCreature.Generation
         SkeletonInference,
         CenterOfMass,
         AppearanceBake,
+        InfluenceDomainResolution,
     }
 
     public readonly struct StageTiming
