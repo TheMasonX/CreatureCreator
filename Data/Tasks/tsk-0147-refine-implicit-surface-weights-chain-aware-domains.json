@@ -88,15 +88,21 @@
       "author": "anonymous",
       "body": "Council disposition 2026-09-12 (\u0060docs/audits/creaturecreator-council-review-metaball-pivot-2026-09-12.md\u0060, findings C1 and C2, gate G2).\n\nThis task\u0027s work has landed as \u0060f7dd934\u0060 on \u0060audit/skeleton-animation-improvements-2026-09-07\u0060 and is pushed to origin. It adds \u0060InfluenceWeightingPolicy\u0060 with \u0060ChainAwareLocality\u0060 and \u0060LongitudinalBlendMarginRadii\u0060, both default ON, plus an EditMode test asserting the forearm is excluded at an upper-arm vertex.\n\nRequired next evidence, because two later tasks now depend on it:\n1. Re-run the read-only live measurement on the same rig with \u0060Default\u0060 against \u0060Legacy\u0060. Record the mean, maximum, and count-above-0.25 forearm weight on upper-arm-dominant vertices for both policies.\n2. Record the maximum cross-chain weight per joint for the elbow, foot, and tail.\n3. State whether the shipped \u0060Default\u0060 gate satisfies the user\u0027s elbow mandate. If it does, the elbow scope is removed from the dependent task.\n\nDo not tune constants to make the measurement pass. If leakage remains, record the residual and the joint where it survives.\n\nThis task also shares the foot symptom with \u0060TSK-0150\u0060, \u0060TSK-0201\u0060, and \u0060TSK-0224\u0060. One canonical owner must be chosen before any of them proceeds.\n\nNo code change made.",
       "createdAtUtc": "2026-09-12T06:33:09.4977033Z"
+    },
+    {
+      "id": "c-da7df94eb317438b9285b4b603c37aba",
+      "author": "anonymous",
+      "body": "2026-09-12 task-board review \u2014 correction to the 2026-09-12 council disposition above: the shared-symptom list cites TSK-0201, but TSK-0201 is the root-potential appearance-culling task; the weighting record renumbered from that key is TSK-0238 (\u0022Prove limb binding radii cover the sampled metaball envelope\u0022). Shared foot/limb-weight symptom set: TSK-0147, TSK-0150, TSK-0168, TSK-0172, TSK-0238, under the forward owner TSK-0222/TSK-0224. No canonical owner has been chosen yet; surfaced for user decision because these records carry STRICT user mandates.",
+      "createdAtUtc": "2026-09-13T04:52:04.4837764Z"
     }
   ],
   "epicId": null,
   "parentId": "TSK-0077",
   "dueDateUtc": null,
   "createdAtUtc": "2026-09-07T06:27:32.3039768Z",
-  "updatedAtUtc": "2026-09-12T06:33:09.4977033Z",
+  "updatedAtUtc": "2026-09-13T04:52:04.4837764Z",
   "completedAtUtc": null,
-  "revision": 21,
+  "revision": 22,
   "isArchived": false,
   "hasLoadError": false,
   "loadError": null,

@@ -20,16 +20,29 @@
   "attachments": [],
   "externalLinks": [],
   "linkedPages": [],
-  "comments": [],
+  "comments": [
+    {
+      "id": "c-01195d7405c84826b68b4d13e21d1402",
+      "author": "anonymous",
+      "body": "2026-09-12 task-board review: input to this policy task. 24 \u0060Done\u0060 records in \u0060Data/Tasks/\u0060 have zero comments, so they carry no recorded validation evidence: TSK-0001, 0002, 0003, 0005, 0007, 0022, 0024, 0025, 0026, 0027, 0031, 0033, 0035, 0036, 0042, 0043, 0047, 0049, 0050, 0051, 0052, 0053, 0059, 0060, 0066, 0067, 0068, 0069, 0070, 0074, 0075, 0078, 0079, 0080, 0086, 0087, 0088, 0091, 0092, 0096, 0102, 0141, 0244. These are legacy migrated records that predate the evidence rule. Recommended policy: require a \u0060lastValidatedCommit\u0060 / validation-state field so unsupported \u0060Done\u0060 records are detectable without retrofitting prose into historical records.",
+      "createdAtUtc": "2026-09-13T04:52:12.6477613Z"
+    },
+    {
+      "id": "c-cb91d731013845eabc2c66077156680f",
+      "author": "anonymous",
+      "body": "Correction to the preceding comment: the verified count is **43** \u0060Done\u0060 records with zero comments, not 24 \u2014 the key list in that comment is correct and complete; only the stated count was wrong.",
+      "createdAtUtc": "2026-09-13T04:52:24.7826818Z"
+    }
+  ],
   "epicId": null,
   "parentId": null,
   "dueDateUtc": null,
   "createdAtUtc": "2026-09-12T05:53:57.4873403Z",
-  "updatedAtUtc": "2026-09-12T05:53:57.4873403Z",
+  "updatedAtUtc": "2026-09-13T04:52:24.7826818Z",
   "completedAtUtc": null,
-  "revision": 1,
+  "revision": 3,
   "isArchived": false,
   "hasLoadError": false,
   "loadError": null,
-  "sourceFilePath": null
+  "sourceFilePath": "tsk-0220-add-structured-validation-state-and-evidence-rules-to-the-task-and-audit-process.json"
 }

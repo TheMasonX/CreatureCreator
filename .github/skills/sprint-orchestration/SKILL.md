@@ -33,6 +33,17 @@ context and never implements the slice body itself.
 Do NOT use for a single focused change (use `creature-workflow`) or for work that
 spans layers within one slice (use `subagent-swarm`).
 
+## Workflow Position
+
+- **Upstream:** a `council` report or an audit names the decision; a MemorySmith
+  task owns each round.
+- **Downstream:** orthogonal, multi-layer work moves to `subagent-swarm` once the
+  shared contract is stable on `main`.
+- **Contract:** the canonical repo contract, assumption ledger, and rollback
+  protocol live in
+  [`agent-orchestration-contract.instructions.md`](../../instructions/agent-orchestration-contract.instructions.md).
+  Cite it from every brief instead of restating it.
+
 **Fit check (degrade fast if violated):** this model pays off only when rounds are
 bounded, mostly-independent, and each has a clear stop-line and one owning task. It
 degrades quickly if a round becomes large, overlapping with another, or poorly
@@ -56,14 +67,20 @@ subagents inside one round. One round = one coherent change = one subagent.
 ## Sprint Setup
 
 1. Confirm the fixed point (current `main` head) and that the worktree otherwise
-   only contains files you intend to leave untracked.
+   only contains files you intend to leave untracked. Record the SHA in the round
+   log: it is the rollback target.
 2. Choose the rounds for this sprint. A default sprint is 3 rounds. For each round,
    confirm a live owning MemorySmith task and that no duplicate implementation has
    already landed on `main` ("source is truth" — a `Backlog`/`InProgress` label is
    not proof a gap exists; read source first).
-3. Agree the commit policy with the user (commit+push per round, commit locally
+3. Classify each round's acceptance gate and record the class in the round log:
+   - **Council-gated** — the round implements a `council` or audit decision. Link
+     the report path and adopt that evidence gate verbatim as the round gate.
+   - **Bounded** — ordinary work. One executable acceptance check is sufficient;
+     do not manufacture a council review for it.
+4. Agree the commit policy with the user (commit+push per round, commit locally
    only, or no commit). BeastMaster rules default to no commit unless requested.
-4. Open the round log and a per-round handoff (see
+5. Open the round log and a per-round handoff (see
    [template](./assets/sequential-sprint-handoff-template.md)).
 
 ## Per-Round Loop (repeat for Rounds 1..N)
@@ -74,25 +91,40 @@ subagents inside one round. One round = one coherent change = one subagent.
    (main head); the owning task key + acceptance criteria; the exact files/scope and
    explicit stop boundaries; one falsifiable hypothesis and one discriminating check;
    the required validation gate; the required report format. Reference tasks and
-   files; do not paste large audits. Remind the subagent to follow
-   `Assets/Scripts/README.md`, `creature-workflow`, `engineering-guardrails`, and
-   `unity-validation`, and that it must NOT commit.
+   files; do not paste large audits. Point the subagent at the
+   [orchestration contract](../../instructions/agent-orchestration-contract.instructions.md)
+   for the repo contract and rollback rules rather than restating them. Remind it to
+   follow `Assets/Scripts/README.md`, `creature-workflow`, `engineering-guardrails`,
+   and `unity-validation`, and that it must NOT commit.
 3. **Dispatch.** Run ONE subagent (BeastMaster) with the brief. It works and returns
    a report.
 4. **Review.** Verify the returned diff: no unrelated changes, no public API drift,
    no duplication, ownership preserved, edge-case tests present. Run `git diff
    --check`. Independently sanity-check any surprising claims (e.g. a no-change
    finding) rather than trusting the report. For substantive rounds, read the key
-   new file(s), not just the summary. **Evidence confidence has tiers** — be
-   explicit about which you relied on and record it in the log:
-   - *Report-trusted*: you accept the subagent's stated gate results (e.g. full
+   new file(s), not just the summary. **Record evidence provenance** for every
+   accepted claim so the log shows what was trusted and why:
+   - `report-only`: you accept the subagent's stated gate results (e.g. full
      489/489 suite) without re-running. Acceptable for low-risk rounds and to avoid
      blowing your own context on a full suite.
-   - *Spot-checked*: you hand-checked a representative number/math or a focused
+   - `spot-checked`: you hand-checked a representative number/math or a focused
      claim, and read the key file(s).
-   - *Independently re-run*: for high-risk slices you re-run the SINGLE focused
-     gate yourself (not the full suite) and confirm it passes. If you cannot reach
-     Unity, record the blocker rather than inventing evidence.
+   - `re-run`: for high-risk slices you re-run the SINGLE focused gate yourself
+     (not the full suite) and confirm it passes. If you cannot reach Unity, record
+     the blocker rather than inventing evidence.
+
+   These names are evidence provenance, not task validation state, which
+   `task-tracker` owns. Never record `report-only` evidence as a `unity-tested`
+   or `user-accepted` result.
+
+   **If the round's gate fails: stop.** Do not advance and do not commit. Record
+   the exact command, exit code, and first failing output, then restore only this
+   round's paths to the recorded fixed point per the rollback protocol in the
+   [orchestration contract](../../instructions/agent-orchestration-contract.instructions.md).
+   Never run `git reset --hard`, `git clean -fd`, or `git checkout .` — unrelated
+   worktree changes must survive. Re-brief the round with the failure evidence; a
+   round that fails the same gate twice is re-scoped, not retried.
+
 5. **Record.** Add the round's implementation + validation evidence to the canonical
    MemorySmith task (`memorysmith_task_add_comment`), preserving any `## User
    Mandate` section and the `user-mandated` label. Set status per `task-tracker`
@@ -117,9 +149,20 @@ subagents inside one round. One round = one coherent change = one subagent.
   summary (e.g. a convention it chose, a behavior change beyond the happy path, a
   deliberately-different edge case). This narrows the handoff-nuance loss and tells
   the orchestrator exactly what to read.
-- The shared repo contract (below) and a no-commit reminder.
+- **Require the assumption ledger.** For any round touching transforms, mirroring,
+  SDF signs, quantization, extraction, or skeleton frames, the subagent must state
+  the coordinate space, handedness, sign convention, unit, and ordering it assumed,
+  using the ledger format in the orchestration contract. Also require what it cannot
+  guarantee without a file, test, or Unity run.
+- **Require per-claim provenance.** Each reported result is tagged `re-run`,
+  `spot-checked`, or `report-only` so the orchestrator knows what to trust.
+- The orchestration contract (by path) and a no-commit reminder.
 
 ## Shared Repo Contract (pass to every subagent)
+
+Pass the canonical contract by path:
+[`agent-orchestration-contract.instructions.md`](../../instructions/agent-orchestration-contract.instructions.md).
+Keep these load-bearing rules inline in the brief:
 
 - `CreatureDefinition` is authoritative DNA; meshes/colors/skeletons/poses are
   derived. Runtime under `Assets/Scripts/Runtime` has no scene-object/editor-API/
@@ -138,12 +181,19 @@ subagents inside one round. One round = one coherent change = one subagent.
 ## Review Checklist (each round)
 
 - [ ] Brief gave fixed point, owner, acceptance, scope, and stop lines.
+- [ ] Round gate class recorded: council-gated (report path linked) or bounded.
 - [ ] One subagent ran; no parallel or nested subagents inside the round.
 - [ ] Subagent returned exact commands/results; no invented Unity evidence.
 - [ ] Subagent explicitly flagged any non-obvious design decisions it made.
+- [ ] Subagent returned an assumption ledger where the round touched math,
+      transforms, signs, or frames, and named what it could not verify.
+- [ ] Each accepted claim's provenance recorded (`report-only` / `spot-checked` /
+      `re-run`).
 - [ ] Diff contains only the intended slice; no unrelated files.
 - [ ] No public API drift, no duplication, ownership preserved, edge-case tests present.
 - [ ] `git diff --check` passes.
+- [ ] Fixed point SHA recorded before the round; a failed gate stopped the sprint
+      and rolled back only this round's paths.
 - [ ] The round's validation gate actually ran and passed (report-trusted or
       independently re-run; note which).
 - [ ] For high-risk or substantive rounds, orchestrator read the key file(s) and
@@ -162,6 +212,8 @@ subagents inside one round. One round = one coherent change = one subagent.
 - Do not create a second snapshot architecture, generic service framework, generic
   SDF IR, or generic animation framework.
 - Do not edit `Data/Tasks/*.json` by hand; use MemorySmith task tools.
+- Do not run `git reset --hard`, `git clean -fd`, or `git checkout .`; roll back
+  only the failed round's paths and leave unrelated worktree changes alone.
 - Do not commit/push until the orchestrator review passes and the user's policy
   allows it.
 
@@ -177,18 +229,22 @@ subagents inside one round. One round = one coherent change = one subagent.
   agent hierarchy alone.
 - **Reports are lossy.** Treat a subagent report as a distilled summary, not ground
   truth. Spot-check surprising claims, read the key file(s) on substantive rounds,
-  and for high-risk slices re-run the one focused gate yourself (see trust tiers).
+  and for high-risk slices re-run the one focused gate yourself (see evidence
+  provenance above).
 - **Do not let a round widen mid-sprint.** If a round turns out to be larger or more
   coupled than briefed, stop and re-scope it rather than letting the subagent absorb
   the extra work and return a bigger, less-reviewable diff.
 
 ## Sprint / Round Log
 
-Record after each round: round, owning task, status, commit, validation, evidence
-confidence (report-trusted vs independently re-run), notes.
+Record after each round: round, owning task, gate class (council-gated / bounded),
+status, commit, validation command and result, evidence provenance (`report-only`
+/ `spot-checked` / `re-run`), rollback target SHA, notes. A failed round records
+the failure mechanism and the rollback as well.
 
 ## References
 
 - [Handoff template](./assets/sequential-sprint-handoff-template.md)
+- [Agent Orchestration Contract](../../instructions/agent-orchestration-contract.instructions.md)
 - Related skills: `creature-workflow`, `engineering-guardrails`, `unity-validation`,
   `subagent-swarm`, `task-tracker`, `council`, `cc-audit-synthesis`.

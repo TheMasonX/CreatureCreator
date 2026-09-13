@@ -1,8 +1,8 @@
-{
+﻿{
   "id": "tsk-0237-prove-sparse-candidate-region-sampling",
   "key": "TSK-0237",
   "title": "Prove sparse candidate-region SDF sampling before enabling it",
-  "description": "Follow-up performance task under TSK-0008. A sparse candidate-region sampling prototype was reviewed during the 2026-09-11 performance council and intentionally removed before baseline validation. The concept is promising because FieldSampling remains the largest measured Quality 16 stage, but it must first prove scalar parity and topology completeness across all potential-envelope cases. The removed prototype also redundantly expanded the already conservative potential envelope by InfluenceRadius, so candidate-region ownership must be re-derived explicitly from SdfProgramBuilder's existing envelope contract rather than layered ad hoc.\n\n## Reconciliation\nRenumbered from TSK-0200 on 2026-09-12. TSK-0200 now resolves uniquely to the in-progress sparse root-envelope SDF sampling task tsk-0200-sparse-root-envelope-sdf-sampling; this record keeps the sparse candidate-region sampling proof.",
+  "description": "Follow-up performance task under TSK-0008. A sparse candidate-region sampling prototype was reviewed during the 2026-09-11 performance council and intentionally removed before baseline validation. The concept is promising because FieldSampling remains the largest measured Quality 16 stage, but it must first prove scalar parity and topology completeness across all potential-envelope cases. The removed prototype also redundantly expanded the already conservative potential envelope by InfluenceRadius, so candidate-region ownership must be re-derived explicitly from SdfProgramBuilder\u0027s existing envelope contract rather than layered ad hoc.\n\n## Reconciliation\nRenumbered from TSK-0200 on 2026-09-12. TSK-0200 now resolves uniquely to the in-progress sparse root-envelope SDF sampling task tsk-0200-sparse-root-envelope-sdf-sampling; this record keeps the sparse candidate-region sampling proof.",
   "type": "Performance",
   "status": "Backlog",
   "priority": "High",
@@ -28,17 +28,23 @@
       "author": "ChatGPT",
       "body": "Council disposition 2026-09-11: do not enable sparse candidate-region sampling as the baseline yet. The prototype was conservative but unvalidated and applied an additional InfluenceRadius expansion on top of the potential-envelope construction. Required next step is an explicit parity matrix covering spheres, boxes, capsules, elongated and transformed ellipsoids, symmetry, smooth unions, nested unions, thin/high-blend cases, and envelope fallback cases; then compare sampled grids, mixed-cell sets, topology, and deterministic output before measuring speedup.",
       "createdAtUtc": "2026-09-11T00:00:00Z"
+    },
+    {
+      "id": "c-7115c67671b24ba09bb5675bc948681b",
+      "author": "anonymous",
+      "body": "2026-09-12 task-board review: this is the proof gate for TSK-0200 (\u0022Restrict SDF sampling to conservative root-envelope candidates\u0022). Record the parity matrix (spheres, boxes, capsules, elongated/transformed ellipsoids, symmetry, smooth/nested unions, thin/high-blend, envelope fallback) before TSK-0200\u0027s sparse path becomes the baseline. These two records were previously unlinked; they are sibling descendants of TSK-0008.",
+      "createdAtUtc": "2026-09-13T04:51:57.9747916Z"
     }
   ],
   "epicId": null,
   "parentId": "tsk-0008-profile-and-optimize-preview-generation-hotspots",
   "dueDateUtc": null,
   "createdAtUtc": "2026-09-11T00:00:00Z",
-  "updatedAtUtc": "2026-09-12T06:57:30.6830537Z",
+  "updatedAtUtc": "2026-09-13T04:51:57.9747916Z",
   "completedAtUtc": null,
+  "revision": 2,
   "isArchived": false,
   "hasLoadError": false,
   "loadError": null,
-  "sourceFilePath": "tsk-0237-prove-sparse-candidate-region-sampling.json",
-  "revision": 1
+  "sourceFilePath": "tsk-0237-prove-sparse-candidate-region-sampling.json"
 }

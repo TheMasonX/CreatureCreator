@@ -81,15 +81,21 @@
       "author": "anonymous",
       "body": "Corroborated 2026-09-12 by the metaball pivot synthesis: \u0060docs/audits/creaturecreator-spore-metaball-pivot-and-appearance-synthesis-2026-09-12.md\u0060 (report \u0060CC-SYNTH-SPORE-PIVOT-20260912-A7E4D1\u0060), finding F-06.\n\nThe synthesis confirms GP-01 from \u0060creaturecreator-audit-generation-performance-lifecycle-2026-09-12.md\u0060: the scheduler starts every request immediately and rejects stale results only after the work completes. A ten-frame drag therefore produces ten costly generations even though nine can never be presented.\n\nNo new scope is created here. The level-of-detail task TSK-0225 will consume this scheduler and must not create a competing path. Two requests from TSK-0225 back into this task:\n1. Expose the bounded-scheduler counters from GP-03 (queued, active, cancelled, stale-completed) so the interactive tier can prove it coalesces.\n2. Confirm whether cancellation is required for the interactive tier or whether one-running plus one-pending is sufficient. TSK-0225 assumes the latter.\n\nNo code change made.",
       "createdAtUtc": "2026-09-12T06:24:44.9421382Z"
+    },
+    {
+      "id": "c-a6fb9dafe5b440aa9548ccda3b891ae7",
+      "author": "anonymous",
+      "body": "2026-09-12 task-board review: TSK-0250 (\u0022Make preview geometry ownership transactional and instance-safe\u0022) is now the bounded child owner for the generated-object ownership clause of this task (transactional registration/cleanup, instance-safe ownership, generated-Mesh lifetime). This task retains scheduler bounding, the request/result contract, and domain-reload policy. No scope was removed from this record.",
+      "createdAtUtc": "2026-09-13T04:51:57.8996925Z"
     }
   ],
   "epicId": null,
   "parentId": "tsk-0098-decompose-creatureeditorwindow-responsibilities",
   "dueDateUtc": null,
   "createdAtUtc": "2026-09-03T22:37:19.7381337Z",
-  "updatedAtUtc": "2026-09-12T06:24:44.9421382Z",
+  "updatedAtUtc": "2026-09-13T04:51:57.8996925Z",
   "completedAtUtc": null,
-  "revision": 10,
+  "revision": 11,
   "isArchived": false,
   "hasLoadError": false,
   "loadError": null,

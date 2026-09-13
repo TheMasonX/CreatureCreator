@@ -1,4 +1,4 @@
-{
+﻿{
   "id": "tsk-0249-latest-only-generation-scheduler",
   "key": "TSK-0249",
   "title": "Make preview generation scheduler latest-only and cancellable",
@@ -28,14 +28,21 @@
       "author": "ChatGPT",
       "body": "Current-head audit 2026-09-12: CreatureGenerationScheduler starts one uncancelled Task.Run per request and suppresses stale results only after work completes. EnqueueCaptured is also public and relies on caller-established detached-definition ownership. GenerationDiagnostics is mutable and can be externally supplied, so sharing one instance across concurrent requests would race its Lists. This is a concrete responsiveness/CPU/memory and API-contract problem; redesign is preferred over a tactical patch.",
       "createdAtUtc": "2026-09-12T19:56:00Z"
+    },
+    {
+      "id": "c-b24c0ff8cb024a88bdfef4f67fd45e37",
+      "author": "anonymous",
+      "body": "2026-09-12 task-board review: related scheduler task. TSK-0211 (\u0022Harden runtime preview ContextMenu scheduler lifecycle\u0022) owns the editor ContextMenu lifecycle that drives and disposes requests; this record owns the latest-only/cancellation execution policy. TSK-0104 owns the bounded async-request boundary (queued-work bounding, request/result contract, domain-reload policy). Keep those three roles separate; do not create a competing scheduler task.",
+      "createdAtUtc": "2026-09-13T04:52:41.0026342Z"
     }
   ],
   "epicId": null,
   "parentId": "TSK-0008",
   "dueDateUtc": null,
   "createdAtUtc": "2026-09-12T19:56:00Z",
-  "updatedAtUtc": "2026-09-13T04:34:05.7311046Z",
-  "revision": 2,
+  "updatedAtUtc": "2026-09-13T04:52:41.0026342Z",
+  "completedAtUtc": null,
+  "revision": 3,
   "isArchived": false,
   "hasLoadError": false,
   "loadError": null,

@@ -35,15 +35,21 @@
       "author": "anonymous",
       "body": "Audit synthesis 2026-09-12 (late) \u2014 external synthesis corroboration.\n\nSYN-04 (P1, 0.99) Confirmed: final implicit-surface skin weights are still authored at Unity bind time, not in generation. GeneratedCreatureData carries influence domains but not the final weights or the weighting policy identity, and the binding path calls ImplicitSurfaceWeightAuthoring.Author for production-generated data.\n\nCouncil Seat 4 (confidence 0.995) recommends: generation computes final VertexInfluence data exactly once; Unity binding only converts it to BoneWeight/bindpose arrays; keep LinearBlendSkinning.Deform as the mathematical oracle and compare the Unity SMR result to it.\n\nThis task owns that migration. Acceptance gates: identical weights before/after; identical rest-pose result; posed result equal within explicit tolerance; weighting-policy identity captured with the generated artifact. Related: TSK-0219 (layered revision identity) and TSK-0206 (Unity BoneWeight contract). Council ordering places this slice at position 2, after request/artifact identity (TSK-0095) and before duplicate-program consolidation (TSK-0248).",
       "createdAtUtc": "2026-09-13T04:35:13.9363327Z"
+    },
+    {
+      "id": "c-fd94865d4e5d45a8961a8930b005d844",
+      "author": "anonymous",
+      "body": "2026-09-12 task-board review: canonical implementation owner for the weighting pivot (implements TSK-0222). TSK-0147, TSK-0150, TSK-0168, TSK-0172, and TSK-0238 currently refine or diagnose the *legacy* closest-point-on-segment model. Choose one canonical owner before any legacy refinement proceeds. Disposition of those records requires a user decision because they carry STRICT user mandates. TSK-0238 is currently parented under TSK-0147 and must be re-evaluated once the pivot is decided.",
+      "createdAtUtc": "2026-09-13T04:52:04.3234439Z"
     }
   ],
   "epicId": null,
   "parentId": "TSK-0222",
   "dueDateUtc": null,
   "createdAtUtc": "2026-09-12T06:23:58.8681348Z",
-  "updatedAtUtc": "2026-09-13T04:35:13.9363327Z",
+  "updatedAtUtc": "2026-09-13T04:52:04.3234439Z",
   "completedAtUtc": null,
-  "revision": 3,
+  "revision": 4,
   "isArchived": false,
   "hasLoadError": false,
   "loadError": null,

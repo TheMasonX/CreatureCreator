@@ -72,14 +72,30 @@ Activating a group has been observed to trigger a forced recompile and a domain
 reload, which drops the bridge for tens of seconds. Activate every group you need
 once, early, then retry instead of re-activating.
 
+A reload can also switch exposed groups back off mid-session. Calls then fail
+with `... is currently disabled by the user`. Re-run the client-side activator
+for that group, then retry; a plain retry does not recover it.
+
+In VS Code, client-side `activate_*` tools expose a whole tool family. One
+example is `activate_unity_editor_management_toolkit`. These tools report which
+tools they switched on. They are separate from the Unity-side group state that
+`manage_tools` reports. Observed 2026-09-13 on server 10.2.0: `list_groups`
+reported `probuilder` as `enabled: false` while `manage_probuilder` still
+executed. A disabled flag did not block a call once the tool was exposed to the
+client.
+
 ## Batch and payload discipline
 
 - Use `batch_execute` for repeated or independent operations. It is far cheaper
-  than sequential calls. The default cap is 25 commands per batch.
+  than sequential calls. The default cap is 25 commands per batch; 24-command
+  batches ran reliably.
 - Put `"tool"` before `"params"` in every batch command. Name validation has
   been observed to fail flakily on valid commands otherwise; retry once on
   failure. See
   `docs/tasks/handoffs/2026-08-24-cc049-limb-blend-and-next-steps-handoff.md`.
+- A batch can abort mid-flight with `No Unity Editor instances found` when a
+  reload starts. Retry the whole batch, then verify what actually applied rather
+  than assuming a partial write.
 - Request metadata before properties. Never request a full property payload,
   preview, or thumbnail unless the task needs it.
 - Prefer a summary action before a detail action, and keep `page_size` small.
@@ -93,6 +109,70 @@ raise `page_size` to a large value to avoid pagination.
 
 Use screenshots to confirm a visual result, not to discover it. Cap
 `max_resolution` at 256-512 so the image stays cheap to read.
+
+Framing rules, all observed on server 10.2.0:
+
+- A single `screenshot` accepts `view_target` as a coordinate array. A
+  `screenshot_multiview` batch capture does not. It fails with
+  `view_target '[0, 1.8, 0]' not found for batch capture` and needs a GameObject.
+- After a batch capture, an array `view_target` stops resolving for later single
+  `screenshot` calls in the same session. Pass `view_position` plus
+  `view_rotation` instead, and compute the euler angles from the position and the
+  desired target.
+- `screenshot_multiview` auto-frames on the whole scene bounds and reports the
+  radius it chose. Inside an enclosed interior those bounds are wider than the
+  room. The four horizontal frames then sit outside the walls and render
+  blocked, so only the top and bird's-eye frames stay usable. Capture interior
+  angles one at a time with `view_position`.
+- A yaw of 180 degrees mirrors the screen-space X axis, so positive world X
+  appears on the left. Confirm the axis before reading placement from an image.
+- When the requested file name already exists, the tool writes a `_1` suffix
+  instead of overwriting.
+
+## Scene construction with ProBuilder
+
+`manage_probuilder` creates and edits ProBuilder meshes. Shape parameters and
+recipes are in
+[references/probuilder-and-materials.md](./references/probuilder-and-materials.md).
+Four facts cause most of the rework:
+
+- Shape creation uses a **centre pivot**: a cylinder of height `h` at position
+  `y` spans `y-h/2 .. y+h/2`. To put a disc top at `Y=0`, place it at `y = -h/2`.
+- A new shape has **no material** and renders magenta until `set_face_material`
+  runs.
+- A new shape has **no collider**. Add one with
+  `manage_components(action="add", component_type="MeshCollider")` when the
+  surface must be walkable.
+- `manage_probuilder` reads its arguments from the `properties` bag.
+  `set_face_material` with no `faceIndices` assigns every face.
+
+## Materials, emission, and transparency
+
+- `manage_material(action="create")` takes `material_path`, `shader`, and
+  `color`.
+- `manage_material` cannot enable a shader keyword. To make a surface emissive,
+  enable `_EMISSION` and write an HDR `_EmissionColor` through `execute_code`.
+- Emissive materials bloom only with a Bloom volume. Build one with
+  `volume_create_profile`, then `volume_create`, then `volume_add_effect`.
+  `volume_set_effect` requires a `parameters` dict; `properties` is rejected.
+- URP/Lit alpha blending needs a property bundle, not just an alpha colour. The
+  exact bundle is in the reference file.
+
+## Verification recipes
+
+Run these through `execute_code`. Each one caught a real fault during the
+Test-scene lab work.
+
+- **Bounds readback.** Confirm a placement assumption before building on it.
+  Print `Renderer.bounds` per object and compare against the intended extents.
+- **Intersection scan.** `Bounds.Intersects` between two named objects finds a
+  prop that overlaps another. This located a tank that physically intersected a
+  console, which a user reported as "stuck behind stuff".
+- **Null-material scan.** After a bulk create, count renderers whose
+  `sharedMaterial` is null. A non-zero count is the magenta objects.
+- **Feet-on-surface check.** Do not trust `SkinnedMeshRenderer.bounds` for a
+  generated or posed creature: it reported bind-pose extents. Read
+  `MeshFilter.sharedMesh.bounds` or `MeshCollider.bounds` instead.
 
 ## Console and compilation
 
@@ -118,7 +198,8 @@ receive the same mutation.
 
 | Symptom | Likely cause | Action |
 | --- | --- | --- |
-| Tool missing or reports disabled | Group not activated, or reset by a domain reload | Activate the group, retry once |
+| Tool missing or reports disabled | Group not activated, or reset by a domain reload | Re-run the `activate_*` tool, then retry |
+| `... is currently disabled by the user` | A reload switched the exposed groups off mid-session | Re-run the `activate_*` tool; a plain retry does not recover it |
 | `No Unity Editor instances found` | Bridge re-registering after a reload | Retry; do not re-activate groups |
 | `Unity is reloading; please retry` | Assembly reload or import in progress | Retry once the reload finishes |
 | `Timeout receiving Unity response` | Unity busy, for example search indexation | Retry the call |
@@ -144,7 +225,8 @@ call before the snippet runs. `GetInstanceID()` reported
 `Object.FindObjectsByType` and other current APIs.
 - `screenshot_multiview` auto-frames from `view_target` and was observed to
 ignore `orbit_distance` and `orbit_elevations`. Use `view_position` with
-`view_target` for an exact angle.
+  `view_rotation` for an exact angle: after a batch capture, an array
+  `view_target` no longer resolves.
 - A domain reload clears the Unity console, so an empty console is not evidence
 of a clean compile. Read `Logs/Editor.log` or re-run the check after readiness.
 - Creature preview roots and their rig bindings are editor session state, not
@@ -164,6 +246,9 @@ before deleting or posing a preview object.
 - Do not persist scene, triangle, vertex, or world data into DNA.
 - Do not commit, branch, or revert unrelated worktree changes as part of an MCP
   operation.
+- ProBuilder meshes serialize into the scene file. Do not hand-edit a scene to
+  change them, and expect `git diff --check` to flag trailing whitespace on the
+  serializer's empty `m_Data` lines for ProBuilder components.
 - Read [Assets/Scripts/README.md](../../../Assets/Scripts/README.md) before
   non-trivial editor work.
 

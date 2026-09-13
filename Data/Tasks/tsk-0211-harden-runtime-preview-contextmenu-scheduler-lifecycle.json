@@ -1,8 +1,8 @@
-{
+﻿{
   "id": "tsk-0211-harden-runtime-preview-contextmenu-scheduler-lifecycle",
   "key": "TSK-0211",
   "title": "Harden runtime preview ContextMenu scheduler lifecycle",
-  "description": "`CreatureRuntimePreview.Generate()` is exposed through `[ContextMenu(\"Generate Creature\")]`, but `_generationScheduler` is initialized only in `Awake()`. A manual edit-time ContextMenu invocation therefore deserves an explicit lifecycle contract: either ensure the scheduler is initialized before any public/manual Generate entry point, or explicitly prohibit ContextMenu generation outside a valid lifecycle and report a clear diagnostic. Verify how Unity invokes ContextMenu methods in the supported project workflow, add focused editor/manual coverage for the chosen contract, and preserve scheduler disposal/OnDestroy ownership. Do not create a second generation-scheduler abstraction; this is a narrow entry-point lifecycle hardening task.",
+  "description": "\u0060CreatureRuntimePreview.Generate()\u0060 is exposed through \u0060[ContextMenu(\u0022Generate Creature\u0022)]\u0060, but \u0060_generationScheduler\u0060 is initialized only in \u0060Awake()\u0060. A manual edit-time ContextMenu invocation therefore deserves an explicit lifecycle contract: either ensure the scheduler is initialized before any public/manual Generate entry point, or explicitly prohibit ContextMenu generation outside a valid lifecycle and report a clear diagnostic. Verify how Unity invokes ContextMenu methods in the supported project workflow, add focused editor/manual coverage for the chosen contract, and preserve scheduler disposal/OnDestroy ownership. Do not create a second generation-scheduler abstraction; this is a narrow entry-point lifecycle hardening task.",
   "type": "Bug Fix",
   "status": "Backlog",
   "priority": "Medium",
@@ -25,17 +25,25 @@
     {
       "id": "c-0211-audit-20260911",
       "author": "ChatGPT",
-      "body": "Audit evidence 2026-09-11: current source has `[ContextMenu(\"Generate Creature\")] public void Generate()` and `_generationScheduler = new CreatureGenerationScheduler()` only in `Awake()`. Static source inspection cannot prove Unity's exact edit-time invocation lifecycle, so this ticket records the boundary as a verification/hardening item rather than asserting a confirmed runtime defect. No source code was changed during the audit.",
+      "body": "Audit evidence 2026-09-11: current source has \u0060[ContextMenu(\u0022Generate Creature\u0022)] public void Generate()\u0060 and \u0060_generationScheduler = new CreatureGenerationScheduler()\u0060 only in \u0060Awake()\u0060. Static source inspection cannot prove Unity\u0027s exact edit-time invocation lifecycle, so this ticket records the boundary as a verification/hardening item rather than asserting a confirmed runtime defect. No source code was changed during the audit.",
       "createdAtUtc": "2026-09-11T22:30:00Z"
+    },
+    {
+      "id": "c-5a1a18571f5645ec812c4fe24e63667a",
+      "author": "anonymous",
+      "body": "2026-09-12 task-board review: related scheduler task. TSK-0249 (\u0022Make preview generation scheduler latest-only and cancellable\u0022) owns the scheduler\u0027s latest-only/cancellation policy. This record owns the runtime preview ContextMenu lifecycle that drives and disposes those requests. Keep the scheduler policy in TSK-0249 and the editor lifecycle in this record; do not create a third scheduler task.",
+      "createdAtUtc": "2026-09-13T04:52:40.9502107Z"
     }
   ],
   "epicId": null,
   "parentId": null,
+  "dueDateUtc": null,
   "createdAtUtc": "2026-09-11T22:30:00Z",
-  "updatedAtUtc": "2026-09-11T22:30:00Z",
+  "updatedAtUtc": "2026-09-13T04:52:40.9502107Z",
   "completedAtUtc": null,
+  "revision": 2,
   "isArchived": false,
   "hasLoadError": false,
-  "sourceFilePath": "tsk-0211-harden-runtime-preview-contextmenu-scheduler-lifecycle.json",
-  "revision": 1
+  "loadError": null,
+  "sourceFilePath": "tsk-0211-harden-runtime-preview-contextmenu-scheduler-lifecycle.json"
 }

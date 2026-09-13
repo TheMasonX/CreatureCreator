@@ -61,6 +61,9 @@ Load only the skill needed by the task:
   pagination limits, console checks, screenshots, and MCP error recovery.
 - [subagent-swarm](../skills/subagent-swarm/SKILL.md) for work spanning two or
   more independent layers. Use one agent for a focused slice.
+- [sprint-orchestration](../skills/sprint-orchestration/SKILL.md) for a sprint of
+  sequential subagent rounds: one bounded slice per round, each reviewed before
+  the next starts.
 - [council](../skills/council/SKILL.md) for high-impact architecture,
   requirement coverage, migration, audit, or sequencing decisions.
 - [cc-audit-synthesis](../skills/cc-audit-synthesis/SKILL.md) for audit
@@ -70,6 +73,12 @@ Load only the skill needed by the task:
 
 Do not load a skill only because it exists. Follow the skill's scope and stop
 when its completion criteria are met. Use the narrowest validation first.
+
+When coordinating a council, swarm, or sprint, load the
+[Agent Orchestration Contract](../instructions/agent-orchestration-contract.instructions.md):
+it owns the workflow handoff map, the shared repo contract, the assumption
+ledger, the blind-spot declaration, evidence provenance, and the
+validation-failure rollback protocol.
 
 ## Knowledge base queries (onboarding and context)
 

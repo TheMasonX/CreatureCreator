@@ -71,15 +71,21 @@
       "author": "anonymous",
       "body": "Ownership reconciliation 2026-09-12 by the four-seat council (\u0060docs/audits/creaturecreator-council-review-metaball-pivot-2026-09-12.md\u0060, finding C2).\n\nThis task owns the foot symptom directly and is STRICT (\u0022The foot is still being affected\u0022). Provenance verification found that four tasks now claim or touch the same symptom with no recorded supersession: \u0060TSK-0150\u0060 (this task), \u0060TSK-0147\u0060 (chain-aware domains, shipped as \u0060f7dd934\u0060), \u0060TSK-0201\u0060 (metaball-envelope binding proof, child of \u0060TSK-0147\u0060), and \u0060TSK-0224\u0060 (provenance-attributed weights).\n\nProposed resolution, pending the user\u0027s confirmation because this task is \u0060user-mandated\u0060:\n- Keep this task as the canonical owner of the **foot** symptom and its acceptance test.\n- Treat \u0060TSK-0224\u0060 as a capability task that may *feed* the fix, not as a competing owner of the symptom.\n- Record on \u0060TSK-0224\u0060 that it must not close this task\u0027s symptom independently.\n\nDo not restate or relax this task\u0027s mandate. Do not archive it. If the shipped \u0060TSK-0147\u0060 gate already resolves the foot symptom, close this task as fixed with that measurement attached, naming the test.\n\nNo code change made.",
       "createdAtUtc": "2026-09-12T06:33:14.1815497Z"
+    },
+    {
+      "id": "c-114dc15d90c04e6aa1c8510eca6e0055",
+      "author": "anonymous",
+      "body": "2026-09-12 task-board review: this record shares the foot/limb-weight symptom with TSK-0147, TSK-0168, TSK-0172, and TSK-0238. The forward owner is TSK-0222 (research) \u2192 TSK-0224 (attribution-based weights), which may replace the segment-distance mechanism this task refines. One canonical owner must be chosen before proceeding; disposition requires a user decision because this record carries a STRICT user mandate.",
+      "createdAtUtc": "2026-09-13T04:52:04.5691948Z"
     }
   ],
   "epicId": null,
   "parentId": "TSK-0077",
   "dueDateUtc": null,
   "createdAtUtc": "2026-09-07T07:30:52.1860927Z",
-  "updatedAtUtc": "2026-09-12T06:33:14.1815497Z",
+  "updatedAtUtc": "2026-09-13T04:52:04.5691948Z",
   "completedAtUtc": null,
-  "revision": 12,
+  "revision": 13,
   "isArchived": false,
   "hasLoadError": false,
   "loadError": null,

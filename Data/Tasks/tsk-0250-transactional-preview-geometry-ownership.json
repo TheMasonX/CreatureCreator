@@ -1,4 +1,4 @@
-{
+﻿{
   "id": "tsk-0250-transactional-preview-geometry-ownership",
   "key": "TSK-0250",
   "title": "Make preview geometry ownership transactional and instance-safe",
@@ -28,14 +28,21 @@
       "author": "ChatGPT",
       "body": "Current-head audit 2026-09-12: CreaturePreviewController stores root/geometry ownership in global SessionState keys. RegisterOwnedGeometry is called only after child GameObject setup completes, so exceptions can leak an unregistered object. Multiple controller instances share the same ownership key. Treat generated preview ownership as an instance-scoped transactional resource boundary.",
       "createdAtUtc": "2026-09-12T19:56:00Z"
+    },
+    {
+      "id": "c-2d0f6eca73f747199ce59fe97bcc7aef",
+      "author": "anonymous",
+      "body": "2026-09-12 task-board review: reparented under TSK-0104 (\u0022Bound async preview work and define generated Unity-object ownership\u0022), which explicitly owns the generated-Unity-object ownership boundary. This record is the bounded ownership slice and must not create a competing authority. Coordinate with TSK-0122 (Done: structural root ownership), TSK-0167 (duplicate rig/SMR components), and TSK-0211 (ContextMenu scheduler lifecycle).",
+      "createdAtUtc": "2026-09-13T04:51:57.826194Z"
     }
   ],
   "epicId": null,
-  "parentId": null,
+  "parentId": "tsk-0104-bound-async-preview-work-and-define-generated-unity-object-ownership",
   "dueDateUtc": null,
   "createdAtUtc": "2026-09-12T19:56:00Z",
-  "updatedAtUtc": "2026-09-13T04:34:05.7354444Z",
-  "revision": 2,
+  "updatedAtUtc": "2026-09-13T04:51:57.826194Z",
+  "completedAtUtc": null,
+  "revision": 4,
   "isArchived": false,
   "hasLoadError": false,
   "loadError": null,
