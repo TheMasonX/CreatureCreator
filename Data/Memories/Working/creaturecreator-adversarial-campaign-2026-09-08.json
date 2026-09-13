@@ -1,0 +1,11 @@
+{
+  "Id": "creaturecreator-adversarial-campaign-2026-09-08",
+  "Type": "WorkingMemory",
+  "Status": "Active",
+  "Content": "Adversarial CreatureCreator campaign anchored at 2026-09-08 05:03:25 UTC on branch audit/skeleton-animation-improvements-2026-09-07. Actual response-session elapsed was ~13m59s; the requested literal two-hour duration was not reached and must never be falsely reported. Expanded lenses used: runtime correctness, numerical robustness, architecture/design, ownership/aliasing/lifetime, performance/Burst/allocations, Unity/editor lifecycle, serialization/compatibility, testing/validation evidence, task/requirements integrity, API usability, security/robustness, documentation/consolidation, plus animation/skeleton/IK, mesh/geometry, and morphology/SDF specialist review. Confirmed fixes: ThicknessCurveAdapter clone delegates to CurveAdapter; SkinnedMeshBindingBuilder now enforces finite/unique/in-range/positive influence contracts; NumericValidity has Matrix4x4 finiteness; SkeletonSnapshot rejects non-finite frame data; PoseRotationResolver handles overflowed finite-coordinate deltas and malformed rest quaternion fallbacks; MeshExtractionResult rejects overflowed normal arithmetic; ResolvedBody rejects non-finite/non-positive radii; preview path avoids double definition cloning through scheduler EnqueueCaptured; scheduler tests cover failure, dispose, and post-dispose stale completion. TSK-0104 remains canonical owner for bounded/coalesced async work, request/result identity, request-scoped diagnostics, transactional Unity preview replacement, late-result cleanup, and domain reload. Known BodySplineAuthoring MinSpacingSqr unit mismatch remains under TSK-0139 rather than spawning a duplicate task. No fresh Unity execution was available; do not claim current post-change Unity suite success.",
+  "References": [
+    { "Label": "Campaign report", "Uri": "docs/audits/creaturecreator-adversarial-campaign-26-09-08-05-03-25.md" },
+    { "Label": "Expanded peer-review lenses", "Uri": "Data/Memories/Working/creaturecreator-expanded-peer-review-lenses.json" },
+    { "Label": "Async preview owner", "Uri": "Data/Tasks/tsk-0104-bound-async-preview-work-and-define-generated-unity-object-ownership.json" }
+  ]
+}

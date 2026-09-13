@@ -1,0 +1,113 @@
+{
+  "id": "tsk-0187-fix-rig-bone-selection-pivot-and-body-root-naming",
+  "key": "TSK-0187",
+  "title": "Fix rig bone selection pivots and rename body pelvis root",
+  "description": "Fix SceneView rig-bone manipulation so a selected generated bone has an explicit, correct manipulation pivot, and keep the compact body root semantic name as body_root. Unity 6.5 does not permit assignment to Tools.handlePosition. The branch now includes a dedicated editor rotation tool using Handles.RotationHandle at the selected bone's actual Transform.position. Overlay bone clicks must activate that tool because a bone GameObject may own/contain mesh-rendered descendants whose bounds can make Unity's normal Center-mode handle appear at an unrelated visual center. The normal Unity Rotate tool remains a fallback for ordinary objects.\n\nImplementation requirements: trace BoneSnapshot.Position through SkeletonInferrer/SkeletonSnapshot/CreatureRig; generated body/neck/limb transforms retain authoritative world-space positions; explicit rig-bone selection is single-object; overlay selection activates RigBoneRotateTool; the custom rotation handle is positioned from the selected bone Transform.position, respects Tools.pivotRotation Local/Global orientation, supports Undo, and leaves ordinary Unity objects unaffected; retain body_root naming consistently.\n\nAcceptance: selected rig bone has a dedicated rotation handle exactly at its Transform.position; local/global axis orientation matches Tools.pivotRotation; rotating one bone changes only the intended Transform and its hierarchy descendants; Undo restores the prior transform; normal Unity selections remain unaffected; no Tools.handlePosition assignment remains; body_root naming is complete; focused tests/build pass; live Unity SceneView verification confirms no eye/head pivot aliasing.",
+  "type": "Task",
+  "status": "InProgress",
+  "priority": "High",
+  "assigneeMode": "Custom",
+  "assigneeDirectoryId": null,
+  "assigneeCustomText": "Agent",
+  "reporter": "anonymous",
+  "labels": [
+    "editor",
+    "animation",
+    "bug"
+  ],
+  "attachments": [],
+  "externalLinks": [
+    {
+      "id": "l-5f29694abbcacdbeaeb59ffb265ddaa7",
+      "url": "https://github.com/TheMasonX/CreatureCreator/issues/10",
+      "label": "https://github.com/TheMasonX/CreatureCreator/issues/10",
+      "addedAtUtc": "2026-09-07T23:45:00.0000000Z"
+    }
+  ],
+  "linkedPages": [],
+  "comments": [
+    {
+      "id": "c-0136-round1-start",
+      "author": "anonymous",
+      "body": "ROUND 1 START. Reproduction was reviewed against the SceneView implementation. The affected overlay used Selection.activeGameObject only; the screenshot showed Center mode and a stale multi-object selection was a concrete root-cause candidate. The runtime rig path was independently checked so an editor fix could not conceal a bad Bone.Position / Transform.position.",
+      "createdAtUtc": "2026-09-07T23:45:00Z"
+    },
+    {
+      "id": "c-0136-round1-implementation",
+      "author": "anonymous",
+      "body": "ROUND 1 IMPLEMENTATION. SceneView bone clicks now explicitly replace Selection.objects with a one-element selection containing the clicked generated bone before activating it. The compact derived body root was renamed from body_pelvis / PelvisBoneId to body_root / BodyRootBoneId and existing layout/inferrer tests and debug labels were updated.",
+      "createdAtUtc": "2026-09-07T23:46:00Z"
+    },
+    {
+      "id": "c-0136-round1-peer",
+      "author": "anonymous",
+      "body": "ROUND 1 ADVERSARIAL PEER REVIEW. Confirmed the selection-center root cause and challenged coordinate-space and pose paths. Found and corrected stale PelvisBoneId test references and removed unused helpers. No runtime CreatureRig position/pose changes were justified.",
+      "createdAtUtc": "2026-09-07T23:47:00Z"
+    },
+    {
+      "id": "c-0136-round2-final",
+      "author": "anonymous",
+      "body": "ROUND 2 ADVERSARIAL REVIEW. Re-reviewed the complete delta. The selection fix was localized and did not change global Tools.pivotMode. Live Unity verification remained outstanding.",
+      "createdAtUtc": "2026-09-07T23:48:00Z"
+    },
+    {
+      "id": "c-0136-round5-user-repro",
+      "author": "anonymous",
+      "body": "ROUND 5 USER REPRO. User supplied Inspector/SceneView captures showing distinct bone local transforms and correct custom overlay bone positions, while the built-in Rotate handle remained visually anchored at the wrong point. Euler Inspector edits deform more plausibly, but generated Body skinning still shows stretching/smearing. This separates the editor handle issue from the skin-weight/deformation issue.",
+      "createdAtUtc": "2026-09-08T00:29:00Z"
+    },
+    {
+      "id": "c-0136-round5-tool",
+      "author": "anonymous",
+      "body": "ROUND 5 IMPLEMENTATION. Added RigBoneRotateTool, a Unity EditorTool using Handles.RotationHandle at the selected rig bone's world Transform.position, respecting local/global handle orientation and recording Undo.",
+      "createdAtUtc": "2026-09-08T00:31:00Z"
+    },
+    {
+      "id": "c-0136-round5-peer",
+      "author": "anonymous",
+      "body": "ROUND 5 ADVERSARIAL REVIEW. Unity 6 API supports EditorTool/OnToolGUI and Handles.RotationHandle; Tools.handlePosition is read-only. The tool is gated to one selected generated rig bone and does not modify PivotMode. Live interaction verification remains required.",
+      "createdAtUtc": "2026-09-08T00:32:00Z"
+    },
+    {
+      "id": "c-0136-round6-user-repro",
+      "author": "anonymous",
+      "body": "ROUND 6 USER REPRO. User supplied five SceneView/Inspector captures showing that the problematic bones have distinct Transform positions, while the eye/head mesh placement correlates with the incorrect standard Rotate handle center. Euler Inspector rotation is more plausible, confirming the underlying bone transforms are not identical. User reports the issue primarily affects BodyRoot -> segmented spine -> head where mesh-authored eye/head parts are present; other limb manipulations behave normally.",
+      "createdAtUtc": "2026-09-08T00:49:00Z"
+    },
+    {
+      "id": "c-0136-round6-analysis",
+      "author": "anonymous",
+      "body": "ROUND 6 ANALYSIS. The strongest explanation is that mesh-authored descendants are participating in Unity's built-in graphical Center-mode handle calculation even though the selected invisible bone Transform has the correct pivot. The existing custom RigBoneRotateTool is correct in principle, but overlay bone selection must explicitly activate it; otherwise Unity continues using the standard Transform tool. This is preferable to changing runtime bone placement or detaching mesh parts from their semantic bones.",
+      "createdAtUtc": "2026-09-08T00:51:00Z"
+    },
+    {
+      "id": "c-0136-round6-implementation",
+      "author": "anonymous",
+      "body": "ROUND 6 IMPLEMENTATION. RigDebugView bone clicks now activate RigBoneRotateTool immediately after collapsing the selection to the clicked generated bone. This makes the overlay's explicit bone manipulation target authoritative even when that bone owns mesh-rendered descendants. No runtime rig or skinning transforms were altered.",
+      "createdAtUtc": "2026-09-08T00:52:00Z"
+    },
+    {
+      "id": "c-0136-round6-peer",
+      "author": "anonymous",
+      "body": "ROUND 6 ADVERSARIAL REVIEW. Challenged whether the change would alter ordinary Unity selections, global pivot preferences, multiple rigs, or the runtime pose path. The activation is limited to overlay bone clicks; RigBoneRotateTool is itself restricted to exactly one selected generated rig bone. The change is editor-only and does not add per-frame runtime work. Remaining gate is live Unity verification that the R tool appears/activates and the handle coincides with the white joint instead of the eye/head renderer bounds.",
+      "createdAtUtc": "2026-09-08T00:53:00Z"
+    },
+    {
+      "id": "c-0187-key-reconcile-20260908",
+      "author": "anonymous",
+      "body": "Task-integrity reconciliation 2026-09-08: this distinct editor task previously collided with the parser grammar task under TSK-0136. The parser task remains canonical TSK-0136; this editor task is now physically stored under the TSK-0187 filename. Full history is preserved.",
+      "createdAtUtc": "2026-09-08T08:27:00-05:00"
+    }
+  ],
+  "epicId": null,
+  "parentId": null,
+  "dueDateUtc": null,
+  "createdAtUtc": "2026-09-07T23:45:00Z",
+  "updatedAtUtc": "2026-09-08T08:27:00-05:00",
+  "completedAtUtc": null,
+  "revision": 15,
+  "isArchived": false,
+  "hasLoadError": false,
+  "loadError": null,
+  "sourceFilePath": "tsk-0187-fix-rig-bone-selection-pivot-and-body-root-naming.json"
+}

@@ -1,0 +1,50 @@
+﻿{
+  "id": "tsk-0249-latest-only-generation-scheduler",
+  "key": "TSK-0249",
+  "title": "Make preview generation scheduler latest-only and cancellable",
+  "description": "Replace one uncancelled Task.Run per request with an explicit latest-request execution policy. Preserve newest-result-wins semantics while preventing stale requests from consuming full CPU and native-memory budgets when newer edits supersede them. Establish request-owned diagnostics so one GenerationDiagnostics instance cannot be concurrently mutated by multiple workers. Keep EnqueueCaptured as a narrow ownership-transfer seam or replace it with a safer internal/editor-specific capture API; do not make the detached-definition contract depend on convention alone.\n\n## Reconciliation\nRenumbered from TSK-0209 on 2026-09-12. This audit-derived record was allocated on top of a history that already contained TSK-0209 (consolidate preview material region assignment), so the key was double-held. TSK-0209 now resolves uniquely to tsk-0209-consolidate-preview-material-region-assignment. Mechanism: latest-only/cancellable preview scheduling with request-owned diagnostics (finding from current-head-hidden-defects-and-consolidation-council-audit-26-09-12-19-56-00 and round33-scheduler-confirm-2026-09-12; corroborated by creaturecreator-cc-audit-synthesis-26-09-12-17-34-00 SYN-07).",
+  "type": "Performance",
+  "status": "Backlog",
+  "priority": "High",
+  "assigneeMode": "Custom",
+  "assigneeDirectoryId": null,
+  "assigneeCustomText": "Unassigned",
+  "reporter": "ChatGPT",
+  "labels": [
+    "user-mandated",
+    "performance",
+    "generation",
+    "scheduler",
+    "cancellation",
+    "threading",
+    "architecture"
+  ],
+  "attachments": [],
+  "externalLinks": [],
+  "linkedPages": [],
+  "comments": [
+    {
+      "id": "c-chatgpt-20260912-0209-audit",
+      "author": "ChatGPT",
+      "body": "Current-head audit 2026-09-12: CreatureGenerationScheduler starts one uncancelled Task.Run per request and suppresses stale results only after work completes. EnqueueCaptured is also public and relies on caller-established detached-definition ownership. GenerationDiagnostics is mutable and can be externally supplied, so sharing one instance across concurrent requests would race its Lists. This is a concrete responsiveness/CPU/memory and API-contract problem; redesign is preferred over a tactical patch.",
+      "createdAtUtc": "2026-09-12T19:56:00Z"
+    },
+    {
+      "id": "c-b24c0ff8cb024a88bdfef4f67fd45e37",
+      "author": "anonymous",
+      "body": "2026-09-12 task-board review: related scheduler task. TSK-0211 (\u0022Harden runtime preview ContextMenu scheduler lifecycle\u0022) owns the editor ContextMenu lifecycle that drives and disposes requests; this record owns the latest-only/cancellation execution policy. TSK-0104 owns the bounded async-request boundary (queued-work bounding, request/result contract, domain-reload policy). Keep those three roles separate; do not create a competing scheduler task.",
+      "createdAtUtc": "2026-09-13T04:52:41.0026342Z"
+    }
+  ],
+  "epicId": null,
+  "parentId": "TSK-0008",
+  "dueDateUtc": null,
+  "createdAtUtc": "2026-09-12T19:56:00Z",
+  "updatedAtUtc": "2026-09-13T04:52:41.0026342Z",
+  "completedAtUtc": null,
+  "revision": 3,
+  "isArchived": false,
+  "hasLoadError": false,
+  "loadError": null,
+  "sourceFilePath": "tsk-0249-latest-only-generation-scheduler.json"
+}

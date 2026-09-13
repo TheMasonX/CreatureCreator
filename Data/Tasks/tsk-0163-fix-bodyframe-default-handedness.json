@@ -1,0 +1,27 @@
+{
+  "id": "tsk-0163-fix-bodyframe-default-handedness",
+  "key": "TSK-0163",
+  "title": "Fix BodyFrame default right-handedness",
+  "description": "Council multi-pass geometry review found that BodyFrame documents Binormal = Cross(Tangent, Normal), but BodyFrame.Default currently uses Tangent = +Z, Normal = +Y, Binormal = +X. Since +Z x +Y = -X, the empty/degenerate fallback frame is left-handed and disagrees with every transported frame. Fix the default frame to preserve the documented right-handed convention and add an empty-spline regression. Owner family: TSK-0024 BodyFrameResolver; this is a focused correctness follow-up, not a new frame abstraction. Unity execution is required before closure.",
+  "type": "Bug Fix",
+  "status": "Backlog",
+  "priority": "Medium",
+  "assigneeMode": "Custom",
+  "assigneeDirectoryId": null,
+  "assigneeCustomText": "Unassigned",
+  "reporter": "council-exhaustive-audit",
+  "labels": [
+    "council",
+    "body-frame",
+    "geometry",
+    "handedness",
+    "TSK-0024"
+  ],
+  "attachments": [],
+  "externalLinks": [],
+  "linkedPages": [],
+  "parentId": "tsk-0024-shared-bodyframeresolver-parallel-transport-body-frames",
+  "createdAtUtc": "2026-09-07T11:52:26.0000000Z",
+  "updatedAtUtc": "2026-09-07T11:52:26.0000000Z",
+  "revision": 1
+}

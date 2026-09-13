@@ -41,6 +41,13 @@ and during every non-trivial code change.
   and error reporting. Document the owner when the boundary is not obvious.
 - Treat duplicate tasks, duplicate identifiers, and duplicate documentation as
   integrity defects. Link to the canonical record instead of creating another.
+- Allocate a new task key against `main`'s current `Data/Tasks/` state, not just
+  the local branch's view. Keys assigned independently on diverging branches
+  collide. Evidence: `TSK-0136`->`TSK-0187`, `TSK-0172` renumbering, `TSK-0153`,
+  `TSK-0188`, `TSK-0189`. Creation must preflight every existing id and key, not
+  only the normalizer's repair path: the 2026-09-11 window produced nine
+  duplicate keys (`TSK-0197`..`TSK-0205`) from independent sessions that each
+  allocated the same next number (TSK-0213).
 
 ## CreatureCreator recurring traps
 
@@ -60,6 +67,13 @@ Task history identifies these local failure patterns. Check them explicitly:
   only after request identity, revision, and ownership checks. Dispose native
   buffers and generated Unity objects on success, failure, cancellation,
   replacement, and domain reload. Evidence: TSK-0079, TSK-0103, TSK-0104.
+- Watch specifically for the destroy-then-build shape: any method that clears or
+  destroys existing generated Unity objects and then performs a step that can
+  throw (binding, attachment, material resolution) before the replacement is
+  complete leaves no last-good state to fall back to. Build and validate the
+  replacement fully, then swap ownership, then dispose the prior generation.
+  Known instances: `CreaturePreviewController.ApplyPreviewGeometry`,
+  `CreatureRuntimePreview.Update` (TSK-0104).
 - Make malformed DNA total at validation and cloning boundaries. Duplicate IDs,
   null parts, missing parents, invalid roots, and non-finite values must produce
   defined issues or failures, not dictionary exceptions, garbage output, or
@@ -78,6 +92,29 @@ Task history identifies these local failure patterns. Check them explicitly:
 - Treat non-finite SDF values and culling as an explicit contract. Preserve the
   documented `+inf` outside/culled behavior and guard invalid program roots
   before Burst execution. Evidence: TSK-0066, TSK-0067, TSK-0068, TSK-0079.
+- Treat `[NativeDisableParallelForRestriction]` as a manual safety claim on par
+  with `unsafe`. It suppresses the Unity job-safety check that would otherwise
+  catch aliased writes, so every index a job writes must be proven disjoint
+  across the real parallel dimension (`workItemIndex`), not just within one loop
+  iteration. A per-work-item scratch buffer must include the work-item index in
+  its offset and be sized for the concurrent work-item set; a loop-local row
+  index that resets to `0` in every work item does not isolate scratch, even if
+  the job is renamed or re-batched. Evidence: `SdfSamplingRowBatchJob`
+  (`DensityGrid.cs`) still aliases `ScratchValues` across work items after a
+  14-seat council declared the race fixed (TSK-0212, TSK-0198).
+- When a per-vertex or per-sample decision must pick one owning part, bone, or
+  segment among nearby candidates, treat a hard cutover with no blend region as
+  known-risky at seams where the underlying geometry is smoothly connected. Two
+  existing instances (`ImplicitSurfaceWeightAuthoring` domain wall,
+  `PartAppearanceSampler` nearest-part color) both produce a visible
+  discontinuity at Body/limb seams. A new nearest-wins classifier must blend
+  across its own boundary or explicitly justify why not, rather than silently
+  repeating the pattern a third time.
+- Treat a task comment's claim about current code as a lead, not evidence.
+  Re-trace the call graph or reopen the cited source before relying on it,
+  especially before reopening or re-scoping work based on that claim. Evidence:
+  `TSK-0147`'s inaccurate "no call site consumes..." claim, corrected by a
+  direct call-graph trace.
 
 ## Intent and scope
 
@@ -100,7 +137,10 @@ applicable cases:
 - invalid input, empty input, missing references, and boundary values;
 - failure, cancellation, retry, disposal, and domain reload behavior;
 - deterministic output, repeat calls, and stale or out-of-order results;
-- observability at meaningful state transitions and failures.
+- observability at meaningful state transitions and failures;
+- for a validation, normalization, or safety script: its own inability to
+  process an input must surface as a reported failure, never a silently skipped
+  case.
 
 Use the repository's existing diagnostics and Unity console patterns. Do not add
 per-voxel or per-frame logging to pure runtime generation. For operations with

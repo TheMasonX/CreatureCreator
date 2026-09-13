@@ -1,0 +1,52 @@
+﻿{
+  "id": "tsk-0168-investigate-untouched-leg-deformation-unrelated-pose",
+  "key": "TSK-0168",
+  "title": "Investigate untouched leg deformation during unrelated pose",
+  "description": "## Summary\n\nInvestigate the separate symptom where an authored leg deforms inward when another, unrelated creature region is posed. This task does not reopen the confirmed mirrored-foot coupling fix owned historically by \u0060TSK-0150\u0060.\n\n## User Mandate\n\n\u003E I\u0027m not sure if the audit thought that the mirror foot was still being affected by the other limb, that\u0027s been confirmed fixed though. The leg warping is separate\n\nSTRICT. Treat mirrored-foot cross-limb coupling as confirmed fixed for the current user report. Investigate the untouched-leg deformation as a separate mechanism and do not fold it into the foot task without new evidence.\n\n## Scope\n\n- Reproduce the untouched-leg deformation on \u0060dinus_uprightus\u0060 or an equivalent curved-body generated creature.\n- Pose only unrelated bones, such as the tail or opposite body branch, and compare the leg\u0027s rest and posed vertex positions.\n- Inspect actual generated bone weights, influence domains, pose propagation, and Body-to-limb socket behavior before changing heuristics.\n- Distinguish skinning-weight coupling from pose-rotation, compact Body segmentation, or mesh-generation causes.\n- Coordinate shared influence-domain changes with \u0060TSK-0147\u0060, but keep this symptom\u0027s reproduction and acceptance criteria here.\n- Preserve \u0060TSK-0150\u0060 as historical provenance for the resolved mirrored-foot issue.\n\n## Acceptance Criteria\n\n- A focused fixture identifies the untouched leg vertex set and proves whether its geometry changes when only unrelated bones are posed.\n- The fixture distinguishes a weight-domain error from a pose propagation or rig topology error.\n- The generated creature is validated in Unity PlayMode, or the exact Unity blocker is recorded without claiming resolution.\n- Any implementation change has a focused regression test and preserves deterministic weights, rest-pose equivalence, and the four-influence limit.\n- The task is not closed based only on source inspection or on the historical mirrored-foot fix.\n\n## Validation\n\nRun the focused runtime binding and pose tests, the relevant runtime assembly build, and a Unity generated-creature PlayMode test. Capture the actual bone weights or baked mesh positions for the untouched leg. Record residual risk if the \u0060dinus_uprightus\u0060 fixture is unavailable.\n\n## Findings\n\nThe live-use report grouped the untouched-leg symptom with \u0060TSK-0150\u0060, but the user clarified that the mirrored foot is confirmed fixed and the leg warping is separate. Current source review can identify candidate paths in influence domains, pose application, and compact Body binding, but cannot establish the mechanism without the generated fixture.\n\n## Blockers\n\nThe live \u0060dinus_uprightus\u0060 generated session and a completed Unity reproduction are not available in this audit pass.\n\n## Next Step\n\nBuild the pose-isolation fixture first. Do not add a weighting heuristic until the measured deformation identifies the owning path.",
+  "type": "Bug Fix",
+  "status": "Ready",
+  "priority": "High",
+  "assigneeMode": "Custom",
+  "assigneeDirectoryId": null,
+  "assigneeCustomText": "Agent",
+  "reporter": "BeastMaster",
+  "labels": [
+    "runtime",
+    "animation",
+    "skinning",
+    "binding",
+    "weights",
+    "pose",
+    "rig",
+    "audit-synthesis",
+    "user-mandated"
+  ],
+  "attachments": [],
+  "externalLinks": [],
+  "linkedPages": [],
+  "comments": [
+    {
+      "id": "c-cc807a79fd1c40e99bfb0a4f4d70779f",
+      "author": "anonymous",
+      "body": "Created after the user\u0027s clarification that mirrored-foot coupling is fixed and the leg warp is separate. This task owns reproduction and mechanism identification; it must not add a weighting heuristic before a generated-creature pose-isolation fixture identifies the controlling path.",
+      "createdAtUtc": "2026-09-07T19:41:50.7904156Z"
+    },
+    {
+      "id": "c-6c008186703241d7b47d08d89a17d5b6",
+      "author": "anonymous",
+      "body": "Audit synthesis 2026-09-12 (CC-AUDIT-SKIN-20260912-1D83F0A4, CC-AUDIT-20260912-7A5E0C31 F-05): mandatory diagnosis protocol before any weight/radius tuning. The audit is explicit that the same \u0022untouched limb moves\u0022 symptom can originate from wrong influence classification, an over-broad Body influence radius, wrong pose rotation, wrong bindpose, actor/world-space mismatch, or a debug visualisation using the wrong coordinate space. Do not infer a weight bug from screenshots or source inspection.\n\nRequired experiment on a real generated creature:\n1. capture the top four influences for every affected vertex;\n2. visualise the dominant influence;\n3. pose one non-leg Body bone at a time;\n4. compare untouched-leg vertex displacement;\n5. compare the pure LBS oracle against the actual SMR result;\n6. classify the fault, then tune.\n\nAlso note: a debug/visualisation tool must be validated against a posed, non-identity state before it is trusted as evidence for diagnosing a different bug (RigDebugView mixed rest-space and posed-space coordinates in an earlier round).\n\nOwnership separation to preserve: TSK-0150 is the foot/domain isolation mechanism; this task is the untouched-limb deformation mechanism. The audit explicitly says these must not be folded together. Related: TSK-0172 (body smear), TSK-0194 (LBS parity failure cluster D).",
+      "createdAtUtc": "2026-09-12T05:54:43.5049112Z"
+    }
+  ],
+  "epicId": null,
+  "parentId": "TSK-0077",
+  "dueDateUtc": null,
+  "createdAtUtc": "2026-09-07T19:41:46.7343141Z",
+  "updatedAtUtc": "2026-09-12T05:54:43.5049112Z",
+  "completedAtUtc": null,
+  "revision": 3,
+  "isArchived": false,
+  "hasLoadError": false,
+  "loadError": null,
+  "sourceFilePath": "tsk-0168-investigate-untouched-leg-deformation-unrelated-pose.json"
+}

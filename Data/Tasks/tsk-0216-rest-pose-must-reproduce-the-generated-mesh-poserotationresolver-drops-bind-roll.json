@@ -1,0 +1,55 @@
+﻿{
+  "id": "tsk-0216-rest-pose-must-reproduce-the-generated-mesh-poserotationresolver-drops-bind-roll",
+  "key": "TSK-0216",
+  "title": "Rest pose must reproduce the generated mesh (PoseRotationResolver drops bind roll)",
+  "description": "## Summary\nThe skinned mesh deforms with no animation. At rest the rendered mesh must be identical to the generated mesh, because bind poses are the inverse of the rest frames and Unity deforms with \u0060\u03A3 w_i \u00B7 bones[i] \u00B7 bindPose[i] \u00B7 v\u0060. \u0060CreatureRig.ApplyPose(PosedSkeleton.FromRestPose(snapshot))\u0060 runs at generation, so the applied rig rotations come from \u0060PoseRotationResolver.ResolveIntoCompatible\u0060. That resolver re-derives each non-terminal bone\u0027s rotation with \u0060Quaternion.LookRotation(posedChildDirection, restUp)\u0060, which (a) cannot reproduce a bind rotation that carries roll and (b) is undefined for non-segment bones that have children. At rest the applied rotation therefore differs from the bind rotation and the mesh drifts.\n\n## User Mandate\n\u003E Here is the differences between the non-animated raw mesh and the unmodified animated mesh (straight out of the generation phase). Note that it moves a bit, especially the legs. I would think an unmodified animated model should stay exactly still. This is also the amount of squish that happens when the back moves, for reference.\n\nSTRICT. An unmodified (rest) animated model must match the generated mesh exactly.\n\n## Evidence (EditMode probe \u0060PoseRotationRestIdentityProbeTests\u0060)\n\u0060PoseRotationResolver.ResolveIntoCompatible(rest, FromRestPose(rest))\u0060 must reproduce \u0060rest[i].Rotation\u0060 for every bone.\n- Rest round trip for a canonical segment chain (\u0060Rotation = LookRotation(segmentDir, up)\u0060): PASSES.\n- \u0060RestRoundTrip_SegmentBoneWithRolledRotation\u0060: FAILS \u2014 \u0060seg0\u0060 bind \u0060Quaternion.Euler(0,30,0)\u0060 comes back 120\u00B0 off.\n- \u0060RestRoundTrip_NonSegmentBoneWithChild\u0060: FAILS \u2014 \u0060part_root\u0060 identity bind comes back 120\u00B0 off.\nMechanism: \u0060LookRotation\u0060 forces the baked forward onto the direction-to-child and re-derives roll, discarding the authored bind rotation.\n\n## Scope\n- Change \u0060PoseRotationResolver.ResolveIntoCompatible\u0060 so a bone at its rest position keeps its exact rest rotation.\n- Proposed: aim delta \u0060FromToRotation(restDirection, posedDirection) * restRotation\u0060, where both directions are measured between the bone and the same reference child in the REST vs POSED snapshots (segment continuation child, or primary child for non-segment bones). At rest the two directions are equal, so the delta is identity and the bind rotation is preserved; posed it still aims the bone at the child and preserves twist.\n- Keep terminal bones at their rest rotation. Keep the deterministic child selection.\n- No new DNA mutation path; runtime remains pure.\n\n## Acceptance Criteria\n- \u0060PoseRotationRestIdentityProbeTests\u0060 all pass.\n- Existing \u0060PoseRotationResolverTests\u0060 / \u0060CreatureRigTests\u0060 pose contracts still pass, or every intentional contract change is documented with evidence and surfaced to the user.\n- The rendered rest skinned mesh matches the generated mesh (PlayMode / manual check).\n\n## Related\n- TSK-0194 clusters C/D (LBS parity \u002B \u0060body_j2\u0060 fixture drift) \u2014 the same rest/bind mismatch shows up as SMR-vs-LBS-oracle vertex deltas.\n- TSK-0113 (PoseRotationResolver determinism), TSK-0119 (owns the pose contract tests per TSK-0194).\n- TSK-0215 (rig bone rotation snap) \u2014 sibling editor fix; not the cause of this drift.",
+  "type": "Bug",
+  "status": "Ready",
+  "priority": "High",
+  "assigneeMode": "Custom",
+  "assigneeDirectoryId": null,
+  "assigneeCustomText": "Agent",
+  "reporter": "anonymous",
+  "labels": [
+    "user-mandated",
+    "runtime",
+    "animation",
+    "skinning",
+    "pose",
+    "regression"
+  ],
+  "attachments": [],
+  "externalLinks": [],
+  "linkedPages": [],
+  "comments": [
+    {
+      "id": "c-7f98e5712bf34ab5969a909280f32660",
+      "author": "anonymous",
+      "body": "## Rest-pose identity fixed (2026-09-11)\n\n### Root cause\n\u0060PoseRotationResolver.ResolveIntoCompatible\u0060 rebuilt every non-terminal bone rotation with \u0060Quaternion.LookRotation(posedChildDirection, restUp)\u0060:\n- A bind rotation carrying roll cannot be reproduced by \u0060LookRotation\u0060 (roll is re-derived).\n- Non-segment bones that have children (part attachment bones such as eyes with pupils) have no segment direction at all.\n\n\u0060CreatureRig.ApplyPose(PosedSkeleton.FromRestPose(snapshot))\u0060 runs at generation, so those re-derived rotations were applied to the rig while the bind poses still described the authored rest frames. \u0060bones[i] != rest_i\u0060 breaks the skinning identity, so the rendered mesh deformed with no animation.\n\n### Fix\nSwing-from-rest aim delta:\n\u0060rotations[i] = Quaternion.FromToRotation(restDirection, posedDirection) * bone.Rotation\u0060,\nwhere both directions are measured between the bone and the **same** reference child (segment continuation child for segment bones, primary child otherwise) in the REST vs POSED snapshots. At rest the two directions are equal, the delta is identity, and the exact bind rotation is preserved. Posed, the bone still aims at the same child and keeps its authored roll. Degenerate/non-finite directions fall back to the bind rotation. \u0060ResolveLookRotation\u0060 was removed (dead after the change).\n\n### Evidence\nNew EditMode \u0060PoseRotationRestIdentityProbeTests\u0060 (3): a canonical segment chain already round-tripped; \u0060RestRoundTrip_SegmentBoneWithRolledRotation\u0060 and \u0060RestRoundTrip_NonSegmentBoneWithChild\u0060 failed by ~120\u00B0 before the fix and pass now.\n\nFull EditMode **164/164** (148 baseline \u002B 16 new).\n\n### Intentional contract change (surfaced)\nTwo existing assertions encoded the old force-align contract and were updated with documented rationale:\n- \u0060PoseRotationResolverTests.Resolve_ChildDirectionDrivesNonTerminalRotation\u0060: now asserts the swing on the bone\u0027s rest direction instead of on \u0060Vector3.forward\u0060.\n- \u0060PoseRotationResolverTests.Resolve_SegmentedChainUsesPosedContinuationChild\u0060: \u0060segment_1\u0060\u0027s geometric direction is unchanged between rest and posed, so it must keep its rest rotation.\n- \u0060CreatureRigTests.BuildAndApplyPose_...\u0060: a translation-only pose must not rotate a bone; asserts the bind rotation is preserved.\n\nFor real inferred skeletons the bind rotation is built as \u0060LookRotation(segmentDirection, up)\u0060, so forward == rest direction and behaviour is unchanged; only bind-inconsistent bones (the drift case) change.\n\n### Residual\n- The 3 pre-existing PlayMode skinning failures in \u0060CreatureSkinnedMeshRendererTests\u0060 are unchanged (identical vertex deltas). They compare the Unity SMR against an LBS oracle that consumes the same rotations, so they are a bind-pose/weights/Unity-SMR-semantics issue, not this resolver. Remain owned by TSK-0194 clusters C/D.\n- A PlayMode/manual check that the rendered rest mesh now matches the generated mesh is still outstanding (MCP cannot diff rendered meshes here).",
+      "createdAtUtc": "2026-09-12T05:05:57.4963431Z"
+    },
+    {
+      "id": "c-0748e8256100480e9a2e6fec70a92402",
+      "author": "anonymous",
+      "body": "## User confirmation (2026-09-12)\n\u003E Much better, both are confirmed fixed\n\nThe rendered rest mesh now matches the generated mesh (user-confirmed in the editor), and the rest-pose identity probe plus the full EditMode suite are green. Closing as Done on user acceptance. The 3 pre-existing PlayMode skinning failures remain owned by TSK-0194 clusters C/D.",
+      "createdAtUtc": "2026-09-12T05:13:23.2499333Z"
+    },
+    {
+      "id": "c-8c2a459566b7442faff138e284df8bf6",
+      "author": "anonymous",
+      "body": "Audit synthesis 2026-09-12 (late) \u2014 test-contract regression at HEAD fa76a44.\n\nHEAD commit fa76a44 (\u0022Add debug view and fix PoseRotationResolver tests\u0022) reverted the TSK-0216 contract assertions in Assets/Scripts/Tests/Runtime/PoseRotationResolverTests.cs while production Assets/Scripts/Runtime/Animation/Ik/PoseRotationResolver.cs still implements the swing-delta fix. Production last changed at 42aab9b: \u0060ResolveAimRotation = Quaternion.FromToRotation(restForward, posedForward) * restRotation\u0060 (PoseRotationResolver.cs:120-141).\n\nReverted assertions at HEAD:\n- :49 \u0060Assert.Greater(Vector3.Dot(rotations[\u0022root\u0022] * Vector3.forward, Vector3.up), 0.999f)\u0060\n- :184 \u0060Assert.Greater(Vector3.Dot(rotations[\u0022segment_1\u0022] * Vector3.forward, Vector3.right), 0.999f)\u0060\nBoth TSK-0216 explanatory comments were deleted in the same diff.\n\nDiscriminating check: run PlayMode \u0060PoseRotationResolverTests\u0060. Static algebra for :49 says the restored assertion cannot hold \u2014 the root\u0027s rest reference direction is \u002BX, its posed direction is \u002BY, and the root bind rotation is identity, so the rotation is FromToRotation(\u002BX,\u002BY) = \u002B90 deg about \u002BZ, which leaves Vector3.forward unchanged and gives dot(forward, up) = 0, not \u003E 0.999. The EditMode probe PoseRotationRestIdentityProbeTests still asserts the fixed rest-identity contract, so the contradiction is isolated to the PlayMode file.\n\nDisposition: reopened. TSK-0216 is user-mandated, so this synthesis surfaces the conflict instead of silently choosing a side: either restore the TSK-0216 test contract or revert the production swing-delta fix and re-document the contract. Unity was unavailable, so the failing assertion is a static prediction, not an executed result.",
+      "createdAtUtc": "2026-09-13T04:34:53.2103434Z"
+    }
+  ],
+  "epicId": null,
+  "parentId": null,
+  "dueDateUtc": null,
+  "createdAtUtc": "2026-09-12T04:59:38.9755215Z",
+  "updatedAtUtc": "2026-09-13T04:34:56.9411784Z",
+  "completedAtUtc": "2026-09-12T05:13:29.1327036Z",
+  "revision": 6,
+  "isArchived": false,
+  "hasLoadError": false,
+  "loadError": null,
+  "sourceFilePath": "tsk-0216-rest-pose-must-reproduce-the-generated-mesh-poserotationresolver-drops-bind-roll.json"
+}

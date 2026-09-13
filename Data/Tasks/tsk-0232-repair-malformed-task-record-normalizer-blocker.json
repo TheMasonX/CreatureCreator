@@ -1,0 +1,42 @@
+{
+  "id": "tsk-0232-repair-malformed-task-record-normalizer-blocker",
+  "key": "TSK-0232",
+  "title": "Repair malformed task record blocking fail-closed normalization",
+  "description": "## Summary\nRepair the malformed `tsk-0156-separate-skeleton-builder-from-mutable-bone-model.json` record so task-record normalization and collision repair can run to completion.\n\n## User Mandate\n> \"Review the latest audits and synthesize any further tasks that haven't been captured or otherwise find bugs based on the audits and enrich the task system\"\n\nSTRICT. Preserve the existing task's historical scope and do not hand-edit task JSON through the repository workflow.\n\n## Scope\n- Correct the invalid literal newline/escaping in the `TSK-0156` description through the supported MemorySmith task-record workflow.\n- Verify the record can be loaded without `hasLoadError`.\n- Run the fail-closed normalizer only after all task records parse, then verify the known key-collision repair path is reachable.\n\n## Acceptance Criteria\n- `TSK-0156` loads successfully and preserves its existing title, scope, status, and labels.\n- `Scripts/Normalize-TaskRecords.ps1` completes without skipping or silently ignoring invalid records.\n- Existing task-key collision checks execute and report their actual current disposition.\n- No `Data/Tasks/*.json` file is hand-edited.\n\n## Validation\nUse MemorySmith task get/list responses, run `Scripts/Normalize-TaskRecords.ps1` in its documented read/write-safe mode, run the repository task-record validation if available, and run `git diff --check`. Record any remaining malformed records as separate blockers rather than claiming board integrity.\n\n## Findings\n`docs/audits/delta-audit-skillfile-progress-2026-09-10-1.md` source-confirmed that `tsk-0156` contains an invalid literal newline in its JSON description. The newly fail-closed normalizer aborts before collision detection, leaving the task-board repair path blocked. This is task-system integrity work, distinct from runtime audit findings.\n\n## Blockers\nThe existing malformed record may be inaccessible to ordinary task update operations; use the supported MemorySmith repair/import path. Other malformed task records must be inventoried before claiming normalization complete.\n\n## Next Step\nQuery the task record by key, repair it through the supported MemorySmith workflow, then rerun normalization and record evidence.\n\n## Reconciliation\nRenumbered from TSK-0196 on 2026-09-12. This Rejected record is historical: the malformed tsk-0156 record it targets was repaired and the normalizer now parses every record. TSK-0196 now resolves uniquely to tsk-0196-short-circuit-nonfinite-limb-validation.",
+  "type": "Bug",
+  "status": "Rejected",
+  "priority": "Medium",
+  "assigneeMode": "Custom",
+  "assigneeDirectoryId": null,
+  "assigneeCustomText": "Agent",
+  "reporter": "BeastMaster",
+  "labels": [
+    "user-mandated",
+    "task-system",
+    "tooling",
+    "validation",
+    "audit-synthesis"
+  ],
+  "attachments": [],
+  "externalLinks": [],
+  "linkedPages": [],
+  "comments": [
+    {
+      "id": "c-5a6d96304ffd4d7f934b9a1550b592eb",
+      "author": "anonymous",
+      "body": "## Validation correction (2026-09-10)\nThe current executable normalizer parses the task set far enough to detect three identity collisions and does not fail on `TSK-0156` first. The Round 23 skill-file claim that malformed `TSK-0156` blocks collision repair is therefore not reproducible at this fixed point. Task rejected as stale/refuted; no task JSON was edited.",
+      "createdAtUtc": "2026-09-10T23:28:47.2892059Z"
+    }
+  ],
+  "epicId": null,
+  "parentId": null,
+  "dueDateUtc": null,
+  "createdAtUtc": "2026-09-10T23:08:22.3936873Z",
+  "updatedAtUtc": "2026-09-12T06:57:00.2296248Z",
+  "completedAtUtc": null,
+  "revision": 4,
+  "isArchived": false,
+  "hasLoadError": false,
+  "loadError": null,
+  "sourceFilePath": "tsk-0232-repair-malformed-task-record-normalizer-blocker.json"
+}

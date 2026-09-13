@@ -35,15 +35,27 @@
       "author": "anonymous",
       "body": "## Round 5 review evidence (2026-09-07)\n\n### Inventory and hypothesis check\nThe falsifiable hypothesis was that an existing harness could be extended minimally to measure both budgets without runtime changes. The discriminator does not support that conclusion yet: \u0060Assets/Scripts/Tests/Runtime/GenerateDataBenchmark.cs\u0060 is explicitly an opt-in TSK-0135/TSK-0008 generation benchmark. It reports VPU 10 and 16, 7 timed repetitions plus 1 discarded warmup, generation stage timings, and managed-heap deltas only; it does not exercise animation, an enabled \u0060SkinnedMeshRenderer\u0060, or rebind.\n\nExisting runtime tests provide a narrow pose check but not the TSK-0134 acceptance gate:\n- \u0060CreatureRigTests.ApplyPose_RepeatedCallsAllocateNoManagedMemoryAfterWarmup\u0060: 16 warmup calls, then 1,000 indexed \u0060ApplyPose\u0060 calls; asserts 0 managed bytes and logs elapsed milliseconds.\n- \u0060CreatureSkinnedMeshRendererTests.PerFrame_ApplyPose_AllocatesNoManagedMemory_AndDoesNotRebuildMesh\u0060: 8 warmup calls, then 1,000 indexed \u0060ApplyPose\u0060 calls; asserts 0 managed bytes, stable shared mesh, stable bone-weight count, and stable bindpose count.\n- The latter does not measure enabled renderer deformation/GPU cost, animation tick cost, scaling across small/medium/high bone and vertex counts, or bind/rebind latency/allocations.\n\nThe owning runtime split is already correct: \u0060CreatureRig.ApplyPose\u0060 owns the indexed hot path; \u0060CreatureSkinnedMeshRenderer.Bind\u0060 owns one-time weight authoring, bindpose/bone-weight construction, mesh copying, and replacement cleanup. No runtime behavior was changed and no second benchmark framework was added.\n\n### Exact gates\n- \u0060dotnet build ProceduralCreature.Runtime.csproj --no-restore\u0060: passed, exit 0.\n- \u0060dotnet build ProceduralCreature.Tests.Runtime.csproj --no-restore\u0060: passed, exit 0.\n- \u0060dotnet build ProceduralCreature.Editor.csproj --no-restore\u0060: passed, exit 0.\n- \u0060dotnet build ProceduralCreature.Tests.Editor.csproj --no-restore\u0060: passed, exit 0.\n- \u0060git status --short -- Assets/Scripts/Runtime/Animation Assets/Scripts/Tests/Runtime/GenerateDataBenchmark.cs\u0060: passed, no scoped changes.\n- \u0060git diff --check\u0060: not clean, exit 2 because of pre-existing trailing whitespace in \u0060Assets/Test.unity\u0060; this is outside TSK-0134 and was not modified.\n\n### Unity evidence\nNo Unity executable was found in the standard installation locations checked. Therefore no PlayMode benchmark, profiler capture, renderer/GPU measurement, allocation scaling data, or authoritative Unity test result was produced. Repository validation documentation identifies Unity \u00606000.0.35f1\u0060; test mode for this review is N/A because Unity was unavailable. The .NET builds above are compilation evidence only, not performance evidence.\n\n### Decision, blockers, residual risk\nDo not define measured numeric budgets or add a speculative harness in this round. Keep TSK-0134 Backlog. The next implementation should extend the existing opt-in benchmark pattern or add one focused TSK-0134 harness only after Unity is available, with separate workloads/repetitions for: (A) steady-state enabled SMR pose/deformation and (B) geometry rebind after replacement. It must report exact renderer/bone/vertex/influence counts, animation tick and \u0060ApplyPose\u0060 timing, managed allocations after warmup, rebind timing/allocations, and small/medium/high scaling. Residual risk: existing tests establish zero managed allocation for indexed pose application and no mesh rebuild, but do not establish the enabled renderer/GPU frame budget or rebind budget.",
       "createdAtUtc": "2026-09-07T06:11:10.8507625Z"
+    },
+    {
+      "id": "c-874d460418374727a4c07c9fef8744d4",
+      "author": "anonymous",
+      "body": "## Audit synthesis disposition (2026-09-10)\nKeep this task open as the sole performance evidence owner. Absorb F-11\u0027s per-solve \u0060Dictionary\u003Cstring, Vector3\u003E\u0060 allocation only after measurement, and F-12\u0027s missing bind/rebind budget for implicit weight authoring and mesh-array copying. Separate steady-state pose/skinning budget from generation/rebind budget; require Unity PlayMode/profiler evidence.",
+      "createdAtUtc": "2026-09-10T16:26:46.4490376Z"
+    },
+    {
+      "id": "c-b5e2df7a989f43569d0f948f6b4784a1",
+      "author": "anonymous",
+      "body": "2026-09-11 audit synthesis evidence (\u0060docs/audits/creaturecreator-round25-invisible-binding-cost-2026-09-11.md\u0060). \u0060GenerationStage\u0060 in \u0060Generation/GenerationDiagnostics.cs\u0060 only names \u0060GenerateData\u0060 stages; \u0060CreatureRuntimePreview\u0060/\u0060CreatureEditorWindow\u0060 then call \u0060BindImplicitSurfaceToRig\u0060 outside the timed scope, so \u0060TotalGeneration\u0060 cannot include domain resolution, weight authoring, rig bind, or the second skeleton pass. Add \u0060DomainResolution\u0060/\u0060WeightAuthoring\u0060/\u0060RigBind\u0060 (or equivalent) stages and instrument the bind path before defining the bind-time budget (F-12). Note \u0060CreatureRuntimePreview.cs:43\u0060 also constructs \u0060GenerationDiagnostics(collectTimings: false)\u0060. This measurement slice enables the \u0060TSK-0201\u0060/\u0060TSK-0202\u0060 comparisons; \u0060TSK-0202\u0060 (Body arc-length prefix cache) remains the highest-priority measured follow-up.",
+      "createdAtUtc": "2026-09-12T02:47:31.7779186Z"
     }
   ],
   "epicId": null,
   "parentId": "TSK-0077",
   "dueDateUtc": null,
   "createdAtUtc": "2026-09-06T19:15:13.3211971Z",
-  "updatedAtUtc": "2026-09-07T06:11:10.882126Z",
+  "updatedAtUtc": "2026-09-12T02:47:31.7779186Z",
   "completedAtUtc": null,
-  "revision": 4,
+  "revision": 6,
   "isArchived": false,
   "hasLoadError": false,
   "loadError": null,

@@ -1,0 +1,42 @@
+﻿{
+  "id": "tsk-0227-add-a-unity-mcp-operator-skill-adapted-from-the-upstream-mcp-for-unity-skills",
+  "key": "TSK-0227",
+  "title": "Add a unity-mcp operator skill adapted from the upstream MCP for Unity skills",
+  "description": "## Summary\nAdapt the upstream MCP for Unity skill set (\u0060CoplayDev/unity-mcp\u0060, \u0060.claude/skills\u0060) into this repository so agents can operate Unity correctly through MCP.\n\n## User Mandate\n\u003E \u0022Review the unity mcp skills in this repo [unity-mcp/.claude/skills at beta \u00B7 CoplayDev/unity-mcp \u00B7 GitHub](https://github.com/CoplayDev/unity-mcp/tree/beta/.claude/skills) and ensure we have the correct skills here too for interacting with unity via mcp\u0022\n\nSTRICT. Binding constraints:\n- Review the upstream skill set before writing anything.\n- Ensure this repository has equivalent, correct skills for MCP-driven Unity work.\n- Do not introduce skill content that misstates this workspace\u0027s tool surface.\n\n## Scope\n- Added \u0060.github/skills/unity-mcp-operator/SKILL.md\u0060 and \u0060references/mcp-surface.md\u0060.\n- Wired the skill into the \u0060.github/agents/BeastMaster.agent.md\u0060 graduated discovery list.\n- Upstream \u0060blender-to-unity\u0060 assessed not applicable: no Blender MCP is connected and CreatureCreator derives meshes from DNA.\n- Upstream \u0060mcp-source\u0060 captured as the package-source section of \u0060references/mcp-surface.md\u0060 instead of a separate skill.\n\n## Acceptance Criteria\n- A discoverable skill owns MCP call mechanics: readiness, resources, tool groups, batching, payload and pagination limits, console checks, screenshots, and error recovery.\n- Frontmatter is valid and the \u0060name\u0060 matches the folder.\n- The skill cross-links \u0060unity-validation\u0060 and does not duplicate its evidence policy.\n- Tool and resource names match the live workspace surface, or are explicitly marked version-dependent.\n- The agent discovery list references the new skill.\n\n## Validation\n- 2026-09-12: \u0060get_errors\u0060 clean on \u0060SKILL.md\u0060, \u0060references/mcp-surface.md\u0060, and \u0060BeastMaster.agent.md\u0060 after aligning table separators with the repo convention.\n- 2026-09-12: link targets exist: \u0060.github/skills/unity-validation/SKILL.md\u0060, \u0060Assets/Scripts/README.md\u0060, \u0060docs/tasks/handoffs/2026-08-24-cc049-limb-blend-and-next-steps-handoff.md\u0060, \u0060Packages/manifest.json\u0060.\n- 2026-09-12 live MCP evidence: console banner \u0060MCP-FOR-UNITY: StdioBridgeHost started on port 6401. (OS=WindowsEditor, server=10.1.2)\u0060; \u0060manage_script_capabilities\u0060 returned structured ops, text ops, \u0060max_edit_payload_bytes\u0060 262144, \u0060using_guard\u0060 true, \u0060get_sha\u0060 true.\n- No Unity runtime behavior changed, so no test run was required.\n\n## Findings\n- This workspace reaches gated tool groups through \u0060activate_*_tools\u0060 bridge tools; the upstream guide documents the older \u0060manage_tools(action=\u0022activate\u0022, group=...)\u0060 form. Recorded as drift rather than copied verbatim.\n- Repo-specific MCP mechanics (runtime test assembly not discovered by the runner, \u0060batch_execute\u0060 key-order flake, \u0060execute_code\u0060 group reset after domain reload) existed only in handoff narrative before this change.\n\n## Blockers\nNone.\n\n## Next Step\nAdd a dedicated \u0060mcp-source\u0060 skill only if package-source switching becomes routine.",
+  "type": "Task",
+  "status": "Done",
+  "priority": "Medium",
+  "assigneeMode": "Custom",
+  "assigneeDirectoryId": null,
+  "assigneeCustomText": "BeastMaster",
+  "reporter": "anonymous",
+  "labels": [
+    "agent",
+    "documentation",
+    "unity-mcp",
+    "skills",
+    "user-mandated"
+  ],
+  "attachments": [],
+  "externalLinks": [],
+  "linkedPages": [],
+  "comments": [
+    {
+      "id": "c-bde0a7a57630491b82d0e33881229abd",
+      "author": "anonymous",
+      "body": "Implementation evidence (2026-09-12)\n\nFiles added/changed:\n- \u0060.github/skills/unity-mcp-operator/SKILL.md\u0060 (new) \u2014 readiness gate, resource-first loop, tool groups, batch/payload discipline, pagination, screenshots, console gating, multi-instance routing, error-recovery table, repo gotchas, boundaries, completion criteria.\n- \u0060.github/skills/unity-mcp-operator/references/mcp-surface.md\u0060 (new) \u2014 resource URIs, activation map, directly available tools, \u0060manage_script_capabilities\u0060 snapshot, payload/paging rules, upstream drift note, package-source note.\n- \u0060.github/agents/BeastMaster.agent.md\u0060 \u2014 added the \u0060unity-mcp-operator\u0060 bullet to graduated discovery.\n\nUpstream review outcome (3 skills in \u0060CoplayDev/unity-mcp/.claude/skills\u0060):\n- \u0060unity-mcp-skill\u0060 \u2014 adapted. Upstream text is template-based and documents \u0060manage_tools(...)\u0060 plus direct \u0060manage_gameobject\u0060/\u0060manage_components\u0060/\u0060manage_camera\u0060/\u0060manage_ui\u0060/\u0060manage_packages\u0060/\u0060run_tests\u0060; this workspace gates those behind \u0060activate_*_tools\u0060. Recorded as drift instead of copying.\n- \u0060blender-to-unity\u0060 \u2014 not applicable. No Blender MCP tools are connected in this session and CreatureCreator meshes are procedural DNA outputs, not external model imports. No skill created; no scope silently dropped without note.\n- \u0060mcp-source\u0060 \u2014 reduced to a package-source section in the reference file, since \u0060Packages/manifest.json\u0060 pins \u0060com.coplaydev.unity-mcp\u0060 to \u0060...#main\u0060 and switching is a rare maintenance action. A full skill is deferred, not lost.\n\nChecks run:\n- \u0060get_errors\u0060: clean on all three files after switching to spaced table separators (repo convention, markdownlint MD060).\n- Path checks: \u0060.github/skills/unity-validation/SKILL.md\u0060, \u0060Assets/Scripts/README.md\u0060, \u0060docs/tasks/handoffs/2026-08-24-cc049-limb-blend-and-next-steps-handoff.md\u0060, \u0060Packages/manifest.json\u0060 all resolve.\n- Live MCP: console banner reports \u0060server=10.1.2\u0060; \u0060manage_script_capabilities\u0060 confirms the structured/text op sets and limits documented in the reference.\n\nResidual risk: the activation map is a snapshot of one session on MCP server 10.1.2. The reference file states this and points readers at the live tool list.",
+      "createdAtUtc": "2026-09-12T06:49:18.2475658Z"
+    }
+  ],
+  "epicId": null,
+  "parentId": null,
+  "dueDateUtc": null,
+  "createdAtUtc": "2026-09-12T06:49:12.547429Z",
+  "updatedAtUtc": "2026-09-12T06:49:20.3480239Z",
+  "completedAtUtc": "2026-09-12T06:49:20.3480239Z",
+  "revision": 3,
+  "isArchived": false,
+  "hasLoadError": false,
+  "loadError": null,
+  "sourceFilePath": "tsk-0227-add-a-unity-mcp-operator-skill-adapted-from-the-upstream-mcp-for-unity-skills.json"
+}

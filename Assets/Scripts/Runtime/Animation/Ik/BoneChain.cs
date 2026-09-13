@@ -58,6 +58,10 @@ namespace ProceduralCreature.Animation.Ik
                 {
                     throw new DomainException($"Bone '{chainBoneIds[i]}' was not found in the skeleton.");
                 }
+                if (!NumericValidity.IsFinite(bone.Position))
+                {
+                    throw new DomainException($"Bone '{chainBoneIds[i]}' has a non-finite rest position.");
+                }
                 positions[i] = bone.Position;
             }
             return positions;
@@ -74,7 +78,18 @@ namespace ProceduralCreature.Animation.Ik
             var lengths = new float[chainPositions.Length - 1];
             for (int i = 0; i < lengths.Length; i++)
             {
-                lengths[i] = Vector3.Distance(chainPositions[i], chainPositions[i + 1]);
+                if (!NumericValidity.IsFinite(chainPositions[i]) || !NumericValidity.IsFinite(chainPositions[i + 1]))
+                {
+                    throw new DomainException($"Chain positions {i} and {i + 1} must be finite.");
+                }
+
+                float length = Vector3.Distance(chainPositions[i], chainPositions[i + 1]);
+                if (!NumericValidity.IsFinite(length) || length <= 0f)
+                {
+                    throw new DomainException(
+                        $"Chain link {i} must have a finite positive length; got {length}.");
+                }
+                lengths[i] = length;
             }
             return lengths;
         }

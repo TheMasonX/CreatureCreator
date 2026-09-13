@@ -1,0 +1,21 @@
+{
+  "Id": "creaturecreator-council-code-health-2026-09-07",
+  "Content": "Current code-health truth after the 2026-09-07 council-style multi-pass review on branch audit/skeleton-animation-improvements-2026-09-07. No independently runnable /council subagent was exposed in this session, so review was simulated through separate architecture, API/ownership, correctness/determinism, testability, performance/simplicity, and adversarial peer-review hats. Findings were changed only after cross-checking for duplicate ownership and unintended semantic changes. Confirmed fixes: BodySpline.Clone and CreatureDefinition.Clone now share Common.CollectionCloneUtility.DeepClone, preserving null collection state and null elements rather than silently repairing malformed authoring state; GeometryItem.MaterialRegions now snapshots its input into a read-only collection; GeometryItem.VertexInfluences is now a deeply read-only nested collection with copied and read-only inner arrays. Confirmed existing current-state protections: LinearBlendSkinning enforces finite rest/posed frames and four-influence cap; PosedSkeleton rejects non-finite updates; CreaturePreviewController uses structural EntityId ownership; ResolvedBody/ResolvedLimb and SkeletonSnapshot detach resolved arrays/child lists. Intentional mutability: serialized palette Entries remain public authoring surfaces because editor code/tests mutate them directly; do not blanket-convert authoring DTOs to read-only APIs without a migration need. Task ownership: malformed clone behavior remains under TSK-0093; shared CollectionCloneUtility is aligned with the existing utility-consolidation family TSK-0094; generated output ownership remains under TSK-0125; Bone/Skeleton mutable-model migration remains TSK-0156; rest grounding remains TSK-0153; GeneratedCreatureData Colors remains TSK-0154; SkeletonSnapshot queue cleanup remains TSK-0155. Do not create duplicate tasks for these findings. Remaining design concern: PoseRotationResolver branch-frame selection is deterministic but semantically arbitrary; retain as a design note until locomotion requires a defined branch-frame policy. Unity validation was not performed at this HEAD, so tests added/changed in this round are not claimed as executed.",
+  "Type": "WorkingMemory",
+  "Status": "Active",
+  "References": [
+    { "Label": "Multi-pass council audit", "Uri": "docs/audits/creaturecreator-council-code-health-audit-26-09-07-06-33-12.md" },
+    { "Label": "BodySpline clone boundary", "Uri": "Assets/Scripts/Runtime/Definition/BodySpline.cs" },
+    { "Label": "CreatureDefinition clone boundary", "Uri": "Assets/Scripts/Runtime/Definition/CreatureDefinition.cs" },
+    { "Label": "Shared clone helper", "Uri": "Assets/Scripts/Runtime/Common/CollectionCloneUtility.cs" },
+    { "Label": "Generated output contract", "Uri": "Assets/Scripts/Runtime/Generation/GeneratedCreature.cs" },
+    { "Label": "TSK-0093 malformed-definition owner", "Uri": "Data/Tasks/tsk-0093-make-malformed-definition-validation-and-cloning-total.json" },
+    { "Label": "TSK-0156 skeleton builder migration", "Uri": "Data/Tasks/tsk-0156-separate-skeleton-builder-from-mutable-bone-model.json" },
+    { "Label": "TSK-0125 generated output owner", "Uri": "Data/Tasks/tsk-0125-harden-generatedcreature-output-contract-and-materialregion-submesh.json" }
+  ],
+  "Conflicts": [
+    "Older Working memories may describe GeneratedCreature.VertexInfluences as VertexInfluence[] arrays; current truth is nested read-only lists.",
+    "Older clone descriptions may imply Parts or BodySpline.Samples normalize null collections; current clone policy preserves null malformed collection state.",
+    "Older broad audits may still report LinearBlendSkinning finite/cap gaps, PosedSkeleton finite updates, or name-based preview ownership; those findings are stale on the current branch."
+  ]
+}

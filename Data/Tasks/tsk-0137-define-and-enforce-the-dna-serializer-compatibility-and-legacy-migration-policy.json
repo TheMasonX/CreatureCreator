@@ -2,34 +2,38 @@
   "id": "tsk-0137-define-and-enforce-the-dna-serializer-compatibility-and-legacy-migration-policy",
   "key": "TSK-0137",
   "title": "Define and enforce the DNA serializer compatibility and legacy-migration policy",
-  "description": "## Summary\nThe 2026-09-06 next-slice audit found two serializer-boundary policies are undocumented or silently lossy: legacy \u0060verticalOffset\u0060 migration clamps silently, and unknown JSON fields have an implicit open-content policy.\n\n## Scope\n- F-306 (P1 as audited): Legacy \u0060verticalOffset\u0060 migration routes through \u0060JsonDnaSerializer.cs:122-124\u0060 -\u003E \u0060CurveAdapter.FromLegacyOffset\u0060 which clamps to [-1,1] (\u0060CurveAdapter.cs:91\u0060) silently before validation. Choose and document a strict (reject) vs repair (clamp \u002B warn) vs versioned policy; add tests for -1/0/1/\u002B/-1.001/NaN/inf.\n- F-307 (P2): \u0060JsonDnaSerializer\u0060 reads via RequireField/TryGetValue with no unknown-member scan (\u0060JsonDnaSerializer.cs:493-580\u0060), giving implicit open content. Document open/closed/open-with-diagnostics policy and add one locking test.\n\n## Acceptance Criteria\n- The verticalOffset migration policy is explicit and non-silent; out-of-range/NaN/inf inputs have deterministic, tested behavior.\n- The unknown-member (open/closed) compatibility policy is documented and covered by a test.\n\n## Validation\nFocused JsonDnaSerializer/Runtime tests; dotnet Tests build clean. No Unity scene required.\n\n## Findings\nConfirmed at HEAD d3c7f12e. Owner TSK-0036 (migration impl) and TSK-0126 (IDnaSerializer seam) are Done; this is a net-new contract follow-up. See docs/audits/creaturecreator-audit-synthesis-2026-09-06-batch.md.\n\n## Blockers\nNone.\n\n## Next Step\nDecide policy with the owning slice, then implement \u002B test.",
+  "description": "The serializer boundary needs an explicit compatibility policy for legacy verticalOffset migration and unknown JSON members. The earlier verticalOffset concern remains open for policy selection: FromLegacyOffset still clamps finite out-of-range legacy values before normal validation, which may silently repair malformed legacy data. This task should decide strict rejection versus explicit repair/reporting, then lock the decision with tests for valid endpoints and finite out-of-range values. Non-finite legacy offsets are no longer admitted: FromLegacyOffset now rejects NaN and Infinity at the migration boundary. Unknown JSON members likewise need an explicit open/closed/open-with-diagnostics compatibility decision. The raw-control-character writer defect is separately completed under TSK-0164 and is no longer part of this task.",
   "type": "Task",
   "status": "Backlog",
   "priority": "Medium",
   "assigneeMode": "Custom",
   "assigneeDirectoryId": null,
-  "assigneeCustomText": "Agent",
+  "assigneeCustomText": "Unassigned",
   "reporter": "anonymous",
-  "labels": [
-    "audit-synthesis",
-    "serialization",
-    "migration",
-    "net-new",
-    "2026-09-06"
-  ],
+  "labels": ["audit-synthesis", "serialization", "migration", "compatibility", "2026-09-06"],
   "attachments": [],
   "externalLinks": [],
   "linkedPages": [],
-  "comments": [],
-  "epicId": null,
+  "comments": [
+    {
+      "id": "c-0137-control-char-split",
+      "author": "anonymous",
+      "body": "TSK-0164 now owns the CanonicalJsonWriter control-character implementation. This record retains only the still-unresolved legacy verticalOffset finite-range policy and unknown-field policy so task ownership is not duplicated.",
+      "createdAtUtc": "2026-09-08T10:40:00Z"
+    },
+    {
+      "id": "c-0137-nonfinite-guard",
+      "author": "anonymous",
+      "body": "Safe partial hardening landed: CurveAdapter.FromLegacyOffset rejects NaN and +/-Infinity rather than producing a non-finite AnimationCurve. Finite values outside [-1,1] remain historically clamped until the compatibility policy is explicitly decided. Added CurveAdapterMigrationTests covering NaN, Infinity, and preservation of the finite clamp behavior.",
+      "createdAtUtc": "2026-09-08T11:05:00Z"
+    }
+  ],
   "parentId": null,
-  "dueDateUtc": null,
   "createdAtUtc": "2026-09-06T22:44:12.7367527Z",
-  "updatedAtUtc": "2026-09-06T22:44:12.7367527Z",
+  "updatedAtUtc": "2026-09-08T11:05:00Z",
   "completedAtUtc": null,
-  "revision": 1,
+  "revision": 3,
   "isArchived": false,
   "hasLoadError": false,
-  "loadError": null,
-  "sourceFilePath": null
+  "sourceFilePath": "tsk-0137-define-and-enforce-the-dna-serializer-compatibility-and-legacy-migration-policy.json"
 }

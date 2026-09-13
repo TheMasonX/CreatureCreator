@@ -1,0 +1,28 @@
+{
+  "Id": "creaturecreator-council-exhaustive-audit-2026-09-07",
+  "Content": "Current truth after the 2026-09-07 100+ round council-style repository audit. The repo's .github/skills/council/SKILL.md was read directly. No separately invokable council subagent was exposed in this session, so the review used independent simulated seats: Runtime Generation, Editor Workflow, Serialization, Skeleton/IK, and Validation/Sequencing, followed by adversarial synthesis. 108 named rounds were performed as 18 waves x 6 rounds, revisiting the full system through rotating lenses rather than producing 50 superficial findings. Confirmed fixes in this wave: BodySpline.Clone and CreatureDefinition.Clone share CollectionCloneUtility.DeepClone and preserve null collection state; GeometryItem.MaterialRegions detaches its input collection; GeometryItem.VertexInfluences is deeply read-only; DefinitionCanonicalizer now rejects invalid CapsuleAxis instead of repairing it. Confirmed residuals: TSK-0156 mutable Bone/Skeleton model; TSK-0157 parser field-type/range strictness; TSK-0158 backing List/array leakage from GeneratedCreature.Geometry and CreatureSkinnedMeshRenderer.Bones; TSK-0159 mutable CreaturePart element aliasing through CreaturePartHierarchyIndex, requiring a semantic projection decision rather than blind deep-copying; TSK-0160 MeshExtractionResult topology-consuming methods assume valid topology; TSK-0161 canonicalizer non-repairing evidence; TSK-0162 SDF evaluator temporary NativeArray exceptional-path disposal. Existing intent was preserved: palette Entries remain mutable Unity authoring surfaces; deterministic branch-child choice remains a design note; global SDF influence radius remains a conservative performance concern; per-request GenerationDiagnostics allocation means no observed concurrency defect. Important current architecture: CreatureDefinition -> ResolvedCreatureSnapshot -> derived morphology/skeleton/geometry -> narrow Unity/editor presentation. Prefer consolidation, small shared utilities, structural ownership, immutable/read-only derived handoffs, and deletion/simplification over speculative abstractions. Unity validation was not run at final HEAD, so no new test execution is claimed.",
+  "Type": "WorkingMemory",
+  "Status": "Active",
+  "References": [
+    { "Label": "100+ round council audit", "Uri": "docs/audits/creaturecreator-council-exhaustive-50-plus-round-audit-26-09-07.md" },
+    { "Label": "Council skill", "Uri": ".github/skills/council/SKILL.md" },
+    { "Label": "Clone utility", "Uri": "Assets/Scripts/Runtime/Common/CollectionCloneUtility.cs" },
+    { "Label": "Canonicalization", "Uri": "Assets/Scripts/Runtime/Definition/DefinitionCanonicalizer.cs" },
+    { "Label": "Generated output", "Uri": "Assets/Scripts/Runtime/Generation/GeneratedCreature.cs" },
+    { "Label": "SDF evaluator", "Uri": "Assets/Scripts/Runtime/Morphology/Sdf/SdfProgram.cs" },
+    { "Label": "Hierarchy index", "Uri": "Assets/Scripts/Runtime/Definition/CreaturePartHierarchyIndex.cs" },
+    { "Label": "Mesh extraction result", "Uri": "Assets/Scripts/Runtime/Morphology/Extraction/MeshExtractionResult.cs" },
+    { "Label": "Residual task 0156", "Uri": "Data/Tasks/tsk-0156-separate-skeleton-builder-from-mutable-bone-model.json" },
+    { "Label": "Residual task 0157", "Uri": "Data/Tasks/tsk-0157-strict-json-field-type-and-attachment-validation.json" },
+    { "Label": "Residual task 0158", "Uri": "Data/Tasks/tsk-0158-seal-derived-output-collection-views.json" },
+    { "Label": "Residual task 0159", "Uri": "Data/Tasks/tsk-0159-clarify-hierarchy-index-element-ownership.json" },
+    { "Label": "Residual task 0160", "Uri": "Data/Tasks/tsk-0160-harden-mesh-extraction-result-topology-operations.json" },
+    { "Label": "Residual task 0161", "Uri": "Data/Tasks/tsk-0161-stop-canonicalizer-from-repairing-invalid-shape-axis.json" },
+    { "Label": "Residual task 0162", "Uri": "Data/Tasks/tsk-0162-dispose-sdf-evaluator-temp-buffer-on-exception.json" }
+  ],
+  "Conflicts": [
+    "Some historical audits describe read-only APIs as if IReadOnlyList alone were sufficient; current review treats actual backing-store ownership as the stronger contract.",
+    "Some historical hierarchy notes call the index a detached snapshot; current truth is that the collection is detached but the CreaturePart elements still alias the authoritative definition.",
+    "Archived audits may continue to report already-fixed skinning, preview ownership, parser grammar, diagnostics, and deterministic-order defects; those are stale relative to the current branch unless a specific regression reopens them."
+  ]
+}

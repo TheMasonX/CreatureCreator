@@ -1,0 +1,43 @@
+﻿{
+  "id": "tsk-0225-level-of-detail-tiers-and-generation-coalescing",
+  "key": "TSK-0225",
+  "title": "Add level-of-detail tiers and generation coalescing for creature preview and runtime",
+  "description": "## Summary\nAdd level-of-detail tiers to creature generation and remove the generations that cannot be presented. Generation currently runs every request at one quality level, and the scheduler starts every request immediately. Evidence: \u0060docs/audits/creaturecreator-spore-metaball-pivot-and-appearance-synthesis-2026-09-12.md\u0060, findings F-06, F-07, F-10, F-11, section 10. Corroborated by \u0060creaturecreator-audit-generation-performance-lifecycle-2026-09-12.md\u0060 findings GP-01 and GP-03.\n\nMeasured cost drivers: \u0060FieldSampling\u0060 is about 56% of total generation. Only about 13.3% of grid corners lie inside the root bound, and each of those scans about 250 operations. Recorded fixture baselines are about 97.5 ms at 10 voxels per unit and about 215.7 ms at 16 voxels per unit. These are environment-sensitive and must be re-measured.\n\n## Scope\n- Define three tiers. Interactive: coarse grid, render mesh only, no weight rebind, no appearance rebake, no collider. Committed: full grid, weights, appearance, deferred collider. Runtime L1 and L2: meshes derived from the committed mesh by decimation so UVs survive, with a reduced bone set.\n- Drive the runtime tiers from camera distance or an explicit caller request. Do not couple them to the editor.\n- Depend on TSK-0223 for exact per-blob culling. Exact compact-support bounds replace the CC-099 conservative envelope.\n- Derive a conservative drop rule from the summation form. A metaball may be dropped at a given grid resolution when its maximum contribution cannot raise the field to the surface threshold at any sample it can affect.\n- Extend the bounded scheduler from TSK-0104 rather than creating a competing path.\n- Add backpressure counters: queued, active, cancelled, stale-completed, and per-stage duration per GP-03.\n\n## Acceptance Criteria\n- An interactive drag produces at most one running generation and one replaceable pending generation.\n- Total time on the fixed \u0060GenerateDataBenchmark\u0060 fixture improves at 10 and 16 voxels per unit, with the before and after numbers recorded on the task.\n- Extraction is bit-identical with per-blob bucketing enabled and disabled.\n- Extraction is bit-identical with the provably dropped blob set removed at the same grid resolution.\n- Two identical generation requests produce the same committed mesh.\n- Runtime LOD meshes preserve UV0 and produce no visible seam at a tier transition.\n- No tier runs final-quality extraction during a pointer drag.\n\n## Validation\nUnity EditMode and PlayMode plus \u0060dotnet build\u0060. Use \u0060GenerateDataBenchmark\u0060 at 10 and 16 voxels per unit for total and per-stage timing. Record sample count per corner. Add the bucket-parity and drop-parity tests to the Runtime test assembly. Add a PlayMode test that enters an interactive tier and asserts the committed tier is not scheduled during the gesture. Source inspection alone cannot close this task.\n\n## Findings\n- No level-of-detail code exists today. No source file under \u0060Assets/Scripts\u0060 matches \u0060LOD\u0060.\n- Grid resolution is a first-order lever. The recorded fixture roughly doubles in total time from 10 to 16 voxels per unit.\n- Per-blob bucketing is the highest-value change because it attacks the dominant \u0060FieldSampling\u0060 share.\n- Re-extraction per level would need a new UV chart per level. Decimation from the committed mesh preserves UVs and is cheaper.\n- \u0060TSK-0008\u0060 remains the measurement gate. This task owns the design and the tiers, not the profiling instrumentation.\n\n## Blockers\n- TSK-0223 must land before exact per-blob bucketing and the drop rule can be implemented.\n- TSK-0226 must land before the UV-preserving decimation claim can be tested.\n\n## Next Step\nLand the bucket-parity test and the sample-per-corner measurement first. Then add the interactive tier and the coalescing bound.",
+  "type": "Task",
+  "status": "Backlog",
+  "priority": "High",
+  "assigneeMode": "Custom",
+  "assigneeDirectoryId": null,
+  "assigneeCustomText": "Agent",
+  "reporter": "anonymous",
+  "labels": [
+    "performance",
+    "generation",
+    "LOD",
+    "scheduler",
+    "metaball",
+    "rendering"
+  ],
+  "attachments": [],
+  "externalLinks": [],
+  "linkedPages": [],
+  "comments": [
+    {
+      "id": "c-35fcd65ebe8741af8824aa486752db9f",
+      "author": "anonymous",
+      "body": "Council re-scope 2026-09-12 (\u0060docs/audits/creaturecreator-council-review-metaball-pivot-2026-09-12.md\u0060, finding C7 and C9; gate G7).\n\nThis task is over-bundled and circular as written.\n\n1. **Circular dependency.** This task states it needs \u0060TSK-0226\u0060 for UV-preserving decimation, while \u0060TSK-0226\u0060 states it feeds this task. Break the cycle. The runtime decimated tier is deferred until \u0060TSK-0226\u0060 lands a charter. Remove the dependency from this task\u0027s blocking criteria and record it as a trigger instead.\n2. **Remove the duplicated acceptance criteria.** The bounded-scheduler criterion (\u0022at most one running and one replaceable pending generation\u0022) duplicates \u0060TSK-0104\u0060 verbatim and belongs there. The bucket-parity criterion duplicates \u0060TSK-0223\u0060. Keep only this task\u0027s own criteria.\n3. **Split into four owners.** (a) exact per-blob bucketing; (b) scheduler bound, which returns to \u0060TSK-0104\u0060; (c) coarse interactive tier; (d) runtime decimated tiers, deferred.\n4. **Bucketing is the performance lever, not compact support.** Seat 1 verified that \u0060EvaluateInto\u0060 loops over all operation indices up to the root, so today is \u0060O(inBound \u00D7 250)\u0060 and culling saves arithmetic but not loop trips. Bucketing makes it \u0060O(inBound \u00D7 bucketsTouched)\u0060. No bucketing measurement exists anywhere. Gate G7 requires extraction to be bit-identical with bucketing on and off, plus sample count per corner.\n5. **Resolve the budget dispute.** This task\u0027s cost model rests on 216.6 ms at 96\u00B3, while \u0060TSK-0147\u0060 recorded a live editor total of 707.4 to 798.8 ms (1314.8 cold) on the same preview. The unexplained 3 to 6 times gap must be resolved before the interactive tier is sized.\n6. **Add the memory budget** requested by Seat 2: per-corner top-K adds K channels to about 941k corners inside the 56% sampling stage. Tie the budget to \u0060TSK-0008\u0060.\n\nNo code change made.",
+      "createdAtUtc": "2026-09-12T06:33:31.2779776Z"
+    }
+  ],
+  "epicId": null,
+  "parentId": "TSK-0008",
+  "dueDateUtc": null,
+  "createdAtUtc": "2026-09-12T06:24:05.847001Z",
+  "updatedAtUtc": "2026-09-12T06:33:31.2779776Z",
+  "completedAtUtc": null,
+  "revision": 2,
+  "isArchived": false,
+  "hasLoadError": false,
+  "loadError": null,
+  "sourceFilePath": "tsk-0225-level-of-detail-tiers-and-generation-coalescing.json"
+}

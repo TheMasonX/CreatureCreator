@@ -1,0 +1,42 @@
+{
+  "id": "tsk-0186-harden-generated-mesh-assembly-resource-ownership",
+  "key": "TSK-0186",
+  "title": "Harden generated mesh assembly resource ownership",
+  "description": "Seven-seat ownership/lifecycle review found partial-failure leaks in CreatureMeshGenerator assembly. Assemble creates the implicit Unity Mesh before mesh-asset resolution/assembly can throw, and BuildMeshAssetItem creates an owned Mesh before appearance/material/influence construction can fail. Add transactional ownership transfer so newly created meshes are destroyed when assembly aborts, while returned GeometryItems retain ownership on success. Preserve existing output semantics and platform-safe Unity destruction behavior.\n\nCurrent implementation: BuildMeshAssetItem already used local ownership transfer for its individual generated mesh. Assemble now uses the same transactional model across the whole transient GeneratedCreature: the implicit mesh is nulled only after successful insertion, and any later exception destroys the transient output's already-created generated meshes as well as any not-yet-transferred local mesh. Source-level ownership coverage is therefore complete; automated/Unity execution remains an evidence gate rather than a completion prerequisite for the structural source fix.",
+  "type": "Bug Fix",
+  "status": "Done",
+  "priority": "High",
+  "assigneeMode": "Custom",
+  "assigneeDirectoryId": null,
+  "assigneeCustomText": "Agent",
+  "reporter": "council-seven-seat-audit",
+  "labels": ["council", "generation", "unity", "resource-lifetime", "ownership", "TSK-0095"],
+  "attachments": [],
+  "externalLinks": [],
+  "linkedPages": [],
+  "comments": [
+    {
+      "id": "c-20260908-generated-mesh-ownership",
+      "author": "council-seven-seat-audit",
+      "body": "Implemented transactional ownership in CreatureMeshGenerator.Assemble and BuildMeshAssetItem. Implicit mesh ownership transfers only after insertion into GeneratedCreature; accessory mesh ownership transfers only after GeometryItem construction succeeds. Failure paths destroy untransferred meshes. No automated or Unity execution was performed in this campaign.",
+      "createdAtUtc": "2026-09-08T04:52:00Z"
+    },
+    {
+      "id": "c-20260908-assembly-leak-followup",
+      "author": "anonymous",
+      "body": "Follow-up peer audit found the original transaction still leaked the implicit mesh when AppendMeshAssetItems failed after the implicit item had already been inserted: the ownership-transfer flag suppressed cleanup while the transient GeneratedCreature was abandoned. Corrected Assemble to retain the transient output for the duration of the transaction and destroy every generated GeometryItem mesh on failure, while separately cleaning an untransferred local mesh. This closes the partial-failure ownership gap identified by the current audit campaign.",
+      "createdAtUtc": "2026-09-08T19:20:18Z"
+    }
+  ],
+  "epicId": null,
+  "parentId": "tsk-0095-establish-concrete-generation-pipeline-stage-boundaries",
+  "dueDateUtc": null,
+  "completedAtUtc": "2026-09-08T19:20:18Z",
+  "createdAtUtc": "2026-09-08T04:52:00Z",
+  "updatedAtUtc": "2026-09-08T19:20:18Z",
+  "revision": 2,
+  "isArchived": false,
+  "hasLoadError": false,
+  "loadError": null,
+  "sourceFilePath": "tsk-0186-harden-generated-mesh-assembly-resource-ownership.json"
+}

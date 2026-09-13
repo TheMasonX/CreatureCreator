@@ -5,7 +5,8 @@ description: |
   Use when evaluating requirement-to-task coverage, architecture plans, audit
   reconciliation, generation strategy, editor workflow, or migration scope.
   Default to 3 seats plus a synthesizer. Produces a structured report with
-  seat-level findings, confidence, dissent, acceptance criteria, and evidence gates.
+  seat-level findings, evidence provenance, blind-spot declarations, dissent,
+  acceptance criteria, and evidence gates.
 argument-hint: 'Decision topic and scope, such as SDF generation or editor workflow alignment'
 user-invocable: true
 disable-model-invocation: false
@@ -18,7 +19,8 @@ disable-model-invocation: false
 Produce a council report that includes:
 
 - One-sentence decision statement
-- Seat-by-seat findings with confidence percentages and blocking concerns
+- Seat-by-seat findings with evidence provenance, a blind-spot declaration, and
+  blocking concerns
 - Explicit disagreement and dissent; do not flatten differences into consensus
 - Risks, assumptions, and open questions
 - Acceptance criteria and evidence gates before implementation
@@ -87,12 +89,30 @@ default seats cannot assess. Keep the default at three for ordinary reviews.
 Give every seat the same evidence pack and a distinct perspective. Each result
 must contain:
 
-- Findings supported by file, section, or test evidence
+- Findings supported by file, section, or test evidence, each tagged with how it
+  was obtained: `re-run`, `spot-checked`, or `report-only`
 - Risks if the finding is not addressed
 - Specific recommendations
-- Assumptions and open questions
-- Confidence from `0.0` to `1.0`
+- An assumption ledger (required when the decision touches transforms,
+  mirroring, SDF signs, quantization, extraction, or skeleton frames)
+- A blind spot declaration
 - Blocking concerns, if any
+
+```text
+- Assumed: <what you assumed> | Why: <basis> | If wrong: <impact> | Check: <test or inspection that would falsify it>
+- Cannot guarantee: <claim> without <file, test, measurement, or Unity run>.
+```
+
+Do not ask for or report a numeric confidence score. Seats default to a high
+self-assessment and the number carries no evidence.
+
+Keep the seats independent. Write each seat's findings before reading the next
+seat's, and do not let a later seat revise an earlier seat's finding. A seat
+that claims a defect is already handled must supply the discriminating test or
+exact static check that proves it. Agreement between seats is not evidence: a
+14-seat council recorded the SDF sampler scratch race as fixed, and the fix does
+not isolate scratch (`docs/audits/audit-sdf-sampler-race-2026-09-11.md`,
+`TSK-0212`, `TSK-0198`).
 
 For parallel work, use the [subagent-swarm](../subagent-swarm/SKILL.md) skill.
 Each seat must write its prompt, notes, evidence references, and result under
@@ -103,9 +123,17 @@ artifacts directly into source, task, or report files.
 
 Preserve material disagreement. Record which interpretation or assumption
 causes it and identify the evidence that would change the outcome. Do not make
-the synthesizer appear more certain than the seats justify.
+the synthesizer appear more certain than the seats justify. Every unresolved
+disagreement ends with either a discriminating check or an explicit user
+escalation.
 
 ### 5. Synthesize the Decision
+
+**Tie-breaking rule.** When seats disagree, do not average, blend, or soften
+their positions. Name the disagreement, define one concrete Unity test or
+explicit static check that would prove which seat is right, and make that check
+the prerequisite evidence gate for the work. If no check can discriminate, keep
+both options open and escalate the choice to the user rather than choosing one.
 
 Separate:
 
@@ -137,8 +165,21 @@ Run the MemorySmith task-record check per `task-tracker` after task edits
 ### 7. Record the Result
 
 Write the report to `docs/audits/` with a descriptive filename. Include every
-seat's findings, confidence, blocking concerns, dissent, acceptance criteria,
-open questions, and links to the evidence pack.
+seat's findings, evidence provenance, blind-spot declarations, blocking
+concerns, dissent and its resolution, the assumption ledger, acceptance
+criteria, open questions, and links to the evidence pack.
+
+### 8. Hand Off
+
+The report is the handoff artifact:
+
+- To `sprint-orchestration`: the acceptance criteria and evidence gates for each
+  resulting task, plus the report path to cite.
+- To `subagent-swarm`: the open questions and unverified claims as stream inputs.
+- To the user: any escalated disagreement that no check could discriminate.
+
+See the [orchestration contract](../../instructions/agent-orchestration-contract.instructions.md)
+for the workflow map and the shared repo contract.
 
 ## Decision Branches
 
@@ -152,6 +193,8 @@ open questions, and links to the evidence pack.
   source, serialization, topology, or editor evidence.
 - **Runtime/editor boundary risk**: keep the owning behavior in the correct
   assembly and add a compile or focused test gate before proceeding.
+- **Undecidable disagreement**: no available check can separate the seats. Keep
+  both options open, state the cost of each, and ask the user to choose.
 
 ## Completion Checks
 
@@ -159,8 +202,11 @@ A council review is complete only when:
 
 - The decision is explicit and one sentence
 - Evidence links are source-grounded
-- Each seat includes findings, confidence, and blocking concerns
+- Each seat includes findings, evidence provenance, an assumption ledger when
+  applicable, a blind-spot declaration, and blocking concerns
 - Dissent is visible
+- Every researched disagreement has a discriminating check or an explicit user
+  escalation, not an averaged position
 - Acceptance criteria are testable or reviewable
 - Omitted tests or benchmarks have an exception rationale and follow-up gate
 - Open questions have an owner or evidence gate
@@ -180,15 +226,22 @@ A council review is complete only when:
 - <document or source link>
 
 ## Findings
-| Seat | Recommendation | Confidence | Blocking concern |
-|---|---|---:|---|
-| <Seat Name> | ... | 0.85 | ... |
+| Seat | Recommendation | Evidence provenance | Blind spot | Blocking concern |
+|---|---|---|---|---|
+| <Seat Name> | ... | re-run / spot-checked / report-only | Cannot guarantee ... without ... | ... |
+
+## Assumption Ledger
+- Assumed: ... | Why: ... | If wrong: ... | Check: ...
 
 ## Synthesis
 <what changes now vs later>
 
 ## Dissent
 <unresolved disagreement and the evidence that would resolve it>
+
+| Disagreement | Discriminating check | Evidence gate |
+|---|---|---|
+| ... | ... | ... |
 
 ## Acceptance Criteria
 - <Unity, source, serialization, topology, or editor gate>
@@ -201,6 +254,7 @@ A council review is complete only when:
 
 - Prefer evidence over assumptions; trace claims to a file, section, or test.
 - Keep seat reviews independent until synthesis.
+- Do not buy agreement as evidence; require the discriminating check.
 - Make acceptance criteria executable or manually verifiable in Unity.
 - Preserve documented simplifications and validation gaps instead of silently
   expanding scope.
@@ -215,6 +269,7 @@ A council review is complete only when:
 
 ## References
 
+- [Agent Orchestration Contract](../../instructions/agent-orchestration-contract.instructions.md)
 - [Subagent Swarm](../subagent-swarm/SKILL.md)
 - [Task Tracker](../task-tracker/SKILL.md)
 - [Unity Validation](../unity-validation/SKILL.md)

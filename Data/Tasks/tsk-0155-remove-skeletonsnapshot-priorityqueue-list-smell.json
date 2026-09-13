@@ -1,0 +1,39 @@
+{
+  "id": "tsk-0155-remove-skeletonsnapshot-priorityqueue-list-smell",
+  "key": "TSK-0155",
+  "title": "Replace SkeletonSnapshot list priority queue with ordered set",
+  "description": "Remove the quadratic-looking RemoveAt(0) plus repeated Sort pattern from SkeletonSnapshot.Capture while preserving the exact deterministic bone ordering contract. This is a bounded implementation-quality improvement; it must not change semantic ordering or snapshot compatibility.\n\n## Scope\n- Replace pending List/BFS-style priority queue mechanics with a SortedSet ordered by the existing ordinal bone-ID comparer.\n- Preserve root validation, parent-before-child ordering, duplicate detection, cycle detection, and exact observable bone order.\n- Keep the snapshot public API unchanged.\n\n## Acceptance Criteria\n- No pending.RemoveAt(0) or whole-pending-list Sort remains in SkeletonSnapshot.Capture.\n- Existing deterministic ordering tests remain valid.\n- Parent indices remain strictly earlier than child indices.\n- No public API or semantic ordering changes are introduced.\n\n## Validation\n- Runtime and runtime-test builds pass.\n- Existing SkeletonSnapshot tests cover ordering, root contract, cycles, and parent-before-child behavior.\n- git diff --check passes.\n",
+  "type": "Task",
+  "status": "InProgress",
+  "priority": "Low",
+  "assigneeMode": "Custom",
+  "assigneeDirectoryId": null,
+  "assigneeCustomText": "Agent",
+  "reporter": "TheMasonX",
+  "labels": [
+    "runtime",
+    "skeleton",
+    "code-health",
+    "performance",
+    "determinism",
+    "audit-follow-up"
+  ],
+  "comments": [
+    {
+      "id": "c-20260907-snapshot-priorityqueue",
+      "author": "anonymous",
+      "body": "Takeover audit: confirmed SkeletonSnapshot.Capture used a List as a priority queue via pending[0], RemoveAt(0), AddRange, and repeated Sort. Replaced the pending structure with SortedSet<Bone> using the existing CompareBonesById ordering. This preserves the same next-bone selection policy while avoiding front-removal and whole-pending-list resorting. No public API change. Unity execution remains the final executable validation gate when available.",
+      "createdAtUtc": "2026-09-07T11:55:00Z"
+    }
+  ],
+  "epicId": "tsk-0077",
+  "parentId": null,
+  "dueDateUtc": null,
+  "createdAtUtc": "2026-09-07T11:55:00Z",
+  "updatedAtUtc": "2026-09-07T11:55:00Z",
+  "completedAtUtc": null,
+  "revision": 1,
+  "isArchived": false,
+  "hasLoadError": false,
+  "sourceFilePath": "tsk-0155-remove-skeletonsnapshot-priorityqueue-list-smell.json"
+}

@@ -1,0 +1,39 @@
+{
+  "id": "tsk-0158-seal-derived-output-collection-views",
+  "key": "TSK-0158",
+  "title": "Seal derived-output collection views against backing-store mutation",
+  "description": "Council multi-round audit found read-only-looking APIs that still exposed mutable backing collections through interface views. This work now covers GeneratedCreature.Geometry, CreatureSkinnedMeshRenderer.Bones, and CreatureRig.IndexedBones.\n\nScope: return actual read-only wrappers/snapshots, add regression coverage for cast-based mutation, preserve ordering and object identity, and keep runtime/editor ownership unchanged. Coordinate with TSK-0125 (GeneratedCreature), TSK-0132 (skinned adapter), and the indexed-rig contract.\n\nImplemented in current branch: GeneratedCreature.Geometry now uses a cached ReadOnlyCollection; CreatureSkinnedMeshRenderer.Bones now uses a cached read-only view; CreatureRig.IndexedBones now uses a cached read-only view. Focused generated-output ownership coverage includes nested influence collections and GeneratedCreature.Geometry. Remaining gap: focused CreatureRig/renderer cast-mutation regression and Unity execution.\n\nValidation gate: runtime build plus focused ownership tests; Unity execution required before closure.",
+  "type": "Bug Fix",
+  "status": "InProgress",
+  "priority": "Medium",
+  "assigneeMode": "Custom",
+  "assigneeDirectoryId": null,
+  "assigneeCustomText": "Agent",
+  "reporter": "council-exhaustive-audit",
+  "labels": [
+    "council",
+    "api-contract",
+    "immutability",
+    "animation",
+    "generation",
+    "TSK-0125",
+    "TSK-0132"
+  ],
+  "attachments": [],
+  "externalLinks": [],
+  "linkedPages": [],
+  "comments": [
+    {
+      "id": "c-ownership-20260907",
+      "author": "council-exhaustive-audit",
+      "body": "Implemented current-scope ownership hardening at HEAD lineage: GeneratedCreature.Geometry, CreatureSkinnedMeshRenderer.Bones, and CreatureRig.IndexedBones now expose cached read-only wrappers rather than backing collections. No Unity validation performed yet; task remains InProgress.",
+      "createdAtUtc": "2026-09-07T12:30:00Z"
+    }
+  ],
+  "parentId": "tsk-0125-harden-generatedcreature-output-contract-and-materialregion-submesh",
+  "dueDateUtc": null,
+  "isArchived": false,
+  "createdAtUtc": "2026-09-07T11:38:21.0000000Z",
+  "updatedAtUtc": "2026-09-07T11:38:21.0000000Z",
+  "revision": 1
+}

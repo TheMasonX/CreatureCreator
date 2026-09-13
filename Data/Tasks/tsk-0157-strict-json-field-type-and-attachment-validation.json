@@ -1,0 +1,30 @@
+{
+  "id": "tsk-0157-strict-json-field-type-and-attachment-validation",
+  "key": "TSK-0157",
+  "title": "Tighten remaining JSON field-type and attachment validation",
+  "description": "Council multi-round audit residual under existing parser owner TSK-0136. Confirmed issues in JsonDnaSerializer.cs: schemaVersion/noiseSeed use direct double-to-int casts instead of explicit integral/range validation; generic enum parsing accepts numerically represented enum names such as \"999\" unless Enum.IsDefined is checked; meshGeometry.attachment is silently ignored when present with a non-object, non-null value. These should become deterministic DnaDeserializationException failures without changing valid canonical DNA.\n\nScope: add strict integer helper(s), require defined enum values, reject malformed present attachment values, and add focused parser/serializer regressions. Keep all behavior parser-level; do not move semantic validation into DefinitionValidator.\n\nParent owner: TSK-0136. Do not create another parser task.\n\nValidation gate: runtime build plus focused MiniJsonReader/JsonDnaSerializer tests and committed-DNA load sweep. Unity execution is required before closure.",
+  "type": "Bug Fix",
+  "status": "Backlog",
+  "priority": "Medium",
+  "assigneeMode": "Custom",
+  "assigneeDirectoryId": null,
+  "assigneeCustomText": "Unassigned",
+  "reporter": "council-audit",
+  "labels": [
+    "council",
+    "serialization",
+    "parser",
+    "robustness",
+    "TSK-0136"
+  ],
+  "attachments": [],
+  "externalLinks": [],
+  "linkedPages": [],
+  "comments": [],
+  "parentId": "tsk-0136-harden-the-minijsonreader-json-grammar-with-a-dedicated-reader-test-fixture",
+  "dueDateUtc": null,
+  "isArchived": false,
+  "createdAtUtc": "2026-09-07T11:38:16.0000000Z",
+  "updatedAtUtc": "2026-09-07T11:38:16.0000000Z",
+  "revision": 1
+}

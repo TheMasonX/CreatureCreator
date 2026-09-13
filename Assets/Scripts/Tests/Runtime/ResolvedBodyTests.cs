@@ -7,11 +7,6 @@ using ProceduralCreature.Morphology;
 
 namespace ProceduralCreature.Tests.Runtime
 {
-    /// <summary>
-    /// CC-056A resolved Body geometry contract (canonical derived morphology,
-    /// increment B). Runtime assembly — invoke via the PlayMode runner or
-    /// execute_code, not the EditMode MCP runner.
-    /// </summary>
     [TestFixture]
     public class ResolvedBodyTests
     {
@@ -26,7 +21,6 @@ namespace ProceduralCreature.Tests.Runtime
 
         private static BodySpline BentSpline()
         {
-            // Unequal segments: 1.0 then sqrt(0.25 + 4) = sqrt(4.25).
             var spline = new BodySpline();
             spline.Samples.Add(new BodySample { Id = 1, Position = new Vector3(0f, 0f, 0f), Radius = 1f });
             spline.Samples.Add(new BodySample { Id = 2, Position = new Vector3(0f, 0f, 1f), Radius = 1f });
@@ -52,8 +46,7 @@ namespace ProceduralCreature.Tests.Runtime
             Assert.AreEqual(1f, resolved.NormalizedArcLengthAtSample[2], 1e-6f);
             Assert.AreEqual(Vector3.zero, resolved.RootSocket);
             Assert.AreEqual(new Vector3(0f, 0f, 2f), resolved.TerminalSocket);
-            Assert.AreSame(resolved.Centerline, resolved.SamplePositions,
-                "The v1 centerline IS the sample polyline (CC-055 decision pending).");
+            Assert.AreSame(resolved.Centerline, resolved.SamplePositions);
             Assert.AreEqual(0.8f, resolved.SampleRadii[1], 1e-6f, "Radii are copied verbatim.");
         }
 
@@ -83,13 +76,9 @@ namespace ProceduralCreature.Tests.Runtime
             Assert.AreEqual(first.TotalLength, second.TotalLength, 1e-6f);
             for (int i = 0; i < first.SamplePositions.Count; i++)
             {
-                Assert.AreEqual(first.SamplePositions[i], second.SamplePositions[i],
-                    $"sample {i} position is deterministic");
-                Assert.AreEqual(first.SampleRadii[i], second.SampleRadii[i], 1e-6f,
-                    $"sample {i} radius is deterministic");
-                Assert.AreEqual(first.NormalizedArcLengthAtSample[i],
-                    second.NormalizedArcLengthAtSample[i], 1e-6f,
-                    $"sample {i} arc length is deterministic");
+                Assert.AreEqual(first.SamplePositions[i], second.SamplePositions[i]);
+                Assert.AreEqual(first.SampleRadii[i], second.SampleRadii[i], 1e-6f);
+                Assert.AreEqual(first.NormalizedArcLengthAtSample[i], second.NormalizedArcLengthAtSample[i], 1e-6f);
             }
         }
 
@@ -99,26 +88,19 @@ namespace ProceduralCreature.Tests.Runtime
             BodySpline spline = StraightSpline();
             ResolvedBody resolved = ResolvedBody.Resolve(spline);
 
-            // Mutate the source after resolution; the snapshot must retain the
-            // original values (Resolve copies its input arrays).
             spline.Samples[0].Position = new Vector3(99f, 0f, 0f);
             spline.Samples[1].Radius = 99f;
 
-            Assert.AreEqual(2f, resolved.TotalLength, 1e-6f,
-                "Snapshot total length is immune to later source mutation.");
-            Assert.AreEqual(Vector3.zero, resolved.SamplePositions[0],
-                "Snapshot position is immune to later source mutation.");
-            Assert.AreEqual(0.8f, resolved.SampleRadii[1], 1e-6f,
-                "Snapshot radius is immune to later source mutation.");
-            Assert.AreEqual(0.5f, resolved.NormalizedArcLengthAtSample[1], 1e-6f,
-                "Snapshot arc length is immune to later source mutation.");
+            Assert.AreEqual(2f, resolved.TotalLength, 1e-6f);
+            Assert.AreEqual(Vector3.zero, resolved.SamplePositions[0]);
+            Assert.AreEqual(0.8f, resolved.SampleRadii[1], 1e-6f);
+            Assert.AreEqual(0.5f, resolved.NormalizedArcLengthAtSample[1], 1e-6f);
         }
 
         [Test]
         public void Resolve_ExposesReadOnlyCollections()
         {
             ResolvedBody resolved = ResolvedBody.Resolve(StraightSpline());
-
             IList<Vector3> positions = resolved.SamplePositions as IList<Vector3>;
             IList<float> radii = resolved.SampleRadii as IList<float>;
 
@@ -139,7 +121,7 @@ namespace ProceduralCreature.Tests.Runtime
         [Test]
         public void Resolve_NullSampleList_ThrowsDomainException()
         {
-            Assert.Throws<DomainException>(() => ResolvedBody.Resolve((System.Collections.Generic.IReadOnlyList<BodySample>)null));
+            Assert.Throws<DomainException>(() => ResolvedBody.Resolve((IReadOnlyList<BodySample>)null));
         }
 
         [Test]
@@ -159,13 +141,57 @@ namespace ProceduralCreature.Tests.Runtime
         }
 
         [Test]
+        public void Resolve_RejectsNonFiniteBodyRadius()
+        {
+            var spline = new BodySpline();
+            spline.Samples.Add(new BodySample { Id = 1, Position = Vector3.zero, Radius = float.NaN });
+
+            Assert.Throws<DomainException>(() => ResolvedBody.Resolve(spline));
+        }
+
+        [Test]
+        public void Resolve_RejectsNonPositiveBodyRadius()
+        {
+            var spline = new BodySpline();
+            spline.Samples.Add(new BodySample { Id = 1, Position = Vector3.zero, Radius = 0f });
+
+            Assert.Throws<DomainException>(() => ResolvedBody.Resolve(spline));
+        }
+
+        [Test]
+        public void TryResolve_InvalidRadiusReturnsFalseWithoutThrowing()
+        {
+            var spline = new BodySpline();
+            spline.Samples.Add(new BodySample { Id = 1, Position = Vector3.zero, Radius = float.PositiveInfinity });
+
+            Assert.IsFalse(ResolvedBody.TryResolve(spline, out _));
+        }
+
+        [Test]
+        public void Resolve_RejectsNonFinitePolylinePosition()
+        {
+            Assert.Throws<DomainException>(() =>
+                ResolvedPolyline.Resolve(new[] { Vector3.zero, new Vector3(float.NaN, 0f, 0f) }));
+        }
+
+        [Test]
+        public void Resolve_RejectsPolylineTotalLengthOverflow()
+        {
+            Vector3[] positions =
+            {
+                Vector3.zero,
+                new Vector3(float.MaxValue, 0f, 0f),
+                new Vector3(-float.MaxValue, 0f, 0f),
+            };
+
+            Assert.Throws<DomainException>(() => ResolvedPolyline.Resolve(positions));
+        }
+
+        [Test]
         public void TryResolve_NullOrEmptyOrNullSample_ReturnsFalseWithoutThrowing()
         {
-            // CC-089: the validator-only resolved-envelope check must not use
-            // exceptions for routine incomplete authoring data. TryResolve reports
-            // the same structural states Resolve throws on, as a false result.
             Assert.IsFalse(ResolvedBody.TryResolve((BodySpline)null, out ResolvedBody result));
-            Assert.IsFalse(ResolvedBody.TryResolve((System.Collections.Generic.IReadOnlyList<BodySample>)null, out _));
+            Assert.IsFalse(ResolvedBody.TryResolve((IReadOnlyList<BodySample>)null, out _));
 
             var empty = new BodySpline();
             Assert.IsFalse(ResolvedBody.TryResolve(empty, out _));
@@ -188,8 +214,6 @@ namespace ProceduralCreature.Tests.Runtime
         [Test]
         public void TryResolve_ValidInput_MatchesResolveAndReturnsTrue()
         {
-            // CC-089: when TryResolve returns true the value must be exactly what
-            // Resolve produces, for both the spline and sample-list overloads.
             BodySpline spline = StraightSpline();
 
             Assert.IsTrue(ResolvedBody.TryResolve(spline, out ResolvedBody viaSpline));
@@ -220,10 +244,7 @@ namespace ProceduralCreature.Tests.Runtime
             Assert.AreEqual(0f, resolved.SegmentLengths[0], 1e-6f);
             Assert.AreEqual(0f, resolved.SegmentLengths[1], 1e-6f);
             for (int i = 0; i < resolved.NormalizedArcLengthAtSample.Count; i++)
-            {
-                Assert.AreEqual(0f, resolved.NormalizedArcLengthAtSample[i], 1e-6f,
-                    $"sample {i} arc length is 0 on a degenerate spline");
-            }
+                Assert.AreEqual(0f, resolved.NormalizedArcLengthAtSample[i], 1e-6f);
         }
 
         [Test]
@@ -246,7 +267,6 @@ namespace ProceduralCreature.Tests.Runtime
         public void Resolve_BodySplineOverload_MatchesSampleListOverload()
         {
             BodySpline spline = StraightSpline();
-
             ResolvedBody viaSpline = ResolvedBody.Resolve(spline);
             ResolvedBody viaList = ResolvedBody.Resolve(spline.Samples);
 
@@ -254,13 +274,9 @@ namespace ProceduralCreature.Tests.Runtime
             Assert.AreEqual(viaSpline.TotalLength, viaList.TotalLength, 1e-6f);
             for (int i = 0; i < viaSpline.SamplePositions.Count; i++)
             {
-                Assert.AreEqual(viaSpline.SamplePositions[i], viaList.SamplePositions[i],
-                    $"sample {i} position matches between overloads");
-                Assert.AreEqual(viaSpline.SampleRadii[i], viaList.SampleRadii[i], 1e-6f,
-                    $"sample {i} radius matches between overloads");
-                Assert.AreEqual(viaSpline.NormalizedArcLengthAtSample[i],
-                    viaList.NormalizedArcLengthAtSample[i], 1e-6f,
-                    $"sample {i} arc length matches between overloads");
+                Assert.AreEqual(viaSpline.SamplePositions[i], viaList.SamplePositions[i]);
+                Assert.AreEqual(viaSpline.SampleRadii[i], viaList.SampleRadii[i], 1e-6f);
+                Assert.AreEqual(viaSpline.NormalizedArcLengthAtSample[i], viaList.NormalizedArcLengthAtSample[i], 1e-6f);
             }
         }
     }

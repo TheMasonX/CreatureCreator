@@ -20,6 +20,13 @@ namespace ProceduralCreature.Tests.Runtime
 
         private static SkeletonSnapshot Capture(params Bone[] bones)
         {
+            // SkeletonSnapshot.Capture requires exactly one root bone, so chain the
+            // fixture bones into a single hierarchy. Breadth-first ordering over the
+            // chain keeps snapshot index equal to argument order.
+            for (int i = 0; i < bones.Length; i++)
+            {
+                bones[i].ParentBoneId = i == 0 ? null : bones[i - 1].Id;
+            }
             var skeleton = new SkeletonModel();
             skeleton.Bones.AddRange(bones);
             return SkeletonSnapshot.Capture(skeleton);
@@ -43,12 +50,20 @@ namespace ProceduralCreature.Tests.Runtime
             for (int i = 0; i < snapshot.Count; i++)
             {
                 Matrix4x4 rest = Matrix4x4.TRS(snapshot[i].Position, snapshot[i].Rotation, Vector3.one);
-                // bindpose is the inverse rest frame: binding a point and carrying it
-                // back to the same rest frame must be the identity.
                 Vector3 point = new Vector3(0.5f, -0.25f, 1.25f);
                 Vector3 roundTrip = rest.MultiplyPoint3x4(bindposes[i].MultiplyPoint3x4(point));
                 Assert.That(Vector3.Distance(roundTrip, point), Is.LessThan(1e-4f), $"bone {i}");
             }
+        }
+
+        [Test]
+        public void ComputeBindposes_NonFiniteRestPosition_Throws()
+        {
+            // SkeletonSnapshot.Capture rejects a non-finite rest position before the
+            // binding builder runs, so assert the whole capture-and-convert path.
+            Assert.Throws<ProceduralCreature.Common.DomainException>(
+                () => SkinnedMeshBindingBuilder.ComputeBindposes(Capture(
+                    BoneAt("root", new Vector3(float.NaN, 0f, 0f), Quaternion.identity))));
         }
 
         [Test]
@@ -140,6 +155,47 @@ namespace ProceduralCreature.Tests.Runtime
                     new VertexInfluence(0, 0.25f),
                     new VertexInfluence(0, 0.25f),
                 },
+            };
+
+            Assert.Throws<ProceduralCreature.Common.DomainException>(
+                () => SkinnedMeshBindingBuilder.BuildBoneWeights(weights, snapshot.Count));
+        }
+
+        [Test]
+        public void BuildBoneWeights_DuplicateBoneIndex_Throws()
+        {
+            SkeletonSnapshot snapshot = Capture(
+                BoneAt("a", Vector3.zero, Quaternion.identity),
+                BoneAt("b", Vector3.up, Quaternion.identity));
+            var weights = new VertexInfluence[][]
+            {
+                new[] { new VertexInfluence(0, 0.5f), new VertexInfluence(0, 0.5f) },
+            };
+
+            Assert.Throws<ProceduralCreature.Common.DomainException>(
+                () => SkinnedMeshBindingBuilder.BuildBoneWeights(weights, snapshot.Count));
+        }
+
+        [Test]
+        public void BuildBoneWeights_NonFiniteWeight_Throws()
+        {
+            SkeletonSnapshot snapshot = Capture(BoneAt("root", Vector3.zero, Quaternion.identity));
+            var weights = new VertexInfluence[][]
+            {
+                new[] { new VertexInfluence(0, float.PositiveInfinity) },
+            };
+
+            Assert.Throws<ProceduralCreature.Common.DomainException>(
+                () => SkinnedMeshBindingBuilder.BuildBoneWeights(weights, snapshot.Count));
+        }
+
+        [Test]
+        public void BuildBoneWeights_ZeroTotalWeight_Throws()
+        {
+            SkeletonSnapshot snapshot = Capture(BoneAt("root", Vector3.zero, Quaternion.identity));
+            var weights = new VertexInfluence[][]
+            {
+                new[] { new VertexInfluence(0, 0f) },
             };
 
             Assert.Throws<ProceduralCreature.Common.DomainException>(

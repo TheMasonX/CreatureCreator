@@ -1,5 +1,6 @@
 using System;
 using System.Collections.Generic;
+using System.Collections.ObjectModel;
 using ProceduralCreature.Animation.Binding;
 using ProceduralCreature.Common;
 using ProceduralCreature.Definition;
@@ -33,9 +34,15 @@ namespace ProceduralCreature.Generation
         public const string MirrorSuffix = "_mirror";
 
         private readonly List<GeometryItem> _geometry = new List<GeometryItem>();
+        private readonly ReadOnlyCollection<GeometryItem> _geometryView;
+
+        public GeneratedCreature()
+        {
+            _geometryView = _geometry.AsReadOnly();
+        }
 
         /// <summary>Read-only, deterministic, ordered geometry items. New code must not depend on positional item 0.</summary>
-        public IReadOnlyList<GeometryItem> Geometry => _geometry;
+        public IReadOnlyList<GeometryItem> Geometry => _geometryView;
 
         public int Count => _geometry.Count;
 
@@ -100,23 +107,13 @@ namespace ProceduralCreature.Generation
     public sealed class GeometryItem
     {
         public string SourcePartId { get; }
-
         public GeometryType GeometryType { get; }
-
         public Mesh Mesh { get; }
-
-        /// <summary>Original mesh-asset source in its authored local space (null for the implicit surface).</summary>
         public Mesh SourceMesh { get; }
-
-        /// <summary>Authored source-to-creature rest placement for mesh assets (identity for the implicit surface).</summary>
         public Matrix4x4 RestPlacement { get; }
-
         public IReadOnlyList<MaterialRegion> MaterialRegions { get; }
-
         public RigBindingMetadata RigBinding { get; }
-
-        /// <summary>Build-time per-vertex influences in SkeletonSnapshot capture order.</summary>
-        public IReadOnlyList<VertexInfluence[]> VertexInfluences { get; }
+        public IReadOnlyList<IReadOnlyList<VertexInfluence>> VertexInfluences { get; }
 
         internal GeometryItem(
             string sourcePartId,
@@ -131,7 +128,9 @@ namespace ProceduralCreature.Generation
             if (mesh == null) throw new DomainException("geometry item mesh must not be null.");
             if (sourcePartId == null) throw new DomainException("geometry item source part id must not be null.");
 
-            MaterialRegions = materialRegions ?? Array.Empty<MaterialRegion>();
+            MaterialRegions = materialRegions == null
+                ? (IReadOnlyList<MaterialRegion>)Array.Empty<MaterialRegion>()
+                : new List<MaterialRegion>(materialRegions).AsReadOnly();
             ValidateMaterialRegions(mesh);
 
             SourcePartId = sourcePartId;
@@ -143,24 +142,25 @@ namespace ProceduralCreature.Generation
             VertexInfluences = CloneInfluences(vertexInfluences);
         }
 
-        private static IReadOnlyList<VertexInfluence[]> CloneInfluences(
+        private static IReadOnlyList<IReadOnlyList<VertexInfluence>> CloneInfluences(
             IReadOnlyList<VertexInfluence[]> influences)
         {
             if (influences == null || influences.Count == 0)
             {
-                return Array.Empty<VertexInfluence[]>();
+                return Array.Empty<IReadOnlyList<VertexInfluence>>();
             }
 
-            var copy = new VertexInfluence[influences.Count][];
+            var copy = new IReadOnlyList<VertexInfluence>[influences.Count];
             for (int i = 0; i < influences.Count; i++)
             {
-                if (influences[i] == null)
+                VertexInfluence[] vertexInfluences = influences[i];
+                if (vertexInfluences == null)
                 {
                     throw new DomainException($"geometry item vertex influences {i} must not be null.");
                 }
-                copy[i] = (VertexInfluence[])influences[i].Clone();
+                copy[i] = Array.AsReadOnly((VertexInfluence[])vertexInfluences.Clone());
             }
-            return copy;
+            return Array.AsReadOnly(copy);
         }
 
         private void ValidateMaterialRegions(Mesh mesh)
@@ -193,7 +193,9 @@ namespace ProceduralCreature.Generation
                         $"geometry item material region {i} start index {region.StartIndex} is outside the valid range [0, {maxStart}] for submesh {region.SubmeshIndex}.");
                 }
 
-                if (region.IndexCount < 0 || region.StartIndex + region.IndexCount > maxStart)
+                // Avoid StartIndex + IndexCount overflow: validate the remaining
+                // capacity instead of adding two attacker-controlled int values.
+                if (region.IndexCount < 0 || region.IndexCount > maxStart - region.StartIndex)
                 {
                     throw new DomainException(
                         $"geometry item material region {i} range [{region.StartIndex}, {region.StartIndex + region.IndexCount}) exceeds submesh {region.SubmeshIndex} length {maxStart}.");
@@ -216,11 +218,8 @@ namespace ProceduralCreature.Generation
     public sealed class MaterialRegion
     {
         public int SubmeshIndex { get; }
-
         public int StartIndex { get; }
-
         public int IndexCount { get; }
-
         public string MaterialKey { get; }
 
         internal MaterialRegion(int submeshIndex, int startIndex, int indexCount, string materialKey)
@@ -247,9 +246,7 @@ namespace ProceduralCreature.Generation
     public sealed class RigBindingMetadata
     {
         public string SourcePartId { get; }
-
         public string ParentPartId { get; }
-
         public bool IsMirrored { get; }
 
         internal RigBindingMetadata(string sourcePartId, string parentPartId, bool isMirrored)

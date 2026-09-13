@@ -1,0 +1,50 @@
+﻿{
+  "id": "tsk-0200-sparse-root-envelope-sdf-sampling",
+  "key": "TSK-0200",
+  "title": "Restrict SDF sampling to conservative root-envelope candidates",
+  "description": "Performance continuation under TSK-0008 / TSK-0065. DensityGrid currently preserves a full-volume sample array and uses the root potential envelope only as an in-loop early exit, so every grid corner is still visited. Use the already-computed conservative root potential envelope to initialize the sample buffer to \u002Binf and evaluate only a conservatively expanded integer candidate box. Retain the existing per-point envelope check inside the candidate job as a proof guard. Fall back to full-volume sampling when no root potential envelope exists. Preserve exact field values, \u002Binf absent semantics, deterministic sample addresses, and topology.",
+  "type": "Performance",
+  "status": "InProgress",
+  "priority": "High",
+  "assigneeMode": "Custom",
+  "assigneeDirectoryId": null,
+  "assigneeCustomText": "Unassigned",
+  "reporter": "ChatGPT",
+  "labels": [
+    "performance",
+    "generation",
+    "sampling",
+    "sdf",
+    "sparse",
+    "determinism",
+    "culling"
+  ],
+  "attachments": [],
+  "externalLinks": [],
+  "linkedPages": [],
+  "comments": [
+    {
+      "id": "c-chatgpt-20260910-0200-implementation",
+      "author": "ChatGPT",
+      "body": "Implementation started in the 2026-09-10 performance round. The implementation uses the existing SdfProgram.HasPotentialBounds / PotentialMinBound / PotentialMaxBound contract; no new approximate geometry is introduced. Unity parity and fresh editor timing remain required before completion.",
+      "createdAtUtc": "2026-09-10T00:00:00Z"
+    },
+    {
+      "id": "c-3b32f31e261c40c3abc29d47e092e0ca",
+      "author": "anonymous",
+      "body": "2026-09-12 task-board review: TSK-0237 (\u0022Prove sparse candidate-region SDF sampling before enabling it\u0022) is the parity/topology proof gate for this implementation. Do not enable sparse candidate-region sampling as the default baseline until TSK-0237\u0027s parity matrix passes. Both records descend from TSK-0008 but were previously unlinked. The already-reconciled impl/proof split is: this record = implementation (formerly the duplicate TSK-0200 record), TSK-0237 = proof (renumbered from TSK-0200).",
+      "createdAtUtc": "2026-09-13T04:51:57.9392676Z"
+    }
+  ],
+  "epicId": null,
+  "parentId": "tsk-0008-profile-and-optimize-preview-generation-hotspots",
+  "dueDateUtc": null,
+  "createdAtUtc": "2026-09-10T00:00:00Z",
+  "updatedAtUtc": "2026-09-13T04:51:57.9392676Z",
+  "completedAtUtc": null,
+  "revision": 2,
+  "isArchived": false,
+  "hasLoadError": false,
+  "loadError": null,
+  "sourceFilePath": "tsk-0200-sparse-root-envelope-sdf-sampling.json"
+}

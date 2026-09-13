@@ -1,0 +1,36 @@
+{
+  "id": "tsk-0205-repair-invalid-implicit-mesh-topology",
+  "key": "TSK-0205",
+  "title": "Repair invalid implicit-mesh topology after determinism isolation",
+  "description": "Current Unity logs report generated implicit meshes with non-zero boundary and non-manifold edges, accompanied by detached polygon islands in the viewport. Do not patch CubeContourResolver or MarchingCubesExtractor heuristically until TSK-0204 identifies whether the scalar field itself is drifting. Once the input field is proven stable, use boundary/non-manifold/winding edge examples plus a minimal reproducer to identify the extraction defect. Acceptance: repeated identical input produces a closed, consistently wound implicit surface with zero boundary edges, zero non-manifold edges, and zero inconsistent-winding edges, with regression coverage for the failing contour configuration.",
+  "type": "Bug",
+  "status": "Backlog",
+  "priority": "High",
+  "assigneeMode": "Custom",
+  "assigneeDirectoryId": null,
+  "assigneeCustomText": "Unassigned",
+  "reporter": "ChatGPT",
+  "labels": ["user-mandated", "runtime", "generation", "extraction", "topology", "marching-cubes", "validation"],
+  "attachments": [],
+  "externalLinks": [],
+  "linkedPages": [],
+  "comments": [
+    {
+      "id": "c-chatgpt-20260911-topology",
+      "author": "ChatGPT",
+      "body": "2026-09-11 evidence: Unity reported 3 boundary/0 non-manifold edges on one run and 4 boundary/7 non-manifold edges on another; the screenshots show detached polygon islands. The topology validator now also reports inconsistent winding examples. First establish field/extraction determinism under TSK-0204 before changing contour logic.",
+      "createdAtUtc": "2026-09-11T20:30:00Z"
+    }
+  ],
+  "epicId": null,
+  "parentId": "TSK-0008",
+  "dueDateUtc": null,
+  "createdAtUtc": "2026-09-11T20:30:00Z",
+  "updatedAtUtc": "2026-09-11T20:30:00Z",
+  "completedAtUtc": null,
+  "revision": 1,
+  "isArchived": false,
+  "hasLoadError": false,
+  "loadError": null,
+  "sourceFilePath": "tsk-0205-repair-invalid-implicit-mesh-topology.json"
+}

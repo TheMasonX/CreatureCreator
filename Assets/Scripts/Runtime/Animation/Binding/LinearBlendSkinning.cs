@@ -94,9 +94,12 @@ namespace ProceduralCreature.Animation.Binding
     /// * WEIGHT CONVENTION: per-vertex influences are non-negative and authored to sum
     ///   to 1; <see cref="MaxBoneInfluencesPerVertex"/> caps authored influence count
     ///   and is ENFORCED inside <see cref="Deform"/> (a vertex with more influences
-    ///   throws <c>DomainException</c>). <see cref="Deform"/> normalizes by the total
-    ///   weight so a partially-authored sum still yields a unit blend rather than a
-    ///   second, unnormalized convention. A vertex with no net weight is an error.
+    ///   throws <c>DomainException</c>). Duplicate bone indices are rejected because
+    ///   they represent redundant influence slots rather than independent influences
+    ///   and otherwise consume the four-slot budget while silently changing the
+    ///   effective authoring representation. <see cref="Deform"/> normalizes by the
+    ///   total weight so a partially-authored sum still yields a unit blend rather than
+    ///   a second, unnormalized convention. A vertex with no net weight is an error.
     /// * FINITE CONTRACT (F2/F3): rest vertices and every rest and posed
     ///   <c>BonePose</c> frame must be finite. <see cref="Deform"/> rejects a NaN or
     ///   Infinity in a rest vertex or in any bone frame's <c>Position</c>/<c>Rotation</c>
@@ -210,6 +213,14 @@ namespace ProceduralCreature.Animation.Binding
                 {
                     VertexInfluence influence = influences[influenceIndex];
                     ValidateInfluence(influence, vertex, rest.Count);
+                    for (int priorInfluenceIndex = 0; priorInfluenceIndex < influenceIndex; priorInfluenceIndex++)
+                    {
+                        if (influences[priorInfluenceIndex].BoneIndex == influence.BoneIndex)
+                        {
+                            throw new DomainException(
+                                $"bindings[{vertex}] contains duplicate bone index {influence.BoneIndex}.");
+                        }
+                    }
 
                     // Bind offset from the bone's REST frame (quaternion inverse is exact for
                     // scale-free frames), then carry it into the bone's POSED frame.

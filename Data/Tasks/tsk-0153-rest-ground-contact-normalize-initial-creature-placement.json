@@ -1,0 +1,45 @@
+﻿{
+  "id": "tsk-0153-rest-ground-contact-normalize-initial-creature-placement",
+  "key": "TSK-0153",
+  "title": "Normalize initial creature placement so designated feet rest on the ground",
+  "description": "## User Mandate\n\nThe initial generated creature should be placed with its feet touching a common ground plane so the resulting animated model starts in a useful rest placement and is easier to animate. Implement this as a generation/rest-space placement concern, not as a locomotion, IK, or per-frame grounding workaround.\n\n## Review basis\n\nCurrent generation produces a creature-space implicit mesh plus mesh-asset geometry and separately infers the rest skeleton used by the animation adapter. The current animation/skeleton work intentionally leaves foot grounding separate. Existing review evidence identifies the observed \"flat feet / ground contact\" symptom but does not establish that arbitrary lowest-vertex normalization is correct. The Spore-oriented implementation guide places ground contact after gait/ground probing rather than defining the creature's base geometry from an unrelated lowest point.\n\n## Required design\n\n- Define a small pure rest-placement policy (for example `RestGroundingResolver`) that computes one rigid creature-space translation for the generated rest pose.\n- Ground only designated contact geometry, preferably resolved `PartType.Foot` geometry and its intentional contact surface/sole, rather than using the absolute minimum Y of the whole creature. Tails, hands, wings, antennae, and other appendages must not become accidental ground anchors.\n- Support multiple feet: all valid designated feet should resolve to the same ground plane within the configured contact tolerance. Do not choose one arbitrary foot and leave siblings floating or buried.\n- Preserve arbitrary-limb generality: the policy must not contain biped/quadruped modes or assume exactly two/four feet. Zero-foot creatures should remain valid and preserve their authored placement rather than being silently shifted by unrelated geometry.\n- Apply the same rigid translation to every representation that shares rest space: implicit mesh geometry, mesh-asset geometry placement, and the rest skeleton/bind-space coordinates consumed by `CreatureRig`/`SkinnedMeshRenderer`. Do not ground the visual mesh independently of the bones.\n- Keep the translation outside `CreatureDefinition` authored DNA. Grounding is a derived presentation/rest-placement result, not an authored transform mutation.\n- Do not introduce per-frame mesh edits, IK, gait logic, terrain queries, or animation-state dependencies. The initial ground plane is a fixed generation-space convention; dynamic terrain/contact belongs to later locomotion work.\n- Preserve mirror symmetry. Reflection should remain an anatomical symmetry operation around the creature origin; the final global grounding translation must not cause mirrored sides to diverge.\n- Preserve deterministic generation. The same resolved creature and generation settings must produce the same grounding translation and final rest placement regardless of authored part order.\n\n## Architecture / likely implementation seam\n\nPrefer a generated rest-placement value (translation or small placement record) carried alongside `GeneratedCreatureData`/resolved generation output, rather than mutating the resolved snapshot or raw `CreatureDefinition`. The assembly/preview path should consume the placement consistently for generated geometry and skeleton construction. If mesh-asset dimensions are not available during `GenerateData`, either move the final placement calculation to the first stage where authoritative generated geometry is available or introduce a deterministic pre-assembly geometry-contact query; do not approximate a mesh-asset foot's sole from an unrelated skeleton point without documenting the contract.\n\nAvoid a second placement system. Reuse the canonical creature-space transform utilities and existing resolved part/body data. If a foot geometry source is ambiguous (SDF limb, attachment part, or mesh asset), define one explicit source-of-truth ordering and test it.\n\n## Acceptance criteria\n\n- A generated rest creature with one or more designated feet places each valid foot contact surface on Y=0 within a documented tolerance.\n- No designated foot is materially below the ground plane after normalization.\n- Multiple feet remain jointly grounded; contact-height spread is within tolerance.\n- A creature with no feet is not shifted because of a tail, hand, wing, or other lowest appendage.\n- The same placement is applied to geometry and the rest skeleton/bind space, so binding remains rest-pose consistent.\n- Mirrored foot sets retain symmetric placement after grounding.\n- Output is deterministic and independent of authored part ordering.\n- A posed/animated rest initialization begins from the grounded rest pose without requiring an initial IK correction frame.\n\n## Validation\n\n- Add pure runtime tests for one foot, two/many feet, no-foot appendages, mirrored feet, arbitrary limb counts, and authored-order permutations.\n- Verify generated implicit geometry and corresponding rest skeleton use the same placement offset.\n- Verify SMR/LBS rest-pose equivalence still holds after grounding.\n- Add a PlayMode generated-creature test when Unity is available that reads the actual generated geometry/bone placement and confirms the contact surface touches the ground plane.\n- Record exact contact tolerance, test creature configuration, generation settings, and Unity version/mode.\n- Run `dotnet build ProceduralCreature.Runtime.csproj --no-restore`, `dotnet build ProceduralCreature.Tests.Runtime.csproj --no-restore`, and `git diff --check`.\n\n## Non-goals\n\n- Dynamic terrain following or moving ground.\n- Gait/step planning.\n- Runtime IK foot planting.\n- Foot orientation solving beyond what is already authored/resolved.\n- Hard-coded biped/quadruped behavior.\n- Rewriting authored DNA to make a particular creature appear grounded.\n\n## Dependencies\n\nBuild on the resolved anatomy and generated skinned-animation contracts established by TSK-0148, TSK-0147, TSK-0132, and TSK-0073. Keep the separate foot deformation-isolation work in TSK-0150 separate; grounding should consume the final rest-space geometry rather than compensate for bad skinning weights.\n\n## Blockers / risks\n\nThe main design risk is determining the authoritative contact surface for a designated foot when its visual geometry is a welded implicit surface or a mesh asset. Do not close the task with a lowest-vertex heuristic unless that limitation is explicitly accepted and documented. Unity validation is required for the final generated-creature contact result.",
+  "type": "Task",
+  "status": "Backlog",
+  "priority": "High",
+  "assigneeMode": "Custom",
+  "assigneeDirectoryId": null,
+  "assigneeCustomText": "Agent",
+  "reporter": "TheMasonX",
+  "labels": [
+    "runtime",
+    "generation",
+    "animation",
+    "skeleton",
+    "grounding",
+    "foot",
+    "placement",
+    "user-mandated",
+    "cc-073-follow-up"
+  ],
+  "attachments": [],
+  "externalLinks": [],
+  "linkedPages": [],
+  "comments": [
+    {
+      "id": "c-20260907-grounding-review",
+      "author": "anonymous",
+      "body": "Created from the 2026-09-07 animation/skeleton review at 06:07 CDT. Current source keeps foot grounding separate from rig inference and skinning. The task therefore defines grounding as one deterministic rest-space translation shared by generated geometry and skeleton/bind space, with designated foot contact as the anchor rather than absolute creature minimum-Y. No Unity result is claimed at task creation.",
+      "createdAtUtc": "2026-09-07T11:07:02Z"
+    }
+  ],
+  "epicId": null,
+  "parentId": "tsk-0077",
+  "dueDateUtc": null,
+  "createdAtUtc": "2026-09-07T11:07:02Z",
+  "updatedAtUtc": "2026-09-07T11:07:02Z",
+  "completedAtUtc": null,
+  "sourceFilePath": "tsk-0153-rest-ground-contact-normalize-initial-creature-placement.json",
+  "revision": 2,
+  "isArchived": false,
+  "hasLoadError": false
+}

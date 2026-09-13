@@ -1,0 +1,9 @@
+{
+  "Id": "creaturecreator-expanded-peer-review-lenses-2026-09-08",
+  "Type": "WorkingMemory",
+  "Status": "Active",
+  "Content": "Standing audit-campaign preference: use a larger adversarial peer-review council than the default council skill whenever conducting exhaustive CreatureCreator campaigns. Keep multiple independent simulated seats and explicit dissent. At minimum cover runtime correctness, numerical robustness, architecture/design, ownership/aliasing/lifetime, performance/Burst/allocations, Unity/editor lifecycle, serialization/compatibility, testing/validation evidence, task/requirements integrity, API usability, security/robustness, and documentation/consolidation. Add specialist seats when evidence warrants them. Treat each seat independently before synthesis; require concrete file/test evidence, confidence, blocking concerns, acceptance criteria, and evidence gates. Search existing task ownership before creating tasks and preserve one canonical task per work item. This preference should carry into subsequent similarly sized audit campaigns.",
+  "References": [
+    { "Label": "Council skill", "Uri": ".github/skills/council/SKILL.md" }
+  ]
+}

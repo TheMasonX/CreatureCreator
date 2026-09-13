@@ -1,0 +1,45 @@
+{
+  "id": "tsk-0236-define-animated-bounds-and-culling-policy",
+  "key": "TSK-0236",
+  "title": "Define animated bounds and culling policy for skinned meshes",
+  "description": "## Summary\nDefine and implement the animated bounds and culling policy for CreatureSkinnedMeshRenderer output.\n\n## User Mandate\n> Please take everything from this good branch and take over for this agent:\n\nSTRICT. Preserve the uncaptured animated-bounds and culling finding from the reviewed follow-up branch without importing its raw task JSON or duplicate records.\n\n## Scope\n- Establish ownership and update policy for SkinnedMeshRenderer.localBounds during animated deformation.\n- Define the relationship between conservative bounds, runtime culling, updateWhenOffscreen, and generated creature scale.\n- Preserve the authoritative DNA and derived-mesh ownership model; do not make bounds an alternate geometry authority.\n- Keep this separate from the already-delivered same-count skeleton compatibility guard, while coordinating with TSK-0132 and TSK-0142.\n\n## Acceptance Criteria\n- Animated geometry remains visible under the documented culling policy for representative poses and deformations.\n- Bounds behavior is deterministic, finite, and testable without relying on undocumented Unity defaults.\n- The chosen policy has focused runtime/editor coverage and a measured performance tradeoff.\n- No duplicate binding-compatibility task or imported branch-local TSK-0203 collision is created.\n\n## Validation\nRun whole-project .NET compilation, focused runtime/editor tests, and Unity PlayMode/manual culling validation with console inspection. Record exact results and Unity availability.\n\n## Findings\nThe reviewed follow-up branch identified that localBounds and updateWhenOffscreen behavior for animated generated meshes is currently undefined. Its branch-local task records contained a duplicate TSK-0203 key and must not be imported.\n\n## Blockers\nNo implementation or Unity execution has been performed for this finding.\n\n## Next Step\nChoose a conservative bounds policy, add a posed deformation fixture, and measure culling correctness and per-frame cost.\n\n## Reconciliation\nRenumbered from TSK-0200 on 2026-09-12. TSK-0200 now resolves uniquely to the in-progress sparse root-envelope SDF sampling task tsk-0200-sparse-root-envelope-sdf-sampling; this record keeps the animated-bounds and culling policy.",
+  "type": "Task",
+  "status": "Backlog",
+  "priority": "High",
+  "assigneeMode": "Custom",
+  "assigneeDirectoryId": null,
+  "assigneeCustomText": "Agent",
+  "reporter": "anonymous",
+  "labels": [
+    "runtime",
+    "editor",
+    "animation",
+    "skinning",
+    "culling",
+    "performance",
+    "audit-followup",
+    "user-mandated"
+  ],
+  "attachments": [],
+  "externalLinks": [],
+  "linkedPages": [],
+  "comments": [
+    {
+      "id": "c-06c8fbc0252d45b9af8d651f5b1a9d1a",
+      "author": "anonymous",
+      "body": "Task created from reviewed follow-up finding. Task-record integrity validation is currently blocked by pre-existing normalized-key collisions in TSK-0153, TSK-0188, and TSK-0189; Scripts/Normalize-TaskRecords.ps1 reported all three and modified no files. This task remains Backlog.",
+      "createdAtUtc": "2026-09-11T02:20:05.7011466Z"
+    }
+  ],
+  "epicId": null,
+  "parentId": "TSK-0077",
+  "dueDateUtc": null,
+  "createdAtUtc": "2026-09-11T02:18:23.2098472Z",
+  "updatedAtUtc": "2026-09-12T06:57:00.2533057Z",
+  "completedAtUtc": null,
+  "revision": 3,
+  "isArchived": false,
+  "hasLoadError": false,
+  "loadError": null,
+  "sourceFilePath": "tsk-0236-define-animated-bounds-and-culling-policy.json"
+}

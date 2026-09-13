@@ -1,0 +1,48 @@
+﻿{
+  "id": "tsk-0195-sanitize-body-proxy-radius-fallback",
+  "key": "TSK-0195",
+  "title": "Sanitize non-finite Body proxy radius before morphology fallback",
+  "description": "## Summary\nPrevent non-finite authored Body radii from poisoning the compact anatomical influence-radius bridge before its documented fallback can apply.\n\n## User Mandate\n\u003E Ensure everything important is tracked and do not weaken validation or hide malformed-state behavior.\n\n## Scope\n- Sanitize the initial Body proxy radius before any Mathf.Max/Distance-based accumulation.\n- Preserve the existing deterministic fallback value and resolved-morphology behavior for valid radii.\n- Add direct regression coverage for NaN and Infinity on segment-bearing Body morphology.\n\n## Acceptance Criteria\n- NaN/Infinity authored Body radius never produces NaN/Infinity in the returned per-bone radius array.\n- Valid morphology and existing midpoint/clamping behavior are unchanged.\n- Focused runtime tests/build remain green.\n\n## Validation\nUnity PlayMode remains required for task closure; source/build validation is not sufficient to mark Done.\n\n## Findings\nRound 23 audit identified that the caller sanitizes an invalid radius but ResolveBodyProxyRadius rereads raw BoneSpec.Radius; a non-finite value can therefore poison the fallback accumulator.\n\n## Next Step\nSanitize the proxy radius at method entry and add NaN/Infinity regression cases.",
+  "type": "Bug",
+  "status": "InProgress",
+  "priority": "Medium",
+  "assigneeMode": "Custom",
+  "assigneeDirectoryId": null,
+  "assigneeCustomText": "Agent",
+  "reporter": "anonymous",
+  "labels": [
+    "user-mandated",
+    "runtime",
+    "animation",
+    "skinning",
+    "validation"
+  ],
+  "attachments": [],
+  "externalLinks": [],
+  "linkedPages": [],
+  "comments": [
+    {
+      "id": "c-8a2d79c67c8344f7a8b3e9f9d9195c11",
+      "author": "anonymous",
+      "body": "Implemented 2026-09-11. ResolveBodyProxyRadius now sanitizes BoneSpec.Radius before accumulation, preserving the documented deterministic fallback for non-finite/non-positive values. Added a single parameterized regression covering NaN, \u002BInfinity, and -Infinity and asserting finite fallback output. Validation blocker: Unity 6000.5.9f1 is not available in this cloud environment, so PlayMode execution and Done status remain deferred; source-level change is complete pending executable evidence.",
+      "createdAtUtc": "2026-09-11T04:00:00Z"
+    },
+    {
+      "id": "c-fa2881805721477582556cb35bcfe6bf",
+      "author": "anonymous",
+      "body": "Canonical owner after the 2026-09-12 task-key reconciliation. TSK-0231 (formerly tsk-0195-harden-non-finite-body-bone-radius-morphology-bridge, Backlog) is the superseded duplicate of this mechanism and is now Archived.\n\nFolded scope from TSK-0231 that must remain covered here:\n1. Guard non-positive radii as well as non-finite (the 2026-09-11 implementation note already sanitizes non-finite/non-positive).\n2. Guard the ResolveBodyProxyRadius call site, not only method entry.\n3. Add a regression for a segment-bearing Body bone where no body sample falls inside the bone interval; the finite fallback must be retained rather than returning the raw invalid radius.\n\nNo competing radius derivation path is permitted.",
+      "createdAtUtc": "2026-09-12T06:58:05.8278511Z"
+    }
+  ],
+  "epicId": null,
+  "parentId": "TSK-0077",
+  "dueDateUtc": null,
+  "createdAtUtc": "2026-09-11T03:55:00Z",
+  "updatedAtUtc": "2026-09-12T06:58:05.8278511Z",
+  "completedAtUtc": null,
+  "revision": 3,
+  "isArchived": false,
+  "hasLoadError": false,
+  "loadError": null,
+  "sourceFilePath": "tsk-0195-sanitize-body-proxy-radius-fallback.json"
+}

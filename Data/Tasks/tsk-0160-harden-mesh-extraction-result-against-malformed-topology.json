@@ -1,0 +1,40 @@
+﻿{
+  "id": "tsk-0160-harden-mesh-extraction-result-against-malformed-topology",
+  "key": "TSK-0160",
+  "title": "Harden MeshExtractionResult against malformed topology",
+  "description": "Make MeshExtractionResult's public operations total over malformed manually-created data. Triangle storage must contain complete triangles, every index must address an existing vertex, and vertex positions must be finite before topology-dependent operations execute. ComputeAngleWeightedNormals and ToUnityMesh should share one validation boundary so malformed input consistently produces DomainException rather than leaking IndexOutOfRangeException, Unity mesh errors, or NaN normals. Keep extraction-path behavior unchanged for valid results. This record also consolidates the earlier independent TSK-0160 formulation titled 'Harden MeshExtractionResult topology-consuming operations' rather than keeping two task keys for the same invariant.",
+  "type": "Bug Fix",
+  "status": "Done",
+  "priority": "Medium",
+  "assigneeMode": "Custom",
+  "assigneeDirectoryId": null,
+  "assigneeCustomText": "Agent",
+  "reporter": "anonymous",
+  "labels": ["runtime", "mesh", "validation", "code-health", "animation"],
+  "attachments": [],
+  "externalLinks": [],
+  "linkedPages": [],
+  "comments": [
+    {
+      "id": "c-0160-implementation",
+      "author": "anonymous",
+      "body": "Implemented a single MeshExtractionResult.ValidateTopology() boundary and call it from both ComputeAngleWeightedNormals() and ToUnityMesh(). It rejects null storage, incomplete triangle lists, out-of-range/negative indices, and non-finite vertices. Added MeshExtractionResultTests covering each malformed case and a valid normal result. No Unity execution was performed in this harness.",
+      "createdAtUtc": "2026-09-08T05:35:00Z"
+    },
+    {
+      "id": "c-0160-consolidation",
+      "author": "anonymous",
+      "body": "Council/task-integrity review found a second file carrying key TSK-0160 (`tsk-0160-harden-mesh-extraction-result-topology-operations.json`) with materially identical scope. Its substance is consolidated into this canonical record; the duplicate file is removed to restore task-key uniqueness.",
+      "createdAtUtc": "2026-09-08T08:15:00Z"
+    }
+  ],
+  "parentId": "TSK-0094",
+  "dueDateUtc": null,
+  "completedAtUtc": "2026-09-08T05:35:00Z",
+  "createdAtUtc": "2026-09-08T05:35:00Z",
+  "updatedAtUtc": "2026-09-08T08:15:00Z",
+  "revision": 3,
+  "isArchived": false,
+  "hasLoadError": false,
+  "sourceFilePath": "tsk-0160-harden-mesh-extraction-result-against-malformed-topology.json"
+}

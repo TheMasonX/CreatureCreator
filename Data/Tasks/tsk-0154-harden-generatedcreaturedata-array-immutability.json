@@ -1,0 +1,40 @@
+{
+  "id": "tsk-0154-harden-generatedcreaturedata-array-immutability",
+  "key": "TSK-0154",
+  "title": "Harden GeneratedCreatureData array immutability",
+  "description": "Prevent GeneratedCreatureData from exposing caller-owned mutable Color[] storage across the pure-generation to Unity-assembly boundary. Preserve the existing resolved/output architecture; this is a bounded contract-hardening task, not a new output model.\n\n## Scope\n- Defensively copy generated colors at construction.\n- Expose colors read-only to consumers.\n- Update the Unity assembly boundary to consume the read-only representation.\n- Add focused regression coverage for aliasing and null input.\n\n## Acceptance Criteria\n- Mutating the constructor input array after construction cannot mutate GeneratedCreatureData.\n- Consumers cannot cast the Colors property back to the original mutable array.\n- Existing generation output remains equivalent.\n- No second generated-output authority is introduced.\n\n## Validation\n- Runtime and runtime-test builds pass.\n- Focused GeneratedCreatureData tests pass in Unity when available.\n- git diff --check passes.",
+  "type": "Task",
+  "status": "InProgress",
+  "priority": "Medium",
+  "assigneeMode": "Custom",
+  "assigneeDirectoryId": null,
+  "assigneeCustomText": "Agent",
+  "reporter": "TheMasonX",
+  "labels": [
+    "runtime",
+    "generation",
+    "contract",
+    "immutability",
+    "code-health",
+    "audit-follow-up",
+    "animation"
+  ],
+  "comments": [
+    {
+      "id": "c-20260907-generated-data-immutability",
+      "author": "anonymous",
+      "body": "Takeover audit 2026-09-07: confirmed GeneratedCreatureData exposed its constructor-owned Color[] directly, allowing downstream mutation of generated state. Reworked the boundary to defensively copy colors and expose IReadOnlyList<Color>; CreatureMeshGenerator now converts the read-only view only at the Unity Mesh.SetColors boundary. Added focused regression coverage for post-construction aliasing and null colors. Unity execution remains an external validation gate when an editor is available.",
+      "createdAtUtc": "2026-09-07T11:40:00Z"
+    }
+  ],
+  "epicId": "tsk-0077",
+  "parentId": "tsk-0140",
+  "dueDateUtc": null,
+  "createdAtUtc": "2026-09-07T11:40:00Z",
+  "updatedAtUtc": "2026-09-07T11:40:00Z",
+  "completedAtUtc": null,
+  "revision": 1,
+  "isArchived": false,
+  "hasLoadError": false,
+  "sourceFilePath": "tsk-0154-harden-generatedcreaturedata-array-immutability.json"
+}

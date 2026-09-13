@@ -2,9 +2,9 @@
   "id": "tsk-0149-build-depth-independent-rig-debug-view",
   "key": "TSK-0149",
   "title": "Build a depth-independent rig debug view for skeleton inspection",
-  "description": "## User Mandate\n\n\u003E Sythesize these audits of the skeeltal mesh system and then help improve the bone vertex weights. The feet are also no longer flat on the ground, but that\u0027s a seperate issue, I think\n\nSTRICT. This task concerns skeleton inspection only. Keep foot-grounding behavior separate.\n\n## Summary\nExtend the existing skeleton display into a usable rig-debug presentation so pose and weighting changes can be inspected without navigating the generated Unity hierarchy.\n\n## Scope\n- Keep \u0060SkeletonDisplay\u0060 as a pure data builder.\n- Add skeleton-only or faint-mesh mode, depth-independent bone visibility, thicker bone/joint primitives, selected-bone highlighting, labels, and frame/focus controls.\n- Synchronize SceneView selection with semantic parts or bones.\n- Add a minimal exaggerated pose preview for validating bent-chain rotation and weight deformation.\n\n## Acceptance Criteria\n- Bones remain visible through the generated mesh in the debug mode.\n- A user can focus the skeleton, selected bone, selected limb, body, and legs without expanding the generated hierarchy.\n- Selected bones are distinguishable by shape or thickness as well as color.\n- The view exposes stable machine IDs separately from display names.\n- Manual Unity editor validation records the controls and result.\n\n## Validation\nRun the relevant editor assembly build, focused editor tests, and a manual Unity SceneView check after compilation completes. Record console errors and warnings.\n\n## Findings\nThe current \u0060SkeletonDisplay\u0060 emits line segments and joint points only. The supplied screenshot corroborates a P1 tooling gap, while the display implementation itself remains a useful pure-data boundary.\n\n## Blockers\nUnity editor availability is required for the visual gate. This task must not change skeleton inference or weighting ownership.\n\n## Next Step\nAdd depth-independent rendering and skeleton-only mode first, then add labels, focus, selection, and pose preview.",
+  "description": "## Summary\nExtend skeleton display into a usable SceneView rig-debug presentation so pose, topology, and weighting changes can be inspected without navigating generated Unity hierarchy.\n\n## Explicit anatomy requirement\nThe debug workflow must remain generic: it must not assume biped, quadruped, legs, or a fixed limb count. Any articulated limb chain must be discoverable, selectable, labeled, and focusable through structural skeleton metadata rather than PartType-specific branches.\n\n## Current implementation\n`RigDebugView` provides x-ray visibility, adjustable bone width, selected-bone emphasis, click selection, semantic labels plus stable IDs, whole-skeleton/selected-chain/body/limb/selected-bone focus, live-snapshot chain discovery, and a raw-generated-mesh visibility toggle. It uses the live `CreatureRig.RestSkeleton` and indexed transforms rather than re-resolving editor-session DNA. `CreatureRig` also exposes `TryGetBone` and a read-only map boundary. `CreaturePreviewController` owns the raw/skinned visibility transition on the preview root.\n\n## Acceptance\n- Bones remain visible through the generated mesh.\n- Skeleton, selected chain, body, all articulated limbs, and selected bone can be framed directly.\n- Selected bones are distinguishable by shape/thickness as well as color.\n- Machine IDs and semantic display names are available.\n- Focus behavior is based on the live generated rig, not stale editor state.\n- A selected terminal child frames its owning articulated parent chain rather than forcing hierarchy traversal.\n- No biped/quadruped/leg-count assumption is encoded in the debug view.\n- Raw generated mesh visibility can be toggled for generation-vs-skinning diagnosis without introducing a second preview root.\n- Manual Unity SceneView validation is still required before closure.\n\n## Scope limits\nDo not move morphology topology, weighting ownership, or foot-grounding logic into this task. The raw generated mesh presentation has now been pulled forward from the former deferred scope. Pose-preview controls remain outside this task unless separately specified.\n\n## Status\nInProgress: generic implementation landed; Unity visual validation remains open.\n\n## Evidence\nSee the skeleton/animation visualization, implementation delta, and follow-up audit documents under `docs/audits/` on branch `audit/skeleton-animation-improvements-2026-09-07`. TSK-0188 is a child fix for posed attachment visualization.\n\n## Latest Implementation Note\n`Frame Selected Chain` walks the live skeleton parent links from the selected bone to the first Body-rooted ancestor and supplements that with the selected articulated part's segment bones. `RigDebugView` also exposes a raw-mesh toggle. Attachment-point pose correctness is tracked separately by `TSK-0188` so the core debug-view task does not absorb a distinct coordinate-space defect.\n",
   "type": "Task",
-  "status": "Backlog",
+  "status": "InProgress",
   "priority": "High",
   "assigneeMode": "Custom",
   "assigneeDirectoryId": null,
@@ -21,16 +21,47 @@
   "attachments": [],
   "externalLinks": [],
   "linkedPages": [],
-  "comments": [],
+  "comments": [
+    {
+      "id": "c-20260907-rigdebug-rounds",
+      "author": "anonymous",
+      "body": "Sequential implementation rounds completed: standalone x-ray SceneView rig overlay, adjustable thickness, semantic labels plus IDs, direct selection, skeleton/chain/body/leg/selected-bone framing, and live-snapshot ownership. Unity visual validation remains the closure gate.",
+      "createdAtUtc": "2026-09-07T11:30:00Z"
+    },
+    {
+      "id": "c-20260907-arbitrary-limb-debug",
+      "author": "anonymous",
+      "body": "Generalized the debug presentation to the same arbitrary-limb invariant as runtime rigging: removed the hard-coded Focus Legs control and PartType.Leg/Foot label filter. `Focus Limbs` now discovers articulated bones structurally via segment/attachment metadata, so wings, arms, tentacles, antennae, multiple leg sets, and other supported chains do not require new editor modes.",
+      "createdAtUtc": "2026-09-07T12:55:00Z"
+    },
+    {
+      "id": "c-20260907-chain-focus",
+      "author": "anonymous",
+      "body": "Follow-up UX hardening: `Frame Selected Chain` now traverses live parent links so selecting a terminal child such as a foot/hand includes its owning articulated chain. The implementation remains structural and does not depend on PartType or a fixed limb count.",
+      "createdAtUtc": "2026-09-07T13:10:00Z"
+    },
+    {
+      "id": "c-a4f8b687882345649e3c4bdcdf73bbaa",
+      "author": "anonymous",
+      "body": "Audit synthesis 2026-09-07: pull the deferred raw generated mesh presentation into this owner. `CreaturePreviewController.BindImplicitSurface` destroys the preview-root `MeshFilter` and `MeshRenderer` before creating the skinned path, and neither preview path exposes a raw/rest-mesh toggle. Add a structural presentation mode that can show the generated mesh without `SkinnedMeshRenderer`, while preserving the current debug view's generic arbitrary-limb behavior. Acceptance must include a Unity SceneView check that toggles raw versus skinned display and confirms the two paths do not create duplicate owned objects. Provenance: `docs/audits/creaturecreator-rig-liveuse-audit-2026-09-07.md`, Finding 4.",
+      "createdAtUtc": "2026-09-07T19:38:41.4023409Z"
+    },
+    {
+      "id": "c-20260908-audit-reconciliation",
+      "author": "anonymous",
+      "body": "2026-09-08 peer-review reconciliation: the live branch already contains the raw generated mesh toggle and duplicate-component cleanup, so the corresponding audit recommendations are stale as standalone work. The compact Body rig is also already segmented adaptively, so no new spine/tail-subdivision task was created. Posed attachment coordinate-space correctness remains isolated in TSK-0188.",
+      "createdAtUtc": "2026-09-08T14:30:00Z"
+    }
+  ],
   "epicId": null,
   "parentId": "TSK-0073",
   "dueDateUtc": null,
   "createdAtUtc": "2026-09-07T06:27:32.4549774Z",
-  "updatedAtUtc": "2026-09-07T06:27:32.4549774Z",
+  "updatedAtUtc": "2026-09-08T14:30:00Z",
   "completedAtUtc": null,
-  "revision": 1,
+  "revision": 8,
   "isArchived": false,
   "hasLoadError": false,
   "loadError": null,
-  "sourceFilePath": null
+  "sourceFilePath": "tsk-0149-build-depth-independent-rig-debug-view.json"
 }

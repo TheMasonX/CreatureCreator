@@ -1,0 +1,57 @@
+﻿{
+  "id": "tsk-0224-provenance-attributed-implicit-surface-bone-weights",
+  "key": "TSK-0224",
+  "title": "Derive implicit-surface bone weights from metaball source attribution",
+  "description": "## Summary\nCarry per-vertex source attribution through field sampling, extraction, and vertex welding. Derive influence-domain eligibility and bone weights from that attribution instead of from nearest-part SDF and closest-point-on-segment geometry.\n\nThis implements the recommendation owned by TSK-0222. Evidence: \u0060docs/audits/creaturecreator-spore-metaball-pivot-and-appearance-synthesis-2026-09-12.md\u0060, findings F-01, F-08, F-09, section 9. Spore evidence: Chris Hecker, \u0022My Liner Notes for Spore\u0022 (\u0022We generate bone weights for the vertices based on which body parts generated which metaballs\u0022).\n\nReported symptoms this task must address: the elbow moves the whole arm, the foot twists and compresses the leg, the tail moves in disjointed sections, the knee is comparatively acceptable.\n\n## Scope\n- Extend the metaball primitive record with \u0060SourcePartId\u0060, \u0060BoneId\u0060, \u0060ChainId\u0060, \u0060IsMirrored\u0060, \u0060SymmetryGroupId\u0060, and \u0060RegionRole\u0060.\n- Accumulate a top-K contribution set per grid corner during field sampling. Start with K = 4.\n- Interpolate the contribution set with the same parameter used for the vertex position on a grid edge.\n- Merge contributions by source during welding instead of first-writer-wins. \u0060GridVertexOwnership\u0060 in \u0060MarchingCubesExtractor\u0060 already keys corners and axis edges as deterministic grid identities, so a parallel attribution array does not change weld determinism.\n- Aggregate contributions by bone. Reject bones whose chain is not allowed for the vertex by provenance membership, not by geometric distance.\n- Apply a joint-local transfer profile inside \u0060InfluenceWeightingPolicy\u0060. Distance selects which bone inside an allowed chain. Provenance selects which chain.\n- Keep the four-influence cap and the indexed zero-allocation per-frame animation path.\n- Depends on TSK-0223 for compact-support attribution.\n\n## Acceptance Criteria\n- An upper-arm vertex has zero forearm weight unless a forearm primitive contributed at that vertex.\n- A fixed-pose fixture that rotates only the left foot leaves every right-side and shank vertex position bit-identical.\n- Every tail vertex has a tail primitive as its dominant source.\n- The knee fixture result is unchanged by the fix. A change of the same magnitude as the elbow indicates the model is still wrong.\n- Total generation allocates no new managed memory per vertex in the weighting stage.\n- Weights remain deterministic across repeated generation of the same definition.\n- Each reported symptom has a named regression test in the Runtime test assembly.\n\n## Validation\nUnity EditMode and PlayMode. Add the mirrored fixture test that poses one side and asserts the other side is unchanged by position. Re-run the \u0060RigSkinningSweepDiagnostic\u0060 and compare per-bone leakage before and after. Record maximum cross-chain weight per joint. \u0060dotnet build\u0060 Runtime and Tests.Runtime. Source inspection alone cannot close this task.\n\n## Findings\n- The current model is geometric inference: \u0060ImplicitSurfaceInfluenceDomainResolver\u0060 uses the nearest resolved part SDF, and \u0060ImplicitSurfaceWeightAuthoring\u0060 uses closest point on segment with radius-scaled falloff.\n- At a joint several segments are spatially close. Geometric proximity does not identify anatomical ownership.\n- Attribution is discarded today. \u0060GeneratedCreature\u0060 exposes one item for the whole implicit surface, and \u0060MeshExtractionResult\u0060 stores only positions, normals, and triangles.\n- Spore also failed on spine and torso weights, and it never solved torso-attached parts. Scope the target as structurally better with documented failure regions.\n- A thick parent blob can dominate a child near a joint. Raw provenance alone is not an attractive weight, so the joint-local transfer profile is required.\n\n## Blockers\n- TSK-0223 must land first. Without a compact-support field there is no per-primitive contribution to attribute.\n\n## Next Step\nWrite the attribution payload and the per-corner top-K accumulation. Prove attribution survives interpolation and welding on a two-segment fixture before changing any weight formula.",
+  "type": "Task",
+  "status": "Backlog",
+  "priority": "High",
+  "assigneeMode": "Custom",
+  "assigneeDirectoryId": null,
+  "assigneeCustomText": "Agent",
+  "reporter": "anonymous",
+  "labels": [
+    "animation",
+    "rig",
+    "skinning",
+    "weights",
+    "metaball",
+    "provenance",
+    "research-followup",
+    "performance"
+  ],
+  "attachments": [],
+  "externalLinks": [],
+  "linkedPages": [],
+  "comments": [
+    {
+      "id": "c-692177cab8e146c3932043ffd97c8d59",
+      "author": "anonymous",
+      "body": "Council re-scope 2026-09-12 (\u0060docs/audits/creaturecreator-council-review-metaball-pivot-2026-09-12.md\u0060, findings C1, C2, C3, C10; gates G1, G2, G9).\n\n**Blocked.** Do not start this task until gate G1 (\u0060TSK-0194\u0060 green rerun) and gate G2 (\u0060TSK-0147\u0060 post-fix re-measurement) both pass. This task\u0027s premise was argued from pre-fix evidence. \u0060TSK-0147\u0060 shipped a chain-aware gate as \u0060f7dd934\u0060, and this task never accounted for it.\n\nRequired scope corrections:\n\n1. **Add a dominance rule.** Seat 2 verified that \u0022a forearm primitive contributed\u0022 preserves the elbow mechanism, because a forearm metaball legitimately contributes on upper-arm surface points near the joint. Eligibility alone relabels the symptom. Specify a dominance threshold and a deterministic tie-break (lowest \u0060BoneIndex\u0060).\n2. **Reframe as a capability, not the symptom fix.** The structural gain is chain selection. Quality still rests on the joint-local transfer profile, which is a new tunable.\n3. **Mirror keying.** Aggregate on \u0060(SourcePartId, IsMirrored)\u0060, because mirrored twins share \u0060SourcePartId\u0060. Add a dominant-side tie-break so a midline vertex does not gain both \u0060X\u0060 and \u0060X_mirror\u0060.\n4. **Make the weld merge commutative.** \u0060GridVertexOwnership\u0060 keys are deterministic grid identities, so a parallel attribution array is safe, but a first-writer-wins merge is cell-order sensitive.\n5. **Distinguish top-K contributions from the four-bone influence cap.** The original acceptance criteria conflated them.\n6. **Replace three non-executable criteria:**\n   - \u0022Zero forearm weight unless a forearm primitive contributed\u0022 is circular. Replace with a numeric leakage gate: at least 50% reduction of maximum forearm weight on upper-arm-dominant vertices against the \u0060TSK-0147\u0060 \u0060Default\u0060 baseline.\n   - \u0022Every shank vertex bit-identical\u0022 contradicts this task\u0027s own joint-local transfer profile, which deliberately moves shank vertices in the ankle band. Replace with a bounded-movement tolerance.\n   - \u0022The knee fixture result is unchanged\u0022 has no fixture and no baseline. Replace with: knee leakage within \u00601e-5\u0060 of the \u0060TSK-0147\u0060 baseline, and no change of dominant bone at the knee.\n7. **No allocation claim without a harness.** Seat 2 verified \u0060Author\u0060 allocates a \u0060VertexInfluence\u0060 array per vertex today. Do not assert zero allocation without a measured threshold.\n8. **Ownership.** This task must not close the foot symptom. \u0060TSK-0150\u0060 is the canonical foot owner. Record that this task feeds it.\n\nOpen question the council could not settle, and the highest-value one in the review: can attribution be threaded through the existing SDF tree without the field-representation change? If yes, this task no longer depends on \u0060TSK-0223\u0060.\n\nNo code change made.",
+      "createdAtUtc": "2026-09-12T06:33:26.1422727Z"
+    },
+    {
+      "id": "c-a4f33bbdfec74e079a7a5d25fbdaf5d3",
+      "author": "anonymous",
+      "body": "Audit synthesis 2026-09-12 (late) \u2014 external synthesis corroboration.\n\nSYN-04 (P1, 0.99) Confirmed: final implicit-surface skin weights are still authored at Unity bind time, not in generation. GeneratedCreatureData carries influence domains but not the final weights or the weighting policy identity, and the binding path calls ImplicitSurfaceWeightAuthoring.Author for production-generated data.\n\nCouncil Seat 4 (confidence 0.995) recommends: generation computes final VertexInfluence data exactly once; Unity binding only converts it to BoneWeight/bindpose arrays; keep LinearBlendSkinning.Deform as the mathematical oracle and compare the Unity SMR result to it.\n\nThis task owns that migration. Acceptance gates: identical weights before/after; identical rest-pose result; posed result equal within explicit tolerance; weighting-policy identity captured with the generated artifact. Related: TSK-0219 (layered revision identity) and TSK-0206 (Unity BoneWeight contract). Council ordering places this slice at position 2, after request/artifact identity (TSK-0095) and before duplicate-program consolidation (TSK-0248).",
+      "createdAtUtc": "2026-09-13T04:35:13.9363327Z"
+    },
+    {
+      "id": "c-fd94865d4e5d45a8961a8930b005d844",
+      "author": "anonymous",
+      "body": "2026-09-12 task-board review: canonical implementation owner for the weighting pivot (implements TSK-0222). TSK-0147, TSK-0150, TSK-0168, TSK-0172, and TSK-0238 currently refine or diagnose the *legacy* closest-point-on-segment model. Choose one canonical owner before any legacy refinement proceeds. Disposition of those records requires a user decision because they carry STRICT user mandates. TSK-0238 is currently parented under TSK-0147 and must be re-evaluated once the pivot is decided.",
+      "createdAtUtc": "2026-09-13T04:52:04.3234439Z"
+    }
+  ],
+  "epicId": null,
+  "parentId": "TSK-0222",
+  "dueDateUtc": null,
+  "createdAtUtc": "2026-09-12T06:23:58.8681348Z",
+  "updatedAtUtc": "2026-09-13T04:52:04.3234439Z",
+  "completedAtUtc": null,
+  "revision": 4,
+  "isArchived": false,
+  "hasLoadError": false,
+  "loadError": null,
+  "sourceFilePath": "tsk-0224-provenance-attributed-implicit-surface-bone-weights.json"
+}

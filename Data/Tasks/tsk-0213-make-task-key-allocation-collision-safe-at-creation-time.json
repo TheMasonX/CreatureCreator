@@ -1,0 +1,62 @@
+﻿{
+  "id": "tsk-0213-make-task-key-allocation-collision-safe-at-creation-time",
+  "key": "TSK-0213",
+  "title": "Make task-key allocation collision-safe at creation time",
+  "description": "## Summary\nThe 2026-09-11 audit window contains a live MemorySmith task-key collision wave. Keys \u0060TSK-0197\u0060 through \u0060TSK-0205\u0060 each carry 2\u20133 distinct active records that share one key (19 records over 9 keys), produced by at least three independent sessions allocating keys concurrently. \u0060TSK-0189\u0060 made \u0060Scripts/Normalize-TaskRecords.ps1\u0060 collision-safe when *repairing* drift, but nothing guards *creation-time* allocation. Separately, the create/update API accepted a record whose \u0060externalLinks\u0060 shape its own reader rejects, leaving \u0060TSK-0206\u0060 (\u0060hasLoadError: true\u0060) unreadable.\n\n## User Mandate\n\u003E \u0022Synthesize the latest unreviewed audits and re-review the other recent audits from the last 2 days or so in order to extract all relevant information into the task system, or to improve the agent/skills/process/development pipeline aspects\u0022\n\nSTRICT. Do not narrow or re-scope this requirement; surface any proposed change first.\n\n## Scope\n- Make task-key allocation collision-safe at creation time: scan every existing \u0060Data/Tasks/*.json\u0060 id/key before assigning the next key, and fail or reassign on collision.\n- Repair the live collision wave through a supported MemorySmith path (no hand-editing \u0060Data/Tasks/*.json\u0060): preserve every distinct mechanism under a unique key, naming replacements.\n- Harden the record schema so create/update rejects shapes the reader cannot load (for example \u0060externalLinks\u0060 supplied as strings instead of link objects).\n- Keep the normalizer\u0027s fail-closed behavior and \u0060TSK-0189\u0060\u0027s collision-safe repair path intact.\n\n## Acceptance Criteria\n- Creating a task never produces a second live record with an existing key.\n- The live collision census (\u0060TSK-0197\u0060..\u0060TSK-0205\u0060) is resolved to one canonical record per key, with superseded/renamed records archived and naming their replacement.\n- \u0060TSK-0206\u0060 loads without \u0060hasLoadError\u0060, or its record is replaced by a loadable canonical record.\n- \u0060Scripts/Normalize-TaskRecords.ps1\u0060 and the repository task-record validator report no duplicate keys.\n\n## Validation\n\u0060memorysmith_task_list\u0060 census showing unique active keys; \u0060memorysmith_task_get\u0060 for every previously colliding key; \u0060Scripts/Normalize-TaskRecords.ps1\u0060 read/write-safe run; repository task-record validation; \u0060git diff --check\u0060.\n\n## Findings\nSource-confirmed 2026-09-11 via live MemorySmith responses. Duplicate keys observed: \u0060TSK-0197\u0060 (2), \u0060TSK-0198\u0060 (2), \u0060TSK-0199\u0060 (2), \u0060TSK-0200\u0060 (3), \u0060TSK-0201\u0060 (2), \u0060TSK-0202\u0060 (2), \u0060TSK-0203\u0060 (2), \u0060TSK-0204\u0060 (2), \u0060TSK-0205\u0060 (2). \u0060TSK-0206\u0060 returns \u0060hasLoadError\u0060 because \u0060externalLinks[0]\u0060 is a string, not a \u0060TaskExternalLink\u0060 object. Root cause is creation-time allocation across independent sessions, not the normalizer.\n\n## Blockers\nThe MemorySmith tool surface exposes no key-rename operation; resolving the wave may require an API/repair-path change recorded here rather than ad-hoc record deletion.\n\n## Next Step\nAdd the creation-time uniqueness preflight, then reconcile the live collision wave and verify the census.",
+  "type": "Bug Fix",
+  "status": "Backlog",
+  "priority": "High",
+  "assigneeMode": "Custom",
+  "assigneeDirectoryId": null,
+  "assigneeCustomText": "Unassigned",
+  "reporter": "anonymous",
+  "labels": [
+    "user-mandated",
+    "audit-synthesis",
+    "task-system",
+    "tooling",
+    "task-integrity",
+    "process",
+    "follow-up"
+  ],
+  "attachments": [],
+  "externalLinks": [],
+  "linkedPages": [],
+  "comments": [
+    {
+      "id": "c-669c9f8bc6364037b755e63fb486a86f",
+      "author": "anonymous",
+      "body": "Validator evidence (2026-09-11 synthesis). \u0060Scripts/Test-TaskRecords.ps1\u0060 still fails: it reports every key in the \u0060TSK-0195\u0060..\u0060TSK-0205\u0060 collision wave as duplicate, plus the historical \u0060TSK-0153\u0060/\u0060TSK-0188\u0060/\u0060TSK-0189\u0060 pairs and missing-field schema errors in older records. Archiving a duplicate live record (\u0060set_status\u0060 = Archived) does NOT clear the validator: it counts archived JSON files as duplicates. So the acceptance criterion requires either (a) the validator to exclude \u0060isArchived\u0060 records, or (b) a supported rename/delete path for the colliding \u0060Data/Tasks/*.json\u0060 files. This is a validator/tooling gap to add to this task\u0027s scope.",
+      "createdAtUtc": "2026-09-12T02:49:38.0244109Z"
+    },
+    {
+      "id": "c-299112bb260c478593afff988c09fff0",
+      "author": "anonymous",
+      "body": "Real-world collision evidence (2026-09-11). Two distinct records currently share key \u0060TSK-0198\u0060:\n- \u0060tsk-0198-stream-preview-generation-hotpaths-and-direct-edge-ownership\u0060 (Performance; reporter ChatGPT; the stream-preview/extraction perf slice)\n- \u0060tsk-0198-define-portable-animation-clip-and-sampling-contract\u0060 (Task; animation clip/sampling contract)\n\nImpact observed: \u0060task_add_comment\u0060 called with \u0060idOrKey: \u0022TSK-0198\u0022\u0060 was mis-routed to the animation task. The bare key is not sufficient to identify the record; callers must pass the full slug id. This also means any key-based lookup, status change, or handoff reference to \u0060TSK-0198\u0060 is ambiguous.\n\nRequested behaviour: make key allocation collision-safe at creation time (refuse or disambiguate), and make key-based resolution fail loudly on ambiguity instead of silently choosing one record. Suggested validation: a test that creates a second record whose normalized key collides and asserts creation fails (or produces a distinct key), plus a resolution test that asserts an ambiguous key returns an error rather than a record.",
+      "createdAtUtc": "2026-09-12T03:55:36.9231847Z"
+    },
+    {
+      "id": "c-758755ce44ab422b8f9a92ec1545dd50",
+      "author": "anonymous",
+      "body": "Audit synthesis 2026-09-12: this task (creation-time collision safety) is necessary but not sufficient. Two new confirmations from this pass:\n\n1. Prevention did not repair the backlog. \u0060Scripts/Test-TaskRecords.ps1\u0060 fails with 44 issues, including 15 records over 14 duplicated keys (TSK-0153, 0188, 0189, 0195, 0196, 0197, 0198, 0199, 0200 x3, 0201, 0202, 0203, 0204, 0205) and 30 records missing required schema fields, plus one unloadable record (\u0060tsk-0206\u0060). Because the MemorySmith index is keyed by task key, colliding records shadow each other and drop out of \u0060memorysmith_task_list\u0060. Backlog repair is owned by TSK-0217.\n\n2. Cross-branch key divergence produces phantom owners. The 2026-09-12 deep-dive audit cites \u0060TSK-0203\u0060 as the \u0022SMR compatibility guard \u002B animated bounds\u0022 owner (its top-ranked owner for findings F-11, HG-01, HG-03, HG-04). On this branch \u0060TSK-0203\u0060 is two unrelated memory-measurement records, and no task here owns the SMR compatibility guard \u2014 even though the guard is verified present in the worktree (\u0060CreatureSkinnedMeshRenderer.Bind\u0060 checks \u0060snapshot.Count != rig.IndexedBones.Count\u0060 and \u0060rig.RestSkeleton.HasSameBoneOrder(snapshot)\u0060). An audit\u0027s canonical-owner table is therefore not trustworthy across branches; owner keys must be re-resolved on the branch under work, not carried over.\n\nRecommended safeguard (in addition to collision-safe allocation at creation): whenever a synthesis or audit cites a \u0060TSK-####\u0060 owner, resolve that key on the branch under work and confirm the record exists and matches the cited mechanism; if it does not, treat the citation as provenance-only and assign a real owner.\n\nEvidence: \u0060Scripts/Test-TaskRecords.ps1\u0060 run 2026-09-12; \u0060Data/Tasks/tsk-0203-*.json\u0060; \u0060Assets/Scripts/Runtime/Animation/Skinned/CreatureSkinnedMeshRenderer.cs:58-70\u0060. Related: TSK-0217, TSK-0189, TSK-0220.",
+      "createdAtUtc": "2026-09-12T05:54:34.365462Z"
+    },
+    {
+      "id": "c-fe9d5d377faa44df93194ab9a3237b42",
+      "author": "anonymous",
+      "body": "Audit synthesis 2026-09-12 (late): SIXTH recurrence of task-key collision, and the first same-branch recurrence.\n\nState found at HEAD fa76a44: the live board held two records each for TSK-0206, TSK-0207, TSK-0208, TSK-0209, TSK-0210, and TSK-0211 (12 records over 6 keys); Scripts/Test-TaskRecords.ps1 failed with 6 duplicate-key issues.\n\nRoot cause: the 2026-09-12 20:03-20:04 audit-derived commits d62cffd, 592c9b6, ca0a6b3, 8422b37, 9285e07, and b9e7202 allocated TSK-0206..TSK-0211 although each of their parents already contained those exact keys. Verified with git merge-base: 8ec2af3 IS an ancestor of d62cffd (and the same holds for the other five pairs). An agent created tasks without reading the current board, so the ceiling rule was bypassed inside one branch, not just across branches.\n\nRepair: renumbered the newer set to TSK-0246..TSK-0251 via Scripts/Normalize-TaskRecords.ps1 -RenumberMap Scripts/task-key-reconciliation-2026-09-12-late.json (validated whole-map preflight, idempotent on re-run). Board now validates at 251 records, keys and ids unique. A concurrent session also allocated TSK-0243/TSK-0245 during the same window, confirming the ceiling rule can still be missed under concurrency.\n\nImpact beyond bookkeeping: the collision had already corrupted two audits\u0027 owner tables. The external synthesis (creaturecreator-cc-audit-synthesis-26-09-12-17-34-00.md) cites the OLDER set for TSK-0206/0207/0209/0210; the current-head council audit (current-head-hidden-defects-and-consolidation-council-audit-26-09-12-19-56-00.md) cites the NEWER set for TSK-0206..TSK-0211. Key assignment is therefore not cosmetic.\n\nThis task remains the owner of creation-time allocation safety. Next gate: allocate by reading the live maximum key plus the live key set, and add a creation-time preflight that fails closed.",
+      "createdAtUtc": "2026-09-13T04:35:14.0220773Z"
+    }
+  ],
+  "epicId": null,
+  "parentId": null,
+  "dueDateUtc": null,
+  "createdAtUtc": "2026-09-12T02:47:21.5250769Z",
+  "updatedAtUtc": "2026-09-13T04:35:14.0220773Z",
+  "completedAtUtc": null,
+  "revision": 5,
+  "isArchived": false,
+  "hasLoadError": false,
+  "loadError": null,
+  "sourceFilePath": "tsk-0213-make-task-key-allocation-collision-safe-at-creation-time.json"
+}

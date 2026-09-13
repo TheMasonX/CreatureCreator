@@ -1,0 +1,42 @@
+﻿{
+  "id": "tsk-0214-remove-confirmed-dead-code-sdfsamplingjob-and-groupedpartsiblingorderer",
+  "key": "TSK-0214",
+  "title": "Remove unreachable GroupedPartSiblingOrderer dead code",
+  "description": "## Summary\n\u0060GroupedPartSiblingOrderer\u0060 (\u0060Assets/Scripts/Editor/PartSiblingOrderer.cs:45\u0060, static \u0060Grouped\u0060 at \u0060:68\u0060) is confirmed unreachable: no code path can select it and it has no external references. Remove it, or wire a real selection path if the grouped strategy is still intended (state which).\n\n## User Mandate\n\u003E \u0022Synthesize the latest unreviewed audits and re-review the other recent audits from the last 2 days or so in order to extract all relevant information into the task system, or to improve the agent/skills/process/development pipeline aspects\u0022\n\nSTRICT. Do not narrow or re-scope this requirement; surface any proposed change first.\n\n## Scope\n- Delete \u0060GroupedPartSiblingOrderer\u0060 and its \u0060Grouped\u0060 property, or wire a real selection path if the grouped strategy is still intended (state which).\n- Do not change behavior of the selected sibling ordering.\n\n## Acceptance Criteria\n- \u0060grep\u0060 finds no references to \u0060GroupedPartSiblingOrderer\u0060 or \u0060PartSiblingOrderer.Grouped\u0060; whole-project build is 0 warnings / 0 errors.\n- Existing editor part sibling-order tests stay green.\n\n## Validation\nWhole-project compile gate; focused editor tests for part sibling order.\n\n## Findings\n\u0060docs/audits/audit-race-followup-and-streamlining-2026-09-11.md\u0060 confirmed an unreachable \u0060GroupedPartSiblingOrderer\u0060. Verified by grep at synthesis time (2026-09-11): it appears only at its own declaration plus the static \u0060Grouped\u0060 property.\n\n## Blockers\nNone.\n\n## Next Step\nDelete \u0060GroupedPartSiblingOrderer\u0060 and its \u0060Grouped\u0060 property if the grouped strategy is not intended.\n\n## Reconciliation\n2026-09-12 task-board review: the \u0060SdfSamplingJob\u0060 deletion clause was removed from this record and transferred to \u0060TSK-0248\u0060 (\u0022Consolidate duplicate SDF evaluation paths\u0022), which already owns removing the dead legacy sampler as part of SDF-path consolidation. This record now owns only \u0060GroupedPartSiblingOrderer\u0060.",
+  "type": "Task",
+  "status": "Backlog",
+  "priority": "Low",
+  "assigneeMode": "Custom",
+  "assigneeDirectoryId": null,
+  "assigneeCustomText": "Unassigned",
+  "reporter": "anonymous",
+  "labels": [
+    "user-mandated",
+    "audit-synthesis",
+    "dead-code",
+    "cleanup",
+    "maintainability"
+  ],
+  "attachments": [],
+  "externalLinks": [],
+  "linkedPages": [],
+  "comments": [
+    {
+      "id": "c-428b161e3a0d44498cf817e3145e5f08",
+      "author": "anonymous",
+      "body": "2026-09-12 task-board review: the \u0060SdfSamplingJob\u0060 deletion clause was removed from this record\u0027s scope and transferred to \u0060TSK-0248\u0060 (\u0022Consolidate duplicate SDF evaluation paths\u0022), which already owns removing the dead legacy sampler. This record now owns only the unreachable \u0060GroupedPartSiblingOrderer\u0060. No user mandate was relaxed; the STRICT mandate text is preserved verbatim.",
+      "createdAtUtc": "2026-09-13T04:51:20.3696412Z"
+    }
+  ],
+  "epicId": null,
+  "parentId": null,
+  "dueDateUtc": null,
+  "createdAtUtc": "2026-09-12T02:47:52.0920978Z",
+  "updatedAtUtc": "2026-09-13T04:51:20.3696412Z",
+  "completedAtUtc": null,
+  "revision": 3,
+  "isArchived": false,
+  "hasLoadError": false,
+  "loadError": null,
+  "sourceFilePath": "tsk-0214-remove-confirmed-dead-code-sdfsamplingjob-and-groupedpartsiblingorderer.json"
+}

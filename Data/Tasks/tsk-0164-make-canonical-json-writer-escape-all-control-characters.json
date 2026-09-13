@@ -1,0 +1,33 @@
+{
+  "id": "tsk-0164-make-canonical-json-writer-escape-all-control-characters",
+  "key": "TSK-0164",
+  "title": "Make CanonicalJsonWriter escape all JSON control characters",
+  "description": "Council serialization review found a reader/writer contract mismatch. MiniJsonReader rejects raw characters below U+0020 inside JSON strings, but CanonicalJsonWriter.Escape previously emitted only named escapes for quote, backslash, newline, carriage return, and tab. Other U+0000..U+001F controls could therefore be serialized as invalid JSON. Escape now emits named JSON escapes for backspace/form-feed and unicode escapes (`\\u00xx`) for all remaining control characters. Existing normal-string output remains byte-stable, and the serialized value round-trips through JsonDnaSerializer.",
+  "type": "Bug Fix",
+  "status": "Done",
+  "priority": "Medium",
+  "assigneeMode": "Custom",
+  "assigneeDirectoryId": null,
+  "assigneeCustomText": "Unassigned",
+  "reporter": "council-exhaustive-audit",
+  "labels": ["council", "serialization", "json", "parser", "writer", "TSK-0136"],
+  "attachments": [],
+  "externalLinks": [],
+  "linkedPages": [],
+  "parentId": "tsk-0136-harden-the-minijsonreader-json-grammar-with-a-dedicated-reader-test-fixture",
+  "comments": [
+    {
+      "id": "c-0164-implementation-20260908",
+      "author": "anonymous",
+      "body": "Fixed CanonicalJsonWriter.Escape and added JsonDnaSerializerTests.Serialize_EscapesAllJsonControlCharactersInStringFields. Test covers NUL, SOH, BEL, backspace, form-feed, newline, carriage-return, tab, and U+001F; asserts no raw controls remain and the DisplayName round-trips. No Unity execution was performed in this harness.",
+      "createdAtUtc": "2026-09-08T09:45:00Z"
+    }
+  ],
+  "createdAtUtc": "2026-09-07T16:30:00Z",
+  "updatedAtUtc": "2026-09-08T09:45:00Z",
+  "completedAtUtc": "2026-09-08T09:45:00Z",
+  "revision": 2,
+  "isArchived": false,
+  "hasLoadError": false,
+  "sourceFilePath": "tsk-0164-make-canonical-json-writer-escape-all-control-characters.json"
+}

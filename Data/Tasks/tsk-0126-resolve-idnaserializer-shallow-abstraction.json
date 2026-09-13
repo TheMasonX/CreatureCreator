@@ -28,15 +28,27 @@
       "author": "anonymous",
       "body": "## Sprint Round 3 (TSK-0126) \u2014 implementation \u002B validation evidence\n\n**Decision:** Chose scope option (a) \u2014 remove the shallow \u0060IDnaSerializer\u0060 interface and bind callers directly to the concrete \u0060JsonDnaSerializer\u0060. This is the honest contract because there is one sealed implementation with no planned second serializer policy, and concrete construction sites meant the interface never provided a real substitution/policy boundary (audit F5/P2).\n\n**Changed files (worktree):**\n- Deleted \u0060Assets/Scripts/Runtime/Serialization/IDnaSerializer.cs\u0060 (\u002B \u0060.meta\u0060).\n- \u0060JsonDnaSerializer.cs\u0060: removed \u0060: IDnaSerializer\u0060; class stays \u0060public sealed class JsonDnaSerializer\u0060; folded the interface\u0027s contract doc (canonicalize-then-serialize; Deserialize does not validate; DnaDeserializationException for structural malformation) into the class \u0060\u003Csummary\u003E\u0060/\u0060\u003Cremarks\u003E\u0060. Method bodies (\u0060Serialize\u0060/\u0060Deserialize\u0060) are BYTE-IDENTICAL to before \u2014 pure structural refactor, no behavior change.\n- \u0060CreatureEditorSession.cs\u0060, \u0060CreatureEditorWindow.cs\u0060: \u0060IDnaSerializer Serializer\u0060 field type -\u003E \u0060JsonDnaSerializer\u0060.\n- \u0060CreatureRuntimePreview.cs\u0060: already used \u0060new JsonDnaSerializer()\u0060 inline (no interface field) \u2014 no change needed.\n- \u0060MiniJsonReader.cs\u0060, \u0060Assets/Scripts/README.md\u0060: doc-comment references updated \u0060IDnaSerializer\u0060 -\u003E \u0060JsonDnaSerializer\u0060.\n\n**Static/compile gates (verified):**\n- \u0060grep IDnaSerializer\u0060 across all \u0060Assets/**/*.cs\u0060 -\u003E 0 references remain (removal fully propagated).\n- dotnet build --no-restore: Runtime, Editor, Tests.Runtime, Tests.Editor -\u003E all 0 warnings / 0 errors.\n- Unity: after forced recompile/domain reload, console shows NO script compile errors from this change (only a pre-existing PerformanceTesting \u0060TestRunBuilder\u0060 \u0022Internal build system error\u0022, present before this change).\n\n**Unity validation (independently run):**\n- Editor EditMode suite: **129/129 passed, 0 failed** \u2014 includes \u0060CreatureEditorSessionTests\u0060 session save/load round-trip through the now-concrete \u0060JsonDnaSerializer\u0060 binding (the changed editor callers).\n\n**Residual risk / blocker (recorded honestly):**\n- The dedicated Runtime-assembly \u0060JsonDnaSerializer*\u0060 PlayMode round-trip suite could NOT be re-executed in this session. The Unity test runner was left unhealthy by the preceding VS Code crash: PlayMode runs consistently fail to initialize (\u0022tests did not start within timeout\u0022, 5\u002B attempts) and EditMode does not discover the Runtime test assembly\u0027s tests. This is an environment issue, not a code defect.\n- Mitigating fact: the change is behavior-neutral (concrete class method bodies unchanged) and the serializer tests construct the concrete class directly, so they are unaffected by construction. Recommend a confirmatory PlayMode run of \u0060ProceduralCreature.Tests.Runtime\u0060 once the editor test runner is healthy.",
       "createdAtUtc": "2026-09-06T06:46:17.0765389Z"
+    },
+    {
+      "id": "c-afa162be35ff44b8af842681113ad1ea",
+      "author": "anonymous",
+      "body": "2026-09-11 audit synthesis evidence (\u0060docs/audits/audit-race-followup-and-streamlining-2026-09-11.md\u0060). This task owns the \u0060IDnaSerializer\u0060 collapse (one implementation, half its call sites bypass the interface). Batch it with two confirmed dead-code siblings in the same \u0022delete an abstraction/branch nothing uses\u0022 decision class: \u0060SdfSamplingJob\u0060 in \u0060SdfProgram.cs\u0060 (zero callers; keep as the correct reference pattern until \u0060TSK-0212\u0060 lands, then delete) and \u0060GroupedPartSiblingOrderer\u0060 in \u0060PartSiblingOrderer.cs\u0060 (second strategy with no code path that can select it). One cleanup pass, not three tickets.",
+      "createdAtUtc": "2026-09-12T02:47:37.0103328Z"
+    },
+    {
+      "id": "c-f8d6cfdb03de42f7815026117a872980",
+      "author": "anonymous",
+      "body": "Self-correction (2026-09-11 synthesis): the comment above is partly wrong. This task is already \u0060Done\u0060 (2026-09-06) \u2014 \u0060IDnaSerializer\u0060 was removed and grep confirms 0 references under \u0060Assets/Scripts/**\u0060. The streamlining audit\u0027s claim that it is \u0022still Backlog\u0022 is STALE and must not be reopened. Only the two sibling dead-code items remain; they are tracked in \u0060TSK-0214\u0060 (\u0060SdfSamplingJob\u0060 after \u0060TSK-0212\u0060; \u0060GroupedPartSiblingOrderer\u0060 now).",
+      "createdAtUtc": "2026-09-12T02:47:55.8749974Z"
     }
   ],
   "epicId": null,
   "parentId": null,
   "dueDateUtc": null,
   "createdAtUtc": "2026-09-06T04:25:46.4813603Z",
-  "updatedAtUtc": "2026-09-06T06:46:25.9969174Z",
+  "updatedAtUtc": "2026-09-12T02:47:55.8749974Z",
   "completedAtUtc": "2026-09-06T06:46:25.9969174Z",
-  "revision": 3,
+  "revision": 5,
   "isArchived": false,
   "hasLoadError": false,
   "loadError": null,

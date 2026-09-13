@@ -1,0 +1,42 @@
+{
+  "id": "tsk-0162-dispose-sdf-evaluator-temp-buffer-on-exception",
+  "key": "TSK-0162",
+  "title": "Dispose temporary SDF evaluator buffers on exceptional paths",
+  "description": "Council 100+ round resource-lifecycle review confirmed SdfProgramEvaluator.Evaluate(NativeArray<SdfOperation>.ReadOnly, ...) allocates a temporary NativeArray<float> and disposes it only after EvaluateInto returns. If EvaluateInto throws on malformed operation data, the temporary allocation is not disposed by the method.\n\nScope: wrap the temporary allocation/use in try/finally without changing evaluation semantics. Add a regression that exercises the exceptional path where practical, then verify normal reference/culled evaluation parity.\n\nDo not add a broader allocation abstraction; this is a local ownership bug.\n\nValidation gate: runtime build, focused evaluator tests, and Unity execution before closure.",
+  "type": "Bug Fix",
+  "status": "Done",
+  "priority": "Low",
+  "assigneeMode": "Custom",
+  "assigneeDirectoryId": null,
+  "assigneeCustomText": "Unassigned",
+  "reporter": "council-audit",
+  "labels": [
+    "council",
+    "sdf",
+    "resource-lifecycle",
+    "robustness"
+  ],
+  "attachments": [],
+  "externalLinks": [],
+  "linkedPages": [],
+  "comments": [
+    {
+      "id": "c-0162-implementation-20260908",
+      "author": "anonymous",
+      "body": "Implementation verified on the current branch: SdfProgramEvaluator.Evaluate(NativeArray<SdfOperation>.ReadOnly, ...) wraps its temporary values allocation and EvaluateInto call in try/finally, guaranteeing disposal on both normal and exceptional paths. A focused regression was added for the exceptional path via an invalid RootIndex; the guard throws inside the try and the temporary allocation is deterministically disposed.",
+      "createdAtUtc": "2026-09-08T14:55:00Z"
+    },
+    {
+      "id": "c-0162-validation-20260908",
+      "author": "anonymous",
+      "body": "Validation evidence: commit a4fe7cd9a5f2e05ae53f4685d5fc28dd317189fa recorded focused 1/1 for the exception/disposal regression, SDF fixtures 24/24, full PlayMode 380/385 with the five documented pre-existing failures, console clean, and 0 compile errors. The disposal change itself is also present in current SdfProgramEvaluator source. No new Unity execution was performed in this audit response; the cited Unity run is historical repository evidence on this code line.",
+      "createdAtUtc": "2026-09-08T14:55:00Z"
+    }
+  ],
+  "parentId": "tsk-0008-profile-and-optimize-preview-generation-hotspots",
+  "dueDateUtc": null,
+  "isArchived": false,
+  "createdAtUtc": "2026-09-07T11:39:44.0000000Z",
+  "updatedAtUtc": "2026-09-07T11:39:44.0000000Z",
+  "revision": 1
+}

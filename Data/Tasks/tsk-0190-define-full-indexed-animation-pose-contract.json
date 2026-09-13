@@ -1,0 +1,43 @@
+﻿{
+  "id": "tsk-0190-define-full-indexed-animation-pose-contract",
+  "key": "TSK-0190",
+  "title": "Define full indexed animation pose contract",
+  "description": "## Summary\nReplace the current position-only animation interchange assumption with a deliberately specified full indexed pose contract capable of representing explicit joint rotation, terminal-bone orientation, axial roll/twist, and future animation sampling without encoding Unity world transforms.\n\n## Scope\n- Define canonical animation pose space and document creature, actor, bone, and world boundaries.\n- Define index identity, skeleton compatibility, and invalid-bone semantics.\n- Represent explicit position and rotation per bone; terminal orientation and axial roll must not rely only on child position.\n- Preserve immutable pose snapshots for diagnostics and interchange.\n- Keep clip authoring, playback, blending, locomotion, root motion, and Animator/Avatar integration out of scope.\n\n## Acceptance Criteria\n- Focused runtime tests cover round-trip pose values, skeleton compatibility, malformed lengths, non-finite input, terminal orientation, and rest-pose equivalence.\n- The contract uses stable indexed identity and rejects incompatible skeleton data deterministically.\n- Existing immutable PosedSkeleton callers remain compatible until a separately validated rig-adapter migration.\n- No Unity Animator/Avatar or locomotion policy is introduced.\n\n## Validation\nRun whole-project .NET compilation before focused runtime tests. Record the exact results. Unity PlayMode validation is required for any concrete rig application migration and must not be claimed from source inspection.\n\n## Findings\nThe animation roadmap and later independent reviews confirm that the current PosedSkeleton is position-only and is not sufficient for explicit animation rotation, terminal orientation, or axial roll. The prior record was created with the colliding key TSK-0188. This record replaces that duplicate with a unique MemorySmith key.\n\n## Blockers\nUnity execution is unavailable during this reconciliation. The task remains Backlog until implementation and focused tests exist.\n\n## Next Step\nImplement the smallest runtime contract and focused tests after the existing indexed skeleton and external-driver boundaries are reviewed.\n\n## User Mandate\n\u003E \u0022Review all of the recent audits and synthesize them into the approriate memorysmith tasks. Note that external synthesis has been done on some of these, but the external agents lacked memorysmith integration, so the tasks themselves may be very outdated compared to the state. Please check and make sure all of the audits have been fully ingested and turned into tasks as appropriate\u0022\n\nSTRICT. Preserve full recent-audit ingestion, reconcile stale task state against current source, and do not claim Unity validation without execution.",
+  "type": "Task",
+  "status": "Backlog",
+  "priority": "High",
+  "assigneeMode": "Custom",
+  "assigneeDirectoryId": null,
+  "assigneeCustomText": "Agent",
+  "reporter": "BeastMaster",
+  "labels": [
+    "runtime",
+    "animation",
+    "skeleton",
+    "architecture",
+    "audit-synthesis",
+    "user-mandated"
+  ],
+  "attachments": [],
+  "externalLinks": [],
+  "linkedPages": [],
+  "comments": [
+    {
+      "id": "c-96d161836bbf4a39885666f41e231f2c",
+      "author": "anonymous",
+      "body": "Audit synthesis 2026-09-12 (CC-AUDIT-20260912-7A5E0C31, CC-AUDIT-ANIM-20260912-5B71A9E2, CC-AUDIT-HEALTH-20260912-4D6F21A8): this task is the canonical owner for the explicit animation-pose contract. Verified consolidated scope against current source:\n\n- F-01 / AN-01: \u0060PosedSkeleton\u0060 stores only \u0060Vector3[] _positions\u0060 (verified, \u0060PosedSkeleton.cs:26\u0060). \u0060PoseRotationResolver\u0060 derives interior rotation from child direction and leaves terminal bones at rest rotation. Missing information is representational, not a heuristic bug: terminal roll/twist, explicit authored local rotation, independent branch orientation at fixed endpoints, and socket/terminal orientation are all unrepresentable.\n- AN-04: \u0060WithUpdatedPositions\u0060 is sparse and does not distinguish complete frame vs incremental edit vs intentionally reset bone. Define completeness: a submitted render pose is complete and every indexed bone has a defined transform.\n- AN-05: IK vs animation update ordering is unspecified. Pick one rule and document it.\n- AN-06: link lengths are derived from rest positions and seeded from the current pose; a morphology change can leave solver state semantically stale. Coordinate with TSK-0219 (layered revision identity) so a changed skeleton invalidates or rebuilds the binding.\n- AN-09: scale is outside the contract; explicitly reject or explicitly add it.\n- AN-10: mirror semantics are not expressed as animation semantics; the required test is a nontrivial mirrored rotation, not identity.\n- AN-11: bind-time and pose-time skeleton identity are separate contracts and must stay separate.\n- AN-07 / CH-01: \u0060SkeletonSnapshot.HasSameBoneOrder\u0060 is a rest-state compatibility predicate (verified, \u0060SkeletonSnapshot.cs:219\u0060 compares IDs, parent index, source part, part type, mirror flag, position, rotation, segment state, endpoint, child-attachment state). Keep the strength; the name understates it.\n\nRequired acceptance evidence (from the deep-dive exit criteria 1-15): terminal bone rotates without moving its child endpoint; interior bone accepts explicit rotation; rest pose round-trips through LBS/SMR; IK positional solutions convert into the explicit pose format; mirrored bones preserve documented pose-space semantics; actor-local pose under a translated and rotated actor root.\n\nProvenance caveat: the audit suite was taken at branch bases that are NOT ancestors of current HEAD \u0060b5ba54b\u0060. Symbols were re-verified in the worktree; re-check before implementing. Related: TSK-0073, TSK-0118, TSK-0191, TSK-0219.",
+      "createdAtUtc": "2026-09-12T05:54:20.9869732Z"
+    }
+  ],
+  "epicId": null,
+  "parentId": "TSK-0077",
+  "dueDateUtc": null,
+  "createdAtUtc": "2026-09-10T16:26:32.3245181Z",
+  "updatedAtUtc": "2026-09-12T05:54:20.9869732Z",
+  "completedAtUtc": null,
+  "revision": 2,
+  "isArchived": false,
+  "hasLoadError": false,
+  "loadError": null,
+  "sourceFilePath": "tsk-0190-define-full-indexed-animation-pose-contract.json"
+}

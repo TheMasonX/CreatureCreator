@@ -1,0 +1,92 @@
+[
+  {
+    "file": "tsk-0153-fix-body-spline-spacing-epsilon-units.json",
+    "newId": "tsk-0228-fix-body-spline-spacing-epsilon-units",
+    "newKey": "TSK-0228",
+    "note": "Renumbered from TSK-0153 on 2026-09-12 because TSK-0153 was shared with the live ground-contact placement task (tsk-0153-rest-ground-contact-normalize-initial-creature-placement). This archived record is retained for provenance; TSK-0153 now resolves uniquely on this branch."
+  },
+  {
+    "file": "tsk-0188-define-full-indexed-animation-pose-contract.json",
+    "newId": "tsk-0229-define-full-indexed-animation-pose-contract",
+    "newKey": "TSK-0229",
+    "note": "Renumbered from TSK-0188 on 2026-09-12. This archived record is a superseded duplicate of the canonical animation-pose contract owner TSK-0190; TSK-0188 now resolves uniquely to tsk-0188-make-debug-rig-attachment-bones-follow-posed-bones-and-pre-skinned-mesh-space."
+  },
+  {
+    "file": "tsk-0189-add-reusable-zero-allocation-animation-pose-buffer.json",
+    "newId": "tsk-0230-add-reusable-zero-allocation-animation-pose-buffer",
+    "newKey": "TSK-0230",
+    "note": "Renumbered from TSK-0189 on 2026-09-12. This archived record is a superseded duplicate of the canonical pose-buffer owner TSK-0191; TSK-0189 now resolves uniquely to tsk-0189-make-task-record-normalization-collision-safe."
+  },
+  {
+    "file": "tsk-0195-harden-non-finite-body-bone-radius-morphology-bridge.json",
+    "newId": "tsk-0231-harden-non-finite-body-bone-radius-morphology-bridge",
+    "newKey": "TSK-0231",
+    "note": "Renumbered from TSK-0195 on 2026-09-12. Same Round 23 mechanism as the canonical owner TSK-0195 (Sanitize non-finite Body proxy radius before morphology fallback), which carries the implementation evidence. This record's extra scope (non-positive radii, the call-site guard, and the empty-interval fallback case) is folded into TSK-0195."
+  },
+  {
+    "file": "tsk-0196-repair-malformed-task-record-normalizer-blocker.json",
+    "newId": "tsk-0232-repair-malformed-task-record-normalizer-blocker",
+    "newKey": "TSK-0232",
+    "note": "Renumbered from TSK-0196 on 2026-09-12. This Rejected record is historical: the malformed tsk-0156 record it targets was repaired and the normalizer now parses every record. TSK-0196 now resolves uniquely to tsk-0196-short-circuit-nonfinite-limb-validation."
+  },
+  {
+    "file": "tsk-0197-apply-audit-recommendations-to-agent-and-skill-guidance-files.json",
+    "newId": "tsk-0233-apply-audit-recommendations-to-agent-and-skill-guidance-files",
+    "newKey": "TSK-0233",
+    "note": "Renumbered from TSK-0197 on 2026-09-12. This completed agent/skill-guidance record is historical; TSK-0197 now resolves uniquely to tsk-0197-use-cross-thread-safe-allocator-for-background-generation-scratch."
+  },
+  {
+    "file": "tsk-0198-define-portable-animation-clip-and-sampling-contract.json",
+    "newId": "tsk-0234-define-portable-animation-clip-and-sampling-contract",
+    "newKey": "TSK-0234",
+    "note": "Renumbered from TSK-0198 on 2026-09-12. TSK-0198 now resolves uniquely to the in-progress stream-preview performance task tsk-0198-stream-preview-generation-hotpaths-and-direct-edge-ownership; this record keeps the animation clip and sampling contract."
+  },
+  {
+    "file": "tsk-0199-cache-pose-topology-decisions-in-skeleton-snapshot.json",
+    "newId": "tsk-0235-cache-pose-topology-decisions-in-skeleton-snapshot",
+    "newKey": "TSK-0235",
+    "note": "Renumbered from TSK-0199 on 2026-09-12. TSK-0199 now resolves uniquely to the in-progress resolved-Body-frame reuse task tsk-0199-reuse-resolved-body-frames-in-appearance-bake."
+  },
+  {
+    "file": "tsk-0200-define-animated-bounds-and-culling-policy.json",
+    "newId": "tsk-0236-define-animated-bounds-and-culling-policy",
+    "newKey": "TSK-0236",
+    "note": "Renumbered from TSK-0200 on 2026-09-12. TSK-0200 now resolves uniquely to the in-progress sparse root-envelope SDF sampling task tsk-0200-sparse-root-envelope-sdf-sampling; this record keeps the animated-bounds and culling policy."
+  },
+  {
+    "file": "tsk-0200-prove-sparse-candidate-region-sampling.json",
+    "newId": "tsk-0237-prove-sparse-candidate-region-sampling",
+    "newKey": "TSK-0237",
+    "note": "Renumbered from TSK-0200 on 2026-09-12. TSK-0200 now resolves uniquely to the in-progress sparse root-envelope SDF sampling task tsk-0200-sparse-root-envelope-sdf-sampling; this record keeps the sparse candidate-region sampling proof."
+  },
+  {
+    "file": "tsk-0201-prove-limb-influence-radius-matches-sampled-metaball-envelope.json",
+    "newId": "tsk-0238-prove-limb-influence-radius-matches-sampled-metaball-envelope",
+    "newKey": "TSK-0238",
+    "note": "Renumbered from TSK-0201 on 2026-09-12. TSK-0201 now resolves uniquely to the earlier root-potential appearance culling task tsk-0201-use-root-potential-bounds-in-appearance-resolution."
+  },
+  {
+    "file": "tsk-0202-cache-body-arc-length-lookup-for-appearance.json",
+    "newId": "tsk-0239-cache-body-arc-length-lookup-for-appearance",
+    "newKey": "TSK-0239",
+    "note": "Renumbered from TSK-0202 on 2026-09-12. Same mechanism as the canonical owner TSK-0202 (Cache Body arc-length prefixes for appearance projection), which is the live Backlog record; this archived duplicate is retained for provenance."
+  },
+  {
+    "file": "tsk-0203-measure-dense-extraction-ownership-memory.json",
+    "newId": "tsk-0240-measure-dense-extraction-ownership-memory",
+    "newKey": "TSK-0240",
+    "note": "Renumbered from TSK-0203 on 2026-09-12. Same mechanism as the canonical owner TSK-0203 (Measure dense grid ownership memory), which is the live Backlog record; this archived duplicate is retained for provenance."
+  },
+  {
+    "file": "tsk-0204-consolidate-committed-creature-fixture-corpus.json",
+    "newId": "tsk-0241-consolidate-committed-creature-fixture-corpus",
+    "newKey": "TSK-0241",
+    "note": "Renumbered from TSK-0204 on 2026-09-12. TSK-0204 now resolves uniquely to the in-progress field and mesh determinism investigation tsk-0204-prove-repeatable-generated-field-and-mesh-determinism."
+  },
+  {
+    "file": "tsk-0205-align-body-appearance-documentation-with-spine-frame-implementation.json",
+    "newId": "tsk-0242-align-body-appearance-documentation-with-spine-frame-implementation",
+    "newKey": "TSK-0242",
+    "note": "Renumbered from TSK-0205 on 2026-09-12. TSK-0205 now resolves uniquely to the implicit-mesh topology repair task tsk-0205-repair-invalid-implicit-mesh-topology."
+  }
+]

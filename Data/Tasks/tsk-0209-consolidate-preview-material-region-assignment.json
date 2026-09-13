@@ -1,0 +1,44 @@
+{
+  "id": "tsk-0209-consolidate-preview-material-region-assignment",
+  "key": "TSK-0209",
+  "title": "Consolidate duplicated preview MaterialRegion assignment",
+  "description": "The editor `CreaturePreviewController.AssignMaterials` and runtime `CreatureRuntimePreview.AssignItemMaterials` independently implement the same presentation mechanics: allocate one Material slot per mesh submesh, seed all slots with a fallback/default material, iterate `GeometryItem.MaterialRegions`, validate each `SubmeshIndex`, resolve the region material, fall back when unresolved, and log a warning on `DomainException`. The material-resolution seams legitimately differ (`Func<string, Material>` in the editor versus `MaterialResolver` in runtime), but the submesh assignment policy is duplicated across two preview adapters. Consolidate only the mechanically shared assignment logic behind a small dependency-injected helper/callback boundary that remains editor/runtime-neutral; do not create a generic preview framework or move palette policy out of `MaterialResolver`. Preserve current fallback and warning behavior, including unresolved explicit material keys.",
+  "type": "Cleanup",
+  "status": "Backlog",
+  "priority": "Medium",
+  "assigneeMode": "Custom",
+  "assigneeDirectoryId": null,
+  "assigneeCustomText": "Unassigned",
+  "reporter": "ChatGPT",
+  "labels": [
+    "user-mandated",
+    "codebase-health",
+    "deduplication",
+    "appearance",
+    "preview",
+    "editor",
+    "runtime"
+  ],
+  "attachments": [],
+  "externalLinks": [],
+  "linkedPages": [],
+  "comments": [
+    {
+      "id": "c-0209-audit-20260911",
+      "author": "ChatGPT",
+      "body": "Audit evidence 2026-09-11: direct source review confirms materially duplicated `MaterialRegion` assignment loops in `CreaturePreviewController.AssignMaterials` and `CreatureRuntimePreview.AssignItemMaterials`. Existing TSK-0078 owns palette/default-material policy and TSK-0098 owns preview-controller decomposition, but no current task owns this cross-layer mechanical deduplication. No source code was changed during the audit.",
+      "createdAtUtc": "2026-09-11T22:28:00Z"
+    }
+  ],
+  "epicId": null,
+  "parentId": null,
+  "dueDateUtc": null,
+  "createdAtUtc": "2026-09-11T22:28:00Z",
+  "updatedAtUtc": "2026-09-11T22:28:00Z",
+  "completedAtUtc": null,
+  "isArchived": false,
+  "hasLoadError": false,
+  "loadError": null,
+  "sourceFilePath": "tsk-0209-consolidate-preview-material-region-assignment.json",
+  "revision": 1
+}

@@ -9,22 +9,12 @@ using SkeletonModel = ProceduralCreature.Skeleton.Skeleton;
 namespace ProceduralCreature.Animation.Binding
 {
     /// <summary>
-    /// Converts the resolved morphology model into the per-bone radius array the
-    /// welded-surface skinning adapter consumes. This is the adapter/runtime bridge
-    /// between the authoritative Body/limb morphology and the pure weight-authoring
-    /// core: the authoring core still takes a plain <c>radiiByBoneIndex</c> array
-    /// and falls back to <see cref="ImplicitSurfaceWeightAuthoring.DefaultInfluenceRadius"/>
-    /// when a bone has no morphology radius. This bridge owns only mapping from the
-    /// resolved body/limb snapshot into that array; it never mutates or re-derives
-    /// DNA.
+    /// Converts resolved morphology into the per-bone radius data consumed by
+    /// welded-surface skinning. Body radii come from the compact anatomical rig
+    /// layout; limb radii come from the authored limb thickness profile.
     /// </summary>
     public static class MorphologyInfluenceRadiusBridge
     {
-        /// <summary>
-        /// Builds a per-bone radius array for the given resolved creature. Missing
-        /// body/limb entries and non-finite values fall back deterministically to the
-        /// default influence radius so the authoring core remains total and stable.
-        /// </summary>
         public static float[] BuildRadiiByBoneIndex(CreatureDefinition definition)
         {
             if (definition == null)
@@ -32,19 +22,18 @@ namespace ProceduralCreature.Animation.Binding
                 throw new DomainException("definition must not be null.");
             }
 
-            SkeletonModel skeleton = SkeletonInferrer.Infer(definition);
+            // Resolve once and derive every downstream value from the same snapshot.
+            // The previous convenience path resolved once through SkeletonInferrer
+            // and then resolved the same definition again here, creating two
+            // independent derived-state constructions for one request.
             ResolvedCreatureSnapshot snapshot = ResolvedCreatureSnapshot.Resolve(definition);
+            SkeletonModel skeleton = SkeletonInferrer.Infer(snapshot);
             return BuildRadiiByBoneIndex(SkeletonSnapshot.Capture(skeleton), snapshot);
         }
 
-        /// <summary>
-        /// Builds a radius array in the exact bone ordering of <paramref name="skeleton"/>,
-        /// reading radius values from the resolved Body and limb morphology that generated
-        /// the welded surface. Bones with no resolved morphology radius keep the default
-        /// influence radius (0.5), which is the deterministic fallback contract shared by
-        /// <see cref="ImplicitSurfaceWeightAuthoring.BuildSegmentInfluences"/>.
-        /// </summary>
-        public static float[] BuildRadiiByBoneIndex(SkeletonSnapshot skeleton, ResolvedCreatureSnapshot snapshot)
+        public static float[] BuildRadiiByBoneIndex(
+            SkeletonSnapshot skeleton,
+            ResolvedCreatureSnapshot snapshot)
         {
             if (skeleton == null)
             {
@@ -61,21 +50,30 @@ namespace ProceduralCreature.Animation.Binding
                 result[i] = ImplicitSurfaceWeightAuthoring.DefaultInfluenceRadius;
             }
 
+            // Body samples no longer map one-to-one to bones. The compact layout is
+            // the authoritative Body rig/radius representation shared by inference,
+            // attachment mapping, and skin-binding preparation.
             if (snapshot.HasBody)
             {
-                ResolvedBody body = snapshot.Body;
-                for (int i = 0; i < body.SampleIds.Count; i++)
+                IReadOnlyList<AnatomicalBodyRigLayout.BoneSpec> bodyBones =
+                    AnatomicalBodyRigLayout.Build(snapshot);
+                for (int i = 0; i < bodyBones.Count; i++)
                 {
-                    string boneId = SemanticBoneResolver.ResolveBodySocketBoneId(body.SampleIds[i]);
-                    if (!skeleton.TryGetIndex(boneId, out int boneIndex))
-                    {
-                        continue;
-                    }
+                    AnatomicalBodyRigLayout.BoneSpec spec = bodyBones[i];
+                    if (!skeleton.TryGetIndex(spec.Id, out int boneIndex)) continue;
 
-                    float radius = body.SampleRadii[i];
-                    if (!NumericValidity.IsFinite(radius) || radius <= 0f)
+                    float radius = NumericValidity.IsFinite(spec.Radius) && spec.Radius > 0f
+                        ? spec.Radius
+                        : ImplicitSurfaceWeightAuthoring.DefaultInfluenceRadius;
+
+                    // A compact anatomical bone is a skinning proxy for the full
+                    // morphology interval it represents. The radius therefore has to
+                    // cover any centerline-to-chord deviation plus the local sample
+                    // radius. Use the canonical interval regardless of whether this is
+                    // a headward/spine or tailward bone.
+                    if (spec.HasSegment)
                     {
-                        radius = ImplicitSurfaceWeightAuthoring.DefaultInfluenceRadius;
+                        radius = Mathf.Max(radius, ResolveBodyProxyRadius(spec, snapshot.Body, snapshot.Forward));
                     }
                     result[boneIndex] = radius;
                 }
@@ -108,6 +106,70 @@ namespace ProceduralCreature.Animation.Binding
             }
 
             return result;
+        }
+
+        private static float ResolveBodyProxyRadius(
+            AnatomicalBodyRigLayout.BoneSpec bone,
+            ResolvedBody body,
+            Vector3 forward)
+        {
+            float radius = NumericValidity.IsFinite(bone.Radius) && bone.Radius > 0f
+                ? bone.Radius
+                : ImplicitSurfaceWeightAuthoring.DefaultInfluenceRadius;
+            if (body.SamplePositions == null || body.SamplePositions.Count == 0)
+            {
+                return radius;
+            }
+
+            bool storedHeadToTail = IsStoredHeadToTail(body.SamplePositions, forward);
+            float minT = Mathf.Min(bone.StartT, bone.EndT);
+            float maxT = Mathf.Max(bone.StartT, bone.EndT);
+
+            for (int i = 0; i < body.SamplePositions.Count; i++)
+            {
+                float storedT = body.NormalizedArcLengthAtSample != null
+                    && i < body.NormalizedArcLengthAtSample.Count
+                    ? body.NormalizedArcLengthAtSample[i]
+                    : (body.SamplePositions.Count == 1 ? 0f : (float)i / (body.SamplePositions.Count - 1));
+                float canonicalT = storedHeadToTail ? storedT : 1f - storedT;
+                if (canonicalT < minT || canonicalT > maxT) continue;
+
+                float distance = DistanceToSegment(body.SamplePositions[i], bone.Position, bone.EndPosition);
+                float sampleRadius = body.SampleRadii != null && i < body.SampleRadii.Count
+                    ? body.SampleRadii[i]
+                    : radius;
+                if (!NumericValidity.IsFinite(sampleRadius) || sampleRadius <= 0f)
+                {
+                    sampleRadius = radius;
+                }
+
+                float requiredRadius = distance + sampleRadius;
+                if (NumericValidity.IsFinite(requiredRadius))
+                {
+                    radius = Mathf.Max(radius, requiredRadius);
+                }
+            }
+
+            return Mathf.Max(0.001f, radius);
+        }
+
+        private static float DistanceToSegment(Vector3 point, Vector3 a, Vector3 b)
+        {
+            Vector3 ab = b - a;
+            float lengthSquared = ab.sqrMagnitude;
+            if (lengthSquared <= 1e-10f) return Vector3.Distance(point, a);
+
+            float t = Mathf.Clamp01(Vector3.Dot(point - a, ab) / lengthSquared);
+            return Vector3.Distance(point, a + ab * t);
+        }
+
+        private static bool IsStoredHeadToTail(IReadOnlyList<Vector3> positions, Vector3 forward)
+        {
+            if (positions == null || positions.Count < 2) return true;
+            // Creature Forward points from tail toward head. Sample 0 is therefore
+            // headward when its forward projection is greater than the last sample's.
+            return Vector3.Dot(positions[0], forward)
+                >= Vector3.Dot(positions[positions.Count - 1], forward);
         }
 
         private static float ResolveSegmentRadius(ResolvedLimb limb, int segmentIndex)

@@ -125,15 +125,21 @@
       "author": "anonymous",
       "body": "Synthesis evidence (2026-09-06 audit batch; see docs/audits/creaturecreator-audit-synthesis-2026-09-06-batch.md). Corroborating findings consolidated to this editor/decomposition owner:\n- CreaturePreviewController responsibility accumulation \u002B not-transactional apply: whole-codebase F-31/F-50, second-order F-214 (ApplyPreviewGeometry non-transactional), F-217 (editor vs runtime material policy divergence).\n- CreatureDefinition mutation boundary is convention-only (single-mutation-path invariant): next-slice F-301 (extend here as next hardening after current decomposition wave).\n- CreatureEditorWindow god-object decomposition progress: round2-F3 (informational; already owned here; success metric is live delegation, not file size).\n- Preview weak generated-Mesh ownership F-30 and Mesh lifetime ownership F-215 are owned by TSK-0104 (child of this task) - see TSK-0104 comment.\nNo duplicate task created; filed follow-ups belong to TSK-0104 child.",
       "createdAtUtc": "2026-09-06T22:44:28.2753467Z"
+    },
+    {
+      "id": "c-5fd8e58ae5fb44cb9cf6ceb9bf2b338c",
+      "author": "anonymous",
+      "body": "2026-09-11 audit synthesis evidence (\u0060docs/audits/audit-race-followup-and-streamlining-2026-09-11.md\u0060). Confirms this file is \u003E4x the next-largest file and large for the wrong reason: bulk is concentrated in mixed-responsibility methods, notably \u0060DrawBodySampleHandles\u0060 (~165 lines: drag-state machine for two gestures \u002B hit-testing \u002B rendering, interleaved) and \u0060DrawLimbJointHandles\u0060 (~108 lines, similar mixing). Contrast \u0060DefinitionValidator.cs\u0060, whose size is legitimate (14 independent single-purpose \u0060Validate*\u0060 methods). Concrete next step: extract \u0060BodyHandleController\u0060/\u0060LimbHandleController\u0060 as plain C# state owners called by thin \u0060OnSceneGUI\u0060 methods, mirroring the pattern already used for \u0060CreaturePreviewController\u0060.",
+      "createdAtUtc": "2026-09-12T02:47:36.9711447Z"
     }
   ],
   "epicId": null,
   "parentId": null,
   "dueDateUtc": null,
   "createdAtUtc": "2026-09-01T03:20:52.8300758Z",
-  "updatedAtUtc": "2026-09-06T22:44:28.2753467Z",
+  "updatedAtUtc": "2026-09-12T02:47:36.9711447Z",
   "completedAtUtc": null,
-  "revision": 20,
+  "revision": 21,
   "isArchived": false,
   "hasLoadError": false,
   "loadError": null,

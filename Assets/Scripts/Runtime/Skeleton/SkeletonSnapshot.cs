@@ -72,6 +72,22 @@ namespace ProceduralCreature.Skeleton
                 {
                     throw new DomainException("A skeleton snapshot cannot contain a null bone or empty bone id.");
                 }
+                if (!NumericValidity.IsFinite(bone.Position))
+                {
+                    throw new DomainException($"Bone '{bone.Id}' position must be finite.");
+                }
+                if (!NumericValidity.IsFinite(bone.Rotation))
+                {
+                    throw new DomainException($"Bone '{bone.Id}' rotation must be finite.");
+                }
+                if (bone.HasSegment && !NumericValidity.IsFinite(bone.EndPosition))
+                {
+                    throw new DomainException($"Bone '{bone.Id}' segment endpoint must be finite.");
+                }
+                if (bone.HasChildAttachmentPosition && !NumericValidity.IsFinite(bone.ChildAttachmentPosition))
+                {
+                    throw new DomainException($"Bone '{bone.Id}' child attachment position must be finite.");
+                }
                 if (!indices.TryAdd(bone.Id, i))
                 {
                     throw new DomainException($"Skeleton contains duplicate bone id '{bone.Id}'.");
@@ -110,17 +126,21 @@ namespace ProceduralCreature.Skeleton
             }
 
             var orderedBones = new List<Bone>(skeleton.Bones.Count);
-            var pending = new List<Bone>(roots);
+            var pending = new SortedSet<Bone>(Comparer<Bone>.Create(CompareBonesById));
+            foreach (Bone root in roots) pending.Add(root);
+
             while (pending.Count > 0)
             {
-                Bone bone = pending[0];
-                pending.RemoveAt(0);
+                Bone bone = pending.Min;
+                pending.Remove(bone);
                 orderedBones.Add(bone);
 
                 if (childrenById.TryGetValue(bone.Id, out List<Bone> boneChildren))
                 {
-                    pending.AddRange(boneChildren);
-                    pending.Sort(CompareBonesById);
+                    for (int i = 0; i < boneChildren.Count; i++)
+                    {
+                        pending.Add(boneChildren[i]);
+                    }
                 }
             }
 

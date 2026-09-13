@@ -1,0 +1,47 @@
+﻿{
+  "id": "tsk-0254-make-the-rig-debug-overlay-panel-collapsible-draggable-and-resizable-with-correct-row-spacing",
+  "key": "TSK-0254",
+  "title": "Make the rig debug overlay panel collapsible, draggable, and resizable with correct row spacing",
+  "description": "## Summary\nRework the \u0060RigDebugView\u0060 SceneView overlay panel chrome so it is collapsible, repositionable, and resizable, and fix the \u0060Bone width\u0060 label overdraw by reserving an explicit row for it so every following control is pushed down. Child slice of TSK-0149; the rig drawing, focus, selection, and generic arbitrary-limb behavior are unchanged.\n\n## User Mandate\nSTRICT \u2014 verbatim:\n\n\u003E Please make the debug rig UI toggleable/collapsable, and resizable if possible (it\u0027s okay if not). Fix the bone width text overdraw issue too by moving the rest after it down (e.g. claim that much more space if using dynamic button placement)\n\nBinding constraints:\n- The panel must collapse and expand.\n- The panel must be resizable if feasible; draggable is a reasonable part of \u0022usable chrome\u0022.\n- The bone-width label must not overlap the controls after it; the controls after it must claim the label\u0027s space.\n\n## Scope\n- \u0060Assets/Scripts/Editor/RigDebugView.cs\u0060 \u2014 overlay panel chrome and body layout.\n- \u0060Assets/Scripts/Editor/RigDebugPanelLayout.cs\u0060 (new) \u2014 pure, testable layout math (row indices, content height, clamping).\n- \u0060Assets/Scripts/Tests/Editor/RigDebugPanelLayoutTests.cs\u0060 (new) \u2014 EditMode coverage of the layout math.\nOut of scope: rig drawing, focus/selection behavior, DNA, runtime code.\n\n## Acceptance Criteria\n- The panel header toggles collapsed/expanded; collapsed height equals the header height only.\n- The panel can be dragged by its header and resized by a bottom-right grip; both persist across SceneView repaints and editor restarts.\n- Panel position and size are clamped to the SceneView so the panel cannot be lost off-screen.\n- The \u0060Bone width\u0060 label occupies its own reserved row, and the button rows follow it; no row overlaps any other row for any overlay state.\n- Expanded panel height always fits its content (no clipping/overdraw) unless the user resized it larger.\n- Rig drawing, focus, click-selection, and labels behave exactly as before.\n\n## Validation\n- EditMode: new \u0060RigDebugPanelLayoutTests\u0060 (row ordering, content height covers every row, collapse height, clamp range).\n- Unity: full solution compiles, console clean, and a manual SceneView check of collapse/expand, drag, resize, and the bone-width row.\n- Record the exact checks and results on this task.\n\n## Findings\n(empty)\n\n## Blockers\n(empty)\n\n## Next Step\nImplement the layout helper, rework \u0060DrawOverlayControls\u0060, add tests, then compile and validate in Unity.",
+  "type": "Task",
+  "status": "InProgress",
+  "priority": "Medium",
+  "assigneeMode": "Custom",
+  "assigneeDirectoryId": null,
+  "assigneeCustomText": "BeastMaster",
+  "reporter": "anonymous",
+  "labels": [
+    "editor",
+    "visualization",
+    "ux",
+    "user-mandated"
+  ],
+  "attachments": [],
+  "externalLinks": [],
+  "linkedPages": [],
+  "comments": [
+    {
+      "id": "c-5c73af38d0d043469ba1866a315bdec8",
+      "author": "anonymous",
+      "body": "## Implementation\n\u0060Assets/Scripts/Editor/RigDebugView.cs\u0060:\n- Replaced the fixed \u0060GUILayout.BeginArea(new Rect(10,10,290,280), \u0022Rig Debug\u0022, GUI.skin.window)\u0060 with a self-managed panel rect.\n- Header hosts an \u0060EditorGUI.Foldout\u0060: the panel collapses to the 20px header and expands again; collapsed state persists in \u0060EditorPrefs\u0060.\n- Panel drags by the header and resizes by a bottom-right grip (diagonal \u0060MouseCursor.ResizeUpLeft\u0060). Position/size persist in \u0060EditorPrefs\u0060 and are clamped to the SceneView. Body clicks are swallowed so they do not clear the bone selection.\n- Body now uses explicit per-row rects. \u0060Bone width\u0060 owns \u0060Row.LineWidthLabel\u0060 between the slider and the button rows, and panel height is computed from the row count, so the controls after it are pushed down and cannot overlap the label.\n- \u0060EditorGUI.Toggle\u0060/\u0060Foldout\u0060/\u0060LabelField\u0060 take explicit \u0060GUIContent\u0060 labels.\n\nNew: \u0060Assets/Scripts/Editor/RigDebugPanelLayout.cs\u0060 (pure layout math) and \u0060Assets/Scripts/Tests/Editor/RigDebugPanelLayoutTests.cs\u0060.\n\n## Validation\n- Unity 6000.5.9f1, MCP bridge port 6401; \u0060refresh_unity(compile=request, scope=all, wait_for_ready=true)\u0060.\n- \u0060ProceduralCreature.Editor.dll\u0060 rebuilt 2026-09-12 23:37; \u0060read_console(error|warning)\u0060 = 0 entries.\n- EditMode focused: \u0060ProceduralCreature.Tests.Editor.RigDebugPanelLayoutTests\u0060 -\u003E 11/11 passed.\n- EditMode full suite -\u003E 184/184 passed (3.21s).\n- Evidence the enabled body actually draws: the first successful compile emitted 5 \u0060Unable to find style \u0027\u003Clabel\u003E\u0027 in skin \u0027DarkSkin\u0027\u0060 warnings (Layout \u002B Repaint); those come only from the new body path. They disappeared after the \u0060GUIContent\u0060 fix.\n\n## Residual risk / manual gate\n- Collapse click, header drag, and grip resize are real SceneView mouse interactions. MCP cannot inject SceneView input or capture the SceneView in this session, so these remain manual.\n- \u0060GUIUtility.hotControl\u0060 is the standard route for drag events inside \u0060duringSceneGui\u0060, but it is runtime-verified only to the extent that the panel draws with a clean console.\n- The pure clamp/size/height math the interactions drive is covered by the new tests.",
+      "createdAtUtc": "2026-09-13T04:40:33.2765274Z"
+    },
+    {
+      "id": "c-d351985435fb4421be60ad6b379f405e",
+      "author": "anonymous",
+      "body": "## Fix: collapse toggle was a silent no-op (reported by user)\nUser report (verbatim): \u0022It looks very nice and resize works (good job), but toggle doesn\u0027t. The title highlights onmouseover, but the toggle arrow does not and clicking on either does nothing. Enable rig overlay hides everything, which is alright and can be left in, but wasn\u0027t really what was asked for\u0022\n\nRoot cause: \u0060DrawPanelHeader\u0060 compared \u0060EditorGUI.Foldout(...)\u0060 against the pre-call \u0060expanded\u0060 local, then assigned \u0060_collapsed = !expanded\u0060 using that OLD value. Because \u0060expanded == !_collapsed\u0060, the assignment reduced to \u0060_collapsed = _collapsed\u0060 -- a silent no-op. The header therefore highlighted on hover but never collapsed or expanded.\n\nFix: capture the RETURNED value and map it through the now-tested pure helper \u0060RigDebugPanelLayout.CollapsedFromFoldout(newExpanded)\u0060, so the new collapsed state is derived from the returned expanded value. Drag, resize, and row layout are unchanged. The \u0060Enable rig overlay\u0060 toggle is intentionally kept per the user\u0027s note.\n\n## Validation (after fix)\n- \u0060refresh_unity\u0060 -\u003E \u0060ProceduralCreature.Editor.dll\u0060 rebuilt 2026-09-12 23:47; \u0060read_console(error|warning)\u0060 = 0 entries.\n- EditMode focused \u0060RigDebugPanelLayoutTests\u0060: 12/12 passed; added \u0060CollapsedFromFoldout_IsTheInverseOfTheReportedExpandedState\u0060.\n- EditMode full suite: 185/185 passed (3.04s).\n- Recovered a stale \u0060tests_running\u0060 MCP job that survived the domain reload (persisted in SessionState) by invoking \u0060MCPForUnity.Editor.Services.TestJobManager.ClearStuckJob()\u0060; \u0060clear_stuck\u0060 on \u0060run_tests\u0060 did not reach the handler through \u0060batch_execute\u0060. Recorded in repo memory.\n\n## Residual manual check\nClicking the header now derives collapse from the returned expanded value. Confirm in the SceneView that a header click collapses and expands the panel; drag, resize, and the width row were already confirmed by the user.",
+      "createdAtUtc": "2026-09-13T04:46:22.7217543Z"
+    }
+  ],
+  "epicId": null,
+  "parentId": "tsk-0149-build-depth-independent-rig-debug-view",
+  "dueDateUtc": null,
+  "createdAtUtc": "2026-09-13T04:35:05.5871386Z",
+  "updatedAtUtc": "2026-09-13T04:46:22.7217543Z",
+  "completedAtUtc": null,
+  "revision": 3,
+  "isArchived": false,
+  "hasLoadError": false,
+  "loadError": null,
+  "sourceFilePath": "tsk-0254-make-the-rig-debug-overlay-panel-collapsible-draggable-and-resizable-with-correct-row-spacing.json"
+}

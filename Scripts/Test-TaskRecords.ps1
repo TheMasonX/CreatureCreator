@@ -85,11 +85,21 @@ function Test-PageSlug {
 }
 
 Get-ChildItem -LiteralPath $tasksRoot -Filter '*.json' -File | Sort-Object Name | ForEach-Object {
+    $fileName = $_.Name
+    $raw = Get-Content -LiteralPath $_.FullName -Raw
     try {
-        $task = Get-Content -LiteralPath $_.FullName -Raw | ConvertFrom-Json
+        $task = $raw | ConvertFrom-Json
     } catch {
-        try { [void]$errors.Add("$($_.Name): invalid JSON: $($_.Exception.Message)") } catch { [void]$errors.Add("$($_.Name): invalid JSON (parse error)") }
+        try { [void]$errors.Add("$fileName`: invalid JSON: $($_.Exception.Message)") } catch { [void]$errors.Add("$fileName`: invalid JSON (parse error)") }
         return
+    }
+
+    # The MemorySmith reader uses strict System.Text.Json: a raw, unescaped control
+    # character inside a string is rejected even though ConvertFrom-Json accepts it.
+    try {
+        [System.Text.Json.JsonDocument]::Parse($raw).Dispose()
+    } catch {
+        [void]$errors.Add("$fileName`: not loadable by the MemorySmith reader: $($_.Exception.Message)")
     }
 
     $id = [string]$task.id

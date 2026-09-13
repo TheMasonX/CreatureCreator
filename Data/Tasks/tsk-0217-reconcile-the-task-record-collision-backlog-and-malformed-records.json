@@ -1,0 +1,48 @@
+﻿{
+  "id": "tsk-0217-reconcile-the-task-record-collision-backlog-and-malformed-records",
+  "key": "TSK-0217",
+  "title": "Reconcile the task-record collision backlog and malformed records",
+  "description": "## Summary\n\u0060Scripts/Test-TaskRecords.ps1\u0060 currently fails with 44 issues. The board holds 14 duplicated \u0060TSK-\u0060 keys (15 records: TSK-0200 is tripled) plus 30 records missing required schema fields, and \u0060tsk-0206\u0060 cannot be deserialized. Because the MemorySmith index is keyed by task key, colliding records silently shadow one another and drop out of \u0060memorysmith_task_list\u0060, so live work is invisible to agents.\n\n## Scope\n- Duplicate keys: TSK-0153, 0188, 0189, 0195, 0196, 0197, 0198, 0199, 0200 (x3), 0201, 0202, 0203, 0204, 0205.\n- Schema-incomplete records: missing \u0060createdAtUtc\u0060/\u0060updatedAtUtc\u0060/\u0060revision\u0060, plus \u0060tsk-0172\u0060 missing \u0060type\u0060.\n- Unloadable record: \u0060tsk-0206-align-unity-bone-weight-contract-with-binding-builder.json\u0060 (\u0060externalLinks[0]\u0060 shape).\n- Out of scope: collision-safe *creation* (TSK-0213); normalizer tooling hardening (TSK-0189, Done).\n\n## Acceptance Criteria\n- \u0060Scripts/Test-TaskRecords.ps1\u0060 exits 0 with zero issues.\n- \u0060Scripts/Normalize-TaskRecords.ps1\u0060 reports zero collisions and zero skipped files.\n- Each colliding family resolves to exactly one canonical record per mechanism; renumbered or superseded records name their replacement in a note; no mechanism loses its evidence.\n- \u0060memorysmith_task_list\u0060 returns each distinct mechanism exactly once.\n- TSK-0206 either loads correctly or is archived with a named replacement.\n- New keys are allocated above the current maximum and do not re-collide.\n\n## Validation\n- \u0060pwsh Scripts/Test-TaskRecords.ps1\u0060 -\u003E 0 issues.\n- \u0060pwsh Scripts/Normalize-TaskRecords.ps1\u0060 -\u003E \u0022Skipped: 0\u0022 and no collision abort.\n- \u0060memorysmith_task_list\u0060 key set cross-checked against \u0060Data/Tasks/*.json\u0060.\n\n## Findings\n- Evidence: \u0060Test-TaskRecords.ps1\u0060 run 2026-09-12 -\u003E \u0022FAIL: Task record validation found 44 issue(s).\u0022\n- TSK-0200 carries three distinct mechanisms (animated bounds, sparse candidate-region sampling, sparse root-envelope sampling).\n- TSK-0189 collides between an \u0060Archived\u0060 pose-buffer record and the \u0060Done\u0060 normalizer-hardening task.\n- This is the fourth recorded recurrence of the task-key collision pattern (2026-09-08, 2026-09-09, TSK-0213, this pass).\n\n## Blockers\n- The MemorySmith MCP may not expose key renumbering. If it does not, the reconciliation must extend the sanctioned \u0060Scripts/Normalize-TaskRecords.ps1\u0060 path. Hand-editing \u0060Data/Tasks/*.json\u0060 is prohibited.\n\n## Next Step\nTest whether \u0060memorysmith_task_update\u0060 can change a task key. If not, add a sanctioned renumber path to the normalizer, reconcile one colliding family as proof, then sweep the remainder.",
+  "type": "Task",
+  "status": "Done",
+  "priority": "High",
+  "assigneeMode": "Custom",
+  "assigneeDirectoryId": null,
+  "assigneeCustomText": "Agent",
+  "reporter": "BeastMaster",
+  "labels": [
+    "task-integrity",
+    "task-system",
+    "tooling",
+    "process",
+    "follow-up"
+  ],
+  "attachments": [],
+  "externalLinks": [],
+  "linkedPages": [],
+  "comments": [
+    {
+      "id": "c-0029705cf3bd4f69a0a552ffa216fc6d",
+      "author": "anonymous",
+      "body": "New evidence (2026-09-12, during TSK-0227 skill work)\n\n\u0060Scripts/Normalize-TaskRecords.ps1\u0060 aborts in preflight and writes nothing:\n\n\u0060\u0060\u0060\nFAIL: Normalization preflight found 14 task-identity collision(s). No files were modified.\n\u0060\u0060\u0060\n\nColliding keys: TSK-0153, TSK-0188, TSK-0189, TSK-0195, TSK-0196, TSK-0197, TSK-0198, TSK-0199, TSK-0200 (3 files), TSK-0201, TSK-0202, TSK-0203, TSK-0204, TSK-0205.\n\nThis supersedes the earlier \u00223 collisions\u0022 figure recorded in \u0060/memories/repo/tsk-0197-agent-skill-recommendations-applied.md\u0060; the backlog has grown. The newly created TSK-0227 is not among the collisions, so its key is unique.\n\nConsequence: task-board integrity cannot be claimed until the normalizer passes. This is not caused by the skill work, and the skill change touched no task JSON.\n\nNote: TSK-0197 itself is one of the colliding keys, so any follow-up on the agent/skill guidance record must be reconciled against \u0060tsk-0197-use-cross-thread-safe-allocator-for-background-generation-scratch.json\u0060 first.",
+      "createdAtUtc": "2026-09-12T06:49:29.2247398Z"
+    },
+    {
+      "id": "c-7c67e6a46e6541e8b9a48caaa713834d",
+      "author": "anonymous",
+      "body": "Reconciled 2026-09-12. Task-record and tooling changes only; no runtime/editor code touched, so no Unity validation was required.\n\nTooling\n- Scripts/Normalize-TaskRecords.ps1 now accepts -RenumberMap \u003Cfile\u003E. The whole map is validated before any file is touched (source exists, tsk-####-slug target, key above the current ceiling, target uniqueness) and the pass is idempotent on re-run.\n- It also backfills the required schema fields type, createdAtUtc, updatedAtUtc, and revision; a missing timestamp derives from the file\u0027s git addition date with a file-system fallback.\n- Map: Scripts/task-key-reconciliation-2026-09-12.json (15 entries).\n\nDisposition (old key -\u003E new key, surviving canonical in parentheses)\n- TSK-0153 -\u003E TSK-0228 (rest-ground-contact)\n- TSK-0188 -\u003E TSK-0229 (make-debug-rig-attachment; 0229 is a superseded duplicate of TSK-0190)\n- TSK-0189 -\u003E TSK-0230 (make-task-record-normalization; 0230 is a superseded duplicate of TSK-0191)\n- TSK-0195 -\u003E TSK-0231 (sanitize-body-proxy-radius-fallback; duplicate mechanism, 0231 Archived)\n- TSK-0196 -\u003E TSK-0232 (short-circuit-nonfinite-limb, Rejected history retained)\n- TSK-0197 -\u003E TSK-0233 (use-cross-thread-safe-allocator)\n- TSK-0198 -\u003E TSK-0234 (stream-preview-generation-hotpaths)\n- TSK-0199 -\u003E TSK-0235 (reuse-resolved-body-frames)\n- TSK-0200 -\u003E TSK-0236 and TSK-0200 -\u003E TSK-0237 (sparse-root-envelope-sdf-sampling)\n- TSK-0201 -\u003E TSK-0238 (use-root-potential-bounds)\n- TSK-0202 -\u003E TSK-0239 (cache-body-arc-length-prefixes; duplicate mechanism)\n- TSK-0203 -\u003E TSK-0240 (measure-dense-grid-ownership; duplicate mechanism)\n- TSK-0204 -\u003E TSK-0241 (prove-repeatable-determinism)\n- TSK-0205 -\u003E TSK-0242 (repair-invalid-implicit-mesh-topology)\n\nEvery renumbered record carries a \u0022## Reconciliation\u0022 note naming the surviving owner, so no mechanism loses its evidence.\n\nValidation\n- pwsh Scripts/Normalize-TaskRecords.ps1 -\u003E \u0022Fixed: 0  Skipped: 0\u0022 (no collision abort).\n- pwsh Scripts/Test-TaskRecords.ps1 -\u003E \u0022PASS: Checked 240 task record(s); keys and ids are unique.\u0022\n- memorysmith_task_get resolves TSK-0195, TSK-0231, and TSK-0239 to distinct records.\n- git diff --check clean (only pre-existing ProjectSettings line-ending warnings).\n\nNote: memorysmith_task_update has no id/key parameters, so the MCP cannot renumber; the -RenumberMap pass is the sanctioned path. This is the fifth recorded recurrence of branch-local key allocation (TSK-0136, TSK-0172, TSK-0153, and the TSK-0188/0189 pair, then this pass). Creation-time collision safety remains owned by TSK-0213.",
+      "createdAtUtc": "2026-09-12T06:58:05.8969777Z"
+    }
+  ],
+  "epicId": null,
+  "parentId": null,
+  "dueDateUtc": null,
+  "createdAtUtc": "2026-09-12T05:53:38.3087867Z",
+  "updatedAtUtc": "2026-09-12T07:02:09.1511576Z",
+  "completedAtUtc": "2026-09-12T07:02:09.1511576Z",
+  "revision": 5,
+  "isArchived": false,
+  "hasLoadError": false,
+  "loadError": null,
+  "sourceFilePath": "tsk-0217-reconcile-the-task-record-collision-backlog-and-malformed-records.json"
+}

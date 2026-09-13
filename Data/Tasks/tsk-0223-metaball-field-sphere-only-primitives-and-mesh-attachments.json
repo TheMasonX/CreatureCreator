@@ -1,0 +1,45 @@
+﻿{
+  "id": "tsk-0223-metaball-field-sphere-only-primitives-and-mesh-attachments",
+  "key": "TSK-0223",
+  "title": "Adopt a compact-support metaball field with sphere-only primitives and mesh attachments",
+  "description": "## Summary\nReplace the SDF operation tree (Sphere/Capsule/Box/Ellipsoid evaluated with polynomial smooth-min) with a compact-support metaball sum. Implicit morphology uses spheres only. Authored detail geometry stays as mesh-asset attachments. Non-mesh parts are one metaball or a chain of metaballs, which covers spikes, horn bases, and fingers.\n\nThis pivot is the enabling step for the weighting fix (TSK-0224) and the generation/LOD work (TSK-0225). It removes the CC-099 potential-influence-envelope design, the ellipsoid culling exception, and the non-uniform transform distance approximation. Evidence: \u0060docs/audits/creaturecreator-spore-metaball-pivot-and-appearance-synthesis-2026-09-12.md\u0060, findings F-02, section 8. Spore evidence: Chris Hecker, \u0022My Liner Notes for Spore\u0022 (fourth-order polynomial in squared distance, zero contribution beyond the metaball radius, per-metaball scale factor).\n\n## User Mandate\n\u003E I want to go to a metaball \u002B attachable mesh system (no other sdfs like cubes or ellipsoids). Non-mesh parts will be either a single metaball or a chain of them for now. This will allow for things like spikes or fingers too. I want to streamline and simplify.\n\nSTRICT. Captured verbatim. Do not relax or re-scope.\n\n## Scope\n- Field model: \u0060F(p) = isoLevel - sum_i ( s_i * B( |p - c_i| / R_i ) )\u0060, with \u0060B(q) = (q*q - 1)^4\u0060 for \u0060q \u003C 1\u0060 and \u00600\u0060 otherwise. The subtraction preserves the project sign convention of negative-inside and positive-outside.\n- DNA: \u0060ShapeType\u0060 reduces to \u0060Sphere\u0060. Remove \u0060Capsule\u0060, \u0060Box\u0060, and \u0060Ellipsoid\u0060 from the DNA schema, serialization, canonicalization, validation, editor authoring, the SDF compiler, culling, and tests.\n- Keep \u0060MeshGeometry\u0060 and \u0060MeshAssetKey\u0060 as the authored-mesh attachment path.\n- Non-mesh parts become a single metaball or a chain of metaballs. Chain spacing derives from \u0060ResolvedLimb\u0060 arc length per ADR-007.\n- Remove the CC-099 potential-influence envelope and the ellipsoid-specific culling rule. Per-blob culling becomes exact.\n- Decide and execute the migration for \u0060Assets/Creatures/*.json\u0060. The prior audit reports capsule and ellipsoid use in the dino family.\n- Do not reopen TSK-0111. That task consolidated the vocabulary by design. This removal is new scope.\n\n## Acceptance Criteria\n- No \u0060Capsule\u0060, \u0060Box\u0060, or \u0060Ellipsoid\u0060 case remains in the DNA schema, SDF compiler, culling, validation, editor authoring, or tests.\n- Field evaluation is a deterministic sum over the canonical part order.\n- A corner outside every blob support evaluates to \u0060isoLevel\u0060 without scanning any blob.\n- Every file under \u0060Assets/Creatures/\u0060 loads and generates a mesh with no validation error.\n- Skeleton inference, editor behavior, and IK behavior are unchanged.\n- Mesh watertightness, vertex welding, and outward winding still hold.\n- \u0060CC-099\u0060\u0027s envelope machinery and the ellipsoid culling exception are deleted, not left dormant.\n\n## Validation\nUnity EditMode and PlayMode suites plus \u0060dotnet build\u0060 for Runtime and Tests.Runtime. Generate every \u0060Assets/Creatures/*.json\u0060 and assert topology validation passes. Record sample count per corner and total generation time before and after on the fixed \u0060GenerateDataBenchmark\u0060 fixture at 10 and 16 voxels per unit. Source inspection alone cannot close this task.\n\n## Findings\n- The current field is an SDF operation tree with smooth-min. Smooth-min makes influence non-local, so culling requires a conservative envelope. Compact support removes that class of complexity.\n- The metaball sum yields per-primitive contribution as a by-product. TSK-0224 depends on that.\n- Spore used spherical metaballs only. It rejected ellipsoids because orientation-dependent evaluation slowed the editor.\n- Spore did not implement metaball groups, so limbs merged into webbing. Spore treated this as a feature. This project must decide whether to accept, mitigate, or reject the same behavior.\n\n## Blockers\n- The migration policy for existing DNA with capsule and ellipsoid parts is undecided.\n- Additive union may merge nearby limbs. Measure limb separation before committing.\n\n## Next Step\nPrototype one limb as a blob chain. Compare sample count, mesh quality, and limb separation against the current SDF path. Then decide the migration policy and land the removal in one change.",
+  "type": "Task",
+  "status": "Backlog",
+  "priority": "High",
+  "assigneeMode": "Custom",
+  "assigneeDirectoryId": null,
+  "assigneeCustomText": "Agent",
+  "reporter": "anonymous",
+  "labels": [
+    "user-mandated",
+    "architecture",
+    "morphology",
+    "metaball",
+    "sdf",
+    "generation",
+    "performance",
+    "refactor"
+  ],
+  "attachments": [],
+  "externalLinks": [],
+  "linkedPages": [],
+  "comments": [
+    {
+      "id": "c-406c4a1c70b345089d74e9ad240d00ae",
+      "author": "anonymous",
+      "body": "Council re-scope 2026-09-12 (\u0060docs/audits/creaturecreator-council-review-metaball-pivot-2026-09-12.md\u0060, findings C4, C6, C9, C11; gates G3 to G6).\n\nVerified corrections to this task\u0027s scope:\n\n1. **Keep \u0060SdfOperation.Cullable\u0060 and the root region bound.** The synthesis report section 8.3 wrongly listed the root early exit as removed. Only the CC-099 potential-influence envelope is deletable. Removing the root bound regresses the 86.7% of corners that the O(1) pre-fill currently protects. Recompute the bound as the exact union of blob supports.\n2. **Add the \u0060|F|\u0060-as-distance consumer audit as a first-class deliverable**, not a risk row. Four consumers read field magnitude as distance: \u0060PartAppearanceSampler.Resolve\u0060, the \u0060PartBounds\u0060 broad phase, \u0060AppearanceResolveBurst\u0060, and \u0060ImplicitSurfaceInfluenceDomainResolver\u0060. Name each with its replacement or an explicit exemption. Note that nothing depends on unit gradient, so the sign-based extractor path is safe.\n3. **Migration is release-blocking.** Exact census: 17 files under \u0060Assets/Creatures/\u0060, \u0060Capsule\u0060 16 instances in 8 files, \u0060Ellipsoid\u0060 19 in 12 files, \u0060Box\u0060 0. Eleven files need migration, including the user\u0027s live-validation creature \u0060dinus_uprightus.json\u0060. Link \u0060TSK-0204\u0060 (corpus classification) as a prerequisite and reconcile with \u0060TSK-0045\u0060, which is InProgress and implementing the exact parameters this task deletes.\n4. **Split this task into three.** (a) one-limb prototype; (b) migration decision and execution; (c) primitive deletion. Start only the prototype.\n5. **Record the \u0060TSK-0111\u0060 supersession** explicitly. That task is Done with a STRICT mandate preserving the ellipsoid culling behavior. This task reverses it.\n6. **Split the union-operator change from the primitive removal.** Additive metaballs are separable. Seat 1 notes that additive union bulges where smooth-min blends, so current radii do not transfer directly.\n7. **Do not claim a performance win from compact support.** Seat 1 verified that \u0060EvaluateInto\u0060 loops over all operation indices up to the root, so culling saves arithmetic but not loop trips. Bucketing is the performance lever, and it is unmeasured.\n8. **Edge interpolation is linear for a quartic field.** \u0060InterpolateEdge\u0060 uses \u0060t = da/(da-db)\u0060. Re-derive or accept the bias explicitly.\n\nGates: G3 migration decision, G4 corpus census guard, G5 consumer audit, G6 one-limb prototype with sample count, mesh quality, and limb separation.\n\nNo code change made.",
+      "createdAtUtc": "2026-09-12T06:33:20.8883285Z"
+    }
+  ],
+  "epicId": null,
+  "parentId": null,
+  "dueDateUtc": null,
+  "createdAtUtc": "2026-09-12T06:23:52.0335721Z",
+  "updatedAtUtc": "2026-09-12T06:33:20.8883285Z",
+  "completedAtUtc": null,
+  "revision": 2,
+  "isArchived": false,
+  "hasLoadError": false,
+  "loadError": null,
+  "sourceFilePath": "tsk-0223-metaball-field-sphere-only-primitives-and-mesh-attachments.json"
+}

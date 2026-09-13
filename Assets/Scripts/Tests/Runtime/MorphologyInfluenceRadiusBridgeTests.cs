@@ -1,11 +1,9 @@
 using System;
-using System.Collections.Generic;
 using NUnit.Framework;
 using UnityEngine;
 using ProceduralCreature.Animation.Binding;
 using ProceduralCreature.Common;
 using ProceduralCreature.Definition;
-using ProceduralCreature.Morphology;
 using ProceduralCreature.Skeleton;
 using SkeletonModel = ProceduralCreature.Skeleton.Skeleton;
 
@@ -17,7 +15,7 @@ namespace ProceduralCreature.Tests.Runtime
         private const float Tolerance = 1e-4f;
 
         [Test]
-        public void BuildRadii_ValidBodyAndLimbMorphology_UsesFiniteResolvedValues()
+        public void BuildRadii_ValidBodyAndLimbMorphology_UsesCompactBodyAndLimbValues()
         {
             CreatureDefinition definition = CreateDefinition(
                 bodyRadius: 0.85f,
@@ -31,7 +29,8 @@ namespace ProceduralCreature.Tests.Runtime
                 snapshot, ResolvedCreatureSnapshot.Resolve(definition));
 
             AssertFiniteAndDeterministic(first, second);
-            Assert.That(first[snapshot.GetIndex("body_j2")], Is.EqualTo(0.85f).Within(Tolerance));
+            Assert.That(first[snapshot.GetIndex(AnatomicalBodyRigLayout.BodyRootBoneId)],
+                Is.EqualTo(0.85f).Within(Tolerance));
             Assert.That(first[snapshot.GetIndex("limb_j0")], Is.EqualTo(0.10f).Within(Tolerance));
         }
 
@@ -60,19 +59,23 @@ namespace ProceduralCreature.Tests.Runtime
         }
 
         [Test]
-        public void BuildRadii_NonPositiveBodyRadius_UsesDeterministicFiniteFallback()
+        public void BuildRadii_NonPositiveBodyRadius_IsRejected()
         {
             CreatureDefinition definition = CreateDefinition(bodyRadius: 0f, limb: null);
-            SkeletonSnapshot snapshot = SkeletonSnapshot.Capture(SkeletonInferrer.Infer(definition));
 
-            float[] first = MorphologyInfluenceRadiusBridge.BuildRadiiByBoneIndex(
-                snapshot, ResolvedCreatureSnapshot.Resolve(definition));
-            float[] second = MorphologyInfluenceRadiusBridge.BuildRadiiByBoneIndex(
-                snapshot, ResolvedCreatureSnapshot.Resolve(definition));
+            // Strict rejection: invalid DNA is reported by DefinitionValidator and
+            // never resolved, so the resolver must not repair the radius.
+            Assert.Throws<DomainException>(() => ResolvedCreatureSnapshot.Resolve(definition));
+        }
 
-            AssertFiniteAndDeterministic(first, second);
-            Assert.That(first[snapshot.GetIndex("body_j2")],
-                Is.EqualTo(ImplicitSurfaceWeightAuthoring.DefaultInfluenceRadius).Within(Tolerance));
+        [TestCase(float.NaN)]
+        [TestCase(float.PositiveInfinity)]
+        [TestCase(float.NegativeInfinity)]
+        public void BuildRadii_NonFiniteBodyRadius_IsRejected(float radius)
+        {
+            CreatureDefinition definition = CreateDefinition(bodyRadius: radius, limb: null);
+
+            Assert.Throws<DomainException>(() => ResolvedCreatureSnapshot.Resolve(definition));
         }
 
         [Test]
@@ -90,10 +93,26 @@ namespace ProceduralCreature.Tests.Runtime
             AssertFinite(radii);
         }
 
+        [Test]
+        public void BuildRadii_DefinitionOverloadMatchesSnapshotOverload()
+        {
+            CreatureDefinition definition = CreateDefinition(
+                bodyRadius: 0.75f,
+                limb: CreateLimb(new[] { 0f, 0.4f, 1f }, new[] { 0.16f, 0.12f, 0.09f }));
+            ResolvedCreatureSnapshot resolved = ResolvedCreatureSnapshot.Resolve(definition);
+            SkeletonSnapshot skeleton = SkeletonSnapshot.Capture(SkeletonInferrer.Infer(resolved));
+
+            float[] fromDefinition = MorphologyInfluenceRadiusBridge.BuildRadiiByBoneIndex(definition);
+            float[] fromSnapshot = MorphologyInfluenceRadiusBridge.BuildRadiiByBoneIndex(skeleton, resolved);
+
+            AssertFiniteAndDeterministic(fromDefinition, fromSnapshot);
+        }
+
         private static CreatureDefinition CreateDefinition(float? bodyRadius, LimbChain limb)
         {
             var definition = CreatureDefinition.CreateEmpty();
             definition.Forward = Vector3.forward;
+            definition.Body.Samples.Clear();
             definition.Body.Samples.Add(new BodySample
             {
                 Id = 1,
@@ -121,7 +140,12 @@ namespace ProceduralCreature.Tests.Runtime
                     ParentId = CreatureDefinition.BodyId,
                     PartType = PartType.Limb,
                     Limb = limb,
-                    Shape = new ShapeDefinition { Type = ShapeType.Capsule, PrimarySize = 0.1f, Radius = 0.1f },
+                    Shape = new ShapeDefinition
+                    {
+                        Type = ShapeType.Capsule,
+                        PrimarySize = 0.1f,
+                        Radius = 0.1f,
+                    },
                     Appearance = AppearanceDefinition.Default,
                 });
             }

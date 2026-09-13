@@ -29,8 +29,6 @@ namespace ProceduralCreature.Morphology.Extraction
             if (grid == null) throw new DomainException("grid must not be null.");
 
             int cellCount = grid.CellsX * grid.CellsY * grid.CellsZ;
-            // Worst case every cell is active; the job writes only the active
-            // prefix and reports its length. Transient TempJob buffers.
             var output = new NativeArray<ActiveCellEntry>(cellCount, Allocator.Persistent);
             var outputCount = new NativeArray<int>(1, Allocator.Persistent);
             try
@@ -90,12 +88,20 @@ namespace ProceduralCreature.Morphology.Extraction
         /// Decodes a stable linear cell index back into grid coordinates using the
         /// same z-major layout the builder uses to encode it:
         /// cellIndex = (cz * CellsY + cy) * CellsX + cx.
+        /// The caller supplies only X/Y dimensions here, so Z is intentionally
+        /// unbounded by this helper; the owning grid is responsible for validating
+        /// its complete cell range before decoding.
         /// </summary>
         public static void DecodeCellIndex(int cellIndex, int cellsX, int cellsY, out int x, out int y, out int z)
         {
+            if (cellsX <= 0) throw new DomainException("cellsX must be positive.");
+            if (cellsY <= 0) throw new DomainException("cellsY must be positive.");
+            if (cellIndex < 0) throw new DomainException("cellIndex must be non-negative.");
+
+            long cellsPerSlice = (long)cellsX * cellsY;
             x = cellIndex % cellsX;
             y = (cellIndex / cellsX) % cellsY;
-            z = cellIndex / (cellsX * cellsY);
+            z = (int)(cellIndex / cellsPerSlice);
         }
     }
 

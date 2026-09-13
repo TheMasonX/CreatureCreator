@@ -81,10 +81,14 @@ namespace ProceduralCreature.Definition
             return profile;
         }
 
+        /// <summary>
+        /// Clones an AnimationCurve without sharing its mutable key array. The
+        /// implementation is centralized in CurveAdapter so every definition
+        /// adapter uses the same Unity-object cloning contract.
+        /// </summary>
         public static AnimationCurve Clone(AnimationCurve curve)
         {
-            if (curve == null) return null;
-            return new AnimationCurve((Keyframe[])curve.keys.Clone());
+            return CurveAdapter.Clone(curve);
         }
 
         public static bool ContentEquals(AnimationCurve a, AnimationCurve b)

@@ -1,0 +1,43 @@
+{
+  "id": "tsk-0206-align-unity-bone-weight-contract-with-binding-builder",
+  "key": "TSK-0206",
+  "title": "Align Unity bone-weight contract with binding builder",
+  "description": "`SkinnedMeshBindingBuilder.BuildBoneWeights` documents itself as enforcing the same safety contract as `LinearBlendSkinning.Deform`, but its current validation only requires finite non-negative weights with a positive total. It does not enforce Unity's documented `BoneWeight` contract that the four weights sum to 1 and are ordered descending. The current production authoring path (`ImplicitSurfaceWeightAuthoring.Author`) already normalizes and sorts its selected influences, so this is primarily a boundary-contract and future-caller hardening issue rather than a proven current generated-creature defect. Define the owning contract explicitly and make the Unity adapter either normalize/reorder or reject invalid totals/order, with parity tests covering partial totals, descending-order violations, zero-filled unused slots, duplicate indices, and the existing normalized production path.",
+  "type": "Architecture",
+  "status": "Backlog",
+  "priority": "Medium",
+  "assigneeMode": "Custom",
+  "assigneeDirectoryId": null,
+  "assigneeCustomText": "Unassigned",
+  "reporter": "ChatGPT",
+  "labels": [
+    "user-mandated",
+    "animation",
+    "skinning",
+    "validation",
+    "contracts",
+    "codebase-health"
+  ],
+  "attachments": [],
+  "externalLinks": [
+    {
+      "id": "l-3986cea237ec2cd556a0cb3ac87dab8d",
+      "label": "BoneWeight",
+      "url": "https://docs.unity3d.com/cn/6000.0/ScriptReference/BoneWeight.html",
+      "addedAtUtc": "2026-09-11T22:25:00.0000000Z"
+    }
+  ],
+  "linkedPages": [],
+  "comments": [],
+  "epicId": null,
+  "parentId": null,
+  "dueDateUtc": null,
+  "createdAtUtc": "2026-09-11T22:25:00Z",
+  "updatedAtUtc": "2026-09-11T22:25:00Z",
+  "completedAtUtc": null,
+  "revision": 1,
+  "isArchived": false,
+  "hasLoadError": false,
+  "loadError": null,
+  "sourceFilePath": "tsk-0206-align-unity-bone-weight-contract-with-binding-builder.json"
+}

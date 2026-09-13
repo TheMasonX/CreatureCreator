@@ -1,0 +1,44 @@
+﻿{
+  "id": "tsk-0219-define-layered-revision-identity-across-editor-scheduler-rig-and-renderer",
+  "key": "TSK-0219",
+  "title": "Define layered revision identity across editor, scheduler, rig, and renderer",
+  "description": "## Summary\nFive independently-verified artifacts answer the same question \u2014 \u0022is this derived artifact still compatible with the source that produced it?\u0022 \u2014 with five unrelated mechanisms: an editor body fingerprint, a scheduler sequence number, a rig-cached pose skeleton reference, \u0060SkeletonSnapshot.HasSameBoneOrder\u0060 structural equality, and an implicit \u0022current definition\u0022 assumption. The 2026-09-12 audits call this out as one mechanism with one owner.\n\n## Scope\n- Define a layered identity: AuthoringRevision, GenerationRevision, SkeletonRevision, PresentationRevision.\n- Every derived artifact records the minimum revision that invalidates it.\n- Morphology/skeleton change invalidates a live pose binding (reject or rebuild) rather than silently reusing stale link lengths.\n- Placement gestures pin the accepted preview revision at mouse-down and do not switch colliders mid-drag.\n- Canonicalization records a version so cached or generated assets are distinguishable across semantic revisions.\n- Generation signature = hash(effective config \u002B canonical DNA \u002B generator revision).\n- Out of scope: the snapshot publish boundary itself (TSK-0095) and scheduler coalescing (TSK-0104); this task defines the identity those owners consume.\n\n## Acceptance Criteria\n- One documented identity model in the repo, naming each revision, what it covers, and what invalidates it.\n- No derived artifact can be consumed without checking the revision it was produced from.\n- A morphology edit during a live animation binding either rebuilds the binding or is rejected with a defined error; it never silently reuses stale segment data.\n- A placement drag uses one immutable accepted-preview surface for its whole duration.\n- A generated snapshot, a prepared mesh, and a placed preview each report the revision that produced them.\n- Focused tests assert each invalidation rule; none rely on visual judgement.\n\n## Validation\n- EditMode/Runtime tests for: morphology-change invalidation of a binding; placement-revision pinning; canonicalization version round-trip.\n- \u0060Scripts/Test-TaskRecords.ps1\u0060 unaffected.\n- Full-solution compile before the focused test run.\n\n## Findings\n- Verified: \u0060SkeletonSnapshot.HasSameBoneOrder\u0060 compares IDs, parent index, source part, part type, mirror flag, position, rotation, segment state, endpoint, and child-attachment state \u2014 it is a rest-state compatibility predicate, not an order check. Its name understates the contract.\n- Verified: \u0060CreatureGenerationScheduler\u0060 uses only a monotonic \u0060_latestSequence\u0060 for currency; there is no artifact revision.\n- Verified: \u0060SkeletonSnapshot.HasSameBoneOrder\u0060 is the only structural gate between rig and renderer bind.\n- Audit provenance caveat: the 2026-09-12 suite was taken at branch bases that are NOT ancestors of the current HEAD \u0060b5ba54b\u0060. Re-verify each cited symbol before implementing.\n\n## Blockers\n- Sequence depends on TSK-0095 (publish boundary) so revisions have something to attach to; this task can define the model first and adopt it incrementally.\n\n## Next Step\nWrite the identity model as an ADR-style note, name the four revisions, and map each existing fingerprint/sequence/equality check to one of them.",
+  "type": "Task",
+  "status": "Backlog",
+  "priority": "Medium",
+  "assigneeMode": "Custom",
+  "assigneeDirectoryId": null,
+  "assigneeCustomText": "Agent",
+  "reporter": "BeastMaster",
+  "labels": [
+    "architecture",
+    "editor",
+    "runtime",
+    "generation",
+    "preview",
+    "revision",
+    "process"
+  ],
+  "attachments": [],
+  "externalLinks": [],
+  "linkedPages": [],
+  "comments": [
+    {
+      "id": "c-b6c7439ab68d4bb593366db90427638b",
+      "author": "anonymous",
+      "body": "Audit synthesis 2026-09-12 (late) \u2014 external synthesis corroboration; independently re-verified against source.\n\nSYN-05 (P1, 0.98) Confirmed: InfluenceWeightingPolicy identity is NOT carried by generated artifact identity.\n- ResolvedCreatureSnapshot.ComputeRevisionId hashes only canonical DNA: CanonicalJsonWriter.Write(definition) then SHA-256 (Assets/Scripts/Runtime/Definition/CreaturePartWorldTransformResolver.cs:212-221).\n- InfluenceWeightingPolicy lives on CreatureGenerationConfig (Assets/Scripts/Runtime/Generation/CreatureGenerationConfig.cs:20-51), external to the definition.\n- GeneratedCreatureData carries definition \u002B snapshot \u002B mesh \u002B colors \u002B topology \u002B skeleton \u002B InfluenceDomain[] but no policy fingerprint (Assets/Scripts/Runtime/Generation/GeneratedCreatureData.cs:21-60).\n\nSYN-06 (P1, 0.99) Confirmed: the runtime preview reads the live weighting policy during binding, so an already-generated artifact can be reinterpreted by mutable configuration.\n\nThis task owns the layered revision-identity correction. Acceptance gate: a generated artifact records the effective identity of every output-affecting setting read outside CreatureDefinition during binding, and binding never reads mutable generation configuration to reinterpret an already-generated artifact. Related owners: TSK-0224 (generation-owned final weights) and TSK-0248 (compiled-program context).",
+      "createdAtUtc": "2026-09-13T04:35:13.8916002Z"
+    }
+  ],
+  "epicId": null,
+  "parentId": null,
+  "dueDateUtc": null,
+  "createdAtUtc": "2026-09-12T05:53:50.7672209Z",
+  "updatedAtUtc": "2026-09-13T04:35:13.8916002Z",
+  "completedAtUtc": null,
+  "revision": 2,
+  "isArchived": false,
+  "hasLoadError": false,
+  "loadError": null,
+  "sourceFilePath": "tsk-0219-define-layered-revision-identity-across-editor-scheduler-rig-and-renderer.json"
+}

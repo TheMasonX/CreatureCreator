@@ -56,8 +56,19 @@ Load only the skill needed by the task:
 - [unity-validation](../skills/unity-validation/SKILL.md) for Unity state,
   compilation, EditMode or PlayMode tests, assemblies, generation, topology,
   serialization, appearance, skeleton, or IK.
+- [unity-mcp-operator](../skills/unity-mcp-operator/SKILL.md) for MCP call
+  mechanics: readiness, resources, tool-group activation, batching, payload and
+  pagination limits, console checks, screenshots, and MCP error recovery.
+- [decorate-scene](../skills/decorate-scene/SKILL.md) for building and
+  decorating scene content: ProBuilder props assembled from many submodels,
+  procedural textures, shared emissive materials, prefab authoring, validated
+  placement, and visual evidence. Use it for props, furniture, machinery,
+  consoles, and set dressing.
 - [subagent-swarm](../skills/subagent-swarm/SKILL.md) for work spanning two or
   more independent layers. Use one agent for a focused slice.
+- [sprint-orchestration](../skills/sprint-orchestration/SKILL.md) for a sprint of
+  sequential subagent rounds: one bounded slice per round, each reviewed before
+  the next starts.
 - [council](../skills/council/SKILL.md) for high-impact architecture,
   requirement coverage, migration, audit, or sequencing decisions.
 - [cc-audit-synthesis](../skills/cc-audit-synthesis/SKILL.md) for audit
@@ -67,6 +78,12 @@ Load only the skill needed by the task:
 
 Do not load a skill only because it exists. Follow the skill's scope and stop
 when its completion criteria are met. Use the narrowest validation first.
+
+When coordinating a council, swarm, or sprint, load the
+[Agent Orchestration Contract](../instructions/agent-orchestration-contract.instructions.md):
+it owns the workflow handoff map, the shared repo contract, the assumption
+ledger, the blind-spot declaration, evidence provenance, and the
+validation-failure rollback protocol.
 
 ## Knowledge base queries (onboarding and context)
 
@@ -107,7 +124,12 @@ re-researching from scratch.
   `Data/Tasks/*.json` by hand; change task state only through MemorySmith MCP
   task tools. Do not create legacy `CC-###`/Markdown tickets.
 - Do not commit or create branches unless explicitly requested. Do not revert
-  unrelated worktree changes.
+  unrelated worktree changes. When a branch is explicitly requested, first check
+  whether an existing branch already covers the same scope, and sync new
+  task-key allocation against `main`'s current `Data/Tasks/` state at creation
+  time, not just at merge time. Evidence: recurring `TSK-####` collisions from
+  branch-local numbering (`TSK-0136`, `TSK-0172`, `TSK-0153`, `TSK-0188`,
+  `TSK-0189`).
 
 ## MemorySmith task tools
 

@@ -7,9 +7,8 @@ using ProceduralCreature.Morphology.Sdf;
 namespace ProceduralCreature.Tests.Runtime
 {
     /// <summary>
-    /// Slice 1 (CC-008) parity coverage: the active-cell extractor must produce
-    /// byte-for-byte identical output to the pre-change dense reference path on
-    /// the same sampled grid, plus determinism and contour-call accounting.
+    /// Slice 1/2 extraction parity coverage: the optimized active-cell and welded
+    /// edge-cache paths must preserve exact geometry, topology, and deterministic order.
     /// </summary>
     [TestFixture]
     public class MarchingCubesExtractorParityTests
@@ -51,13 +50,21 @@ namespace ProceduralCreature.Tests.Runtime
         }
 
         [Test]
+        public void Extract_MatchesReference_RectangularGrid()
+        {
+            using (DensityGrid grid = RectangularSphereGrid())
+            {
+                AssertExtractMatchesReference(grid, "rectangular grid");
+            }
+        }
+
+        [Test]
         public void Extract_IsDeterministic_Sphere()
         {
             using (DensityGrid grid = SphereGrid())
             {
                 MeshExtractionResult first = MarchingCubesExtractor.Extract(grid);
                 MeshExtractionResult second = MarchingCubesExtractor.Extract(grid);
-
                 AssertSameGeometry(first, second, "determinism");
             }
         }
@@ -69,7 +76,6 @@ namespace ProceduralCreature.Tests.Runtime
             {
                 MeshExtractionResult first = MarchingCubesExtractor.Extract(grid);
                 MeshExtractionResult second = MarchingCubesExtractor.Extract(grid);
-
                 AssertSameGeometry(first, second, "determinism");
             }
         }
@@ -80,7 +86,6 @@ namespace ProceduralCreature.Tests.Runtime
             using (DensityGrid grid = SphereGrid())
             {
                 MeshExtractionResult mesh = MarchingCubesExtractor.Extract(grid);
-
                 Assert.Greater(mesh.MixedCellCount, 0);
                 Assert.AreEqual(mesh.MixedCellCount, mesh.ContourResolutionCallCount,
                     "Homogeneous cells must never reach the contour resolver.");
@@ -93,7 +98,6 @@ namespace ProceduralCreature.Tests.Runtime
             using (DensityGrid grid = EmptyGrid())
             {
                 MeshExtractionResult mesh = MarchingCubesExtractor.Extract(grid);
-
                 Assert.AreEqual(0, mesh.MixedCellCount);
                 Assert.AreEqual(0, mesh.ContourResolutionCallCount);
             }
@@ -105,7 +109,6 @@ namespace ProceduralCreature.Tests.Runtime
             using (DensityGrid grid = SphereGrid())
             {
                 MeshExtractionResult mesh = MarchingCubesExtractor.Extract(grid);
-
                 MeshTopologyReport report = MeshTopologyValidator.Validate(mesh);
                 Assert.AreEqual(0, report.BoundaryEdgeCount);
                 Assert.AreEqual(0, report.NonManifoldEdgeCount);
@@ -118,7 +121,6 @@ namespace ProceduralCreature.Tests.Runtime
             using (DensityGrid grid = OverlappingSpheresGrid())
             {
                 MeshExtractionResult mesh = MarchingCubesExtractor.Extract(grid);
-
                 MeshTopologyReport report = MeshTopologyValidator.Validate(mesh);
                 Assert.AreEqual(0, report.BoundaryEdgeCount);
                 Assert.AreEqual(0, report.NonManifoldEdgeCount);
@@ -153,9 +155,7 @@ namespace ProceduralCreature.Tests.Runtime
         {
             Assert.AreEqual(a.Positions.Count, b.Positions.Count, $"{label}: vertex count");
             for (int i = 0; i < a.Positions.Count; i++)
-            {
                 Assert.AreEqual(a.Positions[i], b.Positions[i], $"{label}: position {i}");
-            }
             CollectionAssert.AreEqual(a.Triangles, b.Triangles, $"{label}: triangle indices");
         }
 
@@ -174,6 +174,13 @@ namespace ProceduralCreature.Tests.Runtime
         private static DensityGrid SphereGrid()
         {
             var bounds = new BoundsDefinition { MaxX = 1.5f, MaxY = 1.5f, MaxZ = 1.5f };
+            var settings = new GenerationSettings { VoxelsPerUnit = 6f };
+            return DensityGrid.SamplePortable(SdfProgramBuilder.CompilePortable(SphereDefinition(1f)), bounds, settings);
+        }
+
+        private static DensityGrid RectangularSphereGrid()
+        {
+            var bounds = new BoundsDefinition { MaxX = 2.25f, MaxY = 1.25f, MaxZ = 1.75f };
             var settings = new GenerationSettings { VoxelsPerUnit = 6f };
             return DensityGrid.SamplePortable(SdfProgramBuilder.CompilePortable(SphereDefinition(1f)), bounds, settings);
         }

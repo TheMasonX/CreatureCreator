@@ -1,0 +1,42 @@
+{
+  "id": "tsk-0233-apply-audit-recommendations-to-agent-and-skill-guidance-files",
+  "key": "TSK-0233",
+  "title": "Apply audit recommendations to agent and skill guidance files",
+  "description": "## Summary\nApply the still-outstanding recommendations that the repository audits made about the repo's own agent-guidance files (`.github/agents/BeastMaster.agent.md` and `.github/skills/*/SKILL.md`) so recurring failure patterns are caught mechanically instead of by prose alone.\n\n## User Mandate\n> \"Review the audits for recommendations to the agent and skill files within this repo and make the relevant changes\"\n\nSTRICT. Apply the recommendations to the agent and skill files; do not silently re-scope or drop them.\n\n## Scope\n- `engineering-guardrails/SKILL.md`: task-key collision from branch-local allocation; re-verify task-record claims against current source; concretize the destroy-then-build shape; add the hard nearest-wins/no-blend trap; validation-script fail-closed gate.\n- `task-tracker/SKILL.md`: mechanical completion gate on `Scripts/Normalize-TaskRecords.ps1`.\n- `cc-audit-synthesis/SKILL.md`: name specific failing tests, not just a count; periodic reconciliation-pace check.\n- `unity-validation/SKILL.md`: debug/visualization tooling validated against a posed, non-identity state.\n- `BeastMaster.agent.md`: branch-scope + task-key allocation against `main` at branch creation.\n\n## Acceptance Criteria\n- Each outstanding recommendation from `meta-synthesis-repeat-patterns-2026-09-09.md`, `creaturecreator-recurring-patterns-guardrails-audit-2026-09-08.md`, and the skill-file delta audits is either applied or explicitly dispositioned as already-applied/refuted.\n- No code, task JSON, or runtime file is edited.\n- `git diff` shows only the intended `.github/` guidance-file changes.\n\n## Validation\nRead each target file before and after; confirm the applied change matches the recommendation; confirm no other `.github/` content changed. `Normalize-TaskRecords.ps1` behavior confirmed by direct execution (3 collisions, 0 skipped, no writes).\n\n## Findings\nSources: `meta-synthesis-repeat-patterns-2026-09-09.md` (patterns A/C/D + secondary items), `creaturecreator-recurring-patterns-guardrails-audit-2026-09-08.md` (patterns 1-3), `delta-audit-skillfiles-2026-09-09.md`, `delta-audit-skillfile-progress-2026-09-10-1.md`. Pattern B (whole-solution compile gate) and the Unity-version fix are already applied to `unity-validation/SKILL.md` (commit `918070e`).\n\n## Blockers\nNone for the guidance edits. The `Normalize-TaskRecords.ps1` gate will currently report the three known `TSK-0153`/`0188`/`0189` collisions; that is a task-board integrity item, tracked separately, not a blocker to adding the gate.\n\n## Next Step\nApply the edits, re-read each file, and record evidence in a task comment.\n\n## Reconciliation\nRenumbered from TSK-0197 on 2026-09-12. This completed agent/skill-guidance record is historical; TSK-0197 now resolves uniquely to tsk-0197-use-cross-thread-safe-allocator-for-background-generation-scratch.",
+  "type": "Task",
+  "status": "Done",
+  "priority": "Medium",
+  "assigneeMode": "Custom",
+  "assigneeDirectoryId": null,
+  "assigneeCustomText": "BeastMaster",
+  "reporter": "BeastMaster",
+  "labels": [
+    "user-mandated",
+    "agent-guidance",
+    "skills",
+    "documentation",
+    "audit-synthesis"
+  ],
+  "attachments": [],
+  "externalLinks": [],
+  "linkedPages": [],
+  "comments": [
+    {
+      "id": "c-9ffc63f6565e432ca9a5431711e5c715",
+      "author": "anonymous",
+      "body": "## Implementation + validation evidence (2026-09-11)\n\nApplied the outstanding recommendations from `meta-synthesis-repeat-patterns-2026-09-09.md`, `creaturecreator-recurring-patterns-guardrails-audit-2026-09-08.md`, and the two skill-file delta audits. `git diff --stat`: 5 files, +51/-2, all under `.github/`.\n\n### Applied\n- `engineering-guardrails/SKILL.md` (+5 edits):\n  - \"One source of truth\": task key must be allocated against `main`, not branch-local (audit 2026-09-08 #1; evidence TSK-0136->0187, TSK-0172, TSK-0153, TSK-0188, TSK-0189).\n  - \"Recurring traps\": concretized the destroy-then-build shape with named instances (`CreaturePreviewController.ApplyPreviewGeometry`, `CreatureRuntimePreview.Update`) (meta-synthesis C).\n  - \"Recurring traps\": new hard nearest-wins / no-blend bullet (`ImplicitSurfaceWeightAuthoring`, `PartAppearanceSampler`) (meta-synthesis D).\n  - \"Recurring traps\": task-comment claims are leads, not evidence; re-trace before relying (audit 2026-09-08 #2; evidence TSK-0147).\n  - \"Production-readiness gate\": validation/normalization scripts must report their own inability to process an input as a failure, not a silent skip (meta-synthesis secondary).\n- `task-tracker/SKILL.md`: Procedure step 7 — run `Scripts/Normalize-TaskRecords.ps1` and confirm zero collisions and zero skipped files before ending a task-creation turn (meta-synthesis A).\n- `cc-audit-synthesis/SKILL.md`: completion checklist gains \"name specific failing tests, not just a count\" and a reconciliation-pace check (meta-synthesis secondary + audit 2026-09-08 #4).\n- `unity-validation/SKILL.md`: validate new debug/visualization tooling against a posed, non-identity state before trusting it as evidence (meta-synthesis secondary; `RigDebugView` instance).\n- `BeastMaster.agent.md`: branch rule now requires checking for an existing branch covering the same scope and syncing task-key allocation against `main` at creation time (audit 2026-09-08 #3).\n\n### Already applied (not re-applied)\n- Pattern B whole-solution compile gate and the Unity version correction (`6000.5.9f1`) are already in `unity-validation/SKILL.md` from commit `918070e`.\n\n### Validation performed\n- Read each target file before and after the edits; confirmed the applied text matches each recommendation.\n- `git diff --check` passes (no whitespace errors); `git diff --stat` shows only the five intended `.github/` guidance files; no code, runtime, or task JSON changed.\n- Directly executed `Scripts/Normalize-TaskRecords.ps1`: it parses all records (0 skipped), reports 3 identity collisions (`TSK-0153`, `TSK-0188`, `TSK-0189`), and aborts before writing. This **refutes** the `delta-audit-skillfile-progress-2026-09-10-1.md` claim that malformed `tsk-0156` blocks the normalizer, and corroborates the `TSK-0196` rejection. The new task-tracker gate is therefore actionable today; the 3 collisions are a separate task-board integrity item.",
+      "createdAtUtc": "2026-09-11T01:14:58.8901781Z"
+    }
+  ],
+  "epicId": null,
+  "parentId": null,
+  "dueDateUtc": null,
+  "createdAtUtc": "2026-09-11T01:14:26.789716Z",
+  "updatedAtUtc": "2026-09-12T06:57:00.2373472Z",
+  "completedAtUtc": "2026-09-11T01:15:01.9180595Z",
+  "revision": 4,
+  "isArchived": false,
+  "hasLoadError": false,
+  "loadError": null,
+  "sourceFilePath": "tsk-0233-apply-audit-recommendations-to-agent-and-skill-guidance-files.json"
+}

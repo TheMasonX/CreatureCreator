@@ -83,11 +83,18 @@ namespace ProceduralCreature.Definition
         ///   blend(u) = (o + 1) * u        for u &lt;= 0.5
         ///   blend(u) = o + (1 - o) * u    for u &gt;= 0.5
         /// </code>
-        /// encoded as a 3-key linear curve. offset 0 yields the linear y = x
-        /// default, so migrated files keep their look with no approximation.
+        /// encoded as a 3-key linear curve. Finite values outside [-1, 1] retain
+        /// the historical clamp until the explicit compatibility policy in
+        /// TSK-0137 decides whether that repair should become strict. Non-finite
+        /// legacy offsets are rejected rather than producing a NaN/Infinity curve.
         /// </summary>
         public static AnimationCurve FromLegacyOffset(float offset)
         {
+            if (!NumericValidity.IsFinite(offset))
+            {
+                throw new DomainException("Legacy verticalOffset must be finite.");
+            }
+
             float o = Mathf.Clamp(offset, -1f, 1f);
             float leftSlope = o + 1f;
             float rightSlope = 1f - o;
@@ -180,6 +187,5 @@ namespace ProceduralCreature.Definition
                 .OrderBy(key => key.time)
                 .ToArray();
         }
-
     }
 }

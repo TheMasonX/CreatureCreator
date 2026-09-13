@@ -1,0 +1,43 @@
+{
+  "id": "tsk-0247-consolidate-vertex-correspondence-evaluation",
+  "key": "TSK-0247",
+  "title": "Consolidate per-vertex part/body correspondence evaluation",
+  "description": "AppearanceBake and implicit-surface influence-domain resolution independently evaluate the same generated vertices against the same Body and resolved part SDF programs. Design one authoritative correspondence result or reusable evaluation pass that can supply nearest-body/part ownership to both consumers without changing tie semantics, mirrored-domain rules, or gradient coloring. Measure before/after because this path is a plausible secondary AppearanceBake and binding hotspot. Do not build a generic IR or service layer merely for abstraction; keep the result specific to generated-surface correspondence.\n\n## Reconciliation\nRenumbered from TSK-0207 on 2026-09-12. This audit-derived record was allocated on top of a history that already contained TSK-0207 (remove dead runtime preview material helper), so the key was double-held. TSK-0207 now resolves uniquely to tsk-0207-remove-dead-runtime-preview-material-helper. Mechanism: share generated-vertex part/body correspondence between appearance and binding (finding from current-head-hidden-defects-and-consolidation-council-audit-26-09-12-19-56-00).",
+  "type": "Performance",
+  "status": "Backlog",
+  "priority": "High",
+  "assigneeMode": "Custom",
+  "assigneeDirectoryId": null,
+  "assigneeCustomText": "Unassigned",
+  "reporter": "ChatGPT",
+  "labels": [
+    "user-mandated",
+    "performance",
+    "generation",
+    "appearance",
+    "binding",
+    "correspondence",
+    "consolidation"
+  ],
+  "attachments": [],
+  "externalLinks": [],
+  "linkedPages": [],
+  "comments": [
+    {
+      "id": "c-chatgpt-20260912-0207-audit",
+      "author": "ChatGPT",
+      "body": "Current-head static audit 2026-09-12: GenerateData already carries compiled part programs and a Body program, but AppearanceBake and InfluenceDomainResolution remain separate consumers that re-evaluate nearest part/body distances over the same vertices. This is a concrete consolidation/performance opportunity after behavior is locked down by parity tests.",
+      "createdAtUtc": "2026-09-12T19:56:00Z"
+    }
+  ],
+  "epicId": null,
+  "parentId": "TSK-0008",
+  "dueDateUtc": null,
+  "createdAtUtc": "2026-09-12T19:56:00Z",
+  "updatedAtUtc": "2026-09-13T04:34:05.7190605Z",
+  "revision": 2,
+  "isArchived": false,
+  "hasLoadError": false,
+  "loadError": null,
+  "sourceFilePath": "tsk-0247-consolidate-vertex-correspondence-evaluation.json"
+}

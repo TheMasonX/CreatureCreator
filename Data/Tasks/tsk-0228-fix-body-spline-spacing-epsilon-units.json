@@ -1,0 +1,42 @@
+{
+  "id": "tsk-0228-fix-body-spline-spacing-epsilon-units",
+  "key": "TSK-0228",
+  "title": "Fix Body spline spacing epsilon unit mismatch",
+  "description": "Correct BodySplineAuthoring degenerate-spacing guards that compare the squared-direction epsilon MinSpacingSqr against linear distances. Introduce an explicit linear threshold tied to GenerationTolerances.MinBodySegmentLength, keep squared comparisons using the squared threshold, and add focused regression coverage for near-coincident append/prepend/respace paths.\n\n## Reconciliation\nRenumbered from TSK-0153 on 2026-09-12 because TSK-0153 was shared with the live ground-contact placement task (tsk-0153-rest-ground-contact-normalize-initial-creature-placement). This archived record is retained for provenance; TSK-0153 now resolves uniquely on this branch.",
+  "type": "Task",
+  "status": "Archived",
+  "priority": "High",
+  "assigneeMode": "Custom",
+  "assigneeDirectoryId": null,
+  "assigneeCustomText": "Agent",
+  "reporter": "TheMasonX",
+  "labels": [
+    "editor",
+    "body-spline",
+    "correctness",
+    "tolerances",
+    "audit-synthesis"
+  ],
+  "attachments": [],
+  "externalLinks": [],
+  "linkedPages": [],
+  "comments": [
+    {
+      "id": "c-20260909-audit-synthesis",
+      "author": "Agent",
+      "body": "Created from the 2026-09-09 eleven-audit takeover synthesis. Repeated audits independently identified MinSpacingSqr as a squared-magnitude epsilon while several BodySplineAuthoring branches compare it to linear magnitudes/distances. The highest-confidence low-risk correction is to make linear-vs-squared units explicit rather than changing the tolerance value arbitrarily. Implementation is intentionally separate from the larger ResolvedPolyline/anatomical-rig work because those require broader planning and validation.",
+      "createdAtUtc": "0001-01-01T00:00:00"
+    }
+  ],
+  "epicId": null,
+  "parentId": null,
+  "dueDateUtc": null,
+  "createdAtUtc": "2026-09-09T20:45:00Z",
+  "updatedAtUtc": "2026-09-12T06:57:00.1756219Z",
+  "completedAtUtc": null,
+  "revision": 3,
+  "isArchived": true,
+  "hasLoadError": false,
+  "loadError": null,
+  "sourceFilePath": "tsk-0228-fix-body-spline-spacing-epsilon-units.json"
+}

@@ -121,7 +121,11 @@ namespace ProceduralCreature.Definition
             {
                 ThicknessKey ka = a[i];
                 ThicknessKey kb = b[i];
-                if (ka == null || kb == null) return ka == null && kb == null;
+                if (ka == null || kb == null)
+                {
+                    if (ka != kb) return false;
+                    continue;
+                }
                 if (!ka.T.Equals(kb.T)) return false;
                 if (!ka.Value.Equals(kb.Value)) return false;
             }
@@ -167,22 +171,42 @@ namespace ProceduralCreature.Definition
 
         /// <summary>
         /// Canonicalizes the profile in place: quantizes every key's T and Value
-        /// and orders keys by strictly increasing T (stable sort), matching the
-        /// canonical JSON requirement that the same DNA always serializes
-        /// identically regardless of authoring key order.
+        /// and orders keys by strictly increasing T (stable sort). Null keys and
+        /// post-quantization time collisions are rejected rather than silently
+        /// repaired. Validation is performed before publishing the new list, so a
+        /// failed canonicalization leaves the original profile untouched.
         /// </summary>
         public void Quantize()
         {
             if (Keys == null) return;
-            Keys = Keys
-                .Where(k => k != null)
-                .Select(k => new ThicknessKey
+
+            var quantized = new List<ThicknessKey>(Keys.Count);
+            for (int i = 0; i < Keys.Count; i++)
+            {
+                ThicknessKey key = Keys[i];
+                if (key == null)
                 {
-                    T = GenerationTolerances.Quantize(k.T),
-                    Value = GenerationTolerances.Quantize(k.Value),
-                })
-                .OrderBy(k => k.T)
-                .ToList();
+                    throw new DomainException("Cannot quantize a thickness profile with a null key.");
+                }
+
+                quantized.Add(new ThicknessKey
+                {
+                    T = GenerationTolerances.Quantize(key.T),
+                    Value = GenerationTolerances.Quantize(key.Value),
+                });
+            }
+
+            quantized.Sort((a, b) => a.T.CompareTo(b.T));
+            for (int i = 1; i < quantized.Count; i++)
+            {
+                if (quantized[i - 1].T.Equals(quantized[i].T))
+                {
+                    throw new DomainException(
+                        $"Thickness profile key times collide after quantization at T={quantized[i].T:0.0000}.");
+                }
+            }
+
+            Keys = quantized;
         }
 
     }

@@ -1,0 +1,9 @@
+{
+  "Id": "creaturecreator-preunity-cleanup-2026-09-08",
+  "Type": "WorkingMemory",
+  "Status": "Active",
+  "Content": "Pre-Unity cleanup campaign on audit/skeleton-animation-improvements-2026-09-07. Final source/task audit re-derived current state from branch source rather than trusting stale audit prose. Small fixes landed: TSK-0162 SdfProgramEvaluator temporary NativeArray now has guaranteed finally disposal and task record closed with historical evidence; GeneratedCreatureData now clones the incoming CreatureDefinition at the pure-generation/Unity-assembly boundary as a bounded extension of TSK-0095, with regression coverage; Scripts/Normalize-TaskRecords.ps1 now repairs filename/key drift in addition to missing keys; CreatureGenerationScheduler.EnqueueCaptured XML documentation now accurately describes its public cross-assembly ownership contract. Existing canonical owners retained: TSK-0104 scheduler/preview lifecycle; TSK-0148 compact anatomical rig; TSK-0149 rig debug presentation; TSK-0150 foot-domain ownership; TSK-0168 untouched-leg investigation; TSK-0187 rig selection/pivot; TSK-0188 debug attachment transform; TSK-0156 mutable Bone/Skeleton migration; TSK-0139 numeric cleanup; TSK-0147 influence-domain evolution; TSK-0008/0180 performance. No fresh Unity Editor/EditMode/PlayMode run was available. Do not close Unity-gated tasks from source-only evidence. Older audit findings about four-bone body topology, duplicate rig components, and missing raw-mesh toggle are stale and must not spawn duplicate tasks. Task-key collision TSK-0136 vs editor pivot task has already been physically reconciled to TSK-0187. Current branch tip at campaign end: b53b2a8741e0f26bd69a495397aaf22999042413.",
+  "References": [
+    { "Label": "Pre-Unity cleanup audit", "Path": "docs/audits/creaturecreator-preunity-cleanup-audit-26-09-08-15-10-00.md" }
+  ]
+}

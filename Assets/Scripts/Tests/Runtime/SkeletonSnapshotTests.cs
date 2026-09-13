@@ -36,6 +36,56 @@ namespace ProceduralCreature.Tests.Runtime
         }
 
         [Test]
+        public void Capture_NonFinitePositionThrowsDomainException()
+        {
+            var skeleton = new Skeleton.Skeleton();
+            skeleton.Bones.Add(new Bone { Id = "root", Position = new Vector3(float.NaN, 0f, 0f) });
+
+            Assert.Throws<DomainException>(() => SkeletonSnapshot.Capture(skeleton));
+        }
+
+        [Test]
+        public void Capture_NonFiniteRotationThrowsDomainException()
+        {
+            var skeleton = new Skeleton.Skeleton();
+            skeleton.Bones.Add(new Bone
+            {
+                Id = "root",
+                Rotation = new Quaternion(0f, float.PositiveInfinity, 0f, 1f),
+            });
+
+            Assert.Throws<DomainException>(() => SkeletonSnapshot.Capture(skeleton));
+        }
+
+        [Test]
+        public void Capture_NonFiniteSegmentEndpointThrowsDomainException()
+        {
+            var skeleton = new Skeleton.Skeleton();
+            skeleton.Bones.Add(new Bone
+            {
+                Id = "root",
+                HasSegment = true,
+                EndPosition = new Vector3(0f, 0f, float.PositiveInfinity),
+            });
+
+            Assert.Throws<DomainException>(() => SkeletonSnapshot.Capture(skeleton));
+        }
+
+        [Test]
+        public void Capture_NonFiniteChildAttachmentThrowsDomainException()
+        {
+            var skeleton = new Skeleton.Skeleton();
+            skeleton.Bones.Add(new Bone
+            {
+                Id = "root",
+                HasChildAttachmentPosition = true,
+                ChildAttachmentPosition = new Vector3(float.NaN, 0f, 0f),
+            });
+
+            Assert.Throws<DomainException>(() => SkeletonSnapshot.Capture(skeleton));
+        }
+
+        [Test]
         public void HasSameBoneOrder_RejectsDifferentIndexedOrder()
         {
             var first = new Skeleton.Skeleton();

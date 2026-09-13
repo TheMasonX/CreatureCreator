@@ -1,0 +1,36 @@
+{
+  "id": "tsk-0184-prevent-generation-sample-budget-estimator-overflow",
+  "key": "TSK-0184",
+  "title": "Prevent generation sample-budget estimator overflow",
+  "description": "Seven-seat whole-codebase audit found that GenerationSettings.EstimateSampleCount could overflow before its saturating product: a cell count at long.MaxValue was incremented directly, wrapping negative and potentially bypassing the validator's allocation budget. Harden the shared estimator with saturating per-axis increments and retain exact behavior for ordinary grids. Add a boundary regression using an extreme finite bound.",
+  "type": "Bug Fix",
+  "status": "Done",
+  "priority": "High",
+  "assigneeMode": "Custom",
+  "assigneeDirectoryId": null,
+  "assigneeCustomText": "Agent",
+  "reporter": "council-seven-seat-audit",
+  "labels": ["council", "generation", "safety-budget", "numeric", "overflow"],
+  "attachments": [],
+  "externalLinks": [],
+  "linkedPages": [],
+  "comments": [
+    {
+      "id": "c-20260908-generation-budget-overflow",
+      "author": "council-seven-seat-audit",
+      "body": "Implemented in GenerationSettings.EstimateSampleCount with SaturatingIncrement. Added GenerationSettingsTests.EstimateSampleCount_SaturatesWhenCellCountReachesLongMaxValue. No automated or Unity execution was performed in this campaign.",
+      "createdAtUtc": "2026-09-08T04:40:00Z"
+    }
+  ],
+  "epicId": null,
+  "parentId": "tsk-0095-establish-concrete-generation-pipeline-stage-boundaries",
+  "dueDateUtc": null,
+  "createdAtUtc": "2026-09-08T04:40:00Z",
+  "updatedAtUtc": "2026-09-08T04:40:00Z",
+  "completedAtUtc": "2026-09-08T04:40:00Z",
+  "revision": 1,
+  "isArchived": false,
+  "hasLoadError": false,
+  "loadError": null,
+  "sourceFilePath": "tsk-0184-prevent-generation-sample-budget-estimator-overflow.json"
+}

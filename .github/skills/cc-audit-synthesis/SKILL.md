@@ -246,6 +246,11 @@ create a branch unless the user explicitly requests it.
 - [ ] Fixed claims were not reopened as duplicate work.
 - [ ] Standards and specification assessments remain separate.
 - [ ] Open evidence gaps have an owner or next evidence step.
+- [ ] Any accepted-baseline test failure is named by test, not cited only as a
+      count, so the claim can be re-checked rather than trusted.
+- [ ] When `docs/audits/` has grown substantially since the last synthesis, the
+      report states whether reconciliation is keeping pace and names any
+      unreconciled backlog.
 - [ ] Record validation and `git diff --check` pass.
 
 ## Example Prompts

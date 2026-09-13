@@ -43,7 +43,7 @@ namespace ProceduralCreature.Definition
         public readonly long EstimateSampleCount(BoundsDefinition bounds)
         {
             GetCellCounts(bounds, out long cellsX, out long cellsY, out long cellsZ);
-            return SaturatingProduct(cellsX + 1L, cellsY + 1L, cellsZ + 1L);
+            return SaturatingProduct(SaturatingIncrement(cellsX), SaturatingIncrement(cellsY), SaturatingIncrement(cellsZ));
         }
 
         private readonly void GetCellCounts(BoundsDefinition bounds,
@@ -63,6 +63,11 @@ namespace ProceduralCreature.Definition
             if (value >= long.MaxValue) return long.MaxValue;
             if (value <= 0d) return 0L;
             return (long)Math.Ceiling(value);
+        }
+
+        private static long SaturatingIncrement(long value)
+        {
+            return value >= long.MaxValue ? long.MaxValue : value + 1L;
         }
 
         private static long SaturatingProduct(long first, long second, long third)

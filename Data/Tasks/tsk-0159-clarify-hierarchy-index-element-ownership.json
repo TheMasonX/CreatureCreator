@@ -1,0 +1,30 @@
+{
+  "id": "tsk-0159-clarify-hierarchy-index-element-ownership",
+  "key": "TSK-0159",
+  "title": "Clarify and harden hierarchy-index element ownership",
+  "description": "Council multi-round audit found that CreaturePartHierarchyIndex detaches the Parts collection but still exposes the original mutable CreaturePart objects. A caller can mutate hierarchy.Parts[i].Id/ParentId/etc. and mutate the authoritative CreatureDefinition through the supposedly detached index. GetChildren has the same shallow-element issue.\n\nThis is deliberately not auto-fixed by deep-cloning the elements: CreatureDefinition.FindPart and hierarchy consumers currently rely on identity-bearing CreaturePart objects, so deep-copying here could silently change public semantics. The work should define whether the index is a read-only traversal view over live elements or a true immutable snapshot, then make that contract structural. Prefer a narrow read-only part projection or internal snapshot type if needed rather than duplicating hierarchy logic.\n\nParent owner: TSK-0093 malformed-definition hierarchy mechanics. Do not create a parallel graph-mechanics implementation.\n\nValidation gate: focused hierarchy/FindPart/GetChildren tests covering attempted element mutation, identity expectations, duplicate/cycle handling, and canonicalization parity; Unity execution required before closure.",
+  "type": "Architecture",
+  "status": "Backlog",
+  "priority": "Medium",
+  "assigneeMode": "Custom",
+  "assigneeDirectoryId": null,
+  "assigneeCustomText": "Unassigned",
+  "reporter": "council-audit",
+  "labels": [
+    "council",
+    "api-contract",
+    "hierarchy",
+    "mutability",
+    "TSK-0093"
+  ],
+  "attachments": [],
+  "externalLinks": [],
+  "linkedPages": [],
+  "comments": [],
+  "parentId": "tsk-0093-make-malformed-definition-validation-and-cloning-total",
+  "dueDateUtc": null,
+  "isArchived": false,
+  "createdAtUtc": "2026-09-07T11:38:26.0000000Z",
+  "updatedAtUtc": "2026-09-07T11:38:26.0000000Z",
+  "revision": 1
+}

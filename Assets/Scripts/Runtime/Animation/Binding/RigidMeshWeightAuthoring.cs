@@ -15,23 +15,19 @@ namespace ProceduralCreature.Animation.Binding
     {
         public static VertexInfluence[][] Author(
             SkeletonSnapshot skeleton,
-            CreaturePart part,
+            string sourcePartId,
             bool mirrored,
             IReadOnlyList<Vector3> restVertices)
         {
             if (skeleton == null) throw new DomainException("skeleton must not be null.");
-            if (part == null) throw new DomainException("part must not be null.");
+            if (string.IsNullOrEmpty(sourcePartId)) throw new DomainException("sourcePartId must not be empty.");
             if (restVertices == null) throw new DomainException("restVertices must not be null.");
-            if (part.Limb != null)
-            {
-                throw new DomainException("Rigid mesh-asset weights require a non-limb part.");
-            }
 
-            string boneId = SemanticBoneResolver.ResolvePartRootBoneId(part, mirrored);
+            string boneId = SemanticBoneResolver.ResolvePartRootBoneId(sourcePartId, mirrored);
             if (!skeleton.TryGetIndex(boneId, out int boneIndex))
             {
                 throw new DomainException(
-                    $"Rigid mesh part '{part.Id}' resolved bone '{boneId}', but that bone is absent from the skeleton snapshot.");
+                    $"Rigid mesh part '{sourcePartId}' resolved bone '{boneId}', but that bone is absent from the skeleton snapshot.");
             }
 
             var result = new VertexInfluence[restVertices.Count][];
@@ -44,6 +40,25 @@ namespace ProceduralCreature.Animation.Binding
                 result[vertex] = new[] { new VertexInfluence(boneIndex, 1f) };
             }
             return result;
+        }
+
+        /// <summary>
+        /// Compatibility overload for callers that still hold authored parts.
+        /// New generation code should pass the resolved semantic ID overload so the
+        /// binding boundary does not depend on mutable CreaturePart state.
+        /// </summary>
+        public static VertexInfluence[][] Author(
+            SkeletonSnapshot skeleton,
+            CreaturePart part,
+            bool mirrored,
+            IReadOnlyList<Vector3> restVertices)
+        {
+            if (part == null) throw new DomainException("part must not be null.");
+            if (part.Limb != null)
+            {
+                throw new DomainException("Rigid mesh-asset weights require a non-limb part.");
+            }
+            return Author(skeleton, part.Id, mirrored, restVertices);
         }
     }
 }

@@ -1,0 +1,36 @@
+﻿{
+  "id": "tsk-0189-make-task-record-normalization-collision-safe",
+  "key": "TSK-0189",
+  "title": "Make task-record normalization collision-safe",
+  "description": "Harden Scripts/Normalize-TaskRecords.ps1 so normalization cannot silently create duplicate task keys while repairing filename/key drift. The current script derives a filename-based key and overwrites a stale stored key without checking whether another record already owns that target key. This is especially dangerous when independently-created branches allocate the same TSK number. Add a preflight pass that parses all task records, computes each record's post-normalization id/key identity, detects duplicate target IDs/keys and collisions with surviving records, and fails before writing any file. Preserve the existing deterministic normalization behavior for non-conflicting records. Do not add CI infrastructure; this is a local safety guard for the normalization utility.",
+  "type": "Bug Fix",
+  "status": "Done",
+  "priority": "High",
+  "assigneeMode": "Custom",
+  "assigneeDirectoryId": null,
+  "assigneeCustomText": "Agent",
+  "reporter": "adversarial-audit-campaign",
+  "labels": ["task-integrity", "powershell", "tooling", "safety", "consolidation"],
+  "attachments": [],
+  "externalLinks": [],
+  "linkedPages": [],
+  "comments": [
+    {
+      "id": "c-20260908-normalizer-collision",
+      "author": "anonymous",
+      "body": "Source-level review found Fix 2b in Normalize-TaskRecords.ps1 changes a present key to the filename-derived key without first checking whether that target key is already owned by another task. The normalizer can therefore manufacture a duplicate key during a collision-reconciliation operation. Fixed by adding a preflight identity/collision pass that aborts before any writes when normalized ids or keys would collide.",
+      "createdAtUtc": "2026-09-08T19:45:00Z"
+    }
+  ],
+  "epicId": null,
+  "parentId": null,
+  "dueDateUtc": null,
+  "createdAtUtc": "2026-09-08T19:45:00Z",
+  "updatedAtUtc": "2026-09-08T19:45:00Z",
+  "completedAtUtc": "2026-09-08T19:45:00Z",
+  "revision": 1,
+  "isArchived": false,
+  "hasLoadError": false,
+  "loadError": null,
+  "sourceFilePath": "tsk-0189-make-task-record-normalization-collision-safe.json"
+}

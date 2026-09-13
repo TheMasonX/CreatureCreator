@@ -1,0 +1,56 @@
+{
+  "id": "tsk-0234-define-portable-animation-clip-and-sampling-contract",
+  "key": "TSK-0234",
+  "title": "Define portable animation clip and deterministic sampling contract",
+  "description": "## Summary\nDefine a runtime-portable animation clip and deterministic sampling contract for indexed creature poses.\n\n## User Mandate\n> Please take everything from this good branch and take over for this agent:\n\nSTRICT. Preserve the uncaptured clip and sampling finding from the reviewed follow-up branch without importing its raw task JSON or duplicate records.\n\n## Scope\n- Define clip channels against authoritative indexed skeleton identity.\n- Specify deterministic time sampling, looping, endpoint behavior, missing-channel behavior, and malformed-data rejection.\n- Keep Unity Animator/Avatar integration, locomotion, blending policy, and editor authoring out of scope.\n- Coordinate with TSK-0190 and TSK-0191 without duplicating their pose contract or buffer ownership.\n\n## Acceptance Criteria\n- The contract is portable runtime data with stable indexed identity and deterministic sampling results.\n- Tests cover exact endpoints, looping, non-looping clamp, malformed channel lengths, incompatible skeletons, and non-finite values.\n- Sampling can feed the reusable indexed pose buffer without per-sample semantic ID resolution.\n- No raw branch task JSON or duplicate TSK key is imported.\n\n## Validation\nRun whole-project .NET compilation, focused runtime tests, and Unity PlayMode validation for the concrete sampling path. Record exact results and Unity availability.\n\n## Findings\nThe reviewed follow-up branch identified a portable animation clip plus deterministic sampling contract that is not captured by the existing full-pose contract or reusable-buffer tasks.\n\n## Blockers\nNo implementation or Unity execution has been performed for this finding.\n\n## Next Step\nDesign the portable clip/channel schema and deterministic sampling tests with TSK-0190 and TSK-0191 as dependencies.\n\n## Reconciliation\nRenumbered from TSK-0198 on 2026-09-12. TSK-0198 now resolves uniquely to the in-progress stream-preview performance task tsk-0198-stream-preview-generation-hotpaths-and-direct-edge-ownership; this record keeps the animation clip and sampling contract.",
+  "type": "Task",
+  "status": "Backlog",
+  "priority": "High",
+  "assigneeMode": "Custom",
+  "assigneeDirectoryId": null,
+  "assigneeCustomText": "Agent",
+  "reporter": "anonymous",
+  "labels": [
+    "runtime",
+    "animation",
+    "skeleton",
+    "sampling",
+    "architecture",
+    "audit-followup",
+    "user-mandated"
+  ],
+  "attachments": [],
+  "externalLinks": [],
+  "linkedPages": [],
+  "comments": [
+    {
+      "id": "c-a24237fb2b644e1bb7a30da07bcfacda",
+      "author": "anonymous",
+      "body": "Task created from reviewed follow-up finding. Task-record integrity validation is currently blocked by pre-existing normalized-key collisions in TSK-0153, TSK-0188, and TSK-0189; Scripts/Normalize-TaskRecords.ps1 reported all three and modified no files. This task remains Backlog.",
+      "createdAtUtc": "2026-09-11T02:20:05.6110819Z"
+    },
+    {
+      "id": "c-de74b0db80254cc1a41eb123c74f8d8d",
+      "author": "anonymous",
+      "body": "Sampler scratch fix validated end-to-end (2026-09-11). `DensityGrid.SamplePortable` now bounds the scheduled work-item set to `ScratchValueBudget` and processes rows in windows; `SdfSamplingRowBatchJob` takes `RowStart`. This removes the silent out-of-bounds scratch writes that the pushed work-item offset introduced.\n\nEvidence:\n- EditMode 148/148 passed. PlayMode full 751 total / 709 passed / 42 failed (`TestResults.xml`, complete list recovered by recursive parse past the runner's 25-cap).\n- The determinism cluster recorded in `TSK-0194` now passes: `FastFieldSamplingTests.FastCulling_IsDeterministic`, `GenerationIntegrityTests.SampleAndExtract_RepeatedRuns_AreBitIdentical`, `CanonicalMorphologyChainTests` x3, `GeneratedCreatureTests` x3, `CreatureGenerationSchedulerTests.AsyncGeneration_MatchesSynchronousMeshAndColors`. 12 recorded failures resolved in total.\n- Editor: 4 regenerations on unchanged DNA/settings gave 20962 triangles / 10483 vertices every time; TotalGeneration 1314.8 ms (cold), 789.0, 779.9, 707.4 ms — inside the documented 701.9–798.8 ms baseline. No detached islands.\n- Screenshot: `Assets/Screenshots/cc-sdf-race-fix-scene-2026-09-11.png`.\n\nRemaining 42 PlayMode failures are pre-existing non-sampler clusters (skeleton/bone, marching-cubes winding, influence domains, non-finite validation, FABRIK/IK). See `TSK-0212` for the acceptance-criteria disposition and `TSK-0194` for the full delta.",
+      "createdAtUtc": "2026-09-12T03:55:10.7815117Z"
+    },
+    {
+      "id": "c-9187ed894f7d4050b0290dde14d09b28",
+      "author": "anonymous",
+      "body": "Correction: the previous comment (\"Sampler scratch fix validated end-to-end\") was posted here in error. It belongs to `tsk-0198-stream-preview-generation-hotpaths-and-direct-edge-ownership` (the stream-preview/extraction performance task) and was mis-routed because the bare key `TSK-0198` currently resolves ambiguously between two records. No sampler or generation work applies to this animation clip/sampling contract task. Tracked by `TSK-0213` (collision-safe task key allocation).",
+      "createdAtUtc": "2026-09-12T03:55:19.5559265Z"
+    }
+  ],
+  "epicId": null,
+  "parentId": "TSK-0077",
+  "dueDateUtc": null,
+  "createdAtUtc": "2026-09-11T02:18:23.1118609Z",
+  "updatedAtUtc": "2026-09-12T06:57:00.2421826Z",
+  "completedAtUtc": null,
+  "revision": 5,
+  "isArchived": false,
+  "hasLoadError": false,
+  "loadError": null,
+  "sourceFilePath": "tsk-0234-define-portable-animation-clip-and-sampling-contract.json"
+}

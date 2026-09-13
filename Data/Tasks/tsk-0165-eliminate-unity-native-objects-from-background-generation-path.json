@@ -1,0 +1,28 @@
+{
+  "id": "tsk-0165-eliminate-unity-native-objects-from-background-generation-path",
+  "key": "TSK-0165",
+  "title": "Eliminate Unity-native object evaluation from background generation",
+  "description": "Council concurrency review found a runtime/editor boundary violation in the background generation path. CreatureGenerationScheduler.Enqueue schedules CreatureMeshGenerator.GenerateData on Task.Run, but GenerateData reaches AppearanceBaker.BakeBurst, which evaluates BodyVerticalGradientSampler against BodyVerticalGradientAppearance containing UnityEngine.Gradient and UnityEngine.AnimationCurve instances. The appearance sampler and its comments describe the stage as pure deterministic math, but the current implementation delegates to Unity-native object evaluation. This makes the scheduler's worker-thread safety assumption invalid and risks thread-affinity/undefined-behavior failures. Scope: establish a truly worker-safe appearance representation (preferred: immutable plain-data curve/gradient snapshots) or explicitly move Unity-native evaluation behind a main-thread presentation boundary; preserve byte-stable DNA and color parity. Do not solve by adding coarse global locks. Acceptance requires deterministic parity tests plus real PlayMode/editor scheduler validation. No implementation in this audit because the correct boundary is architectural rather than a safe one-line patch.",
+  "type": "Bug Fix",
+  "status": "Backlog",
+  "priority": "High",
+  "assigneeMode": "Custom",
+  "assigneeDirectoryId": null,
+  "assigneeCustomText": "Unassigned",
+  "reporter": "council-exhaustive-audit",
+  "labels": [
+    "council",
+    "concurrency",
+    "thread-safety",
+    "generation",
+    "appearance",
+    "runtime-editor-boundary"
+  ],
+  "attachments": [],
+  "externalLinks": [],
+  "linkedPages": [],
+  "parentId": "tsk-0095-establish-concrete-generation-pipeline-stage-boundaries",
+  "createdAtUtc": "2026-09-07T12:00:49.0000000Z",
+  "updatedAtUtc": "2026-09-07T12:00:49.0000000Z",
+  "revision": 1
+}

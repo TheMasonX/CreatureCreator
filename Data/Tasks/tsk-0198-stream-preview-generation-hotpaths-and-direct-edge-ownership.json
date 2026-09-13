@@ -1,0 +1,82 @@
+﻿{
+  "id": "tsk-0198-stream-preview-generation-hotpaths-and-direct-edge-ownership",
+  "key": "TSK-0198",
+  "title": "Stream preview hot paths and remove extraction hash overhead",
+  "description": "Bounded performance slice under TSK-0008 / TSK-0065. Current user-supplied editor logs show steady-state generation dominated by FieldSampling (~387-408 ms) and AppearanceBake (~189-196 ms), with optimized MeshExtraction usually ~113-117 ms and occasional contour-resolution variance. Implemented three behavior-preserving reductions: row-oriented Burst SDF sampling removes per-sample flat-index division/modulo and reduces scratch to per-work-item row batches; streamed Burst appearance resolution removes the vertexCount \u00D7 programCount distance matrix while preserving absolute-distance and Body tie semantics; direct integer grid corner/edge ownership replaces the extraction Dictionary\u003Clong,int\u003E with deterministic dense ownership tables and overflow guards. Acceptance requires Unity parity/determinism/topology validation and fresh benchmark measurements before marking complete.",
+  "type": "Performance",
+  "status": "InProgress",
+  "priority": "High",
+  "assigneeMode": "Custom",
+  "assigneeDirectoryId": null,
+  "assigneeCustomText": "Unassigned",
+  "reporter": "ChatGPT",
+  "labels": [
+    "user-mandated",
+    "performance",
+    "generation",
+    "sampling",
+    "appearance",
+    "extraction",
+    "determinism",
+    "topology",
+    "burst"
+  ],
+  "attachments": [],
+  "externalLinks": [],
+  "linkedPages": [],
+  "comments": [
+    {
+      "id": "c-chatgpt-20260910-0198-implementation",
+      "author": "ChatGPT",
+      "body": "Implementation round 2026-09-10: DensityGrid.SamplePortable now uses row-oriented Burst sampling with bounded per-work-item scratch isolation and contiguous x traversal. AppearanceBaker routes nearest appearance selection through the consolidated AppearanceResolveBurst streamed candidate reducer instead of a full distance matrix and merge pass. MarchingCubesExtractor now uses GridVertexOwnership with direct integer corner/X-edge/Y-edge/Z-edge slots and owner\u002B1 sentinel encoding. Existing AppearanceBakerTests already contain Bake_BurstResolve_MatchesManagedResolveExactly; existing extraction tests cover watertightness and welding invariants. Unity test execution and fresh benchmark comparison remain pending in this environment.",
+      "createdAtUtc": "2026-09-10T00:00:00Z"
+    },
+    {
+      "id": "c-user-benchmark-20260910",
+      "author": "user",
+      "body": "User-supplied Quality 16 steady-state editor logs: TotalGeneration 701.9, 700.6, 798.8, 720.5, 702.8 ms; FieldSampling 386.8-407.5 ms; MeshExtraction 112.6-208.9 ms, normally ~113-117 ms except one 208.9 ms run driven by MeshContourResolution 147 ms; MeshValidation ~5 ms; AppearanceBake 188.7-196.0 ms. Mesh output was stable at 20,962 triangles / 10,483 vertices. These measurements are the post-threading-fix baseline supplied by the user and should be compared with the new implementation after Unity warm-up.",
+      "createdAtUtc": "2026-09-10T00:00:00Z"
+    },
+    {
+      "id": "c-chatgpt-20260910-scratch-correction",
+      "author": "ChatGPT",
+      "body": "Review correction before validation: the first row-batching implementation shared one scratch buffer across parallel work items, which could race. The current implementation allocates bounded per-work-item scratch slices (RowsPerExecute chosen under an 8 MB budget) and offsets each row into its own slice. The unsafe version is no longer the branch state.",
+      "createdAtUtc": "2026-09-10T00:00:00Z"
+    },
+    {
+      "id": "c-chatgpt-20260911-council",
+      "author": "ChatGPT",
+      "body": "Second static council re-audit 2026-09-11: no regression was found in the corrected row-batched sampler, streamed appearance reducer, or dense extraction ownership. One additional resource-lifetime defect was found outside the prior slice: the public AppearanceBaker.Bake cleanup scope did not cover a failure during body-program compilation, so compiled part programs could leak on that exception path. Fixed in 13c72f2fcaa3704319aa45dd8b581ba810eefef8. Follow-up performance/design findings are tracked under TSK-0201 through TSK-0203; Unity compilation, parity, topology, determinism, and fresh benchmarks remain mandatory gates.",
+      "createdAtUtc": "2026-09-11T00:00:00Z"
+    },
+    {
+      "id": "c-chatgpt-20260911-row-race",
+      "author": "ChatGPT",
+      "body": "Critical correction 2026-09-11: the pushed row-batched sampler was still incorrect. SdfSamplingRowBatchJob.Execute calculated rowValueOffset from localRow only, so all parallel work items reused scratch offsets 0..RowsPerExecute-1 and raced each other. This matches the user\u0027s nondeterministic detached polygons and the failing GenerationIntegrity/FastFieldSampling tests. The production sampler is now fixed to add a disjoint workItemScratchOffset per work item, with checked index arithmetic. Unity rerun is required to close this task.",
+      "createdAtUtc": "2026-09-11T21:45:00Z"
+    },
+    {
+      "id": "c-d713435b43c44715a109ccf6ca704dc3",
+      "author": "anonymous",
+      "body": "Post-pull reconciliation (2026-09-11). Pulled commit \u0060656243f\u0060 claims to fix the sampler scratch race but only added the \u0060workItemIndex\u0060 offset; \u0060DensityGrid.cs:89\u0060 still allocates \u0060ScratchValues\u0060 for one work-item batch (\u0060rowScratchLength * rowsPerExecute\u0060), so the new per-work-item offsets run past the buffer for \u0060workItemIndex \u003E= 1\u0060. The pulled audit \u0060docs/audits/creaturecreator-sdf-sampling-race-fix-audit-26-09-11-21-50-00.md\u0060 records the race as repaired and asserts the allocation \u0022already reserves enough storage\u0022 \u2014 that assertion is refuted by source. This task\u0027s Unity validation gate must include: scratch allocation sized for the concurrent work-item set (proven by offset/bounds derivation, not one run), the direct parallel regression passing with a correctly sized scratch buffer, and repeated fingerprint determinism. Incomplete-fix scope is tracked as \u0060TSK-0212\u0060.",
+      "createdAtUtc": "2026-09-12T03:05:30.6680375Z"
+    },
+    {
+      "id": "c-533d0b116d244304ab16a83b3bacb0ee",
+      "author": "anonymous",
+      "body": "Sampler scratch fix validated end-to-end (2026-09-11). \u0060DensityGrid.SamplePortable\u0060 now bounds the scheduled work-item set to \u0060ScratchValueBudget\u0060 and processes rows in windows; \u0060SdfSamplingRowBatchJob\u0060 takes \u0060RowStart\u0060. This removes the silent out-of-bounds scratch writes that the pushed work-item offset introduced.\n\nEvidence:\n- EditMode 148/148 passed. PlayMode full 751 total / 709 passed / 42 failed (\u0060TestResults.xml\u0060, complete list recovered by recursive parse past the runner\u0027s 25-cap).\n- The determinism cluster recorded in \u0060TSK-0194\u0060 now passes: \u0060FastFieldSamplingTests.FastCulling_IsDeterministic\u0060, \u0060GenerationIntegrityTests.SampleAndExtract_RepeatedRuns_AreBitIdentical\u0060, \u0060CanonicalMorphologyChainTests\u0060 x3, \u0060GeneratedCreatureTests\u0060 x3, \u0060CreatureGenerationSchedulerTests.AsyncGeneration_MatchesSynchronousMeshAndColors\u0060. 12 recorded failures resolved in total.\n- Editor: 4 regenerations on unchanged DNA/settings gave 20962 triangles / 10483 vertices every time; TotalGeneration 1314.8 ms (cold), 789.0, 779.9, 707.4 ms \u2014 inside the documented 701.9\u2013798.8 ms baseline. No detached islands.\n- Screenshot: \u0060Assets/Screenshots/cc-sdf-race-fix-scene-2026-09-11.png\u0060.\n\nRemaining 42 PlayMode failures are pre-existing non-sampler clusters (skeleton/bone, marching-cubes winding, influence domains, non-finite validation, FABRIK/IK). See \u0060TSK-0212\u0060 for the acceptance-criteria disposition and \u0060TSK-0194\u0060 for the full delta.\n\nNote: an earlier copy of this comment was mis-routed to \u0060tsk-0198-define-portable-animation-clip-and-sampling-contract\u0060 because the bare key \u0060TSK-0198\u0060 is colliding between two records (see \u0060TSK-0213\u0060). This record is the perf/extraction owner and is the intended target.",
+      "createdAtUtc": "2026-09-12T03:55:19.4949489Z"
+    }
+  ],
+  "epicId": null,
+  "parentId": "tsk-0008-profile-and-optimize-preview-generation-hotspots",
+  "dueDateUtc": null,
+  "createdAtUtc": "2026-09-10T00:00:00Z",
+  "updatedAtUtc": "2026-09-12T03:55:19.4949489Z",
+  "completedAtUtc": null,
+  "revision": 9,
+  "isArchived": false,
+  "hasLoadError": false,
+  "loadError": null,
+  "sourceFilePath": "tsk-0198-stream-preview-generation-hotpaths-and-direct-edge-ownership.json"
+}

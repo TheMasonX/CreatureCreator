@@ -15,6 +15,11 @@ namespace ProceduralCreature.Animation.Binding
     /// correspondence used by appearance baking; this resolver reuses that
     /// contract for binding and does not infer ownership from mesh names or
     /// Unity hierarchy order.
+    ///
+    /// A resolved geometry domain includes its own part plus the intended
+    /// non-Body ancestors in the authored hierarchy. This allows a terminal
+    /// child such as a foot/hand to blend with its owning limb chain while
+    /// excluding sibling and opposite-side chains.
     /// </summary>
     public static class ImplicitSurfaceInfluenceDomainResolver
     {
@@ -32,81 +37,164 @@ namespace ProceduralCreature.Animation.Binding
             SdfProgram body = SdfProgramBuilder.CompilePortableBodyField(definition, snapshot);
             try
             {
-                int scratchLength = Math.Max(1, body.Operations.Length);
-                for (int i = 0; i < parts.Count; i++)
-                {
-                    scratchLength = Math.Max(scratchLength, parts[i].Program.Operations.Length);
-                }
-
-                var scratch = new NativeArray<float>(scratchLength, Allocator.Temp);
-                try
-                {
-                    var domains = new InfluenceDomain[vertices.Count];
-                    for (int vertexIndex = 0; vertexIndex < vertices.Count; vertexIndex++)
-                    {
-                        Vector3 vertex = vertices[vertexIndex];
-                        if (!NumericValidity.IsFinite(vertex))
-                        {
-                            throw new DomainException($"Vertex {vertexIndex} is not finite.");
-                        }
-
-                        float nearest = float.PositiveInfinity;
-                        ResolvedPartSnapshot nearestPart = default;
-                        bool hasPart = false;
-                        for (int partIndex = 0; partIndex < parts.Count; partIndex++)
-                        {
-                            float distance = Mathf.Abs(SdfProgramEvaluator.Evaluate(
-                                parts[partIndex].Program,
-                                new Unity.Mathematics.float3(vertex.x, vertex.y, vertex.z),
-                                scratch));
-                            if (float.IsPositiveInfinity(distance) || distance >= nearest) continue;
-                            nearest = distance;
-                            nearestPart = parts[partIndex].Part;
-                            hasPart = true;
-                        }
-
-                        float bodyDistance = Mathf.Abs(SdfProgramEvaluator.Evaluate(
-                            body,
-                            new Unity.Mathematics.float3(vertex.x, vertex.y, vertex.z),
-                            scratch));
-                        if (!float.IsPositiveInfinity(bodyDistance) && bodyDistance <= nearest)
-                        {
-                            domains[vertexIndex] = new InfluenceDomain(CreatureDefinition.BodyId);
-                        }
-                        else if (hasPart)
-                        {
-                            domains[vertexIndex] = new InfluenceDomain(
-                                ResolvePartDomain(nearestPart, vertex));
-                        }
-                        else
-                        {
-                            throw new DomainException(
-                                $"Vertex {vertexIndex} has no finite resolved body or part domain.");
-                        }
-                    }
-                    return domains;
-                }
-                finally
-                {
-                    scratch.Dispose();
-                }
+                return Resolve(snapshot, vertices, parts, body);
             }
             finally
             {
-                foreach (ResolvedPartProgram part in parts) part.Program.Dispose();
+                foreach (ResolvedPartProgram partProgram in parts) partProgram.Program.Dispose();
                 body.Dispose();
             }
         }
 
-        private static string ResolvePartDomain(ResolvedPartSnapshot part, Vector3 vertex)
+        internal static InfluenceDomain[] Resolve(
+            ResolvedCreatureSnapshot snapshot,
+            IReadOnlyList<Vector3> vertices,
+            IReadOnlyList<ResolvedPartProgram> parts,
+            SdfProgram body)
         {
-            if (!part.MirrorAcrossSymmetryPlane) return part.Id;
+            if (snapshot == null) throw new DomainException("snapshot must not be null.");
+            if (vertices == null) throw new DomainException("vertices must not be null.");
+            if (parts == null) throw new DomainException("parts must not be null.");
+            if (body == null) throw new DomainException("body must not be null.");
+
+            int scratchLength = Math.Max(1, body.Operations.Length);
+            for (int i = 0; i < parts.Count; i++)
+            {
+                if (parts[i].Program == null)
+                    throw new DomainException($"Resolved part program {i} must not be null.");
+                scratchLength = Math.Max(scratchLength, parts[i].Program.Operations.Length);
+            }
+
+            // GenerateData executes on the scheduler's .NET thread-pool worker,
+            // not a Unity main/job worker thread. Allocator.Temp is therefore
+            // invalid here; keep this short-lived build-time scratch allocation
+            // explicitly cross-thread-safe. The array is always disposed in the
+            // finally block below, so its lifetime remains bounded to this call.
+            var scratch = new NativeArray<float>(scratchLength, Allocator.Persistent);
+            try
+            {
+                // Build the hierarchy domains once per resolved part/side. Domain
+                // membership is independent of the vertex; the previous path
+                // allocated a List and string array for every welded vertex.
+                var normalDomains = new InfluenceDomain[parts.Count];
+                var mirroredDomains = new InfluenceDomain[parts.Count];
+                for (int partIndex = 0; partIndex < parts.Count; partIndex++)
+                {
+                    ResolvedPartSnapshot part = parts[partIndex].Part;
+                    normalDomains[partIndex] = BuildHierarchyDomain(snapshot, part, mirrored: false);
+                    mirroredDomains[partIndex] = BuildHierarchyDomain(snapshot, part, mirrored: true);
+                }
+
+                // The Body domain is also invariant across vertices. Keep one
+                // struct instance rather than constructing a new params-array-backed
+                // InfluenceDomain for every Body-domain vertex.
+                InfluenceDomain bodyDomain = new InfluenceDomain(CreatureDefinition.BodyId);
+                var domains = new InfluenceDomain[vertices.Count];
+                for (int vertexIndex = 0; vertexIndex < vertices.Count; vertexIndex++)
+                {
+                    Vector3 vertex = vertices[vertexIndex];
+                    if (!NumericValidity.IsFinite(vertex))
+                    {
+                        throw new DomainException($"Vertex {vertexIndex} is not finite.");
+                    }
+
+                    float nearest = float.PositiveInfinity;
+                    int nearestPartIndex = -1;
+                    for (int partIndex = 0; partIndex < parts.Count; partIndex++)
+                    {
+                        float distance = Mathf.Abs(SdfProgramEvaluator.Evaluate(
+                            parts[partIndex].Program,
+                            new Unity.Mathematics.float3(vertex.x, vertex.y, vertex.z),
+                            scratch));
+                        if (float.IsPositiveInfinity(distance) || distance >= nearest) continue;
+                        nearest = distance;
+                        nearestPartIndex = partIndex;
+                    }
+
+                    float bodyDistance = Mathf.Abs(SdfProgramEvaluator.Evaluate(
+                        body,
+                        new Unity.Mathematics.float3(vertex.x, vertex.y, vertex.z),
+                        scratch));
+                    if (!float.IsPositiveInfinity(bodyDistance) && bodyDistance <= nearest)
+                    {
+                        domains[vertexIndex] = bodyDomain;
+                    }
+                    else if (nearestPartIndex >= 0)
+                    {
+                        ResolvedPartSnapshot nearestPart = parts[nearestPartIndex].Part;
+                        bool mirrored = IsMirroredInstance(nearestPart, vertex);
+                        domains[vertexIndex] = mirrored
+                            ? mirroredDomains[nearestPartIndex]
+                            : normalDomains[nearestPartIndex];
+                    }
+                    else
+                    {
+                        throw new DomainException(
+                            $"Vertex {vertexIndex} has no finite resolved body or part domain.");
+                    }
+                }
+                return domains;
+            }
+            finally
+            {
+                scratch.Dispose();
+            }
+        }
+
+        private static InfluenceDomain BuildHierarchyDomain(
+            ResolvedCreatureSnapshot snapshot,
+            ResolvedPartSnapshot primaryPart,
+            bool mirrored)
+        {
+            string primaryDomain = ResolveDomainForInstance(primaryPart, mirrored);
+            var allowedDomains = new List<string>(4) { primaryDomain };
+
+            // The welded surface is geometry, not hierarchy. Eligibility is the
+            // explicit bridge: the nearest authored geometry part may blend with
+            // its own non-Body ancestors, but never with sibling chains.
+            string parentId = primaryPart.ParentId;
+            int guard = 0;
+            while (!string.IsNullOrEmpty(parentId) && parentId != CreatureDefinition.BodyId)
+            {
+                if (++guard > snapshot.PartsById.Count)
+                {
+                    throw new DomainException(
+                        $"Resolved parent chain for part '{primaryPart.Id}' exceeds the part count; " +
+                        "the resolved hierarchy is cyclic or inconsistent.");
+                }
+
+                if (!snapshot.PartsById.TryGetValue(parentId, out ResolvedPartSnapshot parent))
+                {
+                    throw new DomainException(
+                        $"Resolved part '{primaryPart.Id}' references missing parent '{parentId}'.");
+                }
+
+                string parentDomain = ResolveDomainForInstance(parent, mirrored);
+                if (!allowedDomains.Contains(parentDomain))
+                {
+                    allowedDomains.Add(parentDomain);
+                }
+
+                parentId = parent.ParentId;
+            }
+
+            return new InfluenceDomain(primaryDomain, allowedDomains.ToArray());
+        }
+
+        private static bool IsMirroredInstance(ResolvedPartSnapshot part, Vector3 vertex)
+        {
+            if (!part.MirrorAcrossSymmetryPlane) return false;
 
             Vector3 originalOrigin = part.PartFrameToCreatureSpace.GetColumn(3);
             Vector3 mirroredOrigin = MirrorUtility.ReflectPointAcrossX(originalOrigin);
             float originalDistance = (vertex - originalOrigin).sqrMagnitude;
             float mirroredDistance = (vertex - mirroredOrigin).sqrMagnitude;
-            return mirroredDistance < originalDistance
+            return mirroredDistance < originalDistance;
+        }
+
+        private static string ResolveDomainForInstance(ResolvedPartSnapshot part, bool mirrored)
+        {
+            return mirrored && part.MirrorAcrossSymmetryPlane
                 ? part.Id + SemanticBoneResolver.MirrorSuffix
                 : part.Id;
         }

@@ -21,14 +21,21 @@
   "attachments": [],
   "externalLinks": [],
   "linkedPages": [],
-  "comments": [],
+  "comments": [
+    {
+      "id": "c-e8eb65e6b46a48138a215e2387653cdd",
+      "author": "anonymous",
+      "body": "2026-09-12 task-board review: archived duplicate. Canonical owner is TSK-0018 (\u0022Limb parts as joint chains with between-joint metaballs\u0022), which shares this exact title and remains InProgress. No active work is owned here; this record is retained for provenance only.",
+      "createdAtUtc": "2026-09-13T04:52:04.4218717Z"
+    }
+  ],
   "epicId": null,
   "parentId": null,
   "dueDateUtc": null,
   "createdAtUtc": "2026-09-01T03:17:37.1424162Z",
-  "updatedAtUtc": "2026-09-01T03:17:52.5695348Z",
+  "updatedAtUtc": "2026-09-13T04:52:04.4218717Z",
   "completedAtUtc": null,
-  "revision": 2,
+  "revision": 3,
   "isArchived": true,
   "hasLoadError": false,
   "loadError": null,

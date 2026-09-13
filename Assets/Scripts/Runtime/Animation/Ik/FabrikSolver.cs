@@ -29,16 +29,27 @@ namespace ProceduralCreature.Animation.Ik
             Vector3[] initialPositions, float[] linkLengths, Vector3 target,
             int maxIterations, float tolerance)
         {
-            ValidateInputs(initialPositions, linkLengths, maxIterations, tolerance);
+            ValidateInputs(initialPositions, linkLengths, target, maxIterations, tolerance);
 
             var positions = (Vector3[])initialPositions.Clone();
             Vector3 root = positions[0];
             int last = positions.Length - 1;
 
             float totalLength = 0f;
-            foreach (float length in linkLengths) totalLength += length;
+            foreach (float length in linkLengths)
+            {
+                totalLength += length;
+                if (float.IsInfinity(totalLength))
+                {
+                    throw new DomainException("Total IK chain length exceeds the finite float range.");
+                }
+            }
 
             float rootToTargetDistance = Vector3.Distance(root, target);
+            if (!NumericValidity.IsFinite(rootToTargetDistance))
+            {
+                throw new DomainException("Root-to-target distance must be finite.");
+            }
             if (rootToTargetDistance >= totalLength)
             {
                 StretchTowardTarget(positions, linkLengths, root, target);
@@ -47,7 +58,12 @@ namespace ProceduralCreature.Animation.Ik
 
             for (int iteration = 0; iteration < maxIterations; iteration++)
             {
-                if (Vector3.Distance(positions[last], target) <= tolerance) break;
+                float endEffectorDistance = Vector3.Distance(positions[last], target);
+                if (!NumericValidity.IsFinite(endEffectorDistance))
+                {
+                    throw new DomainException($"IK iteration {iteration} produced a non-finite end-effector distance.");
+                }
+                if (endEffectorDistance <= tolerance) break;
                 BackwardPass(positions, linkLengths, target);
                 ForwardPass(positions, linkLengths, root);
             }
@@ -63,6 +79,7 @@ namespace ProceduralCreature.Animation.Ik
             {
                 Vector3 direction = SafeDirection(positions[i + 1], positions[i]);
                 positions[i] = positions[i + 1] + direction * linkLengths[i];
+                ValidateFiniteResult(positions[i], i);
             }
         }
 
@@ -73,6 +90,7 @@ namespace ProceduralCreature.Animation.Ik
             {
                 Vector3 direction = SafeDirection(positions[i - 1], positions[i]);
                 positions[i] = positions[i - 1] + direction * linkLengths[i - 1];
+                ValidateFiniteResult(positions[i], i);
             }
         }
 
@@ -83,6 +101,7 @@ namespace ProceduralCreature.Animation.Ik
             for (int i = 1; i < positions.Length; i++)
             {
                 positions[i] = positions[i - 1] + direction * linkLengths[i - 1];
+                ValidateFiniteResult(positions[i], i);
             }
         }
 
@@ -90,15 +109,31 @@ namespace ProceduralCreature.Animation.Ik
         /// Direction from 'from' to 'to', or Vector3.up if the two points
         /// coincide (a genuine but rare degenerate case — e.g. a chain whose
         /// current pose has two joints at the same position). Vector3.up is an
-        /// arbitrary but fixed, deterministic fallback; it never produces NaN.
+        /// arbitrary but fixed, deterministic fallback. Subtraction can overflow
+        /// even when both input points are individually finite, so the delta is
+        /// checked before normalization.
         /// </summary>
         private static Vector3 SafeDirection(Vector3 from, Vector3 to)
         {
             Vector3 delta = to - from;
+            if (!NumericValidity.IsFinite(delta))
+            {
+                throw new DomainException("IK joint delta became non-finite while computing a direction.");
+            }
             return delta.sqrMagnitude < DegenerateDirectionEpsilonSqr ? Vector3.up : delta.normalized;
         }
 
-        private static void ValidateInputs(Vector3[] positions, float[] linkLengths, int maxIterations, float tolerance)
+        private static void ValidateFiniteResult(Vector3 position, int index)
+        {
+            if (!NumericValidity.IsFinite(position))
+            {
+                throw new DomainException($"IK solution joint {index} became non-finite.");
+            }
+        }
+
+        private static void ValidateInputs(
+            Vector3[] positions, float[] linkLengths, Vector3 target,
+            int maxIterations, float tolerance)
         {
             if (positions == null) throw new DomainException("initialPositions must not be null.");
             if (linkLengths == null) throw new DomainException("linkLengths must not be null.");
@@ -111,6 +146,17 @@ namespace ProceduralCreature.Animation.Ik
                 throw new DomainException(
                     $"linkLengths.Length ({linkLengths.Length}) must equal positions.Length - 1 ({positions.Length - 1}).");
             }
+            for (int i = 0; i < positions.Length; i++)
+            {
+                if (!NumericValidity.IsFinite(positions[i]))
+                {
+                    throw new DomainException($"Initial joint position {i} must be finite.");
+                }
+            }
+            if (!NumericValidity.IsFinite(target))
+            {
+                throw new DomainException("target must be finite.");
+            }
             foreach (float length in linkLengths)
             {
                 if (length <= 0f || float.IsNaN(length) || float.IsInfinity(length))
@@ -119,7 +165,10 @@ namespace ProceduralCreature.Animation.Ik
                 }
             }
             if (maxIterations <= 0) throw new DomainException("maxIterations must be positive.");
-            if (tolerance < 0f || float.IsNaN(tolerance)) throw new DomainException("tolerance must be non-negative.");
+            if (tolerance < 0f || float.IsNaN(tolerance) || float.IsInfinity(tolerance))
+            {
+                throw new DomainException("tolerance must be finite and non-negative.");
+            }
         }
     }
 }

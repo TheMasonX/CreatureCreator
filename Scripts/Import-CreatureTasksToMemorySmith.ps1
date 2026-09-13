@@ -98,14 +98,13 @@ function Invoke-MemorySmith([string]$Method, [hashtable]$Arguments, [int]$Reques
     if ($response.error) { throw "MCP $Method failed: $($response.error.message)" }
     $text = @($response.result.content | Where-Object { $_.type -eq 'text' } | Select-Object -ExpandProperty text) -join "`n"
     if ([string]::IsNullOrWhiteSpace($text)) { return $null }
-    for ($attempt = 0; $attempt -lt 2; $attempt++) {
-        try {
-            $parsed = $text | ConvertFrom-Json
-            if ($parsed -is [string]) { $text = $parsed; continue }
-            return $parsed
-        } catch { return $text }
+    try {
+        $parsed = $text | ConvertFrom-Json
+        if ($parsed -is [string]) { return $parsed }
+        return $parsed
+    } catch {
+        return $text
     }
-    return $text
 }
 
 if ($ResetState -and (Test-Path -LiteralPath $StatePath)) { Remove-Item -LiteralPath $StatePath -Force }

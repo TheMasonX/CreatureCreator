@@ -1,5 +1,6 @@
 using System;
 using System.Collections.Generic;
+using System.Collections.ObjectModel;
 using ProceduralCreature.Definition;
 
 namespace ProceduralCreature.Generation
@@ -19,6 +20,7 @@ namespace ProceduralCreature.Generation
         SkeletonInference,
         CenterOfMass,
         AppearanceBake,
+        InfluenceDomainResolution,
     }
 
     public readonly struct StageTiming
@@ -34,24 +36,24 @@ namespace ProceduralCreature.Generation
     }
 
     /// <summary>
-    /// Centralized diagnostics collected across one generation run: which stage
-    /// failed, how long each stage took, and any validation issues surfaced along
-    /// the way. This is what "Generation failures must identify the stage and, when
-    /// possible, the part/parameter responsible" (§14) is built on top of.
-    ///
-    /// Deliberately append-only and stage-scoped rather than a single flat log, so
-    /// timing hooks (Sprint 0.2: "performance timing hooks for SDF sampling, mesh
-    /// extraction, skeleton inference, and appearance baking") don't require
-    /// per-voxel logging noise — one StageTiming entry per stage per run.
+    /// Mutable collector for one generation run. Consumers receive fixed read-only
+    /// views, so the completed diagnostic surface cannot be mutated through an
+    /// IReadOnlyList downcast. All exceptions escaping a timed stage mark that stage
+    /// failed before being rethrown, keeping Succeeded consistent with the scheduler's
+    /// all-exceptions failure boundary.
     /// </summary>
     public sealed class GenerationDiagnostics
     {
         private readonly List<StageTiming> _timings = new List<StageTiming>();
         private readonly List<ValidationIssue> _issues = new List<ValidationIssue>();
+        private readonly ReadOnlyCollection<StageTiming> _timingsView;
+        private readonly ReadOnlyCollection<ValidationIssue> _issuesView;
 
         public GenerationDiagnostics(bool collectTimings = true)
         {
             CollectTimings = collectTimings;
+            _timingsView = _timings.AsReadOnly();
+            _issuesView = _issues.AsReadOnly();
         }
 
         public GenerationStage? FailedStage { get; private set; }
@@ -66,8 +68,8 @@ namespace ProceduralCreature.Generation
         public int VertexCount { get; private set; }
         public int TriangleCount { get; private set; }
 
-        public IReadOnlyList<StageTiming> Timings => _timings;
-        public IReadOnlyList<ValidationIssue> Issues => _issues;
+        public IReadOnlyList<StageTiming> Timings => _timingsView;
+        public IReadOnlyList<ValidationIssue> Issues => _issuesView;
 
         public bool Succeeded => FailedStage == null;
 
@@ -123,41 +125,42 @@ namespace ProceduralCreature.Generation
 
         public void RecordIssue(ValidationIssue issue)
         {
+            if (issue == null) throw new ArgumentNullException(nameof(issue));
             _issues.Add(issue);
         }
 
         public void RecordIssues(IEnumerable<ValidationIssue> issues)
         {
-            _issues.AddRange(issues);
+            if (issues == null) throw new ArgumentNullException(nameof(issues));
+            foreach (ValidationIssue issue in issues)
+            {
+                RecordIssue(issue);
+            }
         }
 
-        /// <summary>
-        /// Marks the run as failed at the given stage. Idempotent-ish: the first
-        /// failure recorded wins, matching "a failed generation must not partially
-        /// replace the current valid runtime creature" — once a stage has failed we
-        /// don't want a later stage's failure to overwrite which stage was actually
-        /// responsible.
-        /// </summary>
+        /// <summary>Marks the first failing stage; later failures do not replace it.</summary>
         public void MarkFailed(GenerationStage stage)
         {
             FailedStage ??= stage;
         }
 
         /// <summary>
-        /// Convenience helper for timing a stage: runs <paramref name="action"/>,
-        /// records elapsed time, and marks the stage failed if it throws a
-        /// DomainException (programmer error) — user-data failures should already
-        /// have been surfaced as ValidationIssues by the stage itself, not thrown.
+        /// Times one stage and marks it failed for every exception type before
+        /// propagating that exception. This matches the generation scheduler boundary,
+        /// which treats all escaping exceptions as failed generation rather than only
+        /// domain/user-data exceptions.
         /// </summary>
         public void TimeStage(GenerationStage stage, Action action)
         {
+            if (action == null) throw new ArgumentNullException(nameof(action));
+
             if (!CollectTimings)
             {
                 try
                 {
                     action();
                 }
-                catch (Common.DomainException)
+                catch (Exception)
                 {
                     MarkFailed(stage);
                     throw;
@@ -170,7 +173,7 @@ namespace ProceduralCreature.Generation
             {
                 action();
             }
-            catch (Common.DomainException)
+            catch (Exception)
             {
                 MarkFailed(stage);
                 throw;

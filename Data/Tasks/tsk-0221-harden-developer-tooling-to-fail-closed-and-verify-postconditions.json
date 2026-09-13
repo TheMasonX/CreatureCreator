@@ -1,0 +1,42 @@
+﻿{
+  "id": "tsk-0221-harden-developer-tooling-to-fail-closed-and-verify-postconditions",
+  "key": "TSK-0221",
+  "title": "Harden developer tooling to fail closed and verify postconditions",
+  "description": "## Summary\nThe 2026-09-12 engineering/security/tooling audit found no critical application-security defect, but identified that repository tooling is treated as disposable scaffolding rather than as a controlled part of the engineering system: scripts do not declare local-versus-repository state, deployment verifies exit codes but not artifacts, and there is no repository-wide secret-scan rule.\n\n## User Mandate\n\u003E \u0022As always, look for recurring issues and patterns of bugs or mistakes that we can add process safeguards against\u0022\n\nSTRICT. This task exists to add process safeguards against recurring tooling failure modes. Do not relax, re-scope, or silently drop any safeguard listed in Scope.\n\n## Scope\n- ET-01: document a repository-wide secret rule (no tokens, cookies, auth-bearing MCP endpoints, or exported connection files) and define a lightweight local scan step.\n- ET-02/ET-05: deployment scripts must verify postconditions (output path and expected files exist; service responds) instead of trusting \u0060$LASTEXITCODE\u0060; document which scripts support a dry run.\n- ET-04/ET-09: classify every artifact as source-of-truth, generated-but-committed, generated-and-ignored, or local-only, and reflect that in \u0060.gitignore\u0060 and the README.\n- ET-03/ET-08: document the task-import tooling as strictly one-way and resumable; fail closed when configuration is missing.\n- Meta-synthesis item: any new validation/normalization script must report its own inability to process an input as a failure, not a silent skip.\n- Out of scope: recreating CI (TSK-0123, Rejected).\n\n## Acceptance Criteria\n- A documented artifact-classification table exists and matches \u0060.gitignore\u0060.\n- \u0060Deploy-CreatureWiki.ps1\u0060 and \u0060Bootstrap-CreatureWikiEngine.ps1\u0060 verify at least one concrete postcondition beyond exit code, or record an explicit justification for not doing so.\n- A dry-run or explicit \u0022no dry-run\u0022 statement exists for each script that mutates local state.\n- The secret rule is documented and a repeatable local scan command is defined.\n- \u0060Import-CreatureTasksToMemorySmith.ps1\u0060 is documented as one-way with its dry-run contract stated.\n\n## Validation\n- Re-read each script after edit; confirm the postcondition check and dry-run statement.\n- Run the documented local scan command and record its output.\n- \u0060git diff --check\u0060 passes.\n- No runtime code change, so no Unity gate is required for this task.\n\n## Findings\n- Verified: \u0060Bootstrap-CreatureWikiEngine.ps1\u0060 and \u0060Deploy-CreatureWiki.ps1\u0060 do check \u0060$LASTEXITCODE\u0060 and throw on failure. The residual gap is postcondition verification, not exit-code handling.\n- Verified: \u0060Import-CreatureTasksToMemorySmith.ps1\u0060 already implements \u0060-DryRun\u0060; the deploy path does not.\n- Verified: \u0060.gitignore\u0060 protects the credential-bearing \u0060.vscode/mcp.json\u0060.\n- Caveat: the audit\u0027s \u0022scripts have effects larger than their documentation\u0022 claim is partially refuted \u2014 exit-code gating is present.\n\n## Blockers\n- None. All items are source- and tooling-verifiable without Unity.\n\n## Next Step\nAdd postcondition checks to the two deploy/bootstrap scripts, then write the artifact-classification table into the README and align \u0060.gitignore\u0060.",
+  "type": "Task",
+  "status": "Backlog",
+  "priority": "Medium",
+  "assigneeMode": "Custom",
+  "assigneeDirectoryId": null,
+  "assigneeCustomText": "Agent",
+  "reporter": "BeastMaster",
+  "labels": [
+    "tooling",
+    "process",
+    "security",
+    "documentation",
+    "user-mandated"
+  ],
+  "attachments": [],
+  "externalLinks": [],
+  "linkedPages": [],
+  "comments": [
+    {
+      "id": "c-472368d3ca774cafa46910b232c16667",
+      "author": "anonymous",
+      "body": "2026-09-12 task-board review: additional tooling gap for \u0060Scripts/Test-TaskRecords.ps1\u0060. Task \u0060parentId\u0060 values are stored in two inconsistent encodings: 52 records use the \u0060TSK-####\u0060 key form and 32 use the canonical \u0060tsk-####-\u003Cslug\u003E\u0060 id form (the form the MCP \u0060task_update\u0060 tool stores). The validator checks neither. A key-form \u0060parentId\u0060 is not resolvable by an id lookup, and a stale-slug \u0060parentId\u0060 is undetectable \u2014 one live example was TSK-0185 pointing at the pre-rename TSK-0169 slug. Recommended: enforce the id form and fail when a \u0060parentId\u0060 does not resolve to an existing record id.",
+      "createdAtUtc": "2026-09-13T04:52:12.6856677Z"
+    }
+  ],
+  "epicId": null,
+  "parentId": null,
+  "dueDateUtc": null,
+  "createdAtUtc": "2026-09-12T05:54:03.1702018Z",
+  "updatedAtUtc": "2026-09-13T04:52:12.6856677Z",
+  "completedAtUtc": null,
+  "revision": 2,
+  "isArchived": false,
+  "hasLoadError": false,
+  "loadError": null,
+  "sourceFilePath": "tsk-0221-harden-developer-tooling-to-fail-closed-and-verify-postconditions.json"
+}

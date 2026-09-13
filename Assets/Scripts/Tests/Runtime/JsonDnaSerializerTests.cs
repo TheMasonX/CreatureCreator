@@ -59,13 +59,11 @@ namespace ProceduralCreature.Tests.Runtime
         public void RoundTrip_ReconstructsEquivalentDefinition()
         {
             CreatureDefinition original = MakeTwoPartDefinition();
-
             string json = _serializer.Serialize(original);
             CreatureDefinition reconstructed = _serializer.Deserialize(json);
 
             Assert.AreEqual(original.Parts.Count, reconstructed.Parts.Count);
             Assert.AreEqual(original.SymmetryMode, reconstructed.SymmetryMode);
-
             CreaturePart originalLeg = original.FindPart("part_leg");
             CreaturePart reconstructedLeg = reconstructed.FindPart("part_leg");
             Assert.IsNotNull(reconstructedLeg);
@@ -76,13 +74,29 @@ namespace ProceduralCreature.Tests.Runtime
         }
 
         [Test]
+        public void Serialize_EscapesAllJsonControlCharactersInStringFields()
+        {
+            CreatureDefinition definition = MakeTwoPartDefinition();
+            definition.Parts[0].DisplayName = "quote\" slash\\ controls:\u0000\u0001\u0007\b\f\n\r\t\u001F";
+
+            string json = _serializer.Serialize(definition);
+            StringAssert.DoesNotContain("\u0000", json);
+            StringAssert.DoesNotContain("\u0001", json);
+            StringAssert.DoesNotContain("\u0007", json);
+            StringAssert.DoesNotContain("\u001F", json);
+            StringAssert.Contains("\\b", json);
+            StringAssert.Contains("\\f", json);
+
+            CreatureDefinition roundTripped = _serializer.Deserialize(json);
+            Assert.AreEqual(definition.Parts[0].DisplayName, roundTripped.Parts[0].DisplayName);
+        }
+
+        [Test]
         public void Serialize_IsByteStableAcrossRepeatedCalls()
         {
             CreatureDefinition definition = MakeTwoPartDefinition();
-
             string first = _serializer.Serialize(definition);
             string second = _serializer.Serialize(definition);
-
             Assert.AreEqual(first, second,
                 "Serializing the same definition twice must produce identical text " +
                 "(Sprint 1.3 exit gate: byte-stable canonical JSON).");
@@ -128,17 +142,15 @@ namespace ProceduralCreature.Tests.Runtime
         public void Serialize_IsStableAcrossPartInsertionOrder()
         {
             CreatureDefinition definitionA = MakeTwoPartDefinition();
-
             CreatureDefinition definitionB = CreatureDefinition.CreateEmpty();
             definitionB.SymmetryMode = definitionA.SymmetryMode;
             definitionB.Forward = definitionA.Forward;
             definitionB.Body = definitionA.Body.Clone();
-            definitionB.AddPart(definitionA.Parts[1].Clone()); // leg first
-            definitionB.AddPart(definitionA.Parts[0].Clone()); // body second
+            definitionB.AddPart(definitionA.Parts[1].Clone());
+            definitionB.AddPart(definitionA.Parts[0].Clone());
 
             string jsonA = _serializer.Serialize(definitionA);
             string jsonB = _serializer.Serialize(definitionB);
-
             Assert.AreEqual(jsonA, jsonB,
                 "Canonical output must not depend on Parts list insertion order (§13.4).");
         }
@@ -147,11 +159,9 @@ namespace ProceduralCreature.Tests.Runtime
         public void SaveLoadSave_ProducesByteStableJson()
         {
             CreatureDefinition original = MakeTwoPartDefinition();
-
             string firstSave = _serializer.Serialize(original);
             CreatureDefinition loaded = _serializer.Deserialize(firstSave);
             string secondSave = _serializer.Serialize(loaded);
-
             Assert.AreEqual(firstSave, secondSave,
                 "Save -> load -> canonical-save must be byte-stable (Sprint 1.3 exit gate).");
         }
@@ -165,7 +175,7 @@ namespace ProceduralCreature.Tests.Runtime
         [Test]
         public void Deserialize_ThrowsOnMissingRequiredField()
         {
-            const string json = "{\"schemaVersion\":2,\"symmetryMode\":\"None\"}"; // missing bounds/generation/body/parts
+            const string json = "{\"schemaVersion\":2,\"symmetryMode\":\"None\"}";
             Assert.Throws<DnaDeserializationException>(() => _serializer.Deserialize(json));
         }
 
@@ -183,9 +193,7 @@ namespace ProceduralCreature.Tests.Runtime
         {
             CreatureDefinition original = MakeTwoPartDefinition();
             string json = _serializer.Serialize(original);
-
             CreatureDefinition reconstructed = _serializer.Deserialize(json);
-
             Assert.AreEqual(2, reconstructed.Body.Samples.Count);
             Assert.AreEqual(1u, reconstructed.Body.Samples[0].Id);
             Assert.AreEqual(0.75f, reconstructed.Body.Samples[0].Radius, 1e-4f);
@@ -211,7 +219,6 @@ namespace ProceduralCreature.Tests.Runtime
 
             CreatureDefinition reconstructed = _serializer.Deserialize(_serializer.Serialize(original));
             ShapeDefinition shape = reconstructed.FindPart("part_leg").Shape;
-
             Assert.AreEqual(0.12f, shape.Radius, 1e-4f);
             Assert.AreEqual(ShapeAxis.Z, shape.CapsuleAxis);
             Assert.AreEqual(1.7f, shape.CapsuleHeight, 1e-4f);
@@ -229,7 +236,6 @@ namespace ProceduralCreature.Tests.Runtime
 
             CreatureDefinition migrated = _serializer.Deserialize(json);
             ShapeDefinition shape = migrated.FindPart("part_leg").Shape;
-
             Assert.AreEqual(0.5f, shape.Radius, 1e-4f);
             Assert.AreEqual(ShapeAxis.Y, shape.CapsuleAxis);
             Assert.AreEqual(1f, shape.CapsuleHeight, 1e-4f);

@@ -1,0 +1,50 @@
+﻿{
+  "id": "tsk-0222-re-research-the-spore-deformation-and-skin-paint-algorithms-to-replace-the-current-segment-distance-weighting",
+  "key": "TSK-0222",
+  "title": "Re-research the Spore deformation and skin-paint algorithms to replace the current segment-distance weighting",
+  "description": "## Summary\nRepeated joint-localisation failures in the animation weights (elbow moves the whole arm, foot twists/compresses the whole leg, tail moves in disjointed sections; knee comparatively acceptable) indicate the current build-time weighting model may be the wrong approach rather than mis-tuned. The current model is closest-point-to-segment weighting with influence-domain eligibility, up to four influences, and \u0060RadiusScale = 3\u0060 falloff (\u0060ImplicitSurfaceWeightAuthoring\u0060, \u0060MorphologyInfluenceRadiusBridge\u0060, \u0060ImplicitSurfaceInfluenceDomainResolver\u0060). The user believes the approach itself is wrong and asked for the Spore algorithms to be researched again before further heuristic tuning.\n\n## User Mandate\n\u003E The knee is better than most, the elbow still moves the whole arm, the foot twists and compresses the whole leg, the tail moves in disjointed sections. The animation weights have been really buggy the whole time. I think we\u0027re doing it wrong. Capture these issues in the task system, along with the notes that we need to research the spore algorithms again\n\nSTRICT. Capture verbatim; do not relax or re-scope. This task owns the **research and recommendation**, not a weighting constant change.\n\n## Scope\n- Build on the existing in-repo Spore research rather than re-deriving from memory:\n  - \u0060docs/audits/2026-09-07-spore-spherical-metaballs-rigblocks-and-skin-paint-research.md\u0060\n  - \u0060docs/audits/creaturecreator-spore-informed-deepdive-2026-09-07.md\u0060\n  - \u0060docs/audits/procedural-creature-spore-modern-design-and-implementation-guide.md\u0060\n  - \u0060docs/audits/sporelike-*\u0060 audits and \u0060docs/audits/creaturecreator-spore-informed-deepdive-2026-09-07.md\u0060\n- Reconstruct how Spore (and documented reimplementations) author deformation: skin-paint weight authoring, rig blocks, joint/spline weighting, influence regions, and how they contain cross-chain leakage.\n- Compare each mechanism against the current CreatureCreator model and against the four reported symptoms.\n- Recommend one target weighting model with explicit rejected alternatives and trade-offs (determinism, build-time cost, the four-influence limit, and the indexed zero-allocation per-frame animation path).\n- Research only. Do not change the weighting algorithm or any radius/falloff constant under this task.\n\n## Acceptance Criteria\n- A written research note (under \u0060docs/audits/\u0060 or \u0060docs/adr/\u0060) lists each Spore mechanism with a concrete source reference and states how it maps or does not map to CreatureCreator.\n- For each reported symptom (elbow leaks to whole arm, foot twists/compresses leg, tail disjointed sections, knee acceptable), the note names at least one candidate cause under the target model and the observation that would falsify it.\n- One recommended target model is chosen, with the rejected alternatives and the reason each was rejected.\n- The note preserves documented invariants: \u0060CreatureDefinition\u0060 authoritative; deterministic build-time weights; indexed zero-allocation per-frame path; four-influence limit unless explicitly justified.\n- No production weighting, radius, or falloff constant is changed by this task.\n\n## Validation\n- Each claimed Spore mechanism cites an actual repo audit or source, not recollection.\n- The note is peer-reviewed against the cited sources.\n- Any proposed experiment names its fixture, the measured quantity, and the expected observable result before implementation.\n- Unity execution is not required for the research note itself; the follow-up implementation must carry its own Unity gate.\n\n## Findings\n- Prior Spore research exists in-repo and is the starting evidence base; this task exists so the model decision is evidence-backed rather than another heuristic.\n- Symptom owners that this research must inform: \u0060TSK-0147\u0060 (weights locality, primary), \u0060TSK-0168\u0060 (untouched-limb deformation), \u0060TSK-0172\u0060 (Body smear), \u0060TSK-0148\u0060 / \u0060TSK-0171\u0060 (Body rig segmentation), \u0060TSK-0169\u0060 (skinning sweep diagnostics).\n- The knee being acceptable while the elbow leaks indicates the current model is not uniformly wrong; the faults are junction-specific (domain eligibility, radius overlap, four-influence truncation) as well as possibly structural.\n\n## Blockers\n- None for the research itself. Implementation of any recommended model is deliberately out of scope here and must be a separate bounded task with its own Unity validation.\n\n## Next Step\nRead the existing Spore research audits and write the comparison plus recommendation note. Do not tune weights first.",
+  "type": "Task",
+  "status": "Backlog",
+  "priority": "High",
+  "assigneeMode": "Custom",
+  "assigneeDirectoryId": null,
+  "assigneeCustomText": "Agent",
+  "reporter": "anonymous",
+  "labels": [
+    "user-mandated",
+    "research",
+    "animation",
+    "skinning",
+    "weights",
+    "rig",
+    "spore"
+  ],
+  "attachments": [],
+  "externalLinks": [],
+  "linkedPages": [],
+  "comments": [
+    {
+      "id": "c-5155395f43304235bdc013c6f3fd7aa6",
+      "author": "anonymous",
+      "body": "Audit synthesis delivered 2026-09-12: \u0060docs/audits/creaturecreator-spore-metaball-pivot-and-appearance-synthesis-2026-09-12.md\u0060 (report \u0060CC-SYNTH-SPORE-PIVOT-20260912-A7E4D1\u0060).\n\nThis report satisfies the acceptance criteria of this task. It lists each Spore mechanism with a source reference, maps it to CreatureCreator, names one target model with rejected alternatives, and keeps the documented invariants.\n\nAnswer to the research question: Spore generated skin bone weights from **which body part generated which metaball** (Chris Hecker, \u0022My Liner Notes for Spore\u0022). CreatureCreator uses geometric inference instead: \u0060ImplicitSurfaceInfluenceDomainResolver\u0060 picks the domain by nearest resolved part SDF, and \u0060ImplicitSurfaceWeightAuthoring\u0060 ranks by closest point on segment with \u0060RadiusScale\u0060 falloff. At a joint the geometric answer can be anatomically wrong, which explains the elbow, foot, and tail symptoms and why the knee is comparatively acceptable.\n\nTarget model accepted: provenance-attributed weighting. Provenance selects which chain. Distance selects which bone inside an allowed chain, then a joint-local transfer profile shapes the joint. Rejected alternatives and reasons are in section 9.5.\n\nHonest scope limit: Spore never solved spine weights or torso-attached parts. Target structurally better weighting with documented failure regions, not universal correctness.\n\nPer symptom, the report names a candidate cause and a falsifying observation (section 9.4). The knee is the control: a fix that changes the knee as much as the elbow is not evidence of a correct model.\n\nImplementation is out of scope here and is owned by the new child task TSK-0224. No weighting, radius, or falloff constant was changed.\n\nVerification: all sources re-checked this session. Hecker\u0027s liner notes, the SIGGRAPH 2008 landing page, and Ocean Quigley\u0027s skin-paint post were fetched. Three corrections to the supplied external research are recorded (section 6). Five sources were unavailable: \u0060daniellochner/creature-creator-game\u0060 returned 404, \u0060andrewwillmott.com/s2007\u0060 returned 404, the Mesh Displacement paper returned 401 after redirect, the GDC 2007 deck was not read, and the Blender skin modifier manual returned 403.\n\nUnity execution was not required for this research deliverable.",
+      "createdAtUtc": "2026-09-12T06:24:28.3494639Z"
+    },
+    {
+      "id": "c-760fc8bdb9b14d908cff77d8a0349f91",
+      "author": "anonymous",
+      "body": "2026-09-12 task-board review: this research task and its implementation owner TSK-0224 are the canonical forward track for implicit-surface weighting. The legacy-mechanism tasks TSK-0147, TSK-0150, TSK-0168, TSK-0172, and TSK-0238 refine or diagnose the closest-point-on-segment model that TSK-0224 is intended to replace. Per TSK-0147\u0027s own council note, one canonical owner must be chosen before any of them proceeds; the board currently has no single owner. Disposition of the legacy tasks requires a user decision because they carry STRICT user mandates \u2014 surfaced, not applied.",
+      "createdAtUtc": "2026-09-13T04:52:04.3715655Z"
+    }
+  ],
+  "epicId": null,
+  "parentId": "TSK-0077",
+  "dueDateUtc": null,
+  "createdAtUtc": "2026-09-12T05:57:17.3036932Z",
+  "updatedAtUtc": "2026-09-13T04:52:04.3715655Z",
+  "completedAtUtc": null,
+  "revision": 3,
+  "isArchived": false,
+  "hasLoadError": false,
+  "loadError": null,
+  "sourceFilePath": "tsk-0222-re-research-the-spore-deformation-and-skin-paint-algorithms-to-replace-the-current-segment-distance-weighting.json"
+}

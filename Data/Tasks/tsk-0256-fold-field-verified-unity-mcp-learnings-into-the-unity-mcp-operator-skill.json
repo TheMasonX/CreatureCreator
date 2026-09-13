@@ -1,0 +1,42 @@
+﻿{
+  "id": "tsk-0256-fold-field-verified-unity-mcp-learnings-into-the-unity-mcp-operator-skill",
+  "key": "TSK-0256",
+  "title": "Fold field-verified Unity MCP learnings into the unity-mcp-operator skill",
+  "description": "## Summary\nFold field-verified learnings from live MCP for Unity operation into the \u0060unity-mcp-operator\u0060 skill. The skill was ported from upstream and validated against editor state; this round adds behaviour only observed by actually driving the editor (ProBuilder authoring, material emission and transparency, post-processing volumes, screenshot framing failures, and verification recipes that caught real geometry faults).\n\n## User Mandate\n\u003E \u0022Add anything you have learned about working with the unity mcp tools that would be useful for future agents to this skill\u0022\n\nSTRICT. Binding constraints:\n- Target the existing \u0060.github/skills/unity-mcp-operator/\u0060 skill.\n- Record only behaviour that was observed in a live session; do not add speculation or untested claims.\n- Keep the skill\u0027s existing structure: mechanics and gotchas in \u0060SKILL.md\u0060, detail tables and recipes in \u0060references/\u0060.\n\n## Scope\n- \u0060.github/skills/unity-mcp-operator/SKILL.md\u0060: extend tool-group activation, batch, visual-verification and error-recovery guidance; add ProBuilder, material/emission/transparency, and verification-recipe sections.\n- \u0060.github/skills/unity-mcp-operator/references/probuilder-and-materials.md\u0060: new detail reference.\n- Evidence source: the Test-scene lab work in TSK-0243 (rounds 1-3) on MCP for Unity server 10.2.0.\n- No runtime, editor, or scene code changes.\n\n## Acceptance Criteria\n- Every added claim traces to an observed tool result or console message from this session.\n- ProBuilder shape parameters, the centre-pivot rule, and the missing-material caveat are documented.\n- The screenshot framing failures and the working alternative are documented.\n- The null-material, bounds-readback and bounds-intersection checks are documented as recipes.\n- SKILL.md stays concise; detail tables live in the reference file.\n\n## Validation\n- Diff review of the two changed skill files for accuracy against the recorded session evidence.\n- No invented tool or parameter names: cross-check against the observed tool list and \u0060references/mcp-surface.md\u0060.\n\n## Findings\nSee the task comment.\n\n## Blockers\nNone.\n\n## Next Step\nEdit SKILL.md and add the reference file, then review the diff and record the change evidence.",
+  "type": "Task",
+  "status": "Done",
+  "priority": "Medium",
+  "assigneeMode": "Custom",
+  "assigneeDirectoryId": null,
+  "assigneeCustomText": "BeastMaster",
+  "reporter": "anonymous",
+  "labels": [
+    "skills",
+    "unity-mcp",
+    "documentation",
+    "user-mandated",
+    "agent-guidance"
+  ],
+  "attachments": [],
+  "externalLinks": [],
+  "linkedPages": [],
+  "comments": [
+    {
+      "id": "c-373a25ac6fa242c4853f1bd8f25f41f9",
+      "author": "anonymous",
+      "body": "Implementation and validation evidence (2026-09-13)\n\nChanged files:\n- \u0060.github/skills/unity-mcp-operator/SKILL.md\u0060\n- \u0060.github/skills/unity-mcp-operator/references/probuilder-and-materials.md\u0060 (new)\n\n\u0060SKILL.md\u0060 additions, all from observed behaviour on MCP for Unity server 10.2.0:\n\n1. **Tool groups.** A domain reload can switch exposed groups back off mid-session (\u0060... is currently disabled by the user\u0060). Re-run the client-side activator, because a plain retry does not recover it. Recorded that the \u0060activate_*\u0060 tools expose a whole tool family and are separate from the \u0060manage_tools\u0060 group state. Recorded the observation that \u0060list_groups\u0060 reported \u0060probuilder\u0060 as \u0060enabled: false\u0060 while \u0060manage_probuilder\u0060 still executed.\n2. **Batch discipline.** 24-command batches ran reliably against the 25-command cap. A batch can abort mid-flight with \u0060No Unity Editor instances found\u0060, so retry the whole batch and verify what applied instead of assuming a partial write.\n3. **Visual verification.** Five observed framing rules: array \u0060view_target\u0060 works for a single \u0060screenshot\u0060 but fails for \u0060screenshot_multiview\u0060 (\u0060not found for batch capture\u0060); after a batch capture array \u0060view_target\u0060 stops resolving, so use \u0060view_position\u0060 plus \u0060view_rotation\u0060; \u0060screenshot_multiview\u0060 auto-frames on whole-scene bounds and its horizontal frames land outside interior walls; a yaw of 180 degrees mirrors screen-space X, so positive world X appears left; an existing file name gets a \u0060_1\u0060 suffix instead of overwriting.\n4. **New section \u0022Scene construction with ProBuilder\u0022.** Centre pivot, missing material (renders magenta), missing collider, and the \u0060properties\u0060 argument bag.\n5. **New section \u0022Materials, emission, and transparency\u0022.** The \u0060manage_material\u0060 create signature, the inability to enable a shader keyword, the Bloom volume build order, \u0060volume_set_effect\u0060 requiring \u0060parameters\u0060, and a pointer to the transparency property bundle.\n6. **New section \u0022Verification recipes\u0022.** Bounds readback, \u0060Bounds.Intersects\u0060 scan, null-material scan, and the warning not to trust \u0060SkinnedMeshRenderer.bounds\u0060.\n7. **Error recovery.** Corrected the \u0022tool disabled\u0022 row and added a row for the mid-session disable.\n8. **Boundaries.** Added the note that ProBuilder meshes serialize into the scene and that \u0060git diff --check\u0060 flags the serializer\u0027s empty \u0060m_Data\u0060 lines.\n\nNew reference file \u0060probuilder-and-materials.md\u0060 carries the detail: the shape parameter table for all 12 shape types, the centre-pivot rule with the verified radius-7 / height-0.6 example, the material and collider steps, the persistence check, the emission snippet with gain guidance (4.0 blows out, 1.4-2.4 keeps the hue), the full URP/Lit transparency bundle including the \u0060_SrcBlend\u0060 readback of 1, the volume sequence, the light snippet with the point-light cube-shadow cost, and the four verification snippets.\n\nValidation:\n- \u0060get_errors\u0060 on both files: the reference file is clean. \u0060SKILL.md\u0060 reports one pre-existing false positive on the anchored \u0060mcp-surface.md#editor-preview-and-skinning-inspection\u0060 link. That link exists and this round did not change it. The transient \u0060probuilder-and-materials.md not found\u0060 error cleared once the file was written.\n- Fixed one real lint error found by the checker: MD038 space inside a code span (\u0060m_Data: \u0060), corrected in both files.\n- Sentence length reviewed against the STE rule (20 words for procedures, 25 for descriptions). Two long sentences were split.\n- Every added claim traces to a tool result, a console message, or a screenshot from the TSK-0243 rounds 1-3 session.\n\nResidual risk / open items:\n- The \u0060enabled: false\u0060 but still callable observation is a single observation on server 10.2.0. It may be version-specific, so the skill records it as an observation rather than a contract.\n- The \u0060_SrcBlend\u0060 readback of 1 was checked visually only. The stored value was not reconciled with what the URP inspector writes.\n- No lint script exists for these docs, so the STE check was manual.",
+      "createdAtUtc": "2026-09-13T05:15:53.8005866Z"
+    }
+  ],
+  "epicId": null,
+  "parentId": null,
+  "dueDateUtc": null,
+  "createdAtUtc": "2026-09-13T05:14:04.6491159Z",
+  "updatedAtUtc": "2026-09-13T05:16:05.175943Z",
+  "completedAtUtc": "2026-09-13T05:16:05.175943Z",
+  "revision": 4,
+  "isArchived": false,
+  "hasLoadError": false,
+  "loadError": null,
+  "sourceFilePath": "tsk-0256-fold-field-verified-unity-mcp-learnings-into-the-unity-mcp-operator-skill.json"
+}

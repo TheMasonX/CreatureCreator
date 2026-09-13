@@ -1,0 +1,40 @@
+﻿{
+  "id": "tsk-0167-prevent-duplicate-rig-and-skinned-preview-components",
+  "key": "TSK-0167",
+  "title": "Prevent duplicate rig and skinned preview components",
+  "description": "## Summary\nMake repeated editor preview binding converge on one owned `CreatureRig` and one owned `CreatureSkinnedMeshRenderer` component on the preview root. The controller must define one deterministic owner for each generated component and its generated children rather than assuming `GetComponent<T>()` returns the only instance.\n\n## Scope\n- Audit both editor and runtime preview binding paths that create `CreatureRig` and `CreatureSkinnedMeshRenderer`.\n- Define one clear owner for each component and its generated children.\n- Detect and remove duplicate components before binding, with deterministic cleanup semantics for their generated GameObjects and meshes.\n- Preserve `TSK-0122` root ownership and do not replace it with name-based discovery.\n- Add focused coverage for repeated binding/recovery where Unity execution is available.\n\n## Acceptance Criteria\n- Repeated editor preview binding leaves exactly one `CreatureRig` and one `CreatureSkinnedMeshRenderer` on the owned preview root.\n- Duplicate components created before binding cannot leave duplicate `Bone_*` or `SkinnedMesh` sibling hierarchies after cleanup.\n- Cleanup does not destroy unrelated components or foreign children.\n- The stale Unity-script-reference explanation remains an explicitly unverified hypothesis unless a Unity reproduction proves it.\n\n## Validation\nRun focused editor ownership tests and a repeated-binding/recovery check in Unity when available. Keep source inspection, automated validation, and Unity lifecycle validation separate.\n\n## Current implementation\n`CreaturePreviewController.GetSingleOwnedComponent<T>` scans owned components of each preview rig/skin type during bind/clear, clears generated state on the candidates, retains one deterministic component, and destroys duplicates. This is bind/reload-time only and does not add per-frame lookup or allocation.\n\n## Status\nInProgress — source hardening is present; Unity lifecycle validation remains the closure gate.",
+  "type": "Bug Fix",
+  "status": "InProgress",
+  "priority": "High",
+  "assigneeMode": "Custom",
+  "assigneeDirectoryId": null,
+  "assigneeCustomText": "Agent",
+  "reporter": "BeastMaster",
+  "labels": ["editor", "runtime", "animation", "skinning", "preview", "ownership", "cleanup", "audit-synthesis", "user-mandated"],
+  "attachments": [],
+  "externalLinks": [],
+  "linkedPages": [],
+  "comments": [
+    {
+      "id": "c-df01f888f282482d8c178e38689a7302",
+      "author": "anonymous",
+      "body": "Created from the 2026-09-07 live-use audit synthesis. The duplicate component symptom is accepted as an ownership/lifecycle gap, but the stale Unity script-reference mechanism remains unverified without reproduction.",
+      "createdAtUtc": "2026-09-07T19:38:41.438384Z"
+    },
+    {
+      "id": "c-0167-consolidation",
+      "author": "anonymous",
+      "body": "Council/task-integrity review found an independent TSK-0173 record duplicating this task's ownership scope. Its implementation evidence is consolidated here; TSK-0173 is removed so the original stable key remains canonical.",
+      "createdAtUtc": "2026-09-08T09:10:00Z"
+    }
+  ],
+  "epicId": null,
+  "parentId": "TSK-0098",
+  "createdAtUtc": "2026-09-07T19:38:31.933696Z",
+  "updatedAtUtc": "2026-09-08T09:10:00Z",
+  "completedAtUtc": null,
+  "revision": 3,
+  "isArchived": false,
+  "hasLoadError": false,
+  "sourceFilePath": "tsk-0167-prevent-duplicate-rig-and-skinned-preview-components.json"
+}

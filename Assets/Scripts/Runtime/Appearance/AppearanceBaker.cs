@@ -15,28 +15,11 @@ namespace ProceduralCreature.Appearance
     /// Bakes per-vertex colors onto an extracted mesh: for each vertex, resolves
     /// which part's appearance parameters apply (PartAppearanceSampler), then
     /// modulates that part's BaseColor by triplanar noise (TriplanarNoise) for
-    /// surface variation. A separate stage from mesh extraction (design doc §8),
-    /// consuming MeshExtractionResult's plain data rather than a Unity Mesh.
+    /// surface variation.
     /// </summary>
     public static class AppearanceBaker
     {
-        /// <summary>
-        /// Noise output (0..1) is remapped to this brightness range around 1.0 —
-        /// e.g. [0.85, 1.15] means noise darkens/brightens the base color by at
-        /// most 15%. Kept as a named constant rather than inline magic numbers,
-        /// consistent with the project's tolerance-naming convention
-        /// (GenerationTolerances.cs); revisit alongside real visual-fidelity
-        /// testing rather than treating this value as load-bearing.
-        /// </summary>
         private const float BrightnessVariation = 0.15f;
-
-        /// <summary>
-        /// Slice D: route the per-vertex appearance resolution through the Burst
-        /// jobs in <see cref="AppearanceResolveBurst"/> (bit-identical to the
-        /// managed <see cref="PartAppearanceSampler.Resolver"/>; the Body
-        /// vertical gradient and triplanar noise still run managed). Internal so
-        /// parity tests can force the managed path and compare exactly.
-        /// </summary>
         internal static bool UseBurstResolve = true;
 
         public static Color[] Bake(CreatureDefinition definition, MeshExtractionResult mesh)
@@ -44,59 +27,52 @@ namespace ProceduralCreature.Appearance
             return Bake(definition, mesh, null);
         }
 
-        public static Color[] Bake(
-            CreatureDefinition definition, MeshExtractionResult mesh,
-            GenerationDiagnostics diagnostics)
+        public static Color[] Bake(CreatureDefinition definition, MeshExtractionResult mesh, GenerationDiagnostics diagnostics)
         {
-            var compiledParts = SdfProgramBuilder.CompileIndividualPartsPortable(definition);
-            SdfProgram bodyProgram = SdfProgramBuilder.CompilePortableBodyField(definition);
-            ResolvedBody body = definition.Body == null
-                || definition.Body.Samples == null || definition.Body.Samples.Count == 0
-                ? default
-                : ResolvedBody.Resolve(definition.Body);
+            if (definition == null) throw new DomainException("definition must not be null.");
+            if (mesh == null) throw new DomainException("mesh must not be null.");
+
+            List<ResolvedPartProgram> compiledParts = null;
+            SdfProgram bodyProgram = null;
             try
             {
+                compiledParts = SdfProgramBuilder.CompileIndividualPartsPortable(definition);
+                bodyProgram = SdfProgramBuilder.CompilePortableBodyField(definition);
+                ResolvedBody body = definition.Body == null || definition.Body.Samples == null || definition.Body.Samples.Count == 0
+                    ? default : ResolvedBody.Resolve(definition.Body);
+
                 return Bake(definition, mesh, diagnostics, compiledParts, bodyProgram, body);
             }
             finally
             {
-                foreach (ResolvedPartProgram partProgram in compiledParts) partProgram.Program.Dispose();
-                bodyProgram.Dispose();
+                if (compiledParts != null)
+                {
+                    foreach (ResolvedPartProgram partProgram in compiledParts)
+                        partProgram.Program?.Dispose();
+                }
+                bodyProgram?.Dispose();
             }
         }
 
-        internal static Color[] Bake(
-            CreatureDefinition definition, MeshExtractionResult mesh,
-            GenerationDiagnostics diagnostics,
-            System.Collections.Generic.List<ResolvedPartProgram> compiledParts,
-            SdfProgram bodyProgram, ResolvedBody body)
+        internal static Color[] Bake(CreatureDefinition definition, MeshExtractionResult mesh, GenerationDiagnostics diagnostics,
+            List<ResolvedPartProgram> compiledParts, SdfProgram bodyProgram, ResolvedBody body)
         {
             return Bake(definition, mesh, diagnostics, compiledParts, bodyProgram, body, null);
         }
 
-        internal static Color[] Bake(
-            CreatureDefinition definition, MeshExtractionResult mesh,
-            GenerationDiagnostics diagnostics,
-            System.Collections.Generic.List<ResolvedPartProgram> compiledParts,
-            SdfProgram bodyProgram, ResolvedBody body, ResolvedCreatureSnapshot snapshot)
+        internal static Color[] Bake(CreatureDefinition definition, MeshExtractionResult mesh, GenerationDiagnostics diagnostics,
+            List<ResolvedPartProgram> compiledParts, SdfProgram bodyProgram, ResolvedBody body, ResolvedCreatureSnapshot snapshot)
         {
             if (definition == null) throw new DomainException("definition must not be null.");
             if (mesh == null) throw new DomainException("mesh must not be null.");
 
             Color[] colors = null;
-
             void DoBake()
             {
-                if (mesh.Normals.Count != mesh.Positions.Count)
-                {
-                    mesh.ComputeAngleWeightedNormals();
-                }
-
+                if (mesh.Normals.Count != mesh.Positions.Count) mesh.ComputeAngleWeightedNormals();
                 colors = new Color[mesh.Positions.Count];
                 if (UseBurstResolve)
-                {
                     BakeBurst(definition, mesh, colors, compiledParts, bodyProgram, body, snapshot);
-                }
                 else
                 {
                     using (PartAppearanceSampler.Resolver resolver = snapshot == null
@@ -112,102 +88,83 @@ namespace ProceduralCreature.Appearance
                 }
             }
 
-            if (diagnostics != null)
-            {
-                diagnostics.TimeStage(GenerationStage.AppearanceBake, DoBake);
-            }
-            else
-            {
-                DoBake();
-            }
-
+            if (diagnostics != null) diagnostics.TimeStage(GenerationStage.AppearanceBake, DoBake);
+            else DoBake();
             return colors;
         }
 
-        /// <summary>
-        /// Slice D Burst path: evaluates the nearest-part/Body SDF decision for
-        /// every vertex in Burst, then applies the Body vertical gradient (only
-        /// for Body-owned vertices) and triplanar noise in managed code. The
-        /// final colors are bit-identical to the managed resolver path.
-        /// </summary>
-        private static void BakeBurst(
-            CreatureDefinition definition, MeshExtractionResult mesh, Color[] colors,
-            System.Collections.Generic.List<ResolvedPartProgram> compiledParts,
-            SdfProgram bodyProgram, ResolvedBody body, ResolvedCreatureSnapshot snapshot)
+        private static void BakeBurst(CreatureDefinition definition, MeshExtractionResult mesh, Color[] colors,
+            List<ResolvedPartProgram> compiledParts, SdfProgram bodyProgram, ResolvedBody body, ResolvedCreatureSnapshot snapshot)
         {
-                int programCount = compiledParts.Count + 1;
-                int maxOps = 1;
-                foreach (ResolvedPartProgram partProgram in compiledParts)
+            int maxOps = 1;
+            foreach (ResolvedPartProgram partProgram in compiledParts)
+                maxOps = Mathf.Max(maxOps, partProgram.Program.Operations.IsCreated ? partProgram.Program.Operations.Length : 1);
+            if (bodyProgram != null && bodyProgram.Operations.IsCreated) maxOps = Mathf.Max(maxOps, bodyProgram.Operations.Length);
+
+            int vertexCount = mesh.Positions.Count;
+            var vertices = new NativeArray<float3>(vertexCount, Allocator.Persistent);
+            var nearestDistances = new NativeArray<float>(vertexCount, Allocator.Persistent);
+            var nearestPrograms = new NativeArray<int>(vertexCount, Allocator.Persistent);
+
+            // Body frames are part of the resolved snapshot when the main generation
+            // path is used. For compatibility callers without a snapshot still derive
+            // them once per bake — never once per vertex.
+            Vector3 forward = snapshot == null ? definition.Forward : snapshot.Forward;
+            BodyFrame[] bodyFrames = body.SamplePositions != null && body.SamplePositions.Count > 0
+                ? snapshot?.BodyFrames ?? BodyFrameResolver.ComputeSampleFrames(body, forward)
+                : null;
+            try
+            {
+                for (int i = 0; i < vertexCount; i++)
                 {
-                    maxOps = Mathf.Max(maxOps, partProgram.Program.Operations.IsCreated ? partProgram.Program.Operations.Length : 1);
-                }
-                if (bodyProgram != null && bodyProgram.Operations.IsCreated)
-                {
-                    maxOps = Mathf.Max(maxOps, bodyProgram.Operations.Length);
+                    vertices[i] = new float3(mesh.Positions[i].x, mesh.Positions[i].y, mesh.Positions[i].z);
+                    nearestDistances[i] = float.PositiveInfinity;
+                    nearestPrograms[i] = -1;
                 }
 
-                int vertexCount = mesh.Positions.Count;
-                long distanceCount = (long)vertexCount * programCount;
-                if (distanceCount > int.MaxValue)
+                AppearanceResolveBurst.ResolveAll(
+                    compiledParts, bodyProgram, vertices, maxOps,
+                    nearestDistances, nearestPrograms);
+
+                Color defaultColor = AppearanceDefinition.Default.BaseColor;
+                for (int i = 0; i < vertexCount; i++)
                 {
-                    throw new DomainException("Appearance bake distance matrix exceeds addressable array size.");
-                }
-                var vertices = new NativeArray<float3>(vertexCount, Allocator.Persistent);
-                var distances = new NativeArray<float>((int)distanceCount, Allocator.Persistent);
-                var outBase = new NativeArray<float4>(vertexCount, Allocator.Persistent);
-                var outSeed = new NativeArray<int>(vertexCount, Allocator.Persistent);
-                var outScale = new NativeArray<float>(vertexCount, Allocator.Persistent);
-                var outBody = new NativeArray<bool>(vertexCount, Allocator.Persistent);
-                try
-                {
-                    for (int i = 0; i < vertexCount; i++)
+                    int winner = nearestPrograms[i];
+                    if (winner == compiledParts.Count)
                     {
-                        vertices[i] = new float3(mesh.Positions[i].x, mesh.Positions[i].y, mesh.Positions[i].z);
+                        Color bodyColor = BodyVerticalGradientSampler.EvaluateColor(
+                            snapshot == null ? definition.Body?.Appearance : snapshot.BodyAppearance,
+                            body, forward, bodyFrames, mesh.Positions[i]);
+                        colors[i] = BakeVertexColor(mesh.Positions[i], mesh.Normals[i], bodyColor, 0, 1f);
                     }
-
-                    AppearanceResolveBurst.ResolveAll(
-                        compiledParts, bodyProgram, vertices, programCount, maxOps,
-                        distances, outBase, outSeed, outScale, outBody);
-
-                    for (int i = 0; i < vertexCount; i++)
+                    else
                     {
-                        if (outBody[i])
+                        Color baseColor;
+                        int seed;
+                        float scale;
+                        if (winner >= 0)
                         {
-                            Color bodyColor = BodyVerticalGradientSampler.EvaluateColor(
-                                snapshot == null ? definition.Body?.Appearance : snapshot.BodyAppearance,
-                                body,
-                                snapshot == null ? definition.Forward : snapshot.Forward,
-                                mesh.Positions[i]);
-                            colors[i] = BakeVertexColor(mesh.Positions[i], mesh.Normals[i], bodyColor, 0, 1f);
+                            AppearanceDefinition appearance = compiledParts[winner].Part.Appearance;
+                            baseColor = appearance.BaseColor;
+                            seed = appearance.NoiseSeed;
+                            scale = appearance.NoiseScale;
                         }
                         else
                         {
-                            var baseColor = new Color(outBase[i].x, outBase[i].y, outBase[i].z, outBase[i].w);
-                            colors[i] = BakeVertexColor(mesh.Positions[i], mesh.Normals[i], baseColor, outSeed[i], outScale[i]);
+                            baseColor = defaultColor;
+                            seed = 0;
+                            scale = 1f;
                         }
+                        colors[i] = BakeVertexColor(mesh.Positions[i], mesh.Normals[i], baseColor, seed, scale);
                     }
                 }
-                finally
-                {
-                    vertices.Dispose();
-                    distances.Dispose();
-                    outBase.Dispose();
-                    outSeed.Dispose();
-                    outScale.Dispose();
-                    outBody.Dispose();
-                }
+            }
+            finally
+            {
+                vertices.Dispose(); nearestDistances.Dispose(); nearestPrograms.Dispose();
+            }
         }
 
-        /// <summary>
-        /// Bakes a single part's OWN authored appearance (BaseColor + triplanar
-        /// noise) onto an arbitrary set of vertices. Used for mesh-asset geometry
-        /// items (CC-031): a mesh-asset part is not part of the implicit SDF field,
-        /// so nearest-surface appearance resolution cannot reach it. Its appearance
-        /// resolves directly from the part instead, while keeping the exact same
-        /// noise modulation the implicit bake applies. This deliberately does NOT
-        /// run the Body vertical-gradient or nearest-part samplers — a mesh-asset
-        /// part's color is its own, never the Body's implicit color.
-        /// </summary>
         public static Color[] BakePart(CreaturePart part, IReadOnlyList<Vector3> positions, IReadOnlyList<Vector3> normals)
         {
             if (part == null) throw new DomainException("part must not be null.");
@@ -218,31 +175,18 @@ namespace ProceduralCreature.Appearance
         {
             if (positions == null) throw new DomainException("positions must not be null.");
             if (normals == null) throw new DomainException("normals must not be null.");
-            if (positions.Count != normals.Count)
-            {
-                throw new DomainException("positions and normals must have the same length.");
-            }
-
+            if (positions.Count != normals.Count) throw new DomainException("positions and normals must have the same length.");
             var colors = new Color[positions.Count];
-            for (int i = 0; i < positions.Count; i++)
-            {
-                colors[i] = BakeVertexColor(positions[i], normals[i], appearance.BaseColor, appearance.NoiseSeed, appearance.NoiseScale);
-            }
+            for (int i = 0; i < positions.Count; i++) colors[i] = BakeVertexColor(positions[i], normals[i], appearance.BaseColor, appearance.NoiseSeed, appearance.NoiseScale);
             return colors;
         }
 
         private static Color BakeVertexColor(Vector3 position, Vector3 normal, Color baseColor, int noiseSeed, float noiseScale)
         {
             float noise = TriplanarNoise.Evaluate(position, normal, noiseSeed, noiseScale);
-
-            // Remap noise from [0,1] to [1-BrightnessVariation, 1+BrightnessVariation].
             float brightness = 1f + (noise * 2f - 1f) * BrightnessVariation;
-
-            return new Color(
-                Mathf.Clamp01(baseColor.r * brightness),
-                Mathf.Clamp01(baseColor.g * brightness),
-                Mathf.Clamp01(baseColor.b * brightness),
-                baseColor.a);
+            return new Color(Mathf.Clamp01(baseColor.r * brightness), Mathf.Clamp01(baseColor.g * brightness),
+                Mathf.Clamp01(baseColor.b * brightness), baseColor.a);
         }
     }
 }

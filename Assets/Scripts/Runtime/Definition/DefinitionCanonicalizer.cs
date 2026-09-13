@@ -21,12 +21,6 @@ namespace ProceduralCreature.Definition
     /// </summary>
     public static class DefinitionCanonicalizer
     {
-        /// <summary>
-        /// Returns a new CreatureDefinition with every part's transform quantized and
-        /// parts sorted into a stable order (by Id, ordinal) for deterministic
-        /// serialization (Sprint 1.3: "stable property ordering"). The input is not
-        /// mutated.
-        /// </summary>
         public static CreatureDefinition Canonicalize(CreatureDefinition definition)
         {
             if (definition == null)
@@ -106,9 +100,6 @@ namespace ProceduralCreature.Definition
                 }
             }
 
-            // Stable ordering independent of authoring/insertion order — this is what
-            // makes "definition order independence where semantics are unchanged"
-            // (§13.4 determinism tests) hold for serialization output.
             var orderedParts = new List<CreaturePart>();
             AppendChildren(CreatureDefinition.BodyId, hierarchy, orderedParts);
             foreach (CreaturePart part in result.Parts
@@ -125,17 +116,12 @@ namespace ProceduralCreature.Definition
         private static void CanonicalizeShape(ref ShapeDefinition shape)
         {
             shape = shape.WithLegacyDefaults();
-            if (shape.CapsuleAxis < ShapeAxis.X || shape.CapsuleAxis > ShapeAxis.Z) shape.CapsuleAxis = ShapeAxis.Y;
+            if (shape.CapsuleAxis < ShapeAxis.X || shape.CapsuleAxis > ShapeAxis.Z)
+            {
+                throw new DomainException("Cannot canonicalize a shape with an invalid capsule axis.");
+            }
         }
 
-        /// <summary>
-        /// Canonicalizes the Body vertical-gradient appearance (CC-025/CC-034):
-        /// quantizes gradient key times/colors/alphas and the vertical-curve
-        /// keys, and orders each gradient's and the curve's keys by
-        /// non-decreasing time for deterministic serialization. Throws on a null
-        /// appearance or invalid gradients/curve — canonicalization is not a
-        /// repair pass, matching the body-spline and transform rules above.
-        /// </summary>
         private static void CanonicalizeBodyAppearance(BodyVerticalGradientAppearance appearance)
         {
             if (appearance == null)
@@ -173,14 +159,6 @@ namespace ProceduralCreature.Definition
             GradientAdapter.Quantize(gradient);
         }
 
-        /// <summary>
-        /// Canonicalizes a limb chain (CC-018): quantizes every joint position and
-        /// the thickness profile's keys, and orders the thickness keys by strictly
-        /// increasing T for deterministic serialization. Joint order is preserved
-        /// — list order IS the chain order. Throws on non-finite joints or an
-        /// invalid thickness profile; canonicalization is not a repair pass,
-        /// matching the transform and body-appearance rules above.
-        /// </summary>
         private static void CanonicalizeLimbChain(LimbChain limb)
         {
             if (limb.Joints == null || limb.Joints.Count == 0)
@@ -216,13 +194,6 @@ namespace ProceduralCreature.Definition
             limb.Thickness.Quantize();
         }
 
-        /// <summary>
-        /// Canonicalizes a part's mesh-asset geometry source (CC-031): quantizes the
-        /// attachment's offset/orientation/scale and normalizes the orientation, so
-        /// repeated serialization is byte-identical. The mesh asset key is a stable
-        /// name and is left as authored. Throws on a non-finite attachment;
-        /// canonicalization is not a repair pass.
-        /// </summary>
         private static void CanonicalizeMeshGeometry(MeshGeometry mesh)
         {
             if (mesh.Attachment == null)
@@ -258,6 +229,5 @@ namespace ProceduralCreature.Definition
                 AppendChildren(child.Id, hierarchy, orderedParts);
             }
         }
-
     }
 }

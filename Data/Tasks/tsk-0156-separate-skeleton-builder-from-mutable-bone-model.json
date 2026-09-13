@@ -1,0 +1,39 @@
+{
+  "id": "tsk-0156-separate-skeleton-builder-from-mutable-bone-model",
+  "key": "TSK-0156",
+  "title": "Separate mutable skeleton construction from immutable runtime representation",
+  "description": "Bounded code-health follow-up for the derived skeleton layer. Bone currently exposes public mutable fields and Skeleton exposes a mutable List<Bone>; this makes it possible for downstream consumers to alter derived state after inference and before/after snapshot capture. Replace the current builder-side mutation surface with a narrow construction API or internal builder while preserving SkeletonSnapshot as the authoritative runtime compatibility boundary.\n\n## Scope\n- Keep CreatureDefinition/resolved snapshot semantics unchanged.\n- Inventory all Bone/Skeleton construction and mutation call sites before changing APIs.\n- Introduce an internal construction boundary or immutable constructed skeleton model.\n- Preserve deterministic IDs, parent links, positions, rotations, terminal joints, mirroring, and snapshot ordering.\n- Add negative tests proving consumers cannot mutate completed skeleton state through normal public APIs.\n\n## Non-goals\n- No synthetic locomotion root.\n- No new animation abstraction.\n- No change to bone naming semantics.\n\n## Acceptance Criteria\n- Production consumers cannot mutate a completed skeleton through public fields/list storage.\r\n- Skeleton inference remains transactional and produces byte/semantic-equivalent snapshots.\r\n- Existing animation, IK, binding, and editor tests remain green.\r\n- Migration does not create a second skeleton authority.\r\n\n## Validation\nRuntime/test builds plus focused SkeletonSnapshot, SkeletonInferrer, CreatureRig, and semantic resolver tests. Unity validation required before Done because the runtime hierarchy is downstream of this contract.",
+  "type": "Architecture",
+  "status": "Backlog",
+  "priority": "Medium",
+  "assigneeMode": "Custom",
+  "assigneeDirectoryId": null,
+  "assigneeCustomText": "Agent",
+  "reporter": "TheMasonX",
+  "labels": [
+    "architecture",
+    "skeleton",
+    "code-health",
+    "immutability",
+    "refactoring",
+    "animation"
+  ],
+  "comments": [
+    {
+      "id": "c-20260907-skeleton-mutable-model",
+      "author": "anonymous",
+      "body": "Takeover audit identified a durable encapsulation risk: Bone is a mutable public-field class and Skeleton exposes a mutable List<Bone>. Current inference intentionally needs mutation while constructing derived state, so a direct readonly-field rewrite would be broad and brittle. Track the migration separately; the preferred direction is an internal builder/construction surface feeding the existing immutable SkeletonSnapshot runtime boundary.",
+      "createdAtUtc": "2026-09-07T12:20:00Z"
+    }
+  ],
+  "epicId": "tsk-0077",
+  "parentId": null,
+  "dueDateUtc": null,
+  "createdAtUtc": "2026-09-07T12:20:00Z",
+  "updatedAtUtc": "2026-09-07T12:20:00Z",
+  "completedAtUtc": null,
+  "revision": 1,
+  "isArchived": false,
+  "hasLoadError": false,
+  "sourceFilePath": "tsk-0156-separate-skeleton-builder-from-mutable-bone-model.json"
+}
