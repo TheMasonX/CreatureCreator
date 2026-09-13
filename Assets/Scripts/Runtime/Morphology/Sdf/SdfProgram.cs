@@ -51,11 +51,6 @@ namespace ProceduralCreature.Morphology.Sdf
         }
     }
 
-    /// <summary>
-    /// Compiled correspondence for one resolved part. The generated result keeps
-    /// detached snapshot data for downstream consumers instead of an authored
-    /// CreaturePart reference.
-    /// </summary>
     public readonly struct ResolvedPartProgram
     {
         public readonly ResolvedPartSnapshot Part;
@@ -74,51 +69,100 @@ namespace ProceduralCreature.Morphology.Sdf
 
         public NativeArray<SdfOperation>.ReadOnly Operations => _operations.AsReadOnly();
         public int RootIndex { get; }
-
-        /// <summary>
-        /// Maximum smooth-blend radius across all unions plus a small epsilon. The
-        /// evaluator inflates each culled op's world AABB by this so a skipped op is
-        /// provably farther from the sample than any blend can reach.
-        /// </summary>
         public float InfluenceRadius { get; }
-
         public bool HasPotentialBounds { get; }
         public float3 PotentialMinBound { get; }
         public float3 PotentialMaxBound { get; }
-
         internal NativeArray<SdfOperation> MutableOperations => _operations;
 
         internal SdfProgram(NativeArray<SdfOperation> operations, int rootIndex, float influenceRadius,
             bool hasPotentialBounds = false, float3 potentialMinBound = default, float3 potentialMaxBound = default)
         {
-            _operations = operations;
-            RootIndex = rootIndex;
-            InfluenceRadius = influenceRadius;
-            HasPotentialBounds = hasPotentialBounds;
-            PotentialMinBound = potentialMinBound;
-            PotentialMaxBound = potentialMaxBound;
+            if (!operations.IsCreated)
+            {
+                throw new DomainException("SdfProgram operations must be created.");
+            }
+
+            try
+            {
+                ValidateProgramOperations(operations, rootIndex);
+                if (!NumericValidity.IsFinite(influenceRadius) || influenceRadius < 0f)
+                {
+                    throw new DomainException("SdfProgram influenceRadius must be finite and non-negative.");
+                }
+                if (hasPotentialBounds &&
+                    (!NumericValidity.IsFinite(potentialMinBound) || !NumericValidity.IsFinite(potentialMaxBound) ||
+                     potentialMinBound.x > potentialMaxBound.x ||
+                     potentialMinBound.y > potentialMaxBound.y ||
+                     potentialMinBound.z > potentialMaxBound.z))
+                {
+                    throw new DomainException("SdfProgram potential bounds must be finite and ordered.");
+                }
+
+                _operations = operations;
+                RootIndex = rootIndex;
+                InfluenceRadius = influenceRadius;
+                HasPotentialBounds = hasPotentialBounds;
+                PotentialMinBound = potentialMinBound;
+                PotentialMaxBound = potentialMaxBound;
+            }
+            catch
+            {
+                operations.Dispose();
+                throw;
+            }
+        }
+
+        private static void ValidateProgramOperations(NativeArray<SdfOperation> operations, int rootIndex)
+        {
+            if (rootIndex < 0 || rootIndex >= operations.Length)
+            {
+                throw new DomainException("SdfProgram rootIndex must identify an operation.");
+            }
+
+            for (int i = 0; i < operations.Length; i++)
+            {
+                SdfOperation operation = operations[i];
+                switch (operation.Type)
+                {
+                    case SdfOperationType.Empty:
+                    case SdfOperationType.Sphere:
+                    case SdfOperationType.Box:
+                    case SdfOperationType.Capsule:
+                    case SdfOperationType.Ellipsoid:
+                        break;
+                    case SdfOperationType.Transform:
+                        ValidatePreviousReference(operation.A, i, "Transform.A");
+                        break;
+                    case SdfOperationType.Symmetry:
+                        ValidatePreviousReference(operation.A, i, "Symmetry.A");
+                        break;
+                    case SdfOperationType.SmoothUnion:
+                        ValidatePreviousReference(operation.A, i, "SmoothUnion.A");
+                        ValidatePreviousReference(operation.B, i, "SmoothUnion.B");
+                        break;
+                    default:
+                        throw new DomainException($"SdfProgram operation {i} has unsupported type value {(int)operation.Type}.");
+                }
+            }
+        }
+
+        private static void ValidatePreviousReference(int reference, int operationIndex, string fieldName)
+        {
+            if (reference < 0 || reference >= operationIndex)
+            {
+                throw new DomainException(
+                    $"SdfProgram operation {operationIndex} has invalid {fieldName} reference {reference}; " +
+                    "references must point to an earlier operation.");
+            }
         }
 
         public void Dispose()
         {
-            if (_operations.IsCreated)
-            {
-                _operations.Dispose();
-            }
+            if (_operations.IsCreated) _operations.Dispose();
         }
     }
 
-    /// <summary>
-    /// Evaluates a compiled portable SDF program at a point (CC-045).
-    ///
-    /// Non-finite field contract (CC-064): <c>+inf</c> means outside/culled/absent;
-    /// NaN is always invalid; finite is the evaluated field. Fast culling writes
-    /// <c>+inf</c> for a skipped operation, so a consumer must treat it as "no
-    /// candidate", never as a giant valid distance. Culling is proof-based: an
-    /// operation is skipped only when it is <see cref="SdfOperation.Cullable"/> and
-    /// its valid AABB, inflated by the influence radius, does not contain the point.
-    /// An AABB alone is not a culling proof for an approximate ellipsoid field.
-    /// </summary>
     public static class SdfProgramEvaluator
     {
         public static float Evaluate(SdfProgram program, float3 point)
@@ -224,7 +268,7 @@ namespace ProceduralCreature.Morphology.Sdf
                 case SdfOperationType.SmoothUnion:
                     return SmoothMin(values[valueOffset + operation.A], values[valueOffset + operation.B], operation.Parameters.x);
                 case SdfOperationType.Empty: return float.PositiveInfinity;
-                default: return 0f;
+                default: return float.PositiveInfinity;
             }
         }
 
@@ -263,7 +307,7 @@ namespace ProceduralCreature.Morphology.Sdf
                 case SdfOperationType.Empty:
                     return float.PositiveInfinity;
                 default:
-                    return 0f;
+                    return float.PositiveInfinity;
             }
         }
 
@@ -312,9 +356,6 @@ namespace ProceduralCreature.Morphology.Sdf
 
         private static float SmoothMin(float a, float b, float radius)
         {
-            // AABB-culled children read as +inf ("absent"): the finite child wins, or
-            // +inf when both are absent. math.lerp(b, a, h) is NaN on inf*0, so +inf
-            // must be short-circuited before blending.
             if (float.IsPositiveInfinity(a) || float.IsPositiveInfinity(b))
             {
                 return math.min(a, b);
@@ -339,12 +380,6 @@ namespace ProceduralCreature.Morphology.Sdf
         public float CellSize;
         public int SampleStartIndex;
         public float InfluenceRadius;
-
-        /// <summary>
-        /// True when the root has a conservative potential-influence envelope.
-        /// This is separate from operation Cullable metadata because an approximate
-        /// ellipsoid may need exact evaluation outside its ordinary AABB.
-        /// </summary>
         public bool RootHasPotentialBounds;
         public float3 RootPotentialMinBound;
         public float3 RootPotentialMaxBound;
