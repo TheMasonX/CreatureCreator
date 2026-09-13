@@ -12,19 +12,6 @@ using UnityEngine;
 
 namespace ProceduralCreature.Generation
 {
-    /// <summary>
-    /// Generates a creature's geometry (CC-031). The output is a
-    /// <see cref="GeneratedCreature"/> — a deterministic, ordered collection of
-    /// geometry items — rather than a single Mesh. Item 0 is always the implicit
-    /// combined surface (Body + Shape/Limb parts) extracted from the SDF field;
-    /// mesh-asset parts follow in ascending SourcePartId order, placed at each
-    /// part's local-space position via its GeometryAttachment (pass 1, ADR-002 §2).
-    ///
-    /// Mesh asset keys are resolved through the injected
-    /// <paramref name="meshResolver"/>; a mesh part whose key cannot be resolved is
-    /// a programmer/config error and throws DomainException (no silent drop). The
-    /// domain model never stores UnityEngine.Object references.
-    /// </summary>
     public static class CreatureMeshGenerator
     {
         public static GeneratedCreature Generate(CreatureDefinition definition, out MeshTopologyReport topologyReport, GenerationDiagnostics diagnostics = null)
@@ -62,15 +49,13 @@ namespace ProceduralCreature.Generation
             {
                 Time(diagnostics, GenerationStage.SdfCompile, () =>
                 {
-                    // Compile every request-owned program once. Downstream stages borrow
-                    // these programs rather than reconstructing the same morphology.
                     compiledParts = SdfProgramBuilder.CompileIndividualPartsPortable(definition, snapshot);
                     bodyProgram = SdfProgramBuilder.CompilePortableBodyField(definition, snapshot);
                     fieldProgram = SdfProgramBuilder.CompilePortable(definition, snapshot);
                 });
 
                 DensityGrid grid = GenerateImplicitField(fieldProgram, snapshot, diagnostics);
-                fieldProgram = null; // GenerateImplicitField transfers/disposes it.
+                fieldProgram = null;
                 MeshExtractionResult meshResult = ExtractMesh(grid, diagnostics);
                 MeshTopologyReport generatedTopologyReport = ValidateMesh(meshResult, diagnostics);
                 Color[] colors = BakeAppearance(
@@ -182,8 +167,6 @@ namespace ProceduralCreature.Generation
             SdfProgram bodyProgram,
             GenerationDiagnostics diagnostics)
         {
-            // AppearanceBaker owns the AppearanceBake timing boundary. Keeping a single
-            // owner prevents nested duplicate timings from overstating generation cost.
             return AppearanceBaker.Bake(
                 definition,
                 meshResult,
@@ -263,15 +246,14 @@ namespace ProceduralCreature.Generation
             {
                 Mesh sourceMesh = ResolveMesh(resolvedPart.Id, resolvedPart.MeshAssetKey, meshResolver);
                 Matrix4x4 placement = resolvedPart.GeometryPlacementToCreatureSpace;
-                CreaturePart sourcePart = data.Definition.FindPart(resolvedPart.Id);
 
                 generated.AddGeometry(BuildMeshAssetItem(
-                    resolvedPart, sourcePart, sourceMesh, placement, skeleton, mirror: false));
+                    resolvedPart, sourceMesh, placement, skeleton, mirror: false));
 
                 if (resolvedPart.MirrorAcrossSymmetryPlane && data.Snapshot.SymmetryMode != SymmetryMode.None)
                 {
                     generated.AddGeometry(BuildMeshAssetItem(
-                        resolvedPart, sourcePart, sourceMesh,
+                        resolvedPart, sourceMesh,
                         MirrorUtility.ReflectTransformAcrossX(placement), skeleton, mirror: true));
                 }
             }
@@ -296,7 +278,6 @@ namespace ProceduralCreature.Generation
 
         private static GeometryItem BuildMeshAssetItem(
             ResolvedPartSnapshot part,
-            CreaturePart sourcePart,
             Mesh source,
             Matrix4x4 placement,
             SkeletonSnapshot skeleton,
@@ -359,7 +340,7 @@ namespace ProceduralCreature.Generation
                     materialRegions: regions,
                     rigBinding: new RigBindingMetadata(part.Id, part.ParentId, mirror),
                     vertexInfluences: RigidMeshWeightAuthoring.Author(
-                        skeleton, sourcePart, mirror, mesh.vertices));
+                        skeleton, part.Id, mirror, mesh.vertices));
                 mesh = null;
                 return item;
             }
