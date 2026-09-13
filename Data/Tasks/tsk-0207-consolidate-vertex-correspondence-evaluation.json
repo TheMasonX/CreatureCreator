@@ -1,0 +1,35 @@
+{
+  "id": "tsk-0207-consolidate-vertex-correspondence-evaluation",
+  "key": "TSK-0207",
+  "title": "Consolidate per-vertex part/body correspondence evaluation",
+  "description": "AppearanceBake and implicit-surface influence-domain resolution independently evaluate the same generated vertices against the same Body and resolved part SDF programs. Design one authoritative correspondence result or reusable evaluation pass that can supply nearest-body/part ownership to both consumers without changing tie semantics, mirrored-domain rules, or gradient coloring. Measure before/after because this path is a plausible secondary AppearanceBake and binding hotspot. Do not build a generic IR or service layer merely for abstraction; keep the result specific to generated-surface correspondence.",
+  "type": "Performance",
+  "status": "Backlog",
+  "priority": "High",
+  "assigneeMode": "Custom",
+  "assigneeDirectoryId": null,
+  "assigneeCustomText": "Unassigned",
+  "reporter": "ChatGPT",
+  "labels": ["user-mandated", "performance", "generation", "appearance", "binding", "correspondence", "consolidation"],
+  "attachments": [],
+  "externalLinks": [],
+  "linkedPages": [],
+  "comments": [
+    {
+      "id": "c-chatgpt-20260912-0207-audit",
+      "author": "ChatGPT",
+      "body": "Current-head static audit 2026-09-12: GenerateData already carries compiled part programs and a Body program, but AppearanceBake and InfluenceDomainResolution remain separate consumers that re-evaluate nearest part/body distances over the same vertices. This is a concrete consolidation/performance opportunity after behavior is locked down by parity tests.",
+      "createdAtUtc": "2026-09-12T19:56:00Z"
+    }
+  ],
+  "epicId": null,
+  "parentId": "TSK-0008",
+  "dueDateUtc": null,
+  "createdAtUtc": "2026-09-12T19:56:00Z",
+  "updatedAtUtc": "2026-09-12T19:56:00Z",
+  "revision": 1,
+  "isArchived": false,
+  "hasLoadError": false,
+  "loadError": null,
+  "sourceFilePath": "tsk-0207-consolidate-vertex-correspondence-evaluation.json"
+}
