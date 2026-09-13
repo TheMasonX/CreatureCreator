@@ -10,9 +10,19 @@
   "assigneeDirectoryId": null,
   "assigneeCustomText": "Unassigned",
   "reporter": "council-exhaustive-audit",
-  "labels": ["council", "concurrency", "thread-safety", "generation", "appearance", "runtime-editor-boundary"],
+  "labels": [
+    "council",
+    "concurrency",
+    "thread-safety",
+    "generation",
+    "appearance",
+    "runtime-editor-boundary"
+  ],
   "attachments": [],
   "externalLinks": [],
   "linkedPages": [],
-  "parentId": "tsk-0095-establish-concrete-generation-pipeline-stage-boundaries"
+  "parentId": "tsk-0095-establish-concrete-generation-pipeline-stage-boundaries",
+  "createdAtUtc": "2026-09-07T12:00:49.0000000Z",
+  "updatedAtUtc": "2026-09-07T12:00:49.0000000Z",
+  "revision": 1
 }

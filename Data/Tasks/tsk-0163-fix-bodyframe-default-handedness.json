@@ -10,9 +10,18 @@
   "assigneeDirectoryId": null,
   "assigneeCustomText": "Unassigned",
   "reporter": "council-exhaustive-audit",
-  "labels": ["council", "body-frame", "geometry", "handedness", "TSK-0024"],
+  "labels": [
+    "council",
+    "body-frame",
+    "geometry",
+    "handedness",
+    "TSK-0024"
+  ],
   "attachments": [],
   "externalLinks": [],
   "linkedPages": [],
-  "parentId": "tsk-0024-shared-bodyframeresolver-parallel-transport-body-frames"
+  "parentId": "tsk-0024-shared-bodyframeresolver-parallel-transport-body-frames",
+  "createdAtUtc": "2026-09-07T11:52:26.0000000Z",
+  "updatedAtUtc": "2026-09-07T11:52:26.0000000Z",
+  "revision": 1
 }

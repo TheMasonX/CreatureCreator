@@ -56,6 +56,9 @@ Load only the skill needed by the task:
 - [unity-validation](../skills/unity-validation/SKILL.md) for Unity state,
   compilation, EditMode or PlayMode tests, assemblies, generation, topology,
   serialization, appearance, skeleton, or IK.
+- [unity-mcp-operator](../skills/unity-mcp-operator/SKILL.md) for MCP call
+  mechanics: readiness, resources, tool-group activation, batching, payload and
+  pagination limits, console checks, screenshots, and MCP error recovery.
 - [subagent-swarm](../skills/subagent-swarm/SKILL.md) for work spanning two or
   more independent layers. Use one agent for a focused slice.
 - [council](../skills/council/SKILL.md) for high-impact architecture,

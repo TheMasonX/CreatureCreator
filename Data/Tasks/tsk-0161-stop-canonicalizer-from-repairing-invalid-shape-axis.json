@@ -10,10 +10,20 @@
   "assigneeDirectoryId": null,
   "assigneeCustomText": "Unassigned",
   "reporter": "council-audit",
-  "labels": ["council", "canonicalization", "validation", "data-integrity", "TSK-0093", "TSK-0094"],
+  "labels": [
+    "council",
+    "canonicalization",
+    "validation",
+    "data-integrity",
+    "TSK-0093",
+    "TSK-0094"
+  ],
   "attachments": [],
   "externalLinks": [],
   "linkedPages": [],
   "comments": [],
-  "parentId": "tsk-0094-consolidate-shared-runtime-utilities-and-tolerances"
+  "parentId": "tsk-0094-consolidate-shared-runtime-utilities-and-tolerances",
+  "createdAtUtc": "2026-09-07T11:38:38.0000000Z",
+  "updatedAtUtc": "2026-09-07T11:38:38.0000000Z",
+  "revision": 1
 }

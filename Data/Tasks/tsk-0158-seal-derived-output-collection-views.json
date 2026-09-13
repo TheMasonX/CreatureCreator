@@ -10,7 +10,15 @@
   "assigneeDirectoryId": null,
   "assigneeCustomText": "Agent",
   "reporter": "council-exhaustive-audit",
-  "labels": ["council", "api-contract", "immutability", "animation", "generation", "TSK-0125", "TSK-0132"],
+  "labels": [
+    "council",
+    "api-contract",
+    "immutability",
+    "animation",
+    "generation",
+    "TSK-0125",
+    "TSK-0132"
+  ],
   "attachments": [],
   "externalLinks": [],
   "linkedPages": [],
@@ -24,5 +32,8 @@
   ],
   "parentId": "tsk-0125-harden-generatedcreature-output-contract-and-materialregion-submesh",
   "dueDateUtc": null,
-  "isArchived": false
+  "isArchived": false,
+  "createdAtUtc": "2026-09-07T11:38:21.0000000Z",
+  "updatedAtUtc": "2026-09-07T11:38:21.0000000Z",
+  "revision": 1
 }

@@ -9,7 +9,12 @@
   "assigneeDirectoryId": null,
   "assigneeCustomText": "Agent",
   "reporter": "anonymous",
-  "labels": ["animation", "skinning", "bug", "performance"],
+  "labels": [
+    "animation",
+    "skinning",
+    "bug",
+    "performance"
+  ],
   "attachments": [],
   "externalLinks": [],
   "linkedPages": [],
@@ -34,5 +39,8 @@
   "isArchived": false,
   "hasLoadError": false,
   "revision": 2,
-  "sourceFilePath": "tsk-0172-investigate-and-reduce-generated-body-skinning-smear.json"
+  "sourceFilePath": "tsk-0172-investigate-and-reduce-generated-body-skinning-smear.json",
+  "type": "Task",
+  "createdAtUtc": "2026-09-08T00:34:48.0000000Z",
+  "updatedAtUtc": "2026-09-08T00:34:48.0000000Z"
 }

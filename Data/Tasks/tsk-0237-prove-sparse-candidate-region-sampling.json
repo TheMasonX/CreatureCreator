@@ -1,8 +1,8 @@
-﻿{
-  "id": "tsk-0200-prove-sparse-candidate-region-sampling",
-  "key": "TSK-0200",
+{
+  "id": "tsk-0237-prove-sparse-candidate-region-sampling",
+  "key": "TSK-0237",
   "title": "Prove sparse candidate-region SDF sampling before enabling it",
-  "description": "Follow-up performance task under TSK-0008. A sparse candidate-region sampling prototype was reviewed during the 2026-09-11 performance council and intentionally removed before baseline validation. The concept is promising because FieldSampling remains the largest measured Quality 16 stage, but it must first prove scalar parity and topology completeness across all potential-envelope cases. The removed prototype also redundantly expanded the already conservative potential envelope by InfluenceRadius, so candidate-region ownership must be re-derived explicitly from SdfProgramBuilder's existing envelope contract rather than layered ad hoc.",
+  "description": "Follow-up performance task under TSK-0008. A sparse candidate-region sampling prototype was reviewed during the 2026-09-11 performance council and intentionally removed before baseline validation. The concept is promising because FieldSampling remains the largest measured Quality 16 stage, but it must first prove scalar parity and topology completeness across all potential-envelope cases. The removed prototype also redundantly expanded the already conservative potential envelope by InfluenceRadius, so candidate-region ownership must be re-derived explicitly from SdfProgramBuilder's existing envelope contract rather than layered ad hoc.\n\n## Reconciliation\nRenumbered from TSK-0200 on 2026-09-12. TSK-0200 now resolves uniquely to the in-progress sparse root-envelope SDF sampling task tsk-0200-sparse-root-envelope-sdf-sampling; this record keeps the sparse candidate-region sampling proof.",
   "type": "Performance",
   "status": "Backlog",
   "priority": "High",
@@ -10,7 +10,15 @@
   "assigneeDirectoryId": null,
   "assigneeCustomText": "Unassigned",
   "reporter": "ChatGPT",
-  "labels": ["user-mandated", "performance", "sampling", "sdf", "determinism", "topology", "burst"],
+  "labels": [
+    "user-mandated",
+    "performance",
+    "sampling",
+    "sdf",
+    "determinism",
+    "topology",
+    "burst"
+  ],
   "attachments": [],
   "externalLinks": [],
   "linkedPages": [],
@@ -26,10 +34,11 @@
   "parentId": "tsk-0008-profile-and-optimize-preview-generation-hotspots",
   "dueDateUtc": null,
   "createdAtUtc": "2026-09-11T00:00:00Z",
-  "updatedAtUtc": "2026-09-11T00:00:00Z",
+  "updatedAtUtc": "2026-09-12T06:57:30.6830537Z",
   "completedAtUtc": null,
   "isArchived": false,
   "hasLoadError": false,
   "loadError": null,
-  "sourceFilePath": "tsk-0200-prove-sparse-candidate-region-sampling.json"
+  "sourceFilePath": "tsk-0237-prove-sparse-candidate-region-sampling.json",
+  "revision": 1
 }

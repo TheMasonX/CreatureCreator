@@ -10,7 +10,14 @@
   "assigneeDirectoryId": null,
   "assigneeCustomText": "Unassigned",
   "reporter": "ChatGPT",
-  "labels": ["user-mandated", "codebase-health", "preview", "lifecycle", "editor", "runtime"],
+  "labels": [
+    "user-mandated",
+    "codebase-health",
+    "preview",
+    "lifecycle",
+    "editor",
+    "runtime"
+  ],
   "attachments": [],
   "externalLinks": [],
   "linkedPages": [],
@@ -29,5 +36,6 @@
   "completedAtUtc": null,
   "isArchived": false,
   "hasLoadError": false,
-  "sourceFilePath": "tsk-0211-harden-runtime-preview-contextmenu-scheduler-lifecycle.json"
+  "sourceFilePath": "tsk-0211-harden-runtime-preview-contextmenu-scheduler-lifecycle.json",
+  "revision": 1
 }

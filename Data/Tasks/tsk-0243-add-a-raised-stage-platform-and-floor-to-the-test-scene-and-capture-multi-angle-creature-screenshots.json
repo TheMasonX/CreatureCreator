@@ -1,0 +1,42 @@
+﻿{
+  "id": "tsk-0243-add-a-raised-stage-platform-and-floor-to-the-test-scene-and-capture-multi-angle-creature-screenshots",
+  "key": "TSK-0243",
+  "title": "Add a raised stage platform and floor to the Test scene and capture multi-angle creature screenshots",
+  "description": "## Summary\nAdd a raised circular stage to the Test scene so the creature preview stands on a platform, and verify the result with multi-angle MCP screenshots. This also served as a live exercise of the new \u0060unity-mcp-operator\u0060 skill.\n\n## User Mandate\n\u003E \u0022Use your unity mcp access to test out the mcp usage and try to do things within the scene and navigate around according to what you have learned. You should be able to take screenshots of the creature from multiple angles and maybe add a raised circular/cylinder platform (keep the top at Y=0 and move the floor down a bit) That should be a little stage for the creature. Do this in the test scene\u0022\n\nSTRICT. Binding constraints:\n- Work in the test scene (\u0060Assets/Test.unity\u0060).\n- The platform is circular/cylindrical with its top at exactly Y=0.\n- The floor sits below the platform top.\n- Screenshots of the creature from multiple angles are part of the deliverable.\n\n## Scope\n- \u0060Assets/Test.unity\u0060: added \u0060Stage Platform\u0060 (cylinder) and \u0060Stage Floor\u0060 (plane).\n- \u0060Assets/Materials/StagePlatform.mat\u0060, \u0060Assets/Materials/StageFloor.mat\u0060: new materials.\n- No creature DNA, runtime code, or editor code changed.\n\n## Acceptance Criteria\n- Platform is circular, raised, and its top surface is at Y=0.\n- Floor is below the platform top.\n- Creature still stands correctly on the platform.\n- Multi-angle screenshots captured.\n- Console free of new C# errors.\n\n## Validation\n- \u0060execute_code\u0060 world-bounds check: \u0060Stage Platform\u0060 worldMin \u0060(-4.50, -0.50, -4.50)\u0060, worldMax \u0060(4.50, 0.00, 4.50)\u0060 \u2014 top exactly Y=0, radius 4.5, thickness 0.5. \u0060Stage Floor\u0060 spans 100x100 at Y=-0.5.\n- \u0060manage_camera(action=\u0022screenshot_multiview\u0022)\u0060 6-angle contact sheet before and after the change; plus a positioned three-quarter view confirming the creature\u0027s feet rest on the platform and the platform lip reads above the floor.\n- \u0060read_console(types=[\u0022error\u0022,\u0022warning\u0022])\u0060: no C# errors. Six \u0060Command TCS timed out (N consecutive)\u0060 warnings are MCP bridge timeouts from this session, not scene errors.\n- Scene saved: \u0060manage_scene(action=\u0022save\u0022, path=\u0022Assets/Test.unity\u0022)\u0060 reported success.\n\n## Findings\n- The scene contained **no floor object**, contrary to the assumption in the request. The visible ground was the scene-view grid and the default skybox ground band. A floor was created rather than moved.\n- The Test scene holds two overlapping creature preview roots (\u0060CreatureCreator Preview\u0060 and \u0060CreatureCreator Preview 2 (1)\u0060), both at the origin, producing duplicated limbs in renders. Left untouched as out of scope; flagged for cleanup.\n- The cylinder primitive ships with a \u0060CapsuleCollider\u0060, which is degenerate for a flat disc (radius 4.5 vs height 0.5). Replaced with a convex \u0060MeshCollider\u0060.\n- \u0060screenshot_multiview\u0060 ignored \u0060orbit_distance\u0060 and \u0060orbit_elevations\u0060; it auto-frames from \u0060view_target\u0060. A precise angle needs \u0060view_position\u0060.\n- Activating an MCP tool group triggers a forced synchronous recompile and a domain reload, which drops the bridge for tens of seconds.\n\n## Blockers\nNone.\n\n## Next Step\nOptional: remove the duplicated creature preview root from the Test scene, and mount the stage material work on the creature\u0027s own preview refresh if the platform should follow future edits.",
+  "type": "Task",
+  "status": "Done",
+  "priority": "Medium",
+  "assigneeMode": "Custom",
+  "assigneeDirectoryId": null,
+  "assigneeCustomText": "BeastMaster",
+  "reporter": "anonymous",
+  "labels": [
+    "scene",
+    "unity-mcp",
+    "test-scene",
+    "validation",
+    "user-mandated"
+  ],
+  "attachments": [],
+  "externalLinks": [],
+  "linkedPages": [],
+  "comments": [
+    {
+      "id": "c-686ba4ae63ce4286905172f135a875e1",
+      "author": "anonymous",
+      "body": "Implementation and validation evidence (2026-09-12, MCP for Unity 10.1.2)\n\nScene changes in \u0060Assets/Test.unity\u0060 (scene saved):\n- \u0060Stage Platform\u0060: Cylinder, position (0,-0.25,0), scale (9,0.25,9) \u2192 radius 4.5, thickness 0.5, top surface exactly Y=0. Verified world bounds min (-4.50,-0.50,-4.50), max (4.50,0.00,4.50).\n- \u0060Stage Floor\u0060: Plane, position (0,-0.5,0), scale (10,1,10) \u2192 100x100 at Y=-0.5.\n- Replaced the primitive\u0027s degenerate \u0060CapsuleCollider\u0060 (radius 4.5 vs height 0.5) with a convex \u0060MeshCollider\u0060.\n- New materials \u0060Assets/Materials/StagePlatform.mat\u0060 and \u0060Assets/Materials/StageFloor.mat\u0060, assigned to renderer slot 0.\n\nArtifacts under \u0060Assets/Screenshots/\u0060:\n- \u0060screenshot-20260912-015757.png\u0060 \u2014 scene-view baseline.\n- 6-angle contact sheets before and after the stage.\n- \u0060screenshot-20260912-020121.png\u0060 \u2014 positioned three-quarter view showing the raised platform lip above the floor with the creature\u0027s feet resting on the platform top.\n\nDeviation from the mandate, surfaced rather than absorbed: the Test scene contained **no floor object**, so the floor was created below the platform instead of moved down. The visible \u0022ground\u0022 was the scene-view grid and the default skybox ground band.\n\nSkill corrections applied to \u0060.github/skills/unity-mcp-operator/\u0060 after the live exercise proved the first draft wrong:\n- \u0060manage_tools(action=\u0022list_groups\u0022|\u0022activate\u0022|\u0022deactivate\u0022)\u0060 works here. The earlier claim that only client-side \u0060activate_*\u0060 tools exist was incorrect. The reference file now carries the verified ten-group table and default states.\n- Activating a group triggers a forced synchronous recompile and domain reload; the bridge drops for tens of seconds and reports \u0060No Unity Editor instances found\u0060, then \u0060Unity is reloading; please retry\u0060, then recovers.\n- \u0060execute_code\u0060 compiles with warnings as errors: \u0060GetInstanceID()\u0060 failed with \u0060\u0027Object.GetInstanceID()\u0027 is obsolete: \u0027Use GetEntityId instead.\u0027\u0060.\n- \u0060screenshot_multiview\u0060 ignores \u0060orbit_distance\u0060 and \u0060orbit_elevations\u0060; use \u0060view_position\u0060.\n- \u0060manage_scene(action=\u0022get_hierarchy\u0022, parent=\u003Cnegative preview id\u003E)\u0060 fails with \u0060Could not connect to Unity\u0060.\n\nConsole: no C# errors. The six \u0060Command TCS timed out (N consecutive)\u0060 warnings are the bridge timeouts listed above, not scene problems.\n\nOpen item (out of scope, not fixed): the scene has two overlapping creature preview roots at the origin, which duplicate limbs in renders.",
+      "createdAtUtc": "2026-09-12T07:02:34.8005693Z"
+    }
+  ],
+  "epicId": null,
+  "parentId": null,
+  "dueDateUtc": null,
+  "createdAtUtc": "2026-09-12T07:01:47.8012538Z",
+  "updatedAtUtc": "2026-09-12T07:02:41.08618Z",
+  "completedAtUtc": "2026-09-12T07:02:41.08618Z",
+  "revision": 3,
+  "isArchived": false,
+  "hasLoadError": false,
+  "loadError": null,
+  "sourceFilePath": "tsk-0243-add-a-raised-stage-platform-and-floor-to-the-test-scene-and-capture-multi-angle-creature-screenshots.json"
+}

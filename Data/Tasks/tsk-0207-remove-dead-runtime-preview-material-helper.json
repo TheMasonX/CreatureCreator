@@ -10,7 +10,14 @@
   "assigneeDirectoryId": null,
   "assigneeCustomText": "Unassigned",
   "reporter": "ChatGPT",
-  "labels": ["user-mandated", "codebase-health", "cleanup", "dead-code", "preview", "appearance"],
+  "labels": [
+    "user-mandated",
+    "codebase-health",
+    "cleanup",
+    "dead-code",
+    "preview",
+    "appearance"
+  ],
   "attachments": [],
   "externalLinks": [],
   "linkedPages": [],
@@ -24,5 +31,6 @@
   "isArchived": false,
   "hasLoadError": false,
   "loadError": null,
-  "sourceFilePath": "tsk-0207-remove-dead-runtime-preview-material-helper.json"
+  "sourceFilePath": "tsk-0207-remove-dead-runtime-preview-material-helper.json",
+  "revision": 1
 }

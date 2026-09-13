@@ -10,12 +10,21 @@
   "assigneeDirectoryId": null,
   "assigneeCustomText": "Unassigned",
   "reporter": "council-audit",
-  "labels": ["council", "serialization", "parser", "robustness", "TSK-0136"],
+  "labels": [
+    "council",
+    "serialization",
+    "parser",
+    "robustness",
+    "TSK-0136"
+  ],
   "attachments": [],
   "externalLinks": [],
   "linkedPages": [],
   "comments": [],
   "parentId": "tsk-0136-harden-the-minijsonreader-json-grammar-with-a-dedicated-reader-test-fixture",
   "dueDateUtc": null,
-  "isArchived": false
+  "isArchived": false,
+  "createdAtUtc": "2026-09-07T11:38:16.0000000Z",
+  "updatedAtUtc": "2026-09-07T11:38:16.0000000Z",
+  "revision": 1
 }

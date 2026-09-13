@@ -10,7 +10,15 @@
   "assigneeDirectoryId": null,
   "assigneeCustomText": "Unassigned",
   "reporter": "ChatGPT",
-  "labels": ["user-mandated", "codebase-health", "deduplication", "appearance", "preview", "editor", "runtime"],
+  "labels": [
+    "user-mandated",
+    "codebase-health",
+    "deduplication",
+    "appearance",
+    "preview",
+    "editor",
+    "runtime"
+  ],
   "attachments": [],
   "externalLinks": [],
   "linkedPages": [],
@@ -31,5 +39,6 @@
   "isArchived": false,
   "hasLoadError": false,
   "loadError": null,
-  "sourceFilePath": "tsk-0209-consolidate-preview-material-region-assignment.json"
+  "sourceFilePath": "tsk-0209-consolidate-preview-material-region-assignment.json",
+  "revision": 1
 }

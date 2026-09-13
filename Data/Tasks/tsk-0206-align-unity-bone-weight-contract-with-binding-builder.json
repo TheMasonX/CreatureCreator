@@ -10,9 +10,23 @@
   "assigneeDirectoryId": null,
   "assigneeCustomText": "Unassigned",
   "reporter": "ChatGPT",
-  "labels": ["user-mandated", "animation", "skinning", "validation", "contracts", "codebase-health"],
+  "labels": [
+    "user-mandated",
+    "animation",
+    "skinning",
+    "validation",
+    "contracts",
+    "codebase-health"
+  ],
   "attachments": [],
-  "externalLinks": ["https://docs.unity3d.com/cn/6000.0/ScriptReference/BoneWeight.html"],
+  "externalLinks": [
+    {
+      "id": "l-3986cea237ec2cd556a0cb3ac87dab8d",
+      "label": "BoneWeight",
+      "url": "https://docs.unity3d.com/cn/6000.0/ScriptReference/BoneWeight.html",
+      "addedAtUtc": "2026-09-11T22:25:00.0000000Z"
+    }
+  ],
   "linkedPages": [],
   "comments": [],
   "epicId": null,
