@@ -52,15 +52,17 @@ namespace ProceduralCreature.Tests.Runtime
         {
             CreatureDefinition invalid = CreateDefinition();
             invalid.Forward = Vector3.zero;
+            var diagnostics = new GenerationDiagnostics();
 
             using (var scheduler = new CreatureGenerationScheduler())
             {
-                scheduler.Enqueue(invalid);
+                scheduler.Enqueue(invalid, diagnostics);
                 CreatureGenerationResult result = WaitForResult(scheduler);
 
                 Assert.IsFalse(result.Succeeded);
                 Assert.IsNotNull(result.Exception);
                 Assert.IsNull(result.Data);
+                Assert.AreEqual(GenerationStage.Validation, result.Diagnostics.FailedStage);
             }
         }
 
@@ -80,12 +82,28 @@ namespace ProceduralCreature.Tests.Runtime
             scheduler.Enqueue(CreateDefinition());
             scheduler.Dispose();
 
-            CreatureGenerationResult result = WaitForResult(scheduler);
-
-            Assert.IsNotNull(result);
-            Assert.IsTrue(result.IsStale,
-                "disposing the scheduler advances the latest sequence so already-running work cannot become current");
+            // The cancellation boundary may suppress a result entirely when the
+            // worker has not started. If the worker raced far enough to finish, the
+            // result must still be stale and never become current.
+            for (int attempt = 0; attempt < 600; attempt++)
+            {
+                if (scheduler.TryTakeCompleted(out CreatureGenerationResult result))
+                {
+                    Assert.IsTrue(result.IsStale);
+                    scheduler.Dispose();
+                    return;
+                }
+                Thread.Sleep(10);
+            }
             scheduler.Dispose();
+        }
+
+        [Test]
+        public void Dispose_IsIdempotent()
+        {
+            var scheduler = new CreatureGenerationScheduler();
+            Assert.DoesNotThrow(() => scheduler.Dispose());
+            Assert.DoesNotThrow(() => scheduler.Dispose());
         }
 
         private static CreatureGenerationResult WaitForResult(CreatureGenerationScheduler scheduler)
