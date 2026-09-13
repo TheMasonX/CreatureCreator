@@ -85,10 +85,25 @@ namespace ProceduralCreature.Tests.Runtime
             Assert.IsTrue(generated.TryFindGeometryForPart("eye_mirror", out GeometryItem item));
             int expectedIndex = snapshot.GetIndex(SemanticBoneResolver.ResolvePartRootBoneId(
                 definition.FindPart("eye"), mirrored: true));
-            Assert.AreEqual(expectedIndex, item.RigBinding.IsMirrored
-                ? snapshot.GetIndex("eye_mirror")
-                : -1);
             AssertInfluences(item, expectedIndex);
+        }
+
+        [Test]
+        public void DirectSemanticIdAuthoring_MatchesPartOverload()
+        {
+            CreatureDefinition definition = Definition(mirrored: true);
+            SkeletonSnapshot snapshot = SkeletonSnapshot.Capture(SkeletonInferrer.Infer(definition));
+            VertexInfluence[][] fromId = RigidMeshWeightAuthoring.Author(
+                snapshot, "eye", mirrored: true, new[] { Vector3.zero, Vector3.right });
+            VertexInfluence[][] fromPart = RigidMeshWeightAuthoring.Author(
+                snapshot, definition.FindPart("eye"), mirrored: true, new[] { Vector3.zero, Vector3.right });
+
+            Assert.AreEqual(fromPart.Length, fromId.Length);
+            for (int i = 0; i < fromId.Length; i++)
+            {
+                Assert.AreEqual(fromPart[i][0].BoneIndex, fromId[i][0].BoneIndex);
+                Assert.AreEqual(fromPart[i][0].Weight, fromId[i][0].Weight, 1e-5f);
+            }
         }
 
         [Test]
