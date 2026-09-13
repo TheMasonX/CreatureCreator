@@ -28,8 +28,8 @@ namespace ProceduralCreature.Tests.Runtime
                 body, definition.Forward, frames, probe, out float lengthT, out _);
 
             Assert.IsTrue(ok);
-            Assert.AreEqual(0.5f, lengthT, 1e-5f,
-                "Forward-facing body uses reversed stored arc so the probe at cumulative 4/9 maps to 5/9, then head/tail orientation is applied.");
+            Assert.AreEqual(5f / 9f, lengthT, 1e-5f,
+                "The cached cumulative arc at the closest segment must match the original prefix-walk parameterization.");
         }
 
         [Test]
