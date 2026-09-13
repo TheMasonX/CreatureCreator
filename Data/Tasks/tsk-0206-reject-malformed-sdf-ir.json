@@ -1,0 +1,36 @@
+{
+  "id": "tsk-0206-reject-malformed-sdf-ir",
+  "key": "TSK-0206",
+  "title": "Reject malformed SDF IR instead of silently producing zero distance",
+  "description": "Harden the SDF execution boundary against invalid SdfOperationType values and invalid operation references. SdfProgramEvaluator currently returns 0 for an unknown operation type in both EvaluateOperation and EvaluateSubtree, which can turn malformed internal IR into a valid-looking surface. Define one validation policy at the compiled-program boundary, add focused regression coverage, and preserve the existing +Infinity/NaN field contract. Do not add exceptions inside Burst hot loops unless the execution boundary is proven safe for the supported Unity/Burst configuration.",
+  "type": "Bug",
+  "status": "Backlog",
+  "priority": "High",
+  "assigneeMode": "Custom",
+  "assigneeDirectoryId": null,
+  "assigneeCustomText": "Unassigned",
+  "reporter": "ChatGPT",
+  "labels": ["user-mandated", "runtime", "sdf", "correctness", "validation", "burst"],
+  "attachments": [],
+  "externalLinks": [],
+  "linkedPages": [],
+  "comments": [
+    {
+      "id": "c-chatgpt-20260912-0206-audit",
+      "author": "ChatGPT",
+      "body": "Current-head static audit 2026-09-12: SdfProgramEvaluator has default return 0f in both operation evaluators. This is unsafe for malformed IR because it manufactures a zero-distance surface. The preferred fix is boundary validation, not hot-loop exception control flow.",
+      "createdAtUtc": "2026-09-12T19:56:00Z"
+    }
+  ],
+  "epicId": null,
+  "parentId": "TSK-0008",
+  "dueDateUtc": null,
+  "createdAtUtc": "2026-09-12T19:56:00Z",
+  "updatedAtUtc": "2026-09-12T19:56:00Z",
+  "completedAtUtc": null,
+  "revision": 1,
+  "isArchived": false,
+  "hasLoadError": false,
+  "loadError": null,
+  "sourceFilePath": "tsk-0206-reject-malformed-sdf-ir.json"
+}
