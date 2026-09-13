@@ -1,0 +1,43 @@
+{
+  "id": "tsk-0250-transactional-preview-geometry-ownership",
+  "key": "TSK-0250",
+  "title": "Make preview geometry ownership transactional and instance-safe",
+  "description": "Harden CreaturePreviewController generated-object ownership. Current editor preview state is persisted through global SessionState keys, while geometry registration happens only after GameObject/component/material setup succeeds. A failure during attachment can therefore leave an unregistered generated object, and multiple controller instances can contend over the same global ownership record. Establish one preview-instance ownership authority with transactional registration/cleanup and explicit generated-Mesh lifetime. Preserve the ability to recover a surviving preview across editor reloads without allowing stale objects from another controller/session to be adopted accidentally.\n\n## Reconciliation\nRenumbered from TSK-0210 on 2026-09-12. This audit-derived record was allocated on top of a history that already contained TSK-0210 (consolidate duplicated preview geometry-bone resolution helper), so the key was double-held. TSK-0210 now resolves uniquely to tsk-0210-consolidate-preview-geometry-bone-resolution-helper. Mechanism: transactional, instance-safe preview geometry ownership and cleanup (finding from current-head-hidden-defects-and-consolidation-council-audit-26-09-12-19-56-00; corroborated by creaturecreator-cc-audit-synthesis-26-09-12-17-34-00 SYN-12/SYN-13).",
+  "type": "Bug",
+  "status": "Backlog",
+  "priority": "High",
+  "assigneeMode": "Custom",
+  "assigneeDirectoryId": null,
+  "assigneeCustomText": "Unassigned",
+  "reporter": "ChatGPT",
+  "labels": [
+    "user-mandated",
+    "editor",
+    "preview",
+    "lifecycle",
+    "ownership",
+    "correctness",
+    "architecture"
+  ],
+  "attachments": [],
+  "externalLinks": [],
+  "linkedPages": [],
+  "comments": [
+    {
+      "id": "c-chatgpt-20260912-0210-audit",
+      "author": "ChatGPT",
+      "body": "Current-head audit 2026-09-12: CreaturePreviewController stores root/geometry ownership in global SessionState keys. RegisterOwnedGeometry is called only after child GameObject setup completes, so exceptions can leak an unregistered object. Multiple controller instances share the same ownership key. Treat generated preview ownership as an instance-scoped transactional resource boundary.",
+      "createdAtUtc": "2026-09-12T19:56:00Z"
+    }
+  ],
+  "epicId": null,
+  "parentId": null,
+  "dueDateUtc": null,
+  "createdAtUtc": "2026-09-12T19:56:00Z",
+  "updatedAtUtc": "2026-09-13T04:34:05.7354444Z",
+  "revision": 2,
+  "isArchived": false,
+  "hasLoadError": false,
+  "loadError": null,
+  "sourceFilePath": "tsk-0250-transactional-preview-geometry-ownership.json"
+}

@@ -1,0 +1,42 @@
+{
+  "id": "tsk-0248-consolidate-sdf-evaluator-and-remove-duplicate-sampling-job",
+  "key": "TSK-0248",
+  "title": "Consolidate duplicate SDF evaluation paths",
+  "description": "Audit and simplify SdfProgramEvaluator's duplicated execution paths and the legacy SdfSamplingJob now that DensityGrid uses SdfSamplingRowBatchJob. Preserve the managed/reference oracle and Burst-compatible hot path as explicit roles, but eliminate dead or equivalent traversal code where a single implementation can safely own the semantics. Add parity tests before removal and do not collapse reference and production paths so aggressively that the reference oracle loses independence.\n\n## Reconciliation\nRenumbered from TSK-0208 on 2026-09-12. This audit-derived record was allocated on top of a history that already contained TSK-0208 (finish NumericValidity migration for DensityGrid), so the key was double-held. TSK-0208 now resolves uniquely to tsk-0208-finish-numericvalidity-migration-for-density-grid. Mechanism: consolidate duplicate SDF traversal paths and legacy SdfSamplingJob plumbing while preserving an independent reference oracle (finding from current-head-hidden-defects-and-consolidation-council-audit-26-09-12-19-56-00; corroborated by creaturecreator-cc-audit-synthesis-26-09-12-17-34-00 SYN-01/SYN-02/SYN-09/SYN-10/SYN-11).",
+  "type": "Refactor",
+  "status": "Backlog",
+  "priority": "Medium",
+  "assigneeMode": "Custom",
+  "assigneeDirectoryId": null,
+  "assigneeCustomText": "Unassigned",
+  "reporter": "ChatGPT",
+  "labels": [
+    "user-mandated",
+    "runtime",
+    "sdf",
+    "consolidation",
+    "refactor",
+    "burst",
+    "testing"
+  ],
+  "attachments": [],
+  "externalLinks": [],
+  "linkedPages": [],
+  "comments": [
+    {
+      "id": "c-chatgpt-20260912-0208-audit",
+      "author": "ChatGPT",
+      "body": "Current-head static audit 2026-09-12: SdfProgram contains both EvaluateOperation/EvaluateSubtree traversal variants and a legacy SdfSamplingJob while DensityGrid's active production path is SdfSamplingRowBatchJob. Simplification is desirable, but only after independent reference parity is preserved.",
+      "createdAtUtc": "2026-09-12T19:56:00Z"
+    }
+  ],
+  "epicId": null,
+  "parentId": "TSK-0008",
+  "dueDateUtc": null,
+  "createdAtUtc": "2026-09-12T19:56:00Z",
+  "updatedAtUtc": "2026-09-13T04:34:05.7263906Z",
+  "revision": 2,
+  "isArchived": false,
+  "hasLoadError": false,
+  "sourceFilePath": "tsk-0248-consolidate-sdf-evaluator-and-remove-duplicate-sampling-job.json"
+}

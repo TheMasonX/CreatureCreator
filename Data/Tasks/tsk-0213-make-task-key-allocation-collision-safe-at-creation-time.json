@@ -40,15 +40,21 @@
       "author": "anonymous",
       "body": "Audit synthesis 2026-09-12: this task (creation-time collision safety) is necessary but not sufficient. Two new confirmations from this pass:\n\n1. Prevention did not repair the backlog. \u0060Scripts/Test-TaskRecords.ps1\u0060 fails with 44 issues, including 15 records over 14 duplicated keys (TSK-0153, 0188, 0189, 0195, 0196, 0197, 0198, 0199, 0200 x3, 0201, 0202, 0203, 0204, 0205) and 30 records missing required schema fields, plus one unloadable record (\u0060tsk-0206\u0060). Because the MemorySmith index is keyed by task key, colliding records shadow each other and drop out of \u0060memorysmith_task_list\u0060. Backlog repair is owned by TSK-0217.\n\n2. Cross-branch key divergence produces phantom owners. The 2026-09-12 deep-dive audit cites \u0060TSK-0203\u0060 as the \u0022SMR compatibility guard \u002B animated bounds\u0022 owner (its top-ranked owner for findings F-11, HG-01, HG-03, HG-04). On this branch \u0060TSK-0203\u0060 is two unrelated memory-measurement records, and no task here owns the SMR compatibility guard \u2014 even though the guard is verified present in the worktree (\u0060CreatureSkinnedMeshRenderer.Bind\u0060 checks \u0060snapshot.Count != rig.IndexedBones.Count\u0060 and \u0060rig.RestSkeleton.HasSameBoneOrder(snapshot)\u0060). An audit\u0027s canonical-owner table is therefore not trustworthy across branches; owner keys must be re-resolved on the branch under work, not carried over.\n\nRecommended safeguard (in addition to collision-safe allocation at creation): whenever a synthesis or audit cites a \u0060TSK-####\u0060 owner, resolve that key on the branch under work and confirm the record exists and matches the cited mechanism; if it does not, treat the citation as provenance-only and assign a real owner.\n\nEvidence: \u0060Scripts/Test-TaskRecords.ps1\u0060 run 2026-09-12; \u0060Data/Tasks/tsk-0203-*.json\u0060; \u0060Assets/Scripts/Runtime/Animation/Skinned/CreatureSkinnedMeshRenderer.cs:58-70\u0060. Related: TSK-0217, TSK-0189, TSK-0220.",
       "createdAtUtc": "2026-09-12T05:54:34.365462Z"
+    },
+    {
+      "id": "c-fe9d5d377faa44df93194ab9a3237b42",
+      "author": "anonymous",
+      "body": "Audit synthesis 2026-09-12 (late): SIXTH recurrence of task-key collision, and the first same-branch recurrence.\n\nState found at HEAD fa76a44: the live board held two records each for TSK-0206, TSK-0207, TSK-0208, TSK-0209, TSK-0210, and TSK-0211 (12 records over 6 keys); Scripts/Test-TaskRecords.ps1 failed with 6 duplicate-key issues.\n\nRoot cause: the 2026-09-12 20:03-20:04 audit-derived commits d62cffd, 592c9b6, ca0a6b3, 8422b37, 9285e07, and b9e7202 allocated TSK-0206..TSK-0211 although each of their parents already contained those exact keys. Verified with git merge-base: 8ec2af3 IS an ancestor of d62cffd (and the same holds for the other five pairs). An agent created tasks without reading the current board, so the ceiling rule was bypassed inside one branch, not just across branches.\n\nRepair: renumbered the newer set to TSK-0246..TSK-0251 via Scripts/Normalize-TaskRecords.ps1 -RenumberMap Scripts/task-key-reconciliation-2026-09-12-late.json (validated whole-map preflight, idempotent on re-run). Board now validates at 251 records, keys and ids unique. A concurrent session also allocated TSK-0243/TSK-0245 during the same window, confirming the ceiling rule can still be missed under concurrency.\n\nImpact beyond bookkeeping: the collision had already corrupted two audits\u0027 owner tables. The external synthesis (creaturecreator-cc-audit-synthesis-26-09-12-17-34-00.md) cites the OLDER set for TSK-0206/0207/0209/0210; the current-head council audit (current-head-hidden-defects-and-consolidation-council-audit-26-09-12-19-56-00.md) cites the NEWER set for TSK-0206..TSK-0211. Key assignment is therefore not cosmetic.\n\nThis task remains the owner of creation-time allocation safety. Next gate: allocate by reading the live maximum key plus the live key set, and add a creation-time preflight that fails closed.",
+      "createdAtUtc": "2026-09-13T04:35:14.0220773Z"
     }
   ],
   "epicId": null,
   "parentId": null,
   "dueDateUtc": null,
   "createdAtUtc": "2026-09-12T02:47:21.5250769Z",
-  "updatedAtUtc": "2026-09-12T05:54:34.365462Z",
+  "updatedAtUtc": "2026-09-13T04:35:14.0220773Z",
   "completedAtUtc": null,
-  "revision": 4,
+  "revision": 5,
   "isArchived": false,
   "hasLoadError": false,
   "loadError": null,

@@ -59,15 +59,21 @@
       "author": "anonymous",
       "body": "Cluster C contract clarification (2026-09-11, per user decision): **strict rejection**.\n\nInvalid DNA is reported by \u0060DefinitionValidator\u0060 and never resolved; resolvers must not repair or sanitize it. No \u0060Mathf.Max\u0060, rotation substitution, or radius clamping was added anywhere.\n\nConcretely in this round:\n- \u0060ResolvedLimb.TryResolve\u0060 (\u0060Assets/Scripts/Runtime/Morphology/ResolvedLimb.cs\u0060) now returns false for a non-finite joint position, mirroring \u0060ResolvedBody.CanResolve\u0060. Previously the non-finite position reached \u0060ResolvedPolyline.Resolve\u0060 and threw, so \u0060DefinitionValidator.Validate\u0060 propagated a \u0060DomainException\u0060 instead of reporting \u0060ValidationCode.NonFiniteLimbJoint\u0060. This was a genuine validator defect against its own documented non-throwing contract (CC-089).\n- Five tests that encoded the superseded lenient contract were rewritten to assert \u0060DomainException\u0060: \u0060MorphologyInfluenceRadiusBridgeTests.BuildRadii_NonPositiveBodyRadius_IsRejected\u0060, \u0060BuildRadii_NonFiniteBodyRadius_IsRejected\u0060 (NaN/\u00B1Infinity), and \u0060PoseRotationResolverTests.Resolve_NonUnitRestRotation_IsRejected\u0060.\n\nThis is an intentional contract clarification, not a regression. Batch result: \u0060DefinitionValidatorLimbTests\u0060 \u002B \u0060MorphologyInfluenceRadiusBridgeTests\u0060 \u002B \u0060PoseRotationResolverTests\u0060 = 42 tests, 41 passed, 1 failed. The single remaining failure is a duplicate-\u0060T\u0060 tie-break question in \u0060ThicknessProfile.Evaluate\u0060 (shared code), detailed in \u0060TSK-0194\u0060; it is not caused by the strict-rejection change.",
       "createdAtUtc": "2026-09-12T04:16:19.6665789Z"
+    },
+    {
+      "id": "c-3344191bd09441ac85152ddf647396b0",
+      "author": "anonymous",
+      "body": "Audit synthesis 2026-09-12 (late): a confirmed P1 defect was found inside the analytic trilinear gradient this task introduced.\n\nDensityGrid.TryEstimateGradient\u0027s dw third term is (c011 - c001) but must be (c011 - c010) (Assets/Scripts/Runtime/Morphology/Extraction/DensityGrid.cs:259). du and dv were re-derived and are correct. Because the gradient drives Marching Cubes winding orientation, a wrong z-derivative can mis-orient triangles \u2014 the same failure class as the W-03 quantization root cause documented in this task.\n\nTracked by the new child task TSK-0252. This task remains the canonical owner for orientation-gradient correctness and non-finite-crossing fixes; the derivative-term correction is intentionally a separate child so the finding is not lost when this broad task closes.",
+      "createdAtUtc": "2026-09-13T04:35:13.9843373Z"
     }
   ],
   "epicId": null,
   "parentId": null,
   "dueDateUtc": null,
   "createdAtUtc": "2026-09-06T04:11:55.9430719Z",
-  "updatedAtUtc": "2026-09-12T04:16:19.6665789Z",
+  "updatedAtUtc": "2026-09-13T04:35:13.9843373Z",
   "completedAtUtc": null,
-  "revision": 7,
+  "revision": 8,
   "isArchived": false,
   "hasLoadError": false,
   "loadError": null,

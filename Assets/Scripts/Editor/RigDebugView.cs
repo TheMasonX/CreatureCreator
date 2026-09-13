@@ -27,6 +27,15 @@ namespace ProceduralCreature.Editor
         private const string SelectableKey = "ProceduralCreature.RigDebug.Selectable";
         private const string WidthKey = "ProceduralCreature.RigDebug.LineWidth";
         private const string RawMeshKey = "ProceduralCreature.RigDebug.ShowRawMesh";
+        private const string CollapsedKey = "ProceduralCreature.RigDebug.Collapsed";
+        private const string PanelXKey = "ProceduralCreature.RigDebug.PanelX";
+        private const string PanelYKey = "ProceduralCreature.RigDebug.PanelY";
+        private const string PanelWidthKey = "ProceduralCreature.RigDebug.PanelWidth";
+        private const string PanelHeightKey = "ProceduralCreature.RigDebug.PanelHeight";
+        private const float DefaultPanelX = 10f;
+        private const float DefaultPanelY = 10f;
+        private const float DefaultPanelWidth = 300f;
+        private const float HeaderFoldoutWidth = 160f;
         private const float GeometryEpsilonSqr = 1e-10f;
         private const float AttachmentMarkerScale = 0.06f;
         private const float SelectionPickRadiusScale = 2.5f;
@@ -37,6 +46,30 @@ namespace ProceduralCreature.Editor
         private static bool _selectable = EditorPrefs.GetBool(SelectableKey, true);
         private static bool _showRawMesh = EditorPrefs.GetBool(RawMeshKey, false);
         private static float _lineWidth = Mathf.Clamp(EditorPrefs.GetFloat(WidthKey, 4f), 1f, 8f);
+        private static bool _collapsed = EditorPrefs.GetBool(CollapsedKey, false);
+
+        // Stored panel geometry. A height of 0 means "fit the content height
+        // automatically"; any larger value is a user resize that is kept.
+        private static Rect _panelRect = new Rect(
+            EditorPrefs.GetFloat(PanelXKey, DefaultPanelX),
+            EditorPrefs.GetFloat(PanelYKey, DefaultPanelY),
+            Mathf.Clamp(
+                EditorPrefs.GetFloat(PanelWidthKey, DefaultPanelWidth),
+                RigDebugPanelLayout.MinPanelWidth,
+                RigDebugPanelLayout.MaxPanelWidth),
+            Mathf.Max(0f, EditorPrefs.GetFloat(PanelHeightKey, 0f)));
+
+        private static bool _draggingPanel;
+        private static bool _resizingPanel;
+        private static Vector2 _panelDragOffset;
+        private static readonly int PanelControlId = "ProceduralCreature.RigDebug.Panel".GetHashCode();
+        private static readonly GUIContent PanelTitle = new GUIContent("Rig Debug");
+        private static readonly GUIContent EnableLabel = new GUIContent("Enable rig overlay");
+        private static readonly GUIContent AlwaysOnTopLabel = new GUIContent("X-ray / always on top");
+        private static readonly GUIContent LabelsLabel = new GUIContent("Bone labels");
+        private static readonly GUIContent SelectableLabel = new GUIContent("Click bones to select");
+        private static readonly GUIContent RawMeshLabel = new GUIContent("Show raw generated mesh");
+        private static readonly GUIContent WidthLabel = new GUIContent();
         private static GUIStyle _labelStyle;
 
         static RigDebugView()
@@ -299,74 +332,266 @@ namespace ProceduralCreature.Editor
         private static void DrawOverlayControls(SceneView sceneView)
         {
             Handles.BeginGUI();
-            GUILayout.BeginArea(new Rect(10f, 10f, 290f, 280f), "Rig Debug", GUI.skin.window);
 
-            bool enabled = GUILayout.Toggle(_enabled, "Enable rig overlay");
+            // Geometry comes from the overlay state captured at the start of the
+            // frame, so the drawn panel height and the drawn rows always agree.
+            // A toggle requests a repaint, so its new geometry applies next frame.
+            bool layoutEnabled = _enabled;
+            var viewSize = new Vector2(sceneView.position.width, sceneView.position.height);
+            float height = RigDebugPanelLayout.EffectiveHeight(_collapsed, layoutEnabled, _panelRect.height);
+            Vector2 origin = RigDebugPanelLayout.ClampPosition(
+                new Vector2(_panelRect.x, _panelRect.y),
+                new Vector2(_panelRect.width, height),
+                viewSize);
+            var panel = new Rect(origin.x, origin.y, _panelRect.width, height);
+
+            DrawPanelBackground(panel);
+            DrawPanelHeader(sceneView, panel);
+
+            if (!_collapsed)
+            {
+                DrawPanelBody(sceneView, panel, layoutEnabled);
+                DrawResizeGrip(RigDebugPanelLayout.ResizeGripRect(panel));
+            }
+
+            HandlePanelInput(sceneView, panel);
+
+            Handles.EndGUI();
+        }
+
+        private static void DrawPanelBackground(Rect panel)
+        {
+            Color background = EditorGUIUtility.isProSkin
+                ? new Color(0.14f, 0.14f, 0.14f, 0.9f)
+                : new Color(0.85f, 0.85f, 0.85f, 0.94f);
+            Color headerBackground = EditorGUIUtility.isProSkin
+                ? new Color(0.22f, 0.22f, 0.22f, 0.98f)
+                : new Color(0.72f, 0.72f, 0.72f, 0.98f);
+            Color border = EditorGUIUtility.isProSkin
+                ? new Color(0f, 0f, 0f, 0.65f)
+                : new Color(0.4f, 0.4f, 0.4f, 0.65f);
+
+            EditorGUI.DrawRect(panel, background);
+            EditorGUI.DrawRect(RigDebugPanelLayout.HeaderRect(panel), headerBackground);
+            EditorGUI.DrawRect(new Rect(panel.x, panel.y, panel.width, 1f), border);
+            EditorGUI.DrawRect(new Rect(panel.x, panel.yMax - 1f, panel.width, 1f), border);
+            EditorGUI.DrawRect(new Rect(panel.x, panel.y, 1f, panel.height), border);
+            EditorGUI.DrawRect(new Rect(panel.xMax - 1f, panel.y, 1f, panel.height), border);
+        }
+
+        private static void DrawPanelHeader(SceneView sceneView, Rect panel)
+        {
+            bool expanded = !_collapsed;
+            bool newExpanded = EditorGUI.Foldout(HeaderFoldoutRect(panel), expanded, PanelTitle, true);
+            if (newExpanded != expanded)
+            {
+                _collapsed = RigDebugPanelLayout.CollapsedFromFoldout(newExpanded);
+                EditorPrefs.SetBool(CollapsedKey, _collapsed);
+                sceneView.Repaint();
+            }
+        }
+
+        private static Rect HeaderFoldoutRect(Rect panel)
+        {
+            Rect header = RigDebugPanelLayout.HeaderRect(panel);
+            return new Rect(
+                header.x + 4f,
+                header.y,
+                Mathf.Min(header.width - 8f, HeaderFoldoutWidth),
+                header.height);
+        }
+
+        private static void DrawPanelBody(SceneView sceneView, Rect panel, bool layoutEnabled)
+        {
+            Rect enableRect = RigDebugPanelLayout.BodyRow(RigDebugPanelLayout.Row.Enable, panel, layoutEnabled);
+            bool enabled = EditorGUI.Toggle(enableRect, EnableLabel, _enabled);
             if (enabled != _enabled)
             {
                 _enabled = enabled;
                 EditorPrefs.SetBool(EnabledKey, _enabled);
-                SceneView.RepaintAll();
+                sceneView.Repaint();
             }
 
-            if (_enabled)
+            if (!layoutEnabled) return;
+
+            Rect alwaysOnTopRect = RigDebugPanelLayout.BodyRow(RigDebugPanelLayout.Row.AlwaysOnTop, panel, layoutEnabled);
+            bool alwaysOnTop = EditorGUI.Toggle(alwaysOnTopRect, AlwaysOnTopLabel, _alwaysOnTop);
+            if (alwaysOnTop != _alwaysOnTop)
             {
-                bool alwaysOnTop = GUILayout.Toggle(_alwaysOnTop, "X-ray / always on top");
-                if (alwaysOnTop != _alwaysOnTop)
-                {
-                    _alwaysOnTop = alwaysOnTop;
-                    EditorPrefs.SetBool(AlwaysOnTopKey, _alwaysOnTop);
-                    SceneView.RepaintAll();
-                }
-
-                bool labels = GUILayout.Toggle(_labels, "Bone labels");
-                if (labels != _labels)
-                {
-                    _labels = labels;
-                    EditorPrefs.SetBool(LabelsKey, _labels);
-                    SceneView.RepaintAll();
-                }
-
-                bool selectable = GUILayout.Toggle(_selectable, "Click bones to select");
-                if (selectable != _selectable)
-                {
-                    _selectable = selectable;
-                    EditorPrefs.SetBool(SelectableKey, _selectable);
-                    SceneView.RepaintAll();
-                }
-
-                bool showRawMesh = GUILayout.Toggle(_showRawMesh, "Show raw generated mesh");
-                if (showRawMesh != _showRawMesh)
-                {
-                    _showRawMesh = showRawMesh;
-                    EditorPrefs.SetBool(RawMeshKey, _showRawMesh);
-                    SetRawMeshVisibility(_showRawMesh);
-                    SceneView.RepaintAll();
-                }
-
-                _lineWidth = GUILayout.HorizontalSlider(_lineWidth, 1f, 8f);
-                EditorPrefs.SetFloat(WidthKey, _lineWidth);
-                EditorGUILayout.LabelField($"Bone width: {_lineWidth:0.0}");
-
-                EditorGUILayout.BeginHorizontal();
-                if (GUILayout.Button("Frame Skeleton")) FrameBones(sceneView, GetAllBones());
-                if (GUILayout.Button("Frame Selected Chain")) FrameBones(sceneView, GetSelectedChain());
-                EditorGUILayout.EndHorizontal();
-
-                EditorGUILayout.BeginHorizontal();
-                if (GUILayout.Button("Focus Limbs")) FrameBones(sceneView, GetLimbBones());
-                if (GUILayout.Button("Focus Body")) FrameBones(sceneView, GetBodyBones());
-                EditorGUILayout.EndHorizontal();
-
-                if (GUILayout.Button("Focus Selected Bone"))
-                {
-                    Transform selected = Selection.activeTransform;
-                    if (selected != null) FrameBones(sceneView, new List<Transform> { selected });
-                }
+                _alwaysOnTop = alwaysOnTop;
+                EditorPrefs.SetBool(AlwaysOnTopKey, _alwaysOnTop);
+                sceneView.Repaint();
             }
 
-            GUILayout.EndArea();
-            Handles.EndGUI();
+            Rect labelsRect = RigDebugPanelLayout.BodyRow(RigDebugPanelLayout.Row.Labels, panel, layoutEnabled);
+            bool labels = EditorGUI.Toggle(labelsRect, LabelsLabel, _labels);
+            if (labels != _labels)
+            {
+                _labels = labels;
+                EditorPrefs.SetBool(LabelsKey, _labels);
+                sceneView.Repaint();
+            }
+
+            Rect selectableRect = RigDebugPanelLayout.BodyRow(RigDebugPanelLayout.Row.Selectable, panel, layoutEnabled);
+            bool selectable = EditorGUI.Toggle(selectableRect, SelectableLabel, _selectable);
+            if (selectable != _selectable)
+            {
+                _selectable = selectable;
+                EditorPrefs.SetBool(SelectableKey, _selectable);
+                sceneView.Repaint();
+            }
+
+            Rect rawMeshRect = RigDebugPanelLayout.BodyRow(RigDebugPanelLayout.Row.ShowRawMesh, panel, layoutEnabled);
+            bool showRawMesh = EditorGUI.Toggle(rawMeshRect, RawMeshLabel, _showRawMesh);
+            if (showRawMesh != _showRawMesh)
+            {
+                _showRawMesh = showRawMesh;
+                EditorPrefs.SetBool(RawMeshKey, _showRawMesh);
+                SetRawMeshVisibility(_showRawMesh);
+                sceneView.Repaint();
+            }
+
+            Rect sliderRect = RigDebugPanelLayout.BodyRow(RigDebugPanelLayout.Row.LineWidthSlider, panel, layoutEnabled);
+            _lineWidth = GUI.HorizontalSlider(sliderRect, _lineWidth, 1f, 8f);
+            EditorPrefs.SetFloat(WidthKey, _lineWidth);
+
+            // The width label owns its own row. The previous fixed-height area let
+            // it overlap the controls below; those controls now claim this row's
+            // space because the panel height is computed from the row count.
+            Rect widthLabelRect = RigDebugPanelLayout.BodyRow(RigDebugPanelLayout.Row.LineWidthLabel, panel, layoutEnabled);
+            WidthLabel.text = $"Bone width: {_lineWidth:0.0}";
+            EditorGUI.LabelField(widthLabelRect, WidthLabel);
+
+            Rect frameRowRect = RigDebugPanelLayout.BodyRow(RigDebugPanelLayout.Row.FrameButtons, panel, layoutEnabled);
+            float columnWidth = (frameRowRect.width - RigDebugPanelLayout.RowSpacing) * 0.5f;
+            float secondColumnX = frameRowRect.x + columnWidth + RigDebugPanelLayout.RowSpacing;
+            if (GUI.Button(new Rect(frameRowRect.x, frameRowRect.y, columnWidth, frameRowRect.height), "Frame Skeleton"))
+            {
+                FrameBones(sceneView, GetAllBones());
+            }
+            if (GUI.Button(new Rect(secondColumnX, frameRowRect.y, columnWidth, frameRowRect.height), "Frame Selected Chain"))
+            {
+                FrameBones(sceneView, GetSelectedChain());
+            }
+
+            Rect focusRowRect = RigDebugPanelLayout.BodyRow(RigDebugPanelLayout.Row.FocusButtons, panel, layoutEnabled);
+            if (GUI.Button(new Rect(focusRowRect.x, focusRowRect.y, columnWidth, focusRowRect.height), "Focus Limbs"))
+            {
+                FrameBones(sceneView, GetLimbBones());
+            }
+            if (GUI.Button(new Rect(secondColumnX, focusRowRect.y, columnWidth, focusRowRect.height), "Focus Body"))
+            {
+                FrameBones(sceneView, GetBodyBones());
+            }
+
+            Rect focusSelectedRect = RigDebugPanelLayout.BodyRow(RigDebugPanelLayout.Row.FocusSelectedBone, panel, layoutEnabled);
+            if (GUI.Button(focusSelectedRect, "Focus Selected Bone"))
+            {
+                Transform selected = Selection.activeTransform;
+                if (selected != null) FrameBones(sceneView, new List<Transform> { selected });
+            }
+        }
+
+        private static void DrawResizeGrip(Rect grip)
+        {
+            EditorGUIUtility.AddCursorRect(grip, MouseCursor.ResizeUpLeft);
+
+            Color color = EditorGUIUtility.isProSkin
+                ? new Color(1f, 1f, 1f, 0.4f)
+                : new Color(0f, 0f, 0f, 0.4f);
+            const float dotSize = 2f;
+            const float dotGap = 3f;
+            for (int i = 0; i < 3; i++)
+            {
+                float offset = i * (dotSize + dotGap);
+                EditorGUI.DrawRect(
+                    new Rect(grip.xMax - dotSize - offset, grip.yMax - dotSize - offset, dotSize, dotSize),
+                    color);
+            }
+        }
+
+        private static void HandlePanelInput(SceneView sceneView, Rect panel)
+        {
+            Event current = Event.current;
+            if (current == null) return;
+
+            switch (current.type)
+            {
+                case EventType.MouseDown:
+                    if (current.button != 0) return;
+                    // The foldout owns its own click; leave the event for it.
+                    if (HeaderFoldoutRect(panel).Contains(current.mousePosition)) return;
+                    if (TryBeginPanelResize(panel, current)) return;
+                    if (TryBeginPanelDrag(panel, current)) return;
+                    // Swallow clicks on the panel body so the SceneView behind it
+                    // does not clear the current bone selection.
+                    if (panel.Contains(current.mousePosition)) current.Use();
+                    return;
+
+                case EventType.MouseDrag:
+                    if (_draggingPanel)
+                    {
+                        Vector2 clamped = RigDebugPanelLayout.ClampPosition(
+                            current.mousePosition - _panelDragOffset,
+                            panel.size,
+                            new Vector2(sceneView.position.width, sceneView.position.height));
+                        _panelRect.x = clamped.x;
+                        _panelRect.y = clamped.y;
+                        current.Use();
+                        sceneView.Repaint();
+                    }
+                    else if (_resizingPanel)
+                    {
+                        Vector2 clamped = RigDebugPanelLayout.ClampSize(
+                            new Vector2(
+                                current.mousePosition.x - _panelRect.x,
+                                current.mousePosition.y - _panelRect.y),
+                            _enabled);
+                        _panelRect.width = clamped.x;
+                        _panelRect.height = clamped.y;
+                        current.Use();
+                        sceneView.Repaint();
+                    }
+                    return;
+
+                case EventType.MouseUp:
+                    if (!_draggingPanel && !_resizingPanel) return;
+                    _draggingPanel = false;
+                    _resizingPanel = false;
+                    if (GUIUtility.hotControl == PanelControlId) GUIUtility.hotControl = 0;
+                    SavePanelRect();
+                    return;
+            }
+        }
+
+        private static bool TryBeginPanelDrag(Rect panel, Event current)
+        {
+            if (!RigDebugPanelLayout.HeaderRect(panel).Contains(current.mousePosition)) return false;
+
+            _draggingPanel = true;
+            _panelDragOffset = current.mousePosition - panel.position;
+            GUIUtility.hotControl = PanelControlId;
+            current.Use();
+            return true;
+        }
+
+        private static bool TryBeginPanelResize(Rect panel, Event current)
+        {
+            if (_collapsed) return false;
+            if (!RigDebugPanelLayout.ResizeGripRect(panel).Contains(current.mousePosition)) return false;
+
+            _resizingPanel = true;
+            GUIUtility.hotControl = PanelControlId;
+            current.Use();
+            return true;
+        }
+
+        private static void SavePanelRect()
+        {
+            EditorPrefs.SetFloat(PanelXKey, _panelRect.x);
+            EditorPrefs.SetFloat(PanelYKey, _panelRect.y);
+            EditorPrefs.SetFloat(PanelWidthKey, _panelRect.width);
+            EditorPrefs.SetFloat(PanelHeightKey, _panelRect.height);
         }
 
         private static void SetRawMeshVisibility(bool visible)

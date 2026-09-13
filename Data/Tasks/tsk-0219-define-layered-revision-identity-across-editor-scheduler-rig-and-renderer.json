@@ -22,16 +22,23 @@
   "attachments": [],
   "externalLinks": [],
   "linkedPages": [],
-  "comments": [],
+  "comments": [
+    {
+      "id": "c-b6c7439ab68d4bb593366db90427638b",
+      "author": "anonymous",
+      "body": "Audit synthesis 2026-09-12 (late) \u2014 external synthesis corroboration; independently re-verified against source.\n\nSYN-05 (P1, 0.98) Confirmed: InfluenceWeightingPolicy identity is NOT carried by generated artifact identity.\n- ResolvedCreatureSnapshot.ComputeRevisionId hashes only canonical DNA: CanonicalJsonWriter.Write(definition) then SHA-256 (Assets/Scripts/Runtime/Definition/CreaturePartWorldTransformResolver.cs:212-221).\n- InfluenceWeightingPolicy lives on CreatureGenerationConfig (Assets/Scripts/Runtime/Generation/CreatureGenerationConfig.cs:20-51), external to the definition.\n- GeneratedCreatureData carries definition \u002B snapshot \u002B mesh \u002B colors \u002B topology \u002B skeleton \u002B InfluenceDomain[] but no policy fingerprint (Assets/Scripts/Runtime/Generation/GeneratedCreatureData.cs:21-60).\n\nSYN-06 (P1, 0.99) Confirmed: the runtime preview reads the live weighting policy during binding, so an already-generated artifact can be reinterpreted by mutable configuration.\n\nThis task owns the layered revision-identity correction. Acceptance gate: a generated artifact records the effective identity of every output-affecting setting read outside CreatureDefinition during binding, and binding never reads mutable generation configuration to reinterpret an already-generated artifact. Related owners: TSK-0224 (generation-owned final weights) and TSK-0248 (compiled-program context).",
+      "createdAtUtc": "2026-09-13T04:35:13.8916002Z"
+    }
+  ],
   "epicId": null,
   "parentId": null,
   "dueDateUtc": null,
   "createdAtUtc": "2026-09-12T05:53:50.7672209Z",
-  "updatedAtUtc": "2026-09-12T05:53:50.7672209Z",
+  "updatedAtUtc": "2026-09-13T04:35:13.8916002Z",
   "completedAtUtc": null,
-  "revision": 1,
+  "revision": 2,
   "isArchived": false,
   "hasLoadError": false,
   "loadError": null,
-  "sourceFilePath": null
+  "sourceFilePath": "tsk-0219-define-layered-revision-identity-across-editor-scheduler-rig-and-renderer.json"
 }

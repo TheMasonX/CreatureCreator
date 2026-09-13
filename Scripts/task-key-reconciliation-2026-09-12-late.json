@@ -1,0 +1,38 @@
+[
+  {
+    "file": "tsk-0206-reject-malformed-sdf-ir.json",
+    "newId": "tsk-0246-reject-malformed-sdf-ir",
+    "newKey": "TSK-0246",
+    "note": "Renumbered from TSK-0206 on 2026-09-12. This audit-derived record was allocated on top of a history that already contained TSK-0206 (Unity bone-weight boundary contract), so the key was double-held. TSK-0206 now resolves uniquely to tsk-0206-align-unity-bone-weight-contract-with-binding-builder. Mechanism: reject malformed SDF IR at the compiled-program boundary (finding from current-head-hidden-defects-and-consolidation-council-audit-26-09-12-19-56-00 and round32-malformed-ir-confirm-serialization-sweep-2026-09-12)."
+  },
+  {
+    "file": "tsk-0207-consolidate-vertex-correspondence-evaluation.json",
+    "newId": "tsk-0247-consolidate-vertex-correspondence-evaluation",
+    "newKey": "TSK-0247",
+    "note": "Renumbered from TSK-0207 on 2026-09-12. This audit-derived record was allocated on top of a history that already contained TSK-0207 (remove dead runtime preview material helper), so the key was double-held. TSK-0207 now resolves uniquely to tsk-0207-remove-dead-runtime-preview-material-helper. Mechanism: share generated-vertex part/body correspondence between appearance and binding (finding from current-head-hidden-defects-and-consolidation-council-audit-26-09-12-19-56-00)."
+  },
+  {
+    "file": "tsk-0208-consolidate-sdf-evaluator-and-remove-duplicate-sampling-job.json",
+    "newId": "tsk-0248-consolidate-sdf-evaluator-and-remove-duplicate-sampling-job",
+    "newKey": "TSK-0248",
+    "note": "Renumbered from TSK-0208 on 2026-09-12. This audit-derived record was allocated on top of a history that already contained TSK-0208 (finish NumericValidity migration for DensityGrid), so the key was double-held. TSK-0208 now resolves uniquely to tsk-0208-finish-numericvalidity-migration-for-density-grid. Mechanism: consolidate duplicate SDF traversal paths and legacy SdfSamplingJob plumbing while preserving an independent reference oracle (finding from current-head-hidden-defects-and-consolidation-council-audit-26-09-12-19-56-00; corroborated by creaturecreator-cc-audit-synthesis-26-09-12-17-34-00 SYN-01/SYN-02/SYN-09/SYN-10/SYN-11)."
+  },
+  {
+    "file": "tsk-0209-latest-only-generation-scheduler.json",
+    "newId": "tsk-0249-latest-only-generation-scheduler",
+    "newKey": "TSK-0249",
+    "note": "Renumbered from TSK-0209 on 2026-09-12. This audit-derived record was allocated on top of a history that already contained TSK-0209 (consolidate preview material region assignment), so the key was double-held. TSK-0209 now resolves uniquely to tsk-0209-consolidate-preview-material-region-assignment. Mechanism: latest-only/cancellable preview scheduling with request-owned diagnostics (finding from current-head-hidden-defects-and-consolidation-council-audit-26-09-12-19-56-00 and round33-scheduler-confirm-2026-09-12; corroborated by creaturecreator-cc-audit-synthesis-26-09-12-17-34-00 SYN-07)."
+  },
+  {
+    "file": "tsk-0210-transactional-preview-geometry-ownership.json",
+    "newId": "tsk-0250-transactional-preview-geometry-ownership",
+    "newKey": "TSK-0250",
+    "note": "Renumbered from TSK-0210 on 2026-09-12. This audit-derived record was allocated on top of a history that already contained TSK-0210 (consolidate duplicated preview geometry-bone resolution helper), so the key was double-held. TSK-0210 now resolves uniquely to tsk-0210-consolidate-preview-geometry-bone-resolution-helper. Mechanism: transactional, instance-safe preview geometry ownership and cleanup (finding from current-head-hidden-defects-and-consolidation-council-audit-26-09-12-19-56-00; corroborated by creaturecreator-cc-audit-synthesis-26-09-12-17-34-00 SYN-12/SYN-13)."
+  },
+  {
+    "file": "tsk-0211-freeze-generated-result-boundaries.json",
+    "newId": "tsk-0251-freeze-generated-result-boundaries",
+    "newKey": "TSK-0251",
+    "note": "Renumbered from TSK-0211 on 2026-09-12. This audit-derived record was allocated on top of a history that already contained TSK-0211 (harden runtime preview ContextMenu scheduler lifecycle), so the key was double-held. TSK-0211 now resolves uniquely to tsk-0211-harden-runtime-preview-contextmenu-scheduler-lifecycle. Mechanism: freeze generated-result boundaries (BodyFrames, MeshExtractionResult collections) and make Unity mesh lifetime exception-safe (finding from current-head-hidden-defects-and-consolidation-council-audit-26-09-12-19-56-00 and creaturecreator-deep-decomposition-ownership-audit-26-09-12-20-05-00; corroborated by creaturecreator-cc-audit-synthesis-26-09-12-17-34-00 SYN-03/SYN-14/SYN-15)."
+  }
+]

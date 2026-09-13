@@ -1,0 +1,43 @@
+{
+  "id": "tsk-0251-freeze-generated-result-boundaries",
+  "key": "TSK-0251",
+  "title": "Freeze generated result boundaries and make Unity mesh lifetime explicit",
+  "description": "Resolve the mismatch between GeneratedCreatureData's documented immutable handoff and its mutable nested MeshExtractionResult/CreatureDefinition object graphs. Define which stage outputs are immutable after generation and enforce that boundary without hiding required editor operations. As part of the same boundary review, make MeshExtractionResult.ToUnityMesh resource ownership exception-safe so a partially constructed Unity Mesh cannot leak when SetVertices, SetTriangles, normals, or bounds calculation fails before CreatureMeshGenerator.Assemble establishes its current cleanup scope.\n\n## Reconciliation\nRenumbered from TSK-0211 on 2026-09-12. This audit-derived record was allocated on top of a history that already contained TSK-0211 (harden runtime preview ContextMenu scheduler lifecycle), so the key was double-held. TSK-0211 now resolves uniquely to tsk-0211-harden-runtime-preview-contextmenu-scheduler-lifecycle. Mechanism: freeze generated-result boundaries (BodyFrames, MeshExtractionResult collections) and make Unity mesh lifetime exception-safe (finding from current-head-hidden-defects-and-consolidation-council-audit-26-09-12-19-56-00 and creaturecreator-deep-decomposition-ownership-audit-26-09-12-20-05-00; corroborated by creaturecreator-cc-audit-synthesis-26-09-12-17-34-00 SYN-03/SYN-14/SYN-15).",
+  "type": "Refactor",
+  "status": "Backlog",
+  "priority": "Medium",
+  "assigneeMode": "Custom",
+  "assigneeDirectoryId": null,
+  "assigneeCustomText": "Unassigned",
+  "reporter": "ChatGPT",
+  "labels": [
+    "user-mandated",
+    "runtime",
+    "generation",
+    "immutability",
+    "resource-lifetime",
+    "mesh",
+    "architecture"
+  ],
+  "attachments": [],
+  "externalLinks": [],
+  "linkedPages": [],
+  "comments": [
+    {
+      "id": "c-chatgpt-20260912-0211-audit",
+      "author": "ChatGPT",
+      "body": "Current-head audit 2026-09-12: GeneratedCreatureData documents itself as immutable, but MeshExtractionResult exposes public mutable Lists and Definition exposes a mutable cloned CreatureDefinition. ToUnityMesh creates a Unity Mesh before later calls that may throw, while CreatureMeshGenerator.Assemble starts its cleanup try only after ToUnityMesh returns. Make the stage-output contract explicit and close the mesh lifetime gap without coupling pure extraction to Unity ownership.",
+      "createdAtUtc": "2026-09-12T19:56:00Z"
+    }
+  ],
+  "epicId": null,
+  "parentId": null,
+  "dueDateUtc": null,
+  "createdAtUtc": "2026-09-12T19:56:00Z",
+  "updatedAtUtc": "2026-09-13T04:34:05.7397216Z",
+  "revision": 2,
+  "isArchived": false,
+  "hasLoadError": false,
+  "loadError": null,
+  "sourceFilePath": "tsk-0251-freeze-generated-result-boundaries.json"
+}
