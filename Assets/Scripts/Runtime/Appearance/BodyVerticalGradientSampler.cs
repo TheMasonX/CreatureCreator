@@ -105,7 +105,16 @@ namespace ProceduralCreature.Appearance
 
             IReadOnlyList<Vector3> positions = body.SamplePositions;
             IReadOnlyList<float> radii = body.SampleRadii;
+            IReadOnlyList<float> normalizedArc = body.NormalizedArcLengthAtSample;
             int count = positions.Count;
+            if (frames == null || frames.Count != count)
+            {
+                throw new DomainException("Body frame count must match resolved Body sample count.");
+            }
+            if (count == 1 && normalizedArc.Count != 1)
+            {
+                throw new DomainException("Resolved Body arc-length data must match its sample count.");
+            }
 
             // Closest point on the polyline (per-segment projection, clamped).
             int closestSegment = 0;
@@ -128,13 +137,21 @@ namespace ProceduralCreature.Appearance
                 }
             }
 
-            float arcToPoint = 0f;
-            if (count > 1)
+            // ResolvedBody already stores the normalized cumulative arc length at
+            // every sample. Interpolating the two endpoint values removes the
+            // previous O(segmentCount) prefix walk for every vertex while retaining
+            // the exact same polyline parameterization.
+            float arcFrac;
+            if (count == 1 || body.TotalLength <= 1e-6f)
             {
-                for (int i = 0; i < closestSegment; i++) arcToPoint += body.SegmentLengths[i];
-                arcToPoint += body.SegmentLengths[closestSegment] * closestSegT;
+                arcFrac = 0f;
             }
-            float arcFrac = body.TotalLength <= 1e-6f ? 0f : Mathf.Clamp01(arcToPoint / body.TotalLength);
+            else
+            {
+                float startArc = normalizedArc[closestSegment];
+                float endArc = normalizedArc[closestSegment + 1];
+                arcFrac = Mathf.Clamp01(Mathf.Lerp(startArc, endArc, closestSegT));
+            }
 
             // Body-length parameter: 0 at the HEAD, 1 at the tail. The head is the
             // end of the spline with the highest projection onto the creature's
