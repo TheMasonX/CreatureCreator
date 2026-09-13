@@ -59,6 +59,11 @@ Load only the skill needed by the task:
 - [unity-mcp-operator](../skills/unity-mcp-operator/SKILL.md) for MCP call
   mechanics: readiness, resources, tool-group activation, batching, payload and
   pagination limits, console checks, screenshots, and MCP error recovery.
+- [decorate-scene](../skills/decorate-scene/SKILL.md) for building and
+  decorating scene content: ProBuilder props assembled from many submodels,
+  procedural textures, shared emissive materials, prefab authoring, validated
+  placement, and visual evidence. Use it for props, furniture, machinery,
+  consoles, and set dressing.
 - [subagent-swarm](../skills/subagent-swarm/SKILL.md) for work spanning two or
   more independent layers. Use one agent for a focused slice.
 - [sprint-orchestration](../skills/sprint-orchestration/SKILL.md) for a sprint of
