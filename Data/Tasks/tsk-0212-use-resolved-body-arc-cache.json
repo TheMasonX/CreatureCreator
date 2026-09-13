@@ -1,0 +1,19 @@
+{
+  "id": "tsk-0212-use-resolved-body-arc-cache",
+  "key": "TSK-0212",
+  "title": "Use resolved Body arc-length cache during appearance projection",
+  "description": "Remove the per-vertex prefix walk over Body segment lengths from BodyVerticalGradientSampler. Use ResolvedBody.NormalizedArcLengthAtSample, which already represents the authoritative cumulative parameterization, and preserve exact head/tail orientation semantics.",
+  "type": "Performance",
+  "status": "Done",
+  "priority": "High",
+  "assigneeMode": "Custom",
+  "assigneeCustomText": "Unassigned",
+  "reporter": "ChatGPT",
+  "labels": ["user-mandated", "performance", "appearance", "body", "determinism"],
+  "comments": [{"id":"c-chatgpt-20260913-0212-done","author":"ChatGPT","body":"Implemented in commit 945d3b6b02f4d61a69ee4d0d8e7530c521558158. The closest segment now interpolates the resolved normalized arc-length endpoints instead of summing prior segments per vertex. Unity runtime validation remains pending.","createdAtUtc":"2026-09-13T00:00:00Z"}],
+  "revision": 1,
+  "isArchived": false,
+  "hasLoadError": false,
+  "loadError": null,
+  "sourceFilePath": "tsk-0212-use-resolved-body-arc-cache.json"
+}
