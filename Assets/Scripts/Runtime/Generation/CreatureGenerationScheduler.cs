@@ -1,5 +1,6 @@
 using System;
 using System.Collections.Concurrent;
+using System.Threading;
 using System.Threading.Tasks;
 using ProceduralCreature.Definition;
 
@@ -10,6 +11,7 @@ namespace ProceduralCreature.Generation
         private readonly object _gate = new object();
         private readonly ConcurrentQueue<CreatureGenerationResult> _completed = new ConcurrentQueue<CreatureGenerationResult>();
         private long _latestSequence;
+        private CancellationTokenSource _latestCancellation;
         private bool _disposed;
 
         public long LatestSequence
@@ -44,8 +46,19 @@ namespace ProceduralCreature.Generation
             lock (_gate)
             {
                 if (_disposed) throw new ObjectDisposedException(nameof(CreatureGenerationScheduler));
+
+                // Newest-request-wins is now cooperative at the scheduler boundary:
+                // cancel any queued/running predecessor before publishing the next
+                // sequence. Generation itself remains synchronous within a worker,
+                // so an already-running request may finish; its result is discarded
+                // instead of entering the completion queue.
+                _latestCancellation?.Cancel();
+                _latestCancellation?.Dispose();
+                _latestCancellation = new CancellationTokenSource();
+                CancellationToken cancellationToken = _latestCancellation.Token;
+
                 long sequence = ++_latestSequence;
-                Task.Run(() => _completed.Enqueue(Run(sequence, capturedDefinition, diagnostics)));
+                Task.Run(() => RunAndPublish(sequence, capturedDefinition, diagnostics, cancellationToken), cancellationToken);
                 return sequence;
             }
         }
@@ -65,9 +78,27 @@ namespace ProceduralCreature.Generation
         {
             lock (_gate)
             {
+                if (_disposed) return;
                 _disposed = true;
                 _latestSequence++;
+                _latestCancellation?.Cancel();
+                _latestCancellation?.Dispose();
+                _latestCancellation = null;
             }
+        }
+
+        private void RunAndPublish(
+            long sequence,
+            CreatureDefinition definition,
+            GenerationDiagnostics diagnostics,
+            CancellationToken cancellationToken)
+        {
+            if (cancellationToken.IsCancellationRequested) return;
+
+            CreatureGenerationResult result = Run(sequence, definition, diagnostics);
+            if (cancellationToken.IsCancellationRequested) return;
+
+            _completed.Enqueue(result);
         }
 
         private static CreatureGenerationResult Run(long sequence, CreatureDefinition definition, GenerationDiagnostics diagnostics)
