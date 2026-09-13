@@ -57,15 +57,20 @@ namespace ProceduralCreature.Generation
 
             List<ResolvedPartProgram> compiledParts = null;
             SdfProgram bodyProgram = null;
+            SdfProgram fieldProgram = null;
             try
             {
                 Time(diagnostics, GenerationStage.SdfCompile, () =>
                 {
+                    // Compile every request-owned program once. Downstream stages borrow
+                    // these programs rather than reconstructing the same morphology.
                     compiledParts = SdfProgramBuilder.CompileIndividualPartsPortable(definition, snapshot);
                     bodyProgram = SdfProgramBuilder.CompilePortableBodyField(definition, snapshot);
+                    fieldProgram = SdfProgramBuilder.CompilePortable(definition, snapshot);
                 });
 
-                DensityGrid grid = GenerateImplicitField(definition, snapshot, diagnostics);
+                DensityGrid grid = GenerateImplicitField(fieldProgram, snapshot, diagnostics);
+                fieldProgram = null; // GenerateImplicitField transfers/disposes it.
                 MeshExtractionResult meshResult = ExtractMesh(grid, diagnostics);
                 MeshTopologyReport generatedTopologyReport = ValidateMesh(meshResult, diagnostics);
                 Color[] colors = BakeAppearance(
@@ -87,6 +92,7 @@ namespace ProceduralCreature.Generation
             }
             finally
             {
+                fieldProgram?.Dispose();
                 if (compiledParts != null)
                 {
                     foreach (ResolvedPartProgram partProgram in compiledParts)
@@ -116,30 +122,15 @@ namespace ProceduralCreature.Generation
         }
 
         private static DensityGrid GenerateImplicitField(
-            CreatureDefinition definition,
+            SdfProgram portableProgram,
             ResolvedCreatureSnapshot snapshot,
             GenerationDiagnostics diagnostics)
         {
-            SdfProgram portableProgram = null;
-            Time(diagnostics, GenerationStage.SdfCompile, () =>
-            {
-                portableProgram = SdfProgramBuilder.CompilePortable(definition, snapshot);
-            });
+            if (portableProgram == null) throw new DomainException("compiled field program must not be null.");
 
             DensityGrid grid = null;
             Time(diagnostics, GenerationStage.FieldSampling,
-                () =>
-                {
-                    try
-                    {
-                        grid = DensityGrid.SamplePortable(portableProgram, snapshot.Bounds, snapshot.Generation);
-                    }
-                    finally
-                    {
-                        portableProgram?.Dispose();
-                        portableProgram = null;
-                    }
-                });
+                () => grid = DensityGrid.SamplePortable(portableProgram, snapshot.Bounds, snapshot.Generation));
             diagnostics?.RecordGridDimensions(grid.CellsX, grid.CellsY, grid.CellsZ, grid.SampleCount);
             return grid;
         }
@@ -191,17 +182,16 @@ namespace ProceduralCreature.Generation
             SdfProgram bodyProgram,
             GenerationDiagnostics diagnostics)
         {
-            Color[] colors = null;
-            Time(diagnostics, GenerationStage.AppearanceBake,
-                () => colors = AppearanceBaker.Bake(
-                    definition,
-                    meshResult,
-                    null,
-                    compiledParts,
-                    bodyProgram,
-                    snapshot.Body,
-                    snapshot));
-            return colors;
+            // AppearanceBaker owns the AppearanceBake timing boundary. Keeping a single
+            // owner prevents nested duplicate timings from overstating generation cost.
+            return AppearanceBaker.Bake(
+                definition,
+                meshResult,
+                diagnostics,
+                compiledParts,
+                bodyProgram,
+                snapshot.Body,
+                snapshot);
         }
 
         private static InfluenceDomain[] ResolveInfluenceDomains(
