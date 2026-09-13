@@ -1,0 +1,35 @@
+{
+  "id": "tsk-0209-latest-only-generation-scheduler",
+  "key": "TSK-0209",
+  "title": "Make preview generation scheduler latest-only and cancellable",
+  "description": "Replace one uncancelled Task.Run per request with an explicit latest-request execution policy. Preserve newest-result-wins semantics while preventing stale requests from consuming full CPU and native-memory budgets when newer edits supersede them. Establish request-owned diagnostics so one GenerationDiagnostics instance cannot be concurrently mutated by multiple workers. Keep EnqueueCaptured as a narrow ownership-transfer seam or replace it with a safer internal/editor-specific capture API; do not make the detached-definition contract depend on convention alone.",
+  "type": "Performance",
+  "status": "Backlog",
+  "priority": "High",
+  "assigneeMode": "Custom",
+  "assigneeDirectoryId": null,
+  "assigneeCustomText": "Unassigned",
+  "reporter": "ChatGPT",
+  "labels": ["user-mandated", "performance", "generation", "scheduler", "cancellation", "threading", "architecture"],
+  "attachments": [],
+  "externalLinks": [],
+  "linkedPages": [],
+  "comments": [
+    {
+      "id": "c-chatgpt-20260912-0209-audit",
+      "author": "ChatGPT",
+      "body": "Current-head audit 2026-09-12: CreatureGenerationScheduler starts one uncancelled Task.Run per request and suppresses stale results only after work completes. EnqueueCaptured is also public and relies on caller-established detached-definition ownership. GenerationDiagnostics is mutable and can be externally supplied, so sharing one instance across concurrent requests would race its Lists. This is a concrete responsiveness/CPU/memory and API-contract problem; redesign is preferred over a tactical patch.",
+      "createdAtUtc": "2026-09-12T19:56:00Z"
+    }
+  ],
+  "epicId": null,
+  "parentId": "TSK-0008",
+  "dueDateUtc": null,
+  "createdAtUtc": "2026-09-12T19:56:00Z",
+  "updatedAtUtc": "2026-09-12T19:56:00Z",
+  "revision": 1,
+  "isArchived": false,
+  "hasLoadError": false,
+  "loadError": null,
+  "sourceFilePath": "tsk-0209-latest-only-generation-scheduler.json"
+}
