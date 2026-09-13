@@ -34,16 +34,6 @@ namespace ProceduralCreature.Morphology.Extraction
 
         public int TriangleCount => Triangles.Count / 3;
 
-        /// <summary>
-        /// Computes per-vertex normals via angle-weighted accumulation of adjacent
-        /// triangle face normals. The topology and vertex-domain contract is checked
-        /// before indexing so manually-constructed malformed results fail with a
-        /// domain error instead of surfacing as arbitrary IndexOutOfRange behavior.
-        /// Idempotent — safe to call more than once; recomputes from scratch each time
-        /// rather than accumulating on stale data. Arithmetic overflow is rejected at
-        /// the geometry boundary too: finite coordinates alone do not guarantee that
-        /// edge vectors or cross products remain representable as finite floats.
-        /// </summary>
         public void ComputeAngleWeightedNormals()
         {
             ValidateTopology();
@@ -148,28 +138,52 @@ namespace ProceduralCreature.Morphology.Extraction
             return Mathf.Acos(Mathf.Clamp(Vector3.Dot(toA, toB), -1f, 1f));
         }
 
+        /// <summary>
+        /// Creates a Unity Mesh and owns it until the method returns successfully.
+        /// If any Unity-side upload or derived-data operation throws, the partially
+        /// constructed mesh is destroyed here rather than leaking until the caller's
+        /// later cleanup scope is established.
+        /// </summary>
         public Mesh ToUnityMesh()
         {
             ValidateTopology();
-            var mesh = new Mesh();
-            if (Positions.Count > 65535)
+            Mesh mesh = null;
+            try
             {
-                mesh.indexFormat = UnityEngine.Rendering.IndexFormat.UInt32;
-            }
-            mesh.SetVertices(Positions);
-            mesh.SetTriangles(Triangles, 0);
+                mesh = new Mesh();
+                if (Positions.Count > 65535)
+                {
+                    mesh.indexFormat = UnityEngine.Rendering.IndexFormat.UInt32;
+                }
+                mesh.SetVertices(Positions);
+                mesh.SetTriangles(Triangles, 0);
 
-            if (Normals.Count == Positions.Count && Positions.Count > 0)
-            {
-                mesh.SetNormals(Normals);
-            }
-            else
-            {
-                mesh.RecalculateNormals();
-            }
+                if (Normals.Count == Positions.Count && Positions.Count > 0)
+                {
+                    mesh.SetNormals(Normals);
+                }
+                else
+                {
+                    mesh.RecalculateNormals();
+                }
 
-            mesh.RecalculateBounds();
-            return mesh;
+                mesh.RecalculateBounds();
+                Mesh completed = mesh;
+                mesh = null;
+                return completed;
+            }
+            catch
+            {
+                DestroyTemporaryMesh(mesh);
+                throw;
+            }
+        }
+
+        private static void DestroyTemporaryMesh(Mesh mesh)
+        {
+            if (mesh == null) return;
+            if (Application.isPlaying) UnityEngine.Object.Destroy(mesh);
+            else UnityEngine.Object.DestroyImmediate(mesh);
         }
     }
 }
