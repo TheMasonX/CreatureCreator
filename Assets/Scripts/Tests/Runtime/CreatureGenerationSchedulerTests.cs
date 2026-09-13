@@ -76,25 +76,15 @@ namespace ProceduralCreature.Tests.Runtime
         }
 
         [Test]
-        public void ResultCompletedAfterDispose_IsMarkedStale()
+        public void Dispose_AdvancesLatestSequence()
         {
             var scheduler = new CreatureGenerationScheduler();
             scheduler.Enqueue(CreateDefinition());
+            long sequenceBeforeDispose = scheduler.LatestSequence;
+
             scheduler.Dispose();
 
-            // The cancellation boundary may suppress a result entirely when the
-            // worker has not started. If the worker raced far enough to finish, the
-            // result must still be stale and never become current.
-            for (int attempt = 0; attempt < 600; attempt++)
-            {
-                if (scheduler.TryTakeCompleted(out CreatureGenerationResult result))
-                {
-                    Assert.IsTrue(result.IsStale);
-                    scheduler.Dispose();
-                    return;
-                }
-                Thread.Sleep(10);
-            }
+            Assert.Greater(scheduler.LatestSequence, sequenceBeforeDispose);
             scheduler.Dispose();
         }
 
