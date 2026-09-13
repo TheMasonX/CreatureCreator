@@ -1,5 +1,6 @@
 using System.Collections.Generic;
 using ProceduralCreature.Common;
+using ProceduralCreature.Definition;
 using ProceduralCreature.Skeleton;
 using UnityEngine;
 
