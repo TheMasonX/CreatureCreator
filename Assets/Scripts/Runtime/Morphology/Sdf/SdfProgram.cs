@@ -91,7 +91,8 @@ namespace ProceduralCreature.Morphology.Sdf
                     throw new DomainException("SdfProgram influenceRadius must be finite and non-negative.");
                 }
                 if (hasPotentialBounds &&
-                    (!NumericValidity.IsFinite(potentialMinBound) || !NumericValidity.IsFinite(potentialMaxBound) ||
+                    (!NumericValidity.IsFinite(potentialMinBound.x) || !NumericValidity.IsFinite(potentialMinBound.y) || !NumericValidity.IsFinite(potentialMinBound.z) ||
+                     !NumericValidity.IsFinite(potentialMaxBound.x) || !NumericValidity.IsFinite(potentialMaxBound.y) || !NumericValidity.IsFinite(potentialMaxBound.z) ||
                      potentialMinBound.x > potentialMaxBound.x ||
                      potentialMinBound.y > potentialMaxBound.y ||
                      potentialMinBound.z > potentialMaxBound.z))
